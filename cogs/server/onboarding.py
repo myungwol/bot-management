@@ -296,10 +296,14 @@ class Onboarding(commands.Cog):
             else: logger.info("ℹ️ Onboarding panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Onboarding panel channel could not be found."); return
         
-        old_id = await get_panel_id("onboarding")
-        if old_id:
-            try: (await channel.fetch_message(old_id)).delete()
-            except (discord.NotFound, discord.Forbidden): pass
+        # [수정된 부분]
+        panel_info = await get_panel_id("onboarding")
+        if panel_info and (old_id := panel_info.get('message_id')):
+            try:
+                message_to_delete = await channel.fetch_message(old_id)
+                await message_to_delete.delete()
+            except (discord.NotFound, discord.Forbidden):
+                pass
         
         embed = discord.Embed(title="🏡 新米住人の方へ", description="この里へようこそ！\n下のボタンを押して、里での暮らし方を確認し、住人登録を始めましょう。", color=discord.Color.gold())
         msg = await channel.send(embed=embed, view=OnboardingPanelView())
