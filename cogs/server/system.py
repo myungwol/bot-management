@@ -49,39 +49,29 @@ class EphemeralRoleSelectView(ui.View):
         super().__init__(timeout=180)
         self.member = member
         self.all_category_role_ids = all_category_role_ids
-        
-        current_user_role_ids = {role.id for role in self.member.roles}
-        options = [
-            discord.SelectOption(
-                label=role_info['label'], value=str(role_id),
-                description=role_info.get('description'),
-                default=(role_id in current_user_role_ids)
-            ) for role_info in category_roles if (role_id := get_role_id(role_info['role_id_key']))
-        ]
-
+        current_user_role_ids = {r.id for r in self.member.roles}
+        options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in category_roles if (rid := get_role_id(info['role_id_key']))]
         self.role_select = ui.Select(placeholder="받고 싶은 역할을 모두 선택하세요...", min_values=0, max_values=len(options) or 1, options=options)
         self.role_select.callback = self.select_callback
         self.add_item(self.role_select)
 
     async def select_callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        selected_role_ids = {int(role_id) for role_id in self.role_select.values}
-        current_user_role_ids = {role.id for role in self.member.roles}
-        roles_to_add_ids = selected_role_ids - current_user_role_ids
-        roles_to_remove_ids = (self.all_category_role_ids - selected_role_ids) & current_user_role_ids
-
+        selected_ids = {int(rid) for rid in self.role_select.values}
+        current_ids = {r.id for r in interaction.user.roles}
+        to_add_ids = selected_ids - current_ids
+        to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
         try:
-            if roles_to_add := [interaction.guild.get_role(rid) for rid in roles_to_add_ids if interaction.guild.get_role(rid)]:
-                await self.member.add_roles(*roles_to_add, reason="드롭다운 역할 선택")
-            if roles_to_remove := [interaction.guild.get_role(rid) for rid in roles_to_remove_ids if interaction.guild.get_role(rid)]:
-                await self.member.remove_roles(*roles_to_remove, reason="드롭다운 역할 선택 해제")
-            
+            if to_add := [interaction.guild.get_role(rid) for rid in to_add_ids if interaction.guild.get_role(rid)]:
+                await interaction.user.add_roles(*to_add)
+            if to_remove := [interaction.guild.get_role(rid) for rid in to_remove_ids if interaction.guild.get_role(rid)]:
+                await interaction.user.remove_roles(*to_remove)
             self.role_select.disabled = True
             await interaction.edit_original_response(content="✅ 역할이 성공적으로 업데이트되었습니다.", view=self)
             self.stop()
         except Exception as e:
             logger.error(f"드롭다운 역할 처리 오류: {e}")
-            await interaction.followup.send("❌ 오류가 발생했습니다.", ephemeral=True)
+            await interaction.followup.send("❌ 오류 발생.", ephemeral=True)
 
 class AutoRoleView(ui.View):
     def __init__(self, panel_config: dict):
@@ -96,12 +86,11 @@ class AutoRoleView(ui.View):
         await interaction.response.defer(ephemeral=True)
         category_id = interaction.data['custom_id'].split(':')[1]
         category_roles = self.panel_config.get("roles", {}).get(category_id, [])
-        if not category_roles: return await interaction.followup.send("선택한 카테고리에 설정된 역할이 없습니다.", ephemeral=True)
-        
-        all_category_role_ids = {get_role_id(r['role_id_key']) for r in category_roles if get_role_id(r['role_id_key'])}
-        embed = discord.Embed(title=f"'{category_id.capitalize()}' 역할 선택", description="아래 드롭다운 메뉴에서 원하시는 역할을 모두 선택한 후, 메뉴 바깥쪽을 클릭해주세요.", color=discord.Color.blue())
-        view = EphemeralRoleSelectView(member=interaction.user, category_roles=category_roles, all_category_role_ids=all_category_role_ids)
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        if not category_roles:
+            return await interaction.followup.send("선택한 카테고리에 설정된 역할이 없습니다.", ephemeral=True)
+        all_ids = {get_role_id(r['role_id_key']) for r in category_roles if get_role_id(r['role_id_key'])}
+        embed = discord.Embed(title=f"'{category_id.capitalize()}' 역할 선택", description="아래 드롭다운에서 원하는 역할을 모두 선택하세요.", color=discord.Color.blue())
+        await interaction.followup.send(embed=embed, view=EphemeralRoleSelectView(interaction.user, category_roles, all_ids), ephemeral=True)
 
 class EmbedEditModal(ui.Modal, title="임베드 내용 편집"):
     def __init__(self, embed: discord.Embed):
@@ -111,6 +100,7 @@ class EmbedEditModal(ui.Modal, title="임베드 내용 편집"):
         self.embed_description = ui.TextInput(label="설명 (\\n = 줄바꿈)", style=discord.TextStyle.paragraph, default=embed.description, required=False, max_length=4000)
         self.add_item(self.embed_title)
         self.add_item(self.embed_description)
+
     async def on_submit(self, interaction: discord.Interaction):
         self.embed.title = self.embed_title.value
         self.embed.description = self.embed_description.value.replace('\\n', '\n')
@@ -121,14 +111,17 @@ class EmbedEditorView(ui.View):
         super().__init__(timeout=None)
         self.message = message
         self.embed_key = embed_key
-    @ui.button(label="제목/설명 수정", style=discord.ButtonStyle.primary, emoji="✍️")
+
+    @ui.button(label="제목/설명 수정", emoji="✍️")
     async def edit_content(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(EmbedEditModal(self.message.embeds[0]))
+
     @ui.button(label="DB에 저장", style=discord.ButtonStyle.success, emoji="💾")
     async def save_to_db(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer(ephemeral=True)
         await save_embed_to_db(self.embed_key, self.message.embeds[0].to_dict())
         await interaction.followup.send(f"✅ DB에 '{self.embed_key}'로 저장됨.", ephemeral=True)
+
     @ui.button(label="편집기 삭제", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def delete_editor(self, interaction: discord.Interaction, button: ui.Button):
         await self.message.delete()
@@ -262,6 +255,8 @@ class ServerSystem(commands.Cog):
     async def set_channel(self, interaction: discord.Interaction, key: str, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
         await save_channel_id_to_db(key, channel.id)
+        # 봇의 캐시도 즉시 업데이트
+        self.bot.channel_configs[key] = channel.id
         await interaction.followup.send(f"✅ 채널 설정 완료: `{key}` 키가 `{channel.mention}` 채널로 등록되었습니다.", ephemeral=True)
 
     @setup_group.command(name="panels", description="코드에 정의된 역할 패널을 생성/업데이트합니다.")
