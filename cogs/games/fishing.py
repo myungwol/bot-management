@@ -1,4 +1,4 @@
-# cogs/games/fishing.py (자동 재생성 기능이 적용된 최종본)
+# cogs/games/fishing.py (명령어 통합 최종본)
 
 import discord
 from discord.ext import commands
@@ -164,32 +164,22 @@ class Fishing(commands.Cog):
         self.fishing_log_channel_id = await get_channel_id_from_db("fishing_log_channel_id")
         logger.info(f"[Fishing Cog] Loaded FISHING_PANEL_CHANNEL_ID: {self.fishing_panel_channel_id}")
         logger.info(f"[Fishing Cog] Loaded FISHING_LOG_CHANNEL_ID: {self.fishing_log_channel_id}")
-    async def regenerate_panel(self):
-        if self.fishing_panel_channel_id and (channel := self.bot.get_channel(self.fishing_panel_channel_id)):
-            old_id = await get_panel_id("fishing")
-            if old_id:
-                try: (await channel.fetch_message(old_id)).delete()
-                except (discord.NotFound, discord.Forbidden): pass
-            embed = discord.Embed(title="🎣 Dico森 釣り場", description="下のボタンを押して釣りを開始し、コインを獲得しましょう！", color=discord.Color.from_rgb(135, 206, 250))
-            msg = await channel.send(embed=embed, view=FishingPanelView(self.bot, self.active_fishing_sessions_by_user))
-            await save_panel_id("fishing", msg.id, channel.id)
-            logger.info(f"✅ Fishing panel auto-regenerated in channel {channel.name}")
-        else:
-            logger.info("ℹ️ Fishing panel channel not set, skipping auto-regeneration.")
-    @app_commands.command(name="釣り場パネル設置", description="釣りゲームを開始できるパネルを設置します。")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_fishing_panel_command(self, i: discord.Interaction):
-        if not self.fishing_panel_channel_id:
-            return await i.response.send_message("エラー: まず `/setup set-channel` で `fishing_panel_channel_id` を設定してください。", ephemeral=True)
-        if i.channel.id != self.fishing_panel_channel_id:
-            return await i.response.send_message(f"このコマンドは <#{self.fishing_panel_channel_id}> でしか使えません。", ephemeral=True)
-        await i.response.defer(ephemeral=True)
-        try:
-            await self.regenerate_panel()
-            await i.followup.send("釣り場パネルを正常に設置しました。", ephemeral=True)
-        except Exception as e:
-            logger.error(f"Error during fishing panel setup command: {e}", exc_info=True)
-            await i.followup.send(f"❌ パネル設置中にエラーが発生しました: {e}", ephemeral=True)
+        
+    async def regenerate_panel(self, channel: discord.TextChannel | None = None):
+        if channel is None:
+            if self.fishing_panel_channel_id: channel = self.bot.get_channel(self.fishing_panel_channel_id)
+            else: logger.info("ℹ️ Fishing panel channel not set, skipping auto-regeneration."); return
+        if not channel: logger.warning("❌ Fishing panel channel could not be found."); return
+        
+        old_id = await get_panel_id("fishing")
+        if old_id:
+            try: (await channel.fetch_message(old_id)).delete()
+            except (discord.NotFound, discord.Forbidden): pass
+        
+        embed = discord.Embed(title="🎣 Dico森 釣り場", description="下のボタンを押して釣りを開始し、コインを獲得しましょう！", color=discord.Color.from_rgb(135, 206, 250))
+        msg = await channel.send(embed=embed, view=FishingPanelView(self.bot, self.active_fishing_sessions_by_user))
+        await save_panel_id("fishing", msg.id, channel.id)
+        logger.info(f"✅ Fishing panel successfully regenerated in channel {channel.name}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Fishing(bot))
