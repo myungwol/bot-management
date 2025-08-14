@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (View/Modal 클래스가 모두 포함된 완전한 최종본)
+# cogs/server/onboarding.py (명령어 통합 최종본)
 
 import discord
 from discord.ext import commands
@@ -65,7 +65,6 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             embed.add_field(name="性別", value=self.gender.value, inline=False)
             embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
-            embed.set_footer(text=f"リクエスト日時: {interaction.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
             
             await approval_channel.send(
                 content=f"<@&{self.approval_role_id}> 新しい住人登録票が提出されました。",
@@ -75,7 +74,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             await interaction.followup.send("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
         except Exception as e:
             logger.error(f"Error submitting self-introduction: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。\n`{e}`", ephemeral=True)
+            await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, bot: commands.Bot, approval_role_id: int, auto_role_mappings: list):
@@ -110,10 +109,7 @@ class ApprovalView(ui.View):
         if not self.approval_role_id:
             await interaction.response.send_message("エラー: 承認役割IDが設定されていません。", ephemeral=True)
             return False
-        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("この操作はサーバー内でのみ実行できます。", ephemeral=True)
-            return False
-        if not any(role.id == self.approval_role_id for role in interaction.user.roles):
+        if not isinstance(interaction.user, discord.Member) or not any(role.id == self.approval_role_id for role in interaction.user.roles):
             await interaction.response.send_message("このボタンを押す権限がありません。", ephemeral=True)
             return False
         return True
@@ -135,9 +131,7 @@ class ApprovalView(ui.View):
         except (discord.NotFound, discord.HTTPException): pass
         
         member = interaction.guild.get_member(self.author.id)
-        if not member:
-            await interaction.followup.send("エラー: 対象のメンバーが見つかりませんでした。", ephemeral=True)
-            return
+        if not member: return await interaction.followup.send("エラー: 対象のメンバーが見つかりませんでした。", ephemeral=True)
         try:
             if approved: await self._perform_approval_tasks(interaction, member)
             else: await self._perform_rejection_tasks(interaction)
@@ -150,8 +144,7 @@ class ApprovalView(ui.View):
             except discord.NotFound: pass
 
     async def _perform_approval_tasks(self, i: discord.Interaction, member: discord.Member):
-        tasks = []
-        cog = self.bot.get_cog("Onboarding")
+        tasks = []; cog = self.bot.get_cog("Onboarding")
         if cog.introduction_channel_id and (ch := i.guild.get_channel(cog.introduction_channel_id)):
             embed = self.original_embed.copy(); embed.title = "ようこそ！新しい仲間です！"; embed.color = discord.Color.green()
             embed.add_field(name="承認した公務員", value=i.user.mention, inline=False)
@@ -221,11 +214,7 @@ class ApprovalView(ui.View):
 
 class OnboardingView(ui.View):
     def __init__(self, current_step: int = 0, approval_role_id: int = 0):
-        super().__init__(timeout=300)
-        self.current_step = current_step
-        self.approval_role_id = approval_role_id
-        self.update_view()
-
+        super().__init__(timeout=300); self.current_step = current_step; self.approval_role_id = approval_role_id; self.update_view()
     def update_view(self):
         self.clear_items(); page_data = GUIDE_PAGES[self.current_step]
         if self.current_step > 0:
@@ -236,16 +225,12 @@ class OnboardingView(ui.View):
             button = ui.Button(label=page_data.get("button_label", "確認"), style=discord.ButtonStyle.success, custom_id="onboarding_action"); button.callback = self.do_action; self.add_item(button)
         elif page_data["type"] == "intro":
             button = ui.Button(label="住人登録票を作成する", style=discord.ButtonStyle.success, custom_id="onboarding_intro"); button.callback = self.create_introduction; self.add_item(button)
-
     async def _update_message(self, interaction: discord.Interaction):
         page = GUIDE_PAGES[self.current_step]
         embed = discord.Embed(title=page["title"], description=page["description"], color=discord.Color.purple())
         if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
         if page.get("rules"): embed.add_field(name="⚠️ ルール", value=page["rules"], inline=False)
-        self.update_view()
-        try: await interaction.edit_original_response(embed=embed, view=self)
-        except Exception as e: logger.error(f"Error updating onboarding message: {e}", exc_info=True)
-
+        self.update_view(); await interaction.edit_original_response(embed=embed, view=self)
     async def go_previous(self, i: discord.Interaction): await i.response.defer(); self.current_step -= 1; await self._update_message(i)
     async def go_next(self, i: discord.Interaction): await i.response.defer(); self.current_step += 1; await self._update_message(i)
     async def do_action(self, i: discord.Interaction):
@@ -257,7 +242,6 @@ class OnboardingView(ui.View):
             self.current_step += 1; await self._update_message(i)
         except discord.Forbidden: await i.followup.send("エラー: 役職を付与する権限がありません。", ephemeral=True)
         except Exception as e: await i.followup.send(f"❌ 予期せぬエラー: {e}", ephemeral=True)
-
     async def create_introduction(self, interaction: discord.Interaction):
         key = f"intro_{interaction.user.id}"; last_time = await get_cooldown(key)
         if last_time and time.time() - last_time < INTRODUCTION_COOLDOWN_SECONDS:
@@ -306,31 +290,21 @@ class Onboarding(commands.Cog):
         self.mention_role_id_1 = get_role_id("mention_role_1")
         logger.info("[Onboarding Cog] Loaded configurations.")
 
-    async def regenerate_panel(self):
-        if self.panel_channel_id and (channel := self.bot.get_channel(self.panel_channel_id)):
-            old_id = await get_panel_id("onboarding")
-            if old_id:
-                try: (await channel.fetch_message(old_id)).delete()
-                except (discord.NotFound, discord.Forbidden): pass
-            embed = discord.Embed(title="🏡 新米住人の方へ", description="この里へようこそ！\n下のボタンを押して、里での暮らし方を確認し、住人登録を始めましょう。", color=discord.Color.gold())
-            msg = await channel.send(embed=embed, view=OnboardingPanelView())
-            await save_panel_id("onboarding", msg.id, channel.id)
-            logger.info(f"✅ Onboarding panel auto-regenerated in channel {channel.name}")
-        else:
-            logger.info("ℹ️ Onboarding panel channel not set, skipping auto-regeneration.")
-
-    @app_commands.command(name="オンボーディングパネル設置", description="サーバー案内と自己紹介を統合したパネルを設置します。")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_onboarding_panel_command(self, i: discord.Interaction):
-        if not self.panel_channel_id: return await i.response.send_message("エラー: パネル設置チャンネルがデータベースに設定されていません。", ephemeral=True)
-        if i.channel.id != self.panel_channel_id: return await i.response.send_message(f"このコマンドは<#{self.panel_channel_id}>でのみ使用できます。", ephemeral=True)
-        await i.response.defer(ephemeral=True)
-        try:
-            await self.regenerate_panel()
-            await i.followup.send("オンボーディングパネルを正常に設置しました。", ephemeral=True)
-        except Exception as e:
-            logger.error(f"Error during onboarding panel setup command: {e}", exc_info=True)
-            await i.followup.send(f"❌ パネル設置中にエラーが発生しました: {e}", ephemeral=True)
+    async def regenerate_panel(self, channel: discord.TextChannel | None = None):
+        if channel is None:
+            if self.panel_channel_id: channel = self.bot.get_channel(self.panel_channel_id)
+            else: logger.info("ℹ️ Onboarding panel channel not set, skipping auto-regeneration."); return
+        if not channel: logger.warning("❌ Onboarding panel channel could not be found."); return
+        
+        old_id = await get_panel_id("onboarding")
+        if old_id:
+            try: (await channel.fetch_message(old_id)).delete()
+            except (discord.NotFound, discord.Forbidden): pass
+        
+        embed = discord.Embed(title="🏡 新米住人の方へ", description="この里へようこそ！\n下のボタンを押して、里での暮らし方を確認し、住人登録を始めましょう。", color=discord.Color.gold())
+        msg = await channel.send(embed=embed, view=OnboardingPanelView())
+        await save_panel_id("onboarding", msg.id, channel.id)
+        logger.info(f"✅ Onboarding panel successfully regenerated in channel {channel.name}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Onboarding(bot))
