@@ -57,11 +57,11 @@ try:
     key: str = os.environ.get("SUPABASE_KEY")
     if not url or not key:
         raise ValueError("SUPABASE_URL 또는 SUPABASE_KEY 환경 변수가 설정되지 않았습니다.")
-    supabase = create_client(supabase_url=url, supabase_key=key)
-    logger.info("✅ Supabase 클라이언트가 성공적으로 생성되었습니다.")
+    # AsyncClient를 직접 사용하여 비동기 클라이언트를 생성합니다.
+    supabase = AsyncClient(supabase_url=url, supabase_key=key) # <--- 이렇게 수정해야 합니다!
+    logger.info("✅ Supabase 비동기 클라이언트가 성공적으로 생성되었습니다.")
 except Exception as e:
     logger.error(f"❌ Supabase 클라이언트 생성 실패: {e}", exc_info=True)
-
 
 # --- ⬇️ [신규/수정] 동적 패널 시스템 함수 섹션 ⬇️ ---
 
