@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (최종 수정본 - 처리자 멘션 적용)
+# cogs/server/nicknames.py (최종 수정본 - 처리자 멘션 오류 수정)
 
 import discord
 from discord.ext import commands
@@ -64,7 +64,9 @@ class NicknameApprovalView(ui.View):
 
     async def _send_result_and_refresh(self, result_embed: discord.Embed):
         nicknames_cog = self.bot.get_cog("Nicknames")
-        if not nicknames_cog or not nicknames_cog.panel_and_result_channel_id: return
+        if not nicknames_cog or not nicknames_cog.panel_and_result_channel_id: 
+            logger.error("Nicknames Cog or result channel ID not found.")
+            return
         result_channel = self.bot.get_channel(nicknames_cog.panel_and_result_channel_id)
         if result_channel:
             try:
@@ -73,7 +75,7 @@ class NicknameApprovalView(ui.View):
             except Exception as e:
                 logger.error(f"Failed to send result or regenerate panel: {e}", exc_info=True)
 
-    @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="nick_approve_v8")
+    @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="nick_approve_v9")
     async def approve(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction): return
         await interaction.response.defer()
@@ -93,13 +95,13 @@ class NicknameApprovalView(ui.View):
         result_embed.add_field(name="対象者", value=self.target_member.mention, inline=False)
         result_embed.add_field(name="変更前の名前", value=f"`{self.original_name}`", inline=True)
         result_embed.add_field(name="変更後の名前", value=f"`{final_name}`", inline=True)
-        # [핵심] 처리자를 이름 대신 멘션으로 변경
-        result_embed.set_footer(text=f"承認者: {interaction.user.mention} (公務員)")
+        # [핵심] 처리자를 footer가 아닌 field로 변경
+        result_embed.add_field(name="承認者", value=f"{interaction.user.mention} (公務員)", inline=False)
         await self._send_result_and_refresh(result_embed)
         try: await interaction.message.delete()
         except discord.NotFound: pass
 
-    @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="nick_reject_v8")
+    @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="nick_reject_v9")
     async def reject(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction): return
         modal = RejectionReasonModal()
@@ -113,8 +115,8 @@ class NicknameApprovalView(ui.View):
         result_embed.add_field(name="申請した名前", value=f"`{self.new_name}`", inline=True)
         result_embed.add_field(name="現在の名前", value=f"`{self.original_name}`", inline=True)
         result_embed.add_field(name="拒否理由", value=modal.reason.value, inline=False)
-        # [핵심] 처리자를 이름 대신 멘션으로 변경
-        result_embed.set_footer(text=f"処理者: {interaction.user.mention} (公務員)")
+        # [핵심] 처리자를 footer가 아닌 field로 변경
+        result_embed.add_field(name="処理者", value=f"{interaction.user.mention} (公務員)", inline=False)
         await self._send_result_and_refresh(result_embed)
         try: await interaction.message.delete()
         except discord.NotFound: pass
