@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (최종 수정본 - 설정 명령어 추가)
+# cogs/server/nicknames.py (최종 수정본 - 신청자 멘션 알림 추가)
 
 import discord
 from discord.ext import commands
@@ -17,7 +17,6 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-# [수정] save_channel_id_to_db 함수 임포트 추가
 from utils.database import (get_panel_id, save_panel_id, get_cooldown, set_cooldown, 
                            get_channel_id_from_db, get_role_id, save_channel_id_to_db)
 
@@ -65,16 +64,19 @@ class NicknameApprovalView(ui.View):
 
     async def _send_result_and_refresh(self, result_embed: discord.Embed):
         nicknames_cog = self.bot.get_cog("Nicknames")
-        if not nicknames_cog or not nicknames_cog.panel_and_result_channel_id: return
+        if not nicknames_cog or not nicknames_cog.panel_and_result_channel_id: 
+            logger.error("Nicknames Cog or result channel ID not found.")
+            return
         result_channel = self.bot.get_channel(nicknames_cog.panel_and_result_channel_id)
         if result_channel:
             try:
-                await result_channel.send(embed=result_embed)
+                # [핵심] 메시지 본문에 신청자 멘션을 추가하여 알림이 가도록 함
+                await result_channel.send(content=self.target_member.mention, embed=result_embed, allowed_mentions=discord.AllowedMentions(users=True))
                 await nicknames_cog.regenerate_panel(result_channel)
             except Exception as e:
                 logger.error(f"Failed to send result or regenerate panel: {e}", exc_info=True)
 
-    @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="nick_approve_v6")
+    @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="nick_approve_v7")
     async def approve(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction): return
         await interaction.response.defer()
@@ -99,7 +101,7 @@ class NicknameApprovalView(ui.View):
         try: await interaction.message.delete()
         except discord.NotFound: pass
 
-    @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="nick_reject_v6")
+    @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="nick_reject_v7")
     async def reject(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction): return
         modal = RejectionReasonModal()
@@ -133,19 +135,21 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         if weighted_length > 8:
             error_message = f"❌ エラー: 名前の長さがルールを超えています。\nルール: 合計8文字まで (漢字は2文字として計算)\n現在の文字数: **{weighted_length}/8**"
             return await interaction.followup.send(error_message, ephemeral=True)
-
         nicknames_cog = interaction.client.get_cog("Nicknames")
         if not nicknames_cog or not nicknames_cog.approval_channel_id or not nicknames_cog.approval_role_id:
             return await interaction.followup.send("エラー: ニックネーム機能が正しく設定されていません。管理者が設定を確認してください。", ephemeral=True)
         approval_channel = interaction.guild.get_channel(nicknames_cog.approval_channel_id)
         if not approval_channel:
             return await interaction.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
-        await set_cooldown(str(interaction.user.id), time.time())
         embed = discord.Embed(title="📝 名前変更申請", color=discord.Color.blue())
         embed.add_field(name="申請者", value=interaction.user.mention, inline=False)
         embed.add_field(name="現在の名前", value=interaction.user.display_name, inline=False)
         embed.add_field(name="希望の名前", value=new_name_value, inline=False)
-        await approval_channel.send(content=f"<@&{self.approval_role_id}>", embed=embed, view=NicknameApprovalView(member=interaction.user, new_name=new_name_value, bot=interaction.client, approval_role_id=self.approval_role_id))
+        await approval_channel.send(
+            content=f"<@&{self.approval_role_id}> 新しい名前変更の申請があります。",
+            embed=embed,
+            view=NicknameApprovalView(member=interaction.user, new_name=new_name_value, bot=interaction.client, approval_role_id=self.approval_role_id)
+        )
         await interaction.followup.send("名前の変更申請を提出しました。", ephemeral=True)
 
 class NicknameChangerPanelView(ui.View):
@@ -166,6 +170,7 @@ class NicknameChangerPanelView(ui.View):
         nicknames_cog = interaction.client.get_cog("Nicknames")
         if not nicknames_cog or not nicknames_cog.approval_role_id:
             return await interaction.response.send_message("エラー: ニックネーム変更機能が設定されていません。管理者が設定を確認してください。", ephemeral=True)
+        await set_cooldown(user_id_str, time.time())
         await interaction.response.send_modal(NicknameChangeModal(approval_role_id=nicknames_cog.approval_role_id))
 
 class Nicknames(commands.Cog):
@@ -235,35 +240,23 @@ class Nicknames(commands.Cog):
             try:
                 old_message = await channel.fetch_message(old_id)
                 await old_message.delete()
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logger.warning(f"Could not delete old nickname panel message {old_id}: {e}")
         embed = discord.Embed(title="📝 名前変更案内", description="サーバーで使用する名前を変更したい場合は、下のボタンを押して申請してください。", color=discord.Color.blurple())
         msg = await channel.send(embed=embed, view=NicknameChangerPanelView())
         await save_panel_id("nickname_changer", msg.id)
         logger.info(f"Nickname panel regenerated in channel {channel.name} with new message ID: {msg.id}")
 
-    # [새로운 기능] 채널 설정을 위한 명령어 그룹
     nick_setup_group = app_commands.Group(name="nick-setup", description="ニックネーム機能のチャンネルなどを設定します。")
-
     @nick_setup_group.command(name="channels", description="[管理者専用] ニックネーム機能に必要なチャンネルを設定します。")
     @app_commands.describe(panel_channel="パネルを設置するチャンネル", approval_channel="申請を承認/拒否するチャンネル")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_channels(self, interaction: discord.Interaction, panel_channel: discord.TextChannel, approval_channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
-        # 패널 채널 저장
         await save_channel_id_to_db("nickname_panel_channel_id", panel_channel.id)
-        # 승인 채널 저장
         await save_channel_id_to_db("nickname_approval_channel_id", approval_channel.id)
-        
-        # 설정 즉시 반영
         await self.load_nickname_channel_configs()
-        
-        await interaction.followup.send(
-            f"✅ ニックネーム機能のチャンネルが設定されました。\n"
-            f"- **パネル設置チャンネル:** {panel_channel.mention}\n"
-            f"- **申請承認チャンネル:** {approval_channel.mention}\n\n"
-            f"次に `{panel_channel.mention}` で `/名前変更パネル設置` コマンドを実行してください。"
-        )
+        await interaction.followup.send(f"✅ ニックネーム機能のチャンネルが設定されました。\n- **パネル設置チャンネル:** {panel_channel.mention}\n- **申請承認チャンネル:** {approval_channel.mention}\n\n次に `{panel_channel.mention}` で `/名前変更パネル設置` コマンドを実行してください。")
 
     @app_commands.command(name="名前変更パネル設置", description="ニックネーム変更申請パネルを設置します。")
     @app_commands.checks.has_permissions(manage_guild=True)
