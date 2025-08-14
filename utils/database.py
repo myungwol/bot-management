@@ -7,18 +7,45 @@ import re
 # 로깅 설정
 logger = logging.getLogger(__name__)
 
-# --- ⬇️ 역할 ID 등 핵심 데이터 관리 ⬇️ ---
+# --- ⬇️ 역할 ID를 이곳에서 모두 관리합니다 ⬇️ ---
+# ◀◀◀ 여기에 있는 모든 '123...' 가짜 ID를 실제 디스코드 서버 역할 ID로 변경하세요! ◀◀◀
 ROLE_ID_CONFIG = {
-    "admin_total": 1405325594228424795, "approval_role": 1405325627384402032,
-    "temp_user_role": 1405325658871042100, "guest_role": 1405325653347405905, "mention_role_1": 1405328830327029921,
-    "role_onboarding_step_1": 1405326693975195829, "role_onboarding_step_2": 1405326692662116555,
-    "role_onboarding_step_3": 1405326186833514516, "role_onboarding_step_4": 1405325631918444598,
-    "age_70s_role": 1405325674499276840, "age_80s_role": 1405325679142375435,
-    "age_90s_role": 1405325683822952603, "age_00s_role": 1405325688281628804, "age_private_role": 1405325668845097124,
+    # --- 관리자 및 직원 역할 ---
+    "admin_total": 1405325594228424795,
+    "approval_role": 1405325627384402032,
+
+    # --- 온보딩(신규 유저) 관련 역할 ---
+    "temp_user_role": 1405325658871042100,
+    "guest_role": 1405325653347405905,
+    "mention_role_1": 1405328830327029921,
+
+    # --- 온보딩 가이드 진행 중 부여/제거될 역할 ---
+    "role_onboarding_step_1": 1405326693975195829,
+    "role_onboarding_step_2": 1405326692662116555,
+    "role_onboarding_step_3": 1405326186833514516,
+    "role_onboarding_step_4": 1405325631918444598,
+
+    # --- 나이 관련 역할 ---
+    "age_70s_role": 1405325674499276840,  # 70년대생 역할 ID
+    "age_80s_role": 1405325679142375435,  # 80년대생 역할 ID
+    "age_90s_role": 1405325683822952603,  # 90년대생 역할 ID
+    "age_00s_role": 1405325688281628804,  # 00년대생 역할 ID
+    "age_private_role": 1405325668845097124,  # 나이 비공개 역할 ID
 }
+
+# --- ⬇️ 자기소개 기반 자동 역할 부여 규칙 (성별) ⬇️ ---
+# [수정] 일본어 키워드로 변경
 AUTO_ROLE_MAPPING = [
-    {"field_name": "性別", "keywords": ["男", "男性", "おとこ", "オトコ", "man", "male"], "role_id": 1405489827884830742},
-    {"field_name": "性別", "keywords": ["女", "女性", "おんな", "オンナ", "woman", "female"], "role_id": 1405489828908367972},
+    {
+        "field_name": "性別",
+        "keywords": ["男", "男性", "おとこ", "オトコ", "man", "male"],
+        "role_id": 1405489827884830742  # ◀◀◀ '남자' 역할 ID 변경 필수
+    },
+    {
+        "field_name": "性別",
+        "keywords": ["女", "女性", "おんな", "オンナ", "woman", "female"],
+        "role_id": 1405489828908367972  # ◀◀◀ '여자' 역할 ID 변경 필수
+    },
 ]
 # --- Supabase 클라이언트 초기화 ---
 supabase: AsyncClient = None
