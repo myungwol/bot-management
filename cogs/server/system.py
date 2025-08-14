@@ -1,4 +1,4 @@
-# cogs/server/system.py (모든 기능 포함, 생략 없는 최종본)
+# cogs/server/system.py (들여쓰기 오류가 수정된 완전한 최종본)
 
 import discord
 from discord.ext import commands, tasks
@@ -217,6 +217,7 @@ class ServerSystem(commands.Cog):
         if before.roles != after.roles or before.premium_since != after.premium_since:
             self._schedule_counter_update(after.guild)
 
+    # [수정] 모든 명령어는 이 클래스 내부에 올바르게 들여쓰기 되어야 합니다.
     setup_group = app_commands.Group(name="setup", description="[管理者] ボットの主要機能を設定します。")
     @setup_group.command(name="panel", description="指定されたチャンネルに機能パネルを設置します。")
     @app_commands.describe(channel="パネルを設置するチャンネル", panel_type="設置するパネルの種類")
@@ -257,4 +258,15 @@ class ServerSystem(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_welcome_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'welcome_embed', "歓迎メッセージ")
     @setup_group.command(name="farewell-message", description="お別れメッセージの編集機を作成します。")
-    @app_c
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def setup_farewell_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'farewell_embed', "お別れメッセージ")
+    async def create_message_editor(self, i: discord.Interaction, ch: discord.TextChannel, key: str, name: str):
+        await i.response.defer(ephemeral=True)
+        embed_data = await get_embed_from_db(key) or {"title": f"{name} タイトル", "description": f"{name} の説明を入力してください。"}
+        embed = discord.Embed.from_dict(embed_data)
+        msg = await ch.send(content=f"**{name} 編集機**", embed=embed)
+        await msg.edit(view=EmbedEditorView(msg, key))
+        await i.followup.send(f"`{ch.mention}` に {name} 編集機を作成しました。", ephemeral=True)
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(ServerSystem(bot))
