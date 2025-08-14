@@ -11,7 +11,11 @@ logger = logging.getLogger(__name__)
 
 # --- 데이터베이스 함수 임포트 ---
 from utils.database import (
+    # [추가] 카운터 기능에 필요한 함수
+    get_counter_configs,
+    # --- 기존 기능들 ---
     get_channel_id_from_db, get_role_id,
+    # --- 동적 패널 시스템 함수들 ---
     save_embed_to_db, get_embed_from_db, delete_embed_from_db,
     save_panel_id, get_panel_id, delete_panel_id,
     add_auto_role_panel, get_all_auto_role_panels, delete_auto_role_panel,
