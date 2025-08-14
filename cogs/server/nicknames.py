@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (최종 수정본 - 신청자 멘션 알림 추가)
+# cogs/server/nicknames.py (최종 수정본 - 쿨타임 로직 수정)
 
 import discord
 from discord.ext import commands
@@ -11,6 +11,7 @@ import logging
 # 로깅 설정
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
 if not logger.handlers:
     handler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -70,13 +71,12 @@ class NicknameApprovalView(ui.View):
         result_channel = self.bot.get_channel(nicknames_cog.panel_and_result_channel_id)
         if result_channel:
             try:
-                # [핵심] 메시지 본문에 신청자 멘션을 추가하여 알림이 가도록 함
                 await result_channel.send(content=self.target_member.mention, embed=result_embed, allowed_mentions=discord.AllowedMentions(users=True))
                 await nicknames_cog.regenerate_panel(result_channel)
             except Exception as e:
                 logger.error(f"Failed to send result or regenerate panel: {e}", exc_info=True)
 
-    @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="nick_approve_v7")
+    @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="nick_approve_v8")
     async def approve(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction): return
         await interaction.response.defer()
@@ -101,7 +101,7 @@ class NicknameApprovalView(ui.View):
         try: await interaction.message.delete()
         except discord.NotFound: pass
 
-    @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="nick_reject_v7")
+    @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="nick_reject_v8")
     async def reject(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction): return
         modal = RejectionReasonModal()
@@ -135,12 +135,17 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         if weighted_length > 8:
             error_message = f"❌ エラー: 名前の長さがルールを超えています。\nルール: 合計8文字まで (漢字は2文字として計算)\n現在の文字数: **{weighted_length}/8**"
             return await interaction.followup.send(error_message, ephemeral=True)
+
         nicknames_cog = interaction.client.get_cog("Nicknames")
         if not nicknames_cog or not nicknames_cog.approval_channel_id or not nicknames_cog.approval_role_id:
             return await interaction.followup.send("エラー: ニックネーム機能が正しく設定されていません。管理者が設定を確認してください。", ephemeral=True)
         approval_channel = interaction.guild.get_channel(nicknames_cog.approval_channel_id)
         if not approval_channel:
             return await interaction.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
+        
+        # [핵심] 신청서가 정상적으로 제출된 이 시점에 쿨타임을 적용
+        await set_cooldown(str(interaction.user.id), time.time())
+        
         embed = discord.Embed(title="📝 名前変更申請", color=discord.Color.blue())
         embed.add_field(name="申請者", value=interaction.user.mention, inline=False)
         embed.add_field(name="現在の名前", value=interaction.user.display_name, inline=False)
@@ -155,7 +160,7 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
 class NicknameChangerPanelView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-    @ui.button(label="名前変更申請", style=discord.ButtonStyle.primary, custom_id="nickname_change_button_v7")
+    @ui.button(label="名前変更申請", style=discord.ButtonStyle.primary, custom_id="nickname_change_button_v8")
     async def request_change(self, interaction: discord.Interaction, button: ui.Button):
         user_id_str = str(interaction.user.id)
         last_request_time = await get_cooldown(user_id_str)
@@ -167,10 +172,12 @@ class NicknameChangerPanelView(ui.View):
             elif minutes > 0: remaining_td_str = f"{minutes}分{seconds}秒"
             else: remaining_td_str = f"{seconds}秒"
             return await interaction.response.send_message(f"次の申請まであと {remaining_td_str} お待ちください。", ephemeral=True)
+        
         nicknames_cog = interaction.client.get_cog("Nicknames")
         if not nicknames_cog or not nicknames_cog.approval_role_id:
             return await interaction.response.send_message("エラー: ニックネーム変更機能が設定されていません。管理者が設定を確認してください。", ephemeral=True)
-        await set_cooldown(user_id_str, time.time())
+        
+        # [수정] 버튼 클릭 시점에서는 쿨타임을 적용하지 않음
         await interaction.response.send_modal(NicknameChangeModal(approval_role_id=nicknames_cog.approval_role_id))
 
 class Nicknames(commands.Cog):
