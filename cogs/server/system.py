@@ -29,7 +29,52 @@ STATIC_AUTO_ROLE_PANELS = {
         }
     }
 }
+# cogs/server/system.py 의 ServerSystem 클래스 내부에 추가할 함수
 
+    # [신규] main.py가 호출할 자동 패널 재생성 함수
+    async def regenerate_panel(self):
+        # 이 Cog가 관리하는 모든 패널에 대해 반복
+        for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
+            try:
+                # on_ready에서 캐시된 채널 설정을 사용
+                channel_id = self.bot.channel_configs.get(panel_config['channel_key'])
+                if not channel_id:
+                    logger.info(f"ℹ️ '{panel_key}' 패널 채널이 DB에 설정되지 않아 건너뜁니다.")
+                    continue
+                
+                channel = self.bot.get_channel(channel_id)
+                if not channel:
+                    logger.warning(f"❌ '{panel_key}' 패널 채널(ID: {channel_id})을 찾을 수 없습니다.")
+                    continue
+
+                # '/setup panels' 명령어와 동일한 로직으로 패널을 생성/업데이트
+                embed = discord.Embed.from_dict(panel_config['embed'])
+                view = AutoRoleView(panel_config)
+                
+                # 기존 메시지가 있는지 확인하고, 없으면 새로 생성
+                panel_info = await get_panel_id(panel_key)
+                if panel_info and (msg_id := panel_info.get('message_id')):
+                    try:
+                        # 기존 메시지가 있으면 내용만 업데이트
+                        msg = await channel.fetch_message(msg_id)
+                        await msg.edit(embed=embed, view=view)
+                        logger.info(f"✅ '{panel_key}' 패널을 자동으로 업데이트했습니다.")
+                    except discord.NotFound:
+                        # 메시지가 삭제되었다면 새로 생성
+                        new_msg = await channel.send(embed=embed, view=view)
+                        await save_panel_id(panel_key, new_msg.id, channel.id)
+                        logger.info(f"✅ '{panel_key}' 패널을 자동으로 재생성했습니다.")
+                else:
+                    # DB에 정보가 없으면 새로 생성
+                    new_msg = await channel.send(embed=embed, view=view)
+                    await save_panel_id(panel_key, new_msg.id, channel.id)
+                    logger.info(f"✅ '{panel_key}' 패널을 자동으로 생성했습니다.")
+
+                # (봇 재시작을 위한 DB 정보 저장은 '/setup panels'에서만 하도록 하여,
+                # on_ready에서는 불필요한 DB 쓰기를 줄이는 것이 더 효율적일 수 있습니다.)
+
+            except Exception as e:
+                logger.error(f"❌ '{panel_key}' 패널 자동 재생성 중 오류: {e}", exc_info=True)
 # --- View / Modal 정의 ---
 class EphemeralRoleSelectView(ui.View):
     def __init__(self, member: discord.Member, category_roles: list, all_category_role_ids: set[int]):
