@@ -129,7 +129,7 @@ class NicknameChangerPanelView(ui.View):
         if not cog or not cog.approval_role_id: return await i.response.send_message("エラー: 機能が設定されていません。", ephemeral=True)
         await i.response.send_modal(NicknameChangeModal(approval_role_id=cog.approval_role_id))
 
-# --- メイン Cog クラス ---
+# --- 메인 Cog 클래스 ---
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.bot.add_view(NicknameChangerPanelView())
@@ -172,10 +172,14 @@ class Nicknames(commands.Cog):
             else: logger.info("ℹ️ Nickname panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Nickname panel channel could not be found."); return
         
-        old_id = await get_panel_id("nickname_changer")
-        if old_id:
-            try: (await channel.fetch_message(old_id)).delete()
-            except (discord.NotFound, discord.Forbidden): pass
+        # [수정된 부분]
+        panel_info = await get_panel_id("nickname_changer")
+        if panel_info and (old_id := panel_info.get('message_id')):
+            try:
+                message_to_delete = await channel.fetch_message(old_id)
+                await message_to_delete.delete()
+            except (discord.NotFound, discord.Forbidden):
+                pass
             
         embed = discord.Embed(title="📝 名前変更案内", description="サーバーで使用する名前を変更したい場合は、下のボタンを押して申請してください。", color=discord.Color.blurple())
         msg = await channel.send(embed=embed, view=NicknameChangerPanelView())
