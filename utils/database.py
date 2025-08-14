@@ -217,6 +217,31 @@ async def add_to_aquarium(user_id_str: str, fish_data: dict):
         await supabase.table('aquariums').insert(insert_data).execute()
     except Exception as e: logger.error(f"[DB Error] add_to_aquarium: {e}", exc_info=True)
 
+async def remove_fish_from_aquarium(fish_id: int): # <--- 누락되었던 함수
+    if not supabase: return
+    try: await supabase.table('aquariums').delete().eq('id', fish_id).execute()
+    except Exception as e: logger.error(f"[DB Error] remove_fish_from_aquarium: {e}", exc_info=True)
+
+async def get_user_gear(user_id_str: str):
+    if not supabase: return {"rod": "素手", "bait": "エサなし"}
+    gear = await get_or_create_user('gear_setups', user_id_str, {"rod": "古い釣竿", "bait": "エサなし"}) or {}
+    inv = await get_inventory(user_id_str)
+    rod = gear.get('rod', '素手')
+    if rod not in ["素手", "古い釣竿"] and inv.get(rod, 0) <= 0: rod = "古い釣竿"
+    bait = gear.get('bait', 'エサなし')
+    if bait != "エサなし" and inv.get(bait, 0) <= 0: bait = "エサなし"
+    return {"rod": rod, "bait": bait}
+
+async def set_user_gear(user_id_str: str, rod: str = None, bait: str = None):
+    if not supabase: return
+    try:
+        await get_or_create_user('gear_setups', user_id_str, {"rod": "古い釣竿", "bait": "エサなし"})
+        data_to_update = {}
+        if rod is not None: data_to_update['rod'] = rod
+        if bait is not None: data_to_update['bait'] = bait
+        if data_to_update: await supabase.table('gear_setups').update(data_to_update).eq('user_id', user_id_str).execute()
+    except Exception as e: logger.error(f"[DB Error] set_user_gear: {e}", exc_info=True)
+
 async def get_activity_data(user_id_str: str):
     return await get_or_create_user('activity_data', user_id_str, {"chat_counts":0, "voice_minutes":0}) or {}
 
@@ -251,10 +276,8 @@ async def get_all_channel_configs():
     except Exception as e: logger.error(f"[DB Error] get_all_channel_configs: {e}", exc_info=True); return {}
 
 async def get_channel_id_from_db(channel_key: str) -> int | None:
-    if channel_key in _cached_channel_configs:
-        return _cached_channel_configs[channel_key]
-    if not supabase:
-        return None
+    if channel_key in _cached_channel_configs: return _cached_channel_configs[channel_key]
+    if not supabase: return None
     try:
         response = await supabase.table('channel_configs').select('channel_id').eq('channel_key', channel_key).limit(1).execute()
         if response.data:
@@ -262,14 +285,11 @@ async def get_channel_id_from_db(channel_key: str) -> int | None:
             _cached_channel_configs[channel_key] = channel_id
             return channel_id
         return None
-    except Exception as e:
-        logger.error(f"[DB Error] get_channel_id_from_db: {e}", exc_info=True)
-        return None
+    except Exception as e: logger.error(f"[DB Error] get_channel_id_from_db: {e}", exc_info=True); return None
 
 async def save_channel_id_to_db(channel_key: str, object_id: int): # <--- 누락되었던 함수
     if not supabase: return
     try:
         await supabase.table('channel_configs').upsert({"channel_key": channel_key, "channel_id": object_id}, on_conflict="channel_key").execute()
         _cached_channel_configs[channel_key] = object_id
-    except Exception as e:
-        logger.error(f"[DB Error] save_channel_id_to_db: {e}", exc_info=True)
+    except Exception as e: logger.error(f"[DB Error] save_channel_id_to_db: {e}", exc_info=True)
