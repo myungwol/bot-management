@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (최종 수정본 - 거절 로그 상세화)
+# cogs/server/onboarding.py (최종 수정본 - 신청자 멘션 알림 추가)
 
 import discord
 from discord.ext import commands
@@ -63,7 +63,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             embed.set_footer(text=f"リクエスト日時: {interaction.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
             await approval_channel.send(
-                content=f"<@&{self.approval_role_id}>" if self.approval_role_id else "承認担当者",
+                content=f"<@&{self.approval_role_id}> 新しい住人登録票が提出されました。",
                 embed=embed,
                 view=ApprovalView(author=interaction.user, original_embed=embed, bot=interaction.client, approval_role_id=self.approval_role_id, auto_role_mappings=onboarding_cog.auto_role_mappings)
             )
@@ -115,10 +115,8 @@ class ApprovalView(ui.View):
 
     async def _handle_approval(self, interaction: discord.Interaction, approved: bool):
         if not await self._check_permission(interaction): return
-
         status_text = "承認" if approved else "拒否"
         original_message = interaction.message
-
         if not approved:
             rejection_modal = RejectionReasonModal()
             await interaction.response.send_modal(rejection_modal)
@@ -126,7 +124,6 @@ class ApprovalView(ui.View):
             self.rejection_reason = rejection_modal.reason.value
         else:
             await interaction.response.defer()
-
         for item in self.children: item.disabled = True
         processing_embed = discord.Embed(title=f"⏳ {status_text}処理中...", description=f"{self.author.mention}さんの住人登録票を処理しています。", color=discord.Color.orange())
         try:
@@ -134,12 +131,10 @@ class ApprovalView(ui.View):
         except (discord.NotFound, discord.HTTPException) as e:
             logger.warning(f"Failed to edit original message to 'processing': {e}")
             pass
-
         member = interaction.guild.get_member(self.author.id)
         if not member:
             await interaction.followup.send("エラー: 対象のメンバーが見つかりませんでした。", ephemeral=True)
             return
-
         try:
             if approved:
                 await self._perform_approval_tasks(interaction, member)
@@ -156,11 +151,7 @@ class ApprovalView(ui.View):
     async def _perform_approval_tasks(self, i: discord.Interaction, member: discord.Member):
         tasks = []
         onboarding_cog = self.bot.get_cog("Onboarding")
-        guest_role_id = onboarding_cog.guest_role_id
-        temp_user_role_id = onboarding_cog.temp_user_role_id
-        introduction_channel_id = onboarding_cog.introduction_channel_id
-        new_welcome_channel_id = onboarding_cog.new_welcome_channel_id
-        mention_role_id_1 = onboarding_cog.mention_role_id_1
+        guest_role_id, temp_user_role_id, introduction_channel_id, new_welcome_channel_id, mention_role_id_1 = onboarding_cog.guest_role_id, onboarding_cog.temp_user_role_id, onboarding_cog.introduction_channel_id, onboarding_cog.new_welcome_channel_id, onboarding_cog.mention_role_id_1
         if introduction_channel_id and (intro_ch := i.guild.get_channel(introduction_channel_id)):
             intro_embed = self.original_embed.copy()
             intro_embed.title = "ようこそ！新しい仲間です！"
@@ -176,8 +167,7 @@ class ApprovalView(ui.View):
         async def update_member_roles_and_nickname():
             try:
                 roles_to_add = []
-                if guest_role_id and (guest_role := i.guild.get_role(guest_role_id)):
-                    roles_to_add.append(guest_role)
+                if guest_role_id and (guest_role := i.guild.get_role(guest_role_id)): roles_to_add.append(guest_role)
                 if self.auto_role_mappings:
                     gender_field = next((f for f in self.original_embed.fields if f.name == "性別"), None)
                     if gender_field:
@@ -185,7 +175,6 @@ class ApprovalView(ui.View):
                             if any(keyword.lower() in gender_field.value.lower() for keyword in rule["keywords"]):
                                 if (role_to_add := i.guild.get_role(rule["role_id"])):
                                     roles_to_add.append(role_to_add)
-                                    logger.info(f"Auto-assigning gender role '{role_to_add.name}' to {member.display_name}.")
                                     break
                 age_field = next((f for f in self.original_embed.fields if f.name == "年齢"), None)
                 if age_field:
@@ -197,21 +186,14 @@ class ApprovalView(ui.View):
                         elif 1980 <= birth_year <= 1989: age_role_key = "age_80s_role"
                         elif 1990 <= birth_year <= 1999: age_role_key = "age_90s_role"
                         elif 2000 <= birth_year <= 2009: age_role_key = "age_00s_role"
-                    if age_role_key:
-                        role_id = get_role_id(age_role_key)
-                        if role_id and (role_to_add := i.guild.get_role(role_id)):
-                            roles_to_add.append(role_to_add)
-                            logger.info(f"Auto-assigning age role '{role_to_add.name}' to {member.display_name} for birth year {birth_year}.")
-                if roles_to_add:
-                    await member.add_roles(*list(set(roles_to_add)), reason="自己紹介承認による自動役割付与")
+                    if age_role_key and (role_id := get_role_id(age_role_key)) and (role_to_add := i.guild.get_role(role_id)):
+                        roles_to_add.append(role_to_add)
+                if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="自己紹介承認による自動役割付与")
                 if temp_user_role_id and (r_remove := i.guild.get_role(temp_user_role_id)) and r_remove in member.roles:
                     await member.remove_roles(r_remove, reason="正式メンバー承認")
-                if (cog := self.bot.get_cog("Nicknames")):
-                    name_field = next((f for f in self.original_embed.fields if f.name == "名前"), None)
-                    if name_field and name_field.value:
-                        await cog.update_nickname(member, base_name_override=name_field.value)
-            except Exception as e:
-                logger.error(f"Error during role/nickname change for {member.display_name}: {e}", exc_info=True)
+                if (cog := self.bot.get_cog("Nicknames")) and (name_field := next((f for f in self.original_embed.fields if f.name == "名前"), None)) and name_field.value:
+                    await cog.update_nickname(member, base_name_override=name_field.value)
+            except Exception as e: logger.error(f"Error during role/nickname change for {member.display_name}: {e}", exc_info=True)
         tasks.append(update_member_roles_and_nickname())
         await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -220,29 +202,14 @@ class ApprovalView(ui.View):
         onboarding_cog = self.bot.get_cog("Onboarding")
         rejection_log_channel_id = onboarding_cog.rejection_log_channel_id
         if rejection_log_channel_id and (rejection_ch := i.guild.get_channel(rejection_log_channel_id)):
-
-            # [핵심] 거절 로그 임베드 생성 방식 수정
-            rejection_embed = discord.Embed(
-                title="❌ 住人登録が拒否されました",
-                description=f"**対象者:** {self.author.mention}", # ID 제거, 멘션만
-                color=discord.Color.red()
-            )
+            rejection_embed = discord.Embed(title="❌ 住人登録が拒否されました", description=f"**対象者:** {self.author.mention}", color=discord.Color.red())
             rejection_embed.set_thumbnail(url=self.author.display_avatar.url)
-
-            # 신청자가 입력한 모든 정보를 그대로 추가
             for field in self.original_embed.fields:
                 rejection_embed.add_field(name=f"申請内容「{field.name}」", value=field.value, inline=False)
-
-            # 거절 사유 추가
             rejection_embed.add_field(name="拒否理由", value=self.rejection_reason or "理由が入力されませんでした。", inline=False)
-
-            # 처리자 멘션 추가
             rejection_embed.add_field(name="処理者", value=i.user.mention, inline=False)
-
-            rejection_embed.timestamp = i.created_at # 처리 시간 기록
-
+            rejection_embed.timestamp = i.created_at
             tasks.append(rejection_ch.send(embed=rejection_embed))
-
         async def send_dm():
             try: await self.author.send(f"お知らせ：「{i.guild.name}」での住人登録が公務員によって拒否されました。理由: 「{self.rejection_reason}」\nお手数ですが、もう一度 <#{onboarding_cog.panel_channel_id}> から登録をやり直してください。")
             except discord.Forbidden: pass
@@ -251,6 +218,7 @@ class ApprovalView(ui.View):
 
     async def _send_new_welcome_message(self, member: discord.Member, channel: discord.TextChannel, mention_role_id_1: int):
         mention_str = f"<@&{mention_role_id_1}>" if mention_role_id_1 else ""
+        # [핵심] content에 member.mention 추가
         content = f"# {member.mention} さんがDico森へ里入りしました！\n## 皆さんで歓迎しましょう！ {mention_str}"
         desc = ("Dico森は、皆さんの「森での暮らし」をより豊かにするための場所です。\n"
                 "様々なイベントや交流を通じて、楽しい思い出を作りましょう！\n\n"
