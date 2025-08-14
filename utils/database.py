@@ -1,3 +1,25 @@
+import os
+import discord
+from supabase import create_client, AsyncClient
+import logging
+import re
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
+
+# --- ⬇️ 역할 ID 등 핵심 데이터 관리 ⬇️ ---
+ROLE_ID_CONFIG = {
+    "admin_total": 1405325594228424795, "approval_role": 1405325627384402032,
+    "temp_user_role": 1405325658871042100, "guest_role": 1405325653347405905, "mention_role_1": 1405328830327029921,
+    "role_onboarding_step_1": 1405326693975195829, "role_onboarding_step_2": 1405326692662116555,
+    "role_onboarding_step_3": 1405326186833514516, "role_onboarding_step_4": 1405325631918444598,
+    "age_70s_role": 1405325674499276840, "age_80s_role": 1405325679142375435,
+    "age_90s_role": 1405325683822952603, "age_00s_role": 1405325688281628804, "age_private_role": 1405325668845097124,
+}
+AUTO_ROLE_MAPPING = [
+    {"field_name": "性別", "keywords": ["男", "男性", "おとこ", "オトコ", "man", "male"], "role_id": 1405489827884830742},
+    {"field_name": "性別", "keywords": ["女", "女性", "おんな", "オンナ", "woman", "female"], "role_id": 1405489828908367972},
+]
 # --- Supabase 클라이언트 초기화 ---
 supabase: AsyncClient = None
 try:
