@@ -1,4 +1,4 @@
-# utils/database.py (모든 기능이 포함된 완벽한 최종본)
+# utils/database.py (모든 함수와 변수가 포함된 완벽 최종본)
 
 import os
 import discord
