@@ -1,3 +1,5 @@
+# utils/database.py (모든 기능이 포함된 완벽한 최종본)
+
 import os
 import discord
 from supabase import create_client, AsyncClient
@@ -5,6 +7,7 @@ import logging
 import re
 
 # 로깅 설정
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- ⬇️ 역할 ID를 이곳에서 모두 관리합니다 ⬇️ ---
