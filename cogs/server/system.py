@@ -123,36 +123,33 @@ class ServerSystem(commands.Cog):
     async def regenerate_panel(self, channel: discord.TextChannel | None = None):
         for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
             try:
-                # 自動再生成の場合、DBからチャンネル情報を取得
-                if channel is None:
+                target_channel = channel
+                if target_channel is None:
                     channel_id = self.bot.channel_configs.get(panel_config['channel_key'])
-                    if not channel_id or not (channel := self.bot.get_channel(channel_id)):
+                    if not channel_id or not (target_channel := self.bot.get_channel(channel_id)):
                         logger.info(f"ℹ️ '{panel_key}' パネルチャンネルがDBに設定されていないため、スキップします。")
                         continue
                 
-                # 手動/自動共通ロジック
                 embed = discord.Embed.from_dict(panel_config['embed'])
                 view = AutoRoleView(panel_config)
-                
                 panel_info = await get_panel_id(panel_key)
                 message_id = panel_info.get('message_id') if panel_info else None
                 
                 live_message = None
                 if message_id:
                     try:
-                        live_message = await channel.fetch_message(message_id)
+                        live_message = await target_channel.fetch_message(message_id)
                         await live_message.edit(embed=embed, view=view)
                         logger.info(f"✅ '{panel_key}' パネルを更新しました。")
                     except discord.NotFound:
-                        live_message = None # メッセージが見つからない場合は新規作成
+                        live_message = None
                 
                 if not live_message:
-                    new_message = await channel.send(embed=embed, view=view)
-                    await save_panel_id(panel_key, new_message.id, channel.id)
+                    new_message = await target_channel.send(embed=embed, view=view)
+                    await save_panel_id(panel_key, new_message.id, target_channel.id)
                     logger.info(f"✅ '{panel_key}' パネルを新規作成しました。")
-                    # View復元のためにパネル情報をDBに保存
-                    await add_auto_role_panel(new_message.id, channel.guild.id, channel.id, embed.title, embed.description)
-                    await delete_all_buttons_for_panel(new_message.id) # 以前のボタン情報をクリア
+                    await add_auto_role_panel(new_message.id, target_channel.guild.id, target_channel.id, embed.title, embed.description)
+                    await delete_all_buttons_for_panel(new_message.id)
 
             except Exception as e:
                 logger.error(f"❌ '{panel_key}' パネルの処理中にエラーが発生しました: {e}", exc_info=True)
@@ -260,15 +257,4 @@ class ServerSystem(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_welcome_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'welcome_embed', "歓迎メッセージ")
     @setup_group.command(name="farewell-message", description="お別れメッセージの編集機を作成します。")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_farewell_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'farewell_embed', "お別れメッセージ")
-    async def create_message_editor(self, i: discord.Interaction, ch: discord.TextChannel, key: str, name: str):
-        await i.response.defer(ephemeral=True)
-        embed_data = await get_embed_from_db(key) or {"title": f"{name} タイトル", "description": f"{name} の説明を入力してください。"}
-        embed = discord.Embed.from_dict(embed_data)
-        msg = await ch.send(content=f"**{name} 編集機**", embed=embed)
-        await msg.edit(view=EmbedEditorView(msg, key))
-        await i.followup.send(f"`{ch.mention}` に {name} 編集機を作成しました。", ephemeral=True)
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(ServerSystem(bot))
+    @app_c
