@@ -1,4 +1,4 @@
-# cogs/server/system.py (줄바꿈 오류 수정 최종본)
+# cogs/server/system.py (최종 수정본 - 자동 역할 버튼 반응 속도 개선)
 
 import discord
 from discord.ext import commands, tasks
@@ -38,26 +38,35 @@ class AutoRoleView(ui.View):
                 button.callback = self.button_callback
                 self.add_item(button)
 
+    # [핵심] 버튼 콜백 함수 수정
     async def button_callback(self, interaction: discord.Interaction):
+        # 1. 즉시 defer로 응답하여 3초 제한 회피 및 반응 속도 향상
+        await interaction.response.defer(ephemeral=True)
+
         custom_id = interaction.data['custom_id']
         role_id = int(custom_id.split(':')[1])
+        
         if not isinstance(interaction.user, discord.Member):
-            return await interaction.response.send_message("エラー: メンバー情報が見つかりません。", ephemeral=True)
+            return await interaction.followup.send("エラー: メンバー情報が見つかりません。", ephemeral=True)
+
         role = interaction.guild.get_role(role_id)
         if not role:
-            return await interaction.response.send_message("エラー: この役職はもう存在しません。", ephemeral=True)
+            return await interaction.followup.send("エラー: この役職はもう存在しません。", ephemeral=True)
+
         try:
+            # 2. defer 이후에 역할 변경 작업 수행
             if role in interaction.user.roles:
                 await interaction.user.remove_roles(role)
-                await interaction.response.send_message(f"✅ 役職「{role.name}」を解除しました。", ephemeral=True)
+                # 3. 최종 결과는 followup.send로 전송
+                await interaction.followup.send(f"✅ 役職「{role.name}」を解除しました。", ephemeral=True)
             else:
                 await interaction.user.add_roles(role)
-                await interaction.response.send_message(f"✅ 役職「{role.name}」を付与しました。", ephemeral=True)
+                await interaction.followup.send(f"✅ 役職「{role.name}」を付与しました。", ephemeral=True)
         except discord.Forbidden:
-            await interaction.response.send_message("エラー: 役職を付与/解除する権限がボットにありません。", ephemeral=True)
+            await interaction.followup.send("エラー: 役職を付与/解除する権限がボットにありません。", ephemeral=True)
         except Exception as e:
             logger.error(f"Error changing role for {interaction.user.name}: {e}", exc_info=True)
-            await interaction.response.send_message("エラーが発生しました。", ephemeral=True)
+            await interaction.followup.send("エラーが発生しました。", ephemeral=True)
 
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -86,7 +95,7 @@ class ServerSystem(commands.Cog):
         self.onboarding_panel_channel_id = await get_channel_id_from_db("onboarding_panel_channel_id")
         self.counter_configs = await get_counter_configs()
         logger.info("[ServerSystem Cog] Loaded all configurations.")
-
+    
     def _schedule_counter_update(self, guild: discord.Guild):
         guild_id = guild.id
         if guild_id in self.update_tasks and not self.update_tasks[guild_id].done(): self.update_tasks[guild_id].cancel()
@@ -174,6 +183,15 @@ class ServerSystem(commands.Cog):
         if before.roles != after.roles or before.premium_since != after.premium_since:
             self._schedule_counter_update(after.guild)
 
+    async def _find_panel_message(self, guild: discord.Guild, message_id: int) -> discord.Message | None:
+        for channel in guild.text_channels:
+            try:
+                message = await channel.fetch_message(message_id)
+                return message
+            except (discord.NotFound, discord.Forbidden):
+                continue
+        return None
+
     counter_group = app_commands.Group(name="counter", description="유저 카운터 채널을 설정합니다.")
     @counter_group.command(name="setup", description="[管理者専用] 特定のチャンネルをユーザーカウンターとして設定します。")
     @app_commands.describe(channel="カウンターとして設定するボイスチャンネル", counter_type="表示する統計の種類", format_string="チャンネル名の表示形式 (例: 「メンバー数: {}」)", role="[役職カウンター用] カウントする役職")
@@ -205,9 +223,7 @@ class ServerSystem(commands.Cog):
     async def autorole_panel_create(self, interaction: discord.Interaction, channel: discord.TextChannel, title: str, description: str):
         await interaction.response.defer(ephemeral=True)
         try:
-            # [핵심] 받은 description 문자열에서 '\\n'을 실제 줄바꿈 문자인 '\n'으로 변경
             formatted_description = description.replace('\\n', '\n')
-
             embed = discord.Embed(title=title, description=formatted_description, color=discord.Color.blurple())
             view = AutoRoleView([])
             message = await channel.send(embed=embed, view=view)
@@ -223,20 +239,17 @@ class ServerSystem(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         try:
             msg_id = int(panel_message_id)
-            # [수정] 패널이 어느 채널에 있는지 알 수 없으므로, 명령어를 사용한 채널에서 찾도록 함
-            panel_message = await interaction.channel.fetch_message(msg_id)
-            if not panel_message or panel_message.author.id != self.bot.user.id:
-                return await interaction.followup.send("エラー: 指定されたIDのメッセージが見つからないか、ボットのメッセージではありません。", ephemeral=True)
+            panel_message = await self._find_panel_message(interaction.guild, msg_id)
+            if not panel_message: return await interaction.followup.send("エラー: サーバー内のどのチャンネルでも、そのIDのメッセージを見つけられませんでした。", ephemeral=True)
+            if panel_message.author.id != self.bot.user.id: return await interaction.followup.send("エラー: 指定されたIDのメッセージはボットのメッセージではありません。", ephemeral=True)
             await add_auto_role_button(msg_id, role.id, label, emoji, style)
             buttons_config = await get_auto_role_buttons(msg_id)
             new_view = AutoRoleView(buttons_config)
             await panel_message.edit(view=new_view)
             await interaction.followup.send(f"✅ パネルに役職「{role.name}」のボタンを追加しました。", ephemeral=True)
         except ValueError: await interaction.followup.send("エラー: メッセージIDは数字である必要があります。", ephemeral=True)
-        except discord.NotFound: await interaction.followup.send("エラー: このチャンネルでそのIDのメッセージを見つけられませんでした。", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"❌ ボタン追加中にエラーが発生しました: {e}", exc_info=True)
-
+        except Exception as e: await interaction.followup.send(f"❌ ボタン追加中にエラーが発生しました: {e}", exc_info=True)
+            
     @autorole_group.command(name="button-remove", description="[管理者専用] 既存のパネルから役割ボタンを削除します。")
     @app_commands.describe(panel_message_id="ボタンを削除するパネルのメッセージID", role="削除するボタンに対応する役職")
     @app_commands.checks.has_permissions(manage_roles=True)
@@ -244,18 +257,16 @@ class ServerSystem(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         try:
             msg_id = int(panel_message_id)
-            panel_message = await interaction.channel.fetch_message(msg_id)
-            if not panel_message or panel_message.author.id != self.bot.user.id:
-                return await interaction.followup.send("エラー: 指定されたIDのメッセージが見つからないか、ボットのメッセージではありません。", ephemeral=True)
+            panel_message = await self._find_panel_message(interaction.guild, msg_id)
+            if not panel_message: return await interaction.followup.send("エラー: サーバー内のどのチャンネルでも、そのIDのメッセージを見つけられませんでした。", ephemeral=True)
+            if panel_message.author.id != self.bot.user.id: return await interaction.followup.send("エラー: 指定されたIDのメッセージはボットのメッセージではありません。", ephemeral=True)
             await remove_auto_role_button(msg_id, role.id)
             buttons_config = await get_auto_role_buttons(msg_id)
             new_view = AutoRoleView(buttons_config)
             await panel_message.edit(view=new_view)
             await interaction.followup.send(f"✅ パネルから役職「{role.name}」のボタンを削除しました。", ephemeral=True)
         except ValueError: await interaction.followup.send("エラー: メッセージIDは数字である必要があります。", ephemeral=True)
-        except discord.NotFound: await interaction.followup.send("エラー: このチャンネルでそのIDのメッセージを見つけられませんでした。", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"❌ ボタン削除中にエラーが発生しました: {e}", exc_info=True)
+        except Exception as e: await interaction.followup.send(f"❌ ボタン削除中にエラーが発生しました: {e}", exc_info=True)
 
 async def setup(bot: commands.Bot):
     cog = ServerSystem(bot)
