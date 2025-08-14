@@ -1,4 +1,4 @@
-# cogs/server/system.py (최종 수정본 - 자동 역할 버튼 반응 속도 개선)
+# cogs/server/system.py (기억 기능 적용, 생략 없음)
 
 import discord
 from discord.ext import commands, tasks
@@ -19,7 +19,8 @@ if not logger.handlers:
 
 from utils.database import (get_channel_id_from_db, get_role_id, 
                            get_counter_configs, add_counter_config, remove_counter_config,
-                           add_auto_role_button, remove_auto_role_button, get_auto_role_buttons)
+                           add_auto_role_button, remove_auto_role_button, get_auto_role_buttons,
+                           add_auto_role_panel, get_all_auto_role_panels)
 
 class AutoRoleView(ui.View):
     def __init__(self, buttons_config: list | None = None):
@@ -38,26 +39,18 @@ class AutoRoleView(ui.View):
                 button.callback = self.button_callback
                 self.add_item(button)
 
-    # [핵심] 버튼 콜백 함수 수정
     async def button_callback(self, interaction: discord.Interaction):
-        # 1. 즉시 defer로 응답하여 3초 제한 회피 및 반응 속도 향상
         await interaction.response.defer(ephemeral=True)
-
         custom_id = interaction.data['custom_id']
         role_id = int(custom_id.split(':')[1])
-        
         if not isinstance(interaction.user, discord.Member):
             return await interaction.followup.send("エラー: メンバー情報が見つかりません。", ephemeral=True)
-
         role = interaction.guild.get_role(role_id)
         if not role:
             return await interaction.followup.send("エラー: この役職はもう存在しません。", ephemeral=True)
-
         try:
-            # 2. defer 이후에 역할 변경 작업 수행
             if role in interaction.user.roles:
                 await interaction.user.remove_roles(role)
-                # 3. 최종 결과는 followup.send로 전송
                 await interaction.followup.send(f"✅ 役職「{role.name}」を解除しました。", ephemeral=True)
             else:
                 await interaction.user.add_roles(role)
@@ -71,7 +64,8 @@ class AutoRoleView(ui.View):
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.bot.add_view(AutoRoleView(None))
+        # 봇 시작 시 빈 뷰를 등록하는 것은 더 이상 필요하지 않음
+        # self.bot.add_view(AutoRoleView(None))
         self.welcome_channel_id: int | None = None
         self.farewell_channel_id: int | None = None
         self.temp_user_role_id: int | None = None
@@ -227,6 +221,7 @@ class ServerSystem(commands.Cog):
             embed = discord.Embed(title=title, description=formatted_description, color=discord.Color.blurple())
             view = AutoRoleView([])
             message = await channel.send(embed=embed, view=view)
+            await add_auto_role_panel(message.id, interaction.guild.id, channel.id, title, formatted_description)
             await interaction.followup.send(f"✅ 自動役割付与パネルを作成しました。\n**メッセージID:** `{message.id}`\nこのIDを使ってボタンを追加してください。", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ パネル作成中にエラーが発生しました: {e}", ephemeral=True)
