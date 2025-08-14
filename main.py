@@ -4,7 +4,6 @@ import discord
 from discord.ext import commands
 import os
 import asyncio
-from keep_alive import keep_alive # 레플릿 봇 24시간 유지를 위해
 
 # utils 폴더에서 데이터베이스 함수 임포트
 from utils.database import get_channel_id_from_db, get_all_channel_configs
@@ -152,7 +151,6 @@ async def main():
     """
     async with bot:
         await load_extensions() # Cog 로드
-        keep_alive()
         print("✅ Keep-alive ウェブサーバーがバックグラウンドで実行中です。")
         await bot.start(BOT_TOKEN) # 봇 로그인 및 실행
 
