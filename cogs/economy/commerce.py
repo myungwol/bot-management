@@ -1,4 +1,4 @@
-# cogs/economy/commerce.py (자동 재생성 기능이 적용된 최종본)
+# cogs/economy/commerce.py (명령어 통합 최종본)
 
 import discord
 from discord.ext import commands
@@ -25,20 +25,15 @@ class SellQuantityModal(ui.Modal, title="販売数量入力"):
     quantity = ui.TextInput(label="販売したい数量を入力してください", placeholder="例: 10", required=True, max_length=5)
     def __init__(self, item_name: str, max_quantity: int):
         super().__init__()
-        self.item_name = item_name
-        self.max_quantity = max_quantity
-        self.quantity.placeholder = f"最大 {max_quantity}個まで入力できます"
-        self.value = None
+        self.item_name = item_name; self.max_quantity = max_quantity
+        self.quantity.placeholder = f"最大 {max_quantity}個まで入力できます"; self.value = None
     async def on_submit(self, interaction: discord.Interaction):
         try:
             quantity_input = int(self.quantity.value)
             if not (1 <= quantity_input <= self.max_quantity):
-                await interaction.response.send_message(f"1から{self.max_quantity}までの数字を入力してください。", ephemeral=True)
-                return
-            self.value = quantity_input
-            await interaction.response.defer()
-        except ValueError:
-            await interaction.response.send_message("数字のみ入力してください。", ephemeral=True)
+                return await interaction.response.send_message(f"1から{self.max_quantity}までの数字を入力してください。", ephemeral=True)
+            self.value = quantity_input; await interaction.response.defer()
+        except ValueError: await interaction.response.send_message("数字のみ入力してください。", ephemeral=True)
 
 class BuyQuantityModal(ui.Modal, title="購入数量入力"):
     quantity = ui.TextInput(label="購入したい数量を入力してください", placeholder="例: 10", required=True, max_length=5)
@@ -54,12 +49,9 @@ class BuyQuantityModal(ui.Modal, title="購入数量入力"):
         try:
             quantity_input = int(self.quantity.value)
             if not (1 <= quantity_input <= self.max_buyable):
-                await interaction.response.send_message(f"1から{self.max_buyable}個までの数量を入力してください。", ephemeral=True)
-                return
-            self.value = quantity_input
-            await interaction.response.defer()
-        except ValueError:
-            await interaction.response.send_message("数字のみ入力してください。", ephemeral=True)
+                return await interaction.response.send_message(f"1から{self.max_buyable}個までの数量を入力してください。", ephemeral=True)
+            self.value = quantity_input; await interaction.response.defer()
+        except ValueError: await interaction.response.send_message("数字のみ入力してください。", ephemeral=True)
 
 class SellItemView(ui.View):
     def __init__(self, user: discord.User):
@@ -76,19 +68,14 @@ class SellItemView(ui.View):
         options = []
         uid_str = str(self.user.id)
         if self.current_category == "魚":
-            user_fish = await get_aquarium(uid_str)
-            for fish in user_fish:
-                proto = next((item for item in FISHING_LOOT if item['name'] == fish['name']), None)
-                if not proto or proto.get("value", 1) == 0: continue
+            for fish in await get_aquarium(uid_str):
+                if not (proto := next((item for item in FISHING_LOOT if item['name'] == fish['name']), None)) or proto.get("value", 1) == 0: continue
                 price = int(proto.get("base_value", 0) + (fish.get('size', 0) * proto.get("size_multiplier", 0)))
                 options.append(discord.SelectOption(label=f"{fish['emoji']} {fish['name']} ({fish['size']}cm)", value=f"fish_{fish['id']}", description=f"売却価格: {price}{CURRENCY_ICON}"))
         elif self.current_category == "アイテム":
-            user_items = await get_inventory(uid_str)
-            for name, count in user_items.items():
-                proto = ITEM_DATABASE.get(name, {})
-                if not proto.get('sellable'): continue
-                price = proto.get('sell_price', 0)
-                options.append(discord.SelectOption(label=f"{name} ({count}個)", value=f"item_{name}", description=f"単価: {price}{CURRENCY_ICON}"))
+            for name, count in (await get_inventory(uid_str)).items():
+                if not (proto := ITEM_DATABASE.get(name, {})).get('sellable'): continue
+                options.append(discord.SelectOption(label=f"{name} ({count}個)", value=f"item_{name}", description=f"単価: {proto.get('sell_price', 0)}{CURRENCY_ICON}"))
         select_menu = ui.Select(placeholder=f"売却したい{self.current_category}を選択..." if options else "販売できるものがありません。", options=options or [discord.SelectOption(label="...")], disabled=not options, row=1)
         select_menu.callback = self.sell_callback; self.add_item(select_menu)
     async def category_button_callback(self, i: discord.Interaction):
@@ -98,24 +85,20 @@ class SellItemView(ui.View):
         value = i.data['values'][0]; sell_type, sell_target = value.split('_', 1); uid_str = str(self.user.id)
         if sell_type == "fish":
             await i.response.defer(ephemeral=True); fish_id = int(sell_target)
-            user_fish = await get_aquarium(uid_str)
-            sold_fish = next((f for f in user_fish if f.get('id') == fish_id), None)
-            if not sold_fish: return await i.followup.send("エラー：その魚は既に売却されたか、存在しません。", ephemeral=True)
-            proto = next((it for it in FISHING_LOOT if it['name'] == sold_fish['name']), None)
-            if not proto: return await i.followup.send("エラー：魚のデータが見つかりません。", ephemeral=True)
-            total_price = int(proto.get("base_value", 0) + (sold_fish.get('size', 0) * proto.get("size_multiplier", 0)))
-            sold_item_info = f"**{sold_fish.get('emoji', '🐟')} {sold_fish['name']}** ({sold_fish['size']}cm)"
-            await remove_fish_from_aquarium(fish_id); await update_wallet(i.user, total_price)
-            await i.followup.send(f"{sold_item_info}を売却し、`{total_price}`{CURRENCY_ICON}を獲得しました！", ephemeral=True)
+            if not (sold_fish := next((f for f in await get_aquarium(uid_str) if f.get('id') == fish_id), None)): return await i.followup.send("エラー：その魚は既に売却されたか、存在しません。", ephemeral=True)
+            if not (proto := next((it for it in FISHING_LOOT if it['name'] == sold_fish['name']), None)): return await i.followup.send("エラー：魚のデータが見つかりません。", ephemeral=True)
+            price = int(proto.get("base_value", 0) + (sold_fish.get('size', 0) * proto.get("size_multiplier", 0)))
+            info = f"**{sold_fish.get('emoji', '🐟')} {sold_fish['name']}** ({sold_fish['size']}cm)"
+            await remove_fish_from_aquarium(fish_id); await update_wallet(i.user, price)
+            await i.followup.send(f"{info}を売却し、`{price}`{CURRENCY_ICON}を獲得しました！", ephemeral=True)
         elif sell_type == "item":
-            item_name = sell_target; user_items = await get_inventory(uid_str); max_quantity = user_items.get(item_name, 0)
-            if max_quantity == 0: return await i.response.send_message("エラー：所持していないアイテムです。", ephemeral=True)
-            modal = SellQuantityModal(item_name, max_quantity); await i.response.send_modal(modal); await modal.wait()
+            item_name = sell_target; max_qty = (await get_inventory(uid_str)).get(item_name, 0)
+            if max_qty == 0: return await i.response.send_message("エラー：所持していないアイテムです。", ephemeral=True)
+            modal = SellQuantityModal(item_name, max_qty); await i.response.send_modal(modal); await modal.wait()
             if modal.value is None: return
-            sell_quantity = modal.value; proto = ITEM_DATABASE.get(item_name); total_price = proto.get('sell_price', 0) * sell_quantity
-            sold_item_info = f"**{item_name}** {sell_quantity}個"
-            await update_inventory(uid_str, item_name, -sell_quantity); await update_wallet(i.user, total_price)
-            await i.followup.send(f"{sold_item_info}を売却し、`{total_price}`{CURRENCY_ICON}を獲得しました！", ephemeral=True)
+            qty = modal.value; price = ITEM_DATABASE.get(item_name, {}).get('sell_price', 0) * qty
+            await update_inventory(uid_str, item_name, -qty); await update_wallet(i.user, price)
+            await i.followup.send(f"**{item_name}** {qty}個を売却し、`{price}`{CURRENCY_ICON}を獲得しました！", ephemeral=True)
         if self.message: await self.update_components(); await self.message.edit(view=self)
 
 class BuyItemView(ui.View):
@@ -127,11 +110,11 @@ class BuyItemView(ui.View):
         return True
     def update_components(self):
         self.clear_items(); is_first = self.current_category_index == 0; is_last = self.current_category_index >= len(BUY_CATEGORIES) - 1
-        prev_btn = ui.Button(label="◀ 前", style=discord.ButtonStyle.grey, disabled=is_first, row=0); next_btn = ui.Button(label="次 ▶", style=discord.ButtonStyle.grey, disabled=is_last, row=0)
+        prev_btn = ui.Button(label="◀ 前", disabled=is_first, row=0); next_btn = ui.Button(label="次 ▶", disabled=is_last, row=0)
         prev_btn.callback = self.prev_category_callback; next_btn.callback = self.next_category_callback; self.add_item(prev_btn); self.add_item(next_btn)
         category = BUY_CATEGORIES[self.current_category_index]
-        items = {name: data for name, data in ITEM_DATABASE.items() if data.get('category') == category and data.get("buyable", False)}
-        options = [discord.SelectOption(label=name, value=name, description=f"{data['price']}{CURRENCY_ICON} - {data.get('description', '')}"[:100], emoji=data.get('emoji')) for name, data in items.items()]
+        items = {n: d for n, d in ITEM_DATABASE.items() if d.get('category') == category and d.get("buyable", False)}
+        options = [discord.SelectOption(label=n, value=n, description=f"{d['price']}{CURRENCY_ICON} - {d.get('description', '')}"[:100], emoji=d.get('emoji')) for n, d in items.items()]
         select = ui.Select(placeholder=f"「{category}」カテゴリの商品を選択" if options else "商品準備中...", options=options or [discord.SelectOption(label="...")], disabled=not options, row=1)
         select.callback = self.select_callback; self.add_item(select)
     def create_embed(self) -> discord.Embed:
@@ -158,24 +141,22 @@ class BuyItemView(ui.View):
                     role = i.guild.get_role(data['id']);
                     if not role: raise ValueError("Role not found.")
                     if role in user.roles: return await i.followup.send(f"すでにその役職をお持ちです。", ephemeral=True)
-                    await update_wallet(user, -price); await user.add_roles(role)
-                    await i.followup.send(f"「{role.name}」役職を購入しました！", ephemeral=True)
-                else:
-                    user_items = await get_inventory(uid_str); current_rank = -1
+                    await update_wallet(user, -price); await user.add_roles(role); await i.followup.send(f"「{role.name}」役職を購入しました！", ephemeral=True)
+                else: # is_upgrade_item
+                    inv = await get_inventory(uid_str); current_rank = -1
                     for idx, rod in enumerate(ROD_HIERARCHY):
-                        if user_items.get(rod, 0) > 0: current_rank = idx
+                        if inv.get(rod, 0) > 0: current_rank = idx
                     if ROD_HIERARCHY.index(name) <= current_rank: return await i.followup.send("すでにその装備またはより良い装備を持っています。", ephemeral=True)
-                    await update_wallet(user, -price); await update_inventory(uid_str, name, 1)
-                    await i.followup.send(f"**{name}**にアップグレードしました！", ephemeral=True)
+                    await update_wallet(user, -price); await update_inventory(uid_str, name, 1); await i.followup.send(f"**{name}**にアップグレードしました！", ephemeral=True)
             except Exception as e: logger.error(f"Single item purchase error: {e}", exc_info=True); await update_wallet(user, price); await i.followup.send("購入処理中にエラーが発生しました。", ephemeral=True)
         else:
             modal = BuyQuantityModal(name, price, balance); await i.response.send_modal(modal); await modal.wait()
             if modal.value is None: return
-            quantity = modal.value; total_price = price * quantity
+            qty = modal.value; total_price = price * qty
             if (await get_wallet(user.id)).get('balance', 0) < total_price: return await i.followup.send("エラー: 残高が不足しています。", ephemeral=True)
             try:
-                await update_wallet(user, -total_price); await update_inventory(uid_str, name, quantity)
-                await i.followup.send(f"**{name}**を{quantity}個購入し、持ち物に入れました。", ephemeral=True)
+                await update_wallet(user, -total_price); await update_inventory(uid_str, name, qty)
+                await i.followup.send(f"**{name}**を{qty}個購入し、持ち物に入れました。", ephemeral=True)
             except Exception as e: logger.error(f"Multi-item purchase error: {e}", exc_info=True); await update_wallet(user, total_price); await i.followup.send("購入処理中にエラーが発生しました。", ephemeral=True)
         if self.message: self.update_components(); await self.message.edit(embed=self.create_embed(), view=self)
 
@@ -207,33 +188,21 @@ class Commerce(commands.Cog):
         self.commerce_panel_channel_id = await get_channel_id_from_db("commerce_panel_channel_id")
         logger.info(f"[Commerce Cog] Loaded COMMERCE_PANEL_CHANNEL_ID: {self.commerce_panel_channel_id}")
 
-    async def regenerate_panel(self):
-        if self.commerce_panel_channel_id and (channel := self.bot.get_channel(self.commerce_panel_channel_id)):
-            old_id = await get_panel_id("commerce_main")
-            if old_id:
-                try: (await channel.fetch_message(old_id)).delete()
-                except (discord.NotFound, discord.Forbidden): pass
-            embed = discord.Embed(title="💸 Dico森の暮らし", description="下のボタンを押して、商店でアイテムを購入したり、販売所で魚や収穫物を売却したりできます。", color=discord.Color.blue())
-            msg = await channel.send(embed=embed, view=CommercePanelView())
-            await save_panel_id("commerce_main", msg.id, channel.id)
-            logger.info(f"✅ Commerce panel auto-regenerated in channel {channel.name}")
-        else:
-            logger.info("ℹ️ Commerce panel channel not set, skipping auto-regeneration.")
-
-    @app_commands.command(name="経済パネル設置", description="経済システム（売買）パネルをチャンネルに設置します。")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_commerce_panel_command(self, i: discord.Interaction):
-        if not self.commerce_panel_channel_id:
-            return await i.response.send_message("エラー: まず `/setup set-channel` で `commerce_panel_channel_id` を設定してください。", ephemeral=True)
-        if i.channel.id != self.commerce_panel_channel_id:
-            return await i.response.send_message(f"このコマンドは <#{self.commerce_panel_channel_id}> でのみ使用できます。", ephemeral=True)
-        await i.response.defer(ephemeral=True)
-        try:
-            await self.regenerate_panel()
-            await i.followup.send("経済システムパネルを正常に設置しました。", ephemeral=True)
-        except Exception as e:
-            logger.error(f'Error executing command: {e}', exc_info=True)
-            await i.followup.send(f'❌ パネル設置中にエラーが発生しました: {e}', ephemeral=True)
+    async def regenerate_panel(self, channel: discord.TextChannel | None = None):
+        if channel is None:
+            if self.commerce_panel_channel_id: channel = self.bot.get_channel(self.commerce_panel_channel_id)
+            else: logger.info("ℹ️ Commerce panel channel not set, skipping auto-regeneration."); return
+        if not channel: logger.warning("❌ Commerce panel channel could not be found."); return
+        
+        old_id = await get_panel_id("commerce_main")
+        if old_id:
+            try: (await channel.fetch_message(old_id)).delete()
+            except (discord.NotFound, discord.Forbidden): pass
+            
+        embed = discord.Embed(title="💸 Dico森の暮らし", description="下のボタンを押して、商店でアイテムを購入したり、販売所で魚や収穫物を売却したりできます。", color=discord.Color.blue())
+        msg = await channel.send(embed=embed, view=CommercePanelView())
+        await save_panel_id("commerce_main", msg.id, channel.id)
+        logger.info(f"✅ Commerce panel successfully regenerated in channel {channel.name}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Commerce(bot))
