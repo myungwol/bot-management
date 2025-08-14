@@ -152,18 +152,25 @@ class ApprovalView(ui.View):
         tasks = []
         onboarding_cog = self.bot.get_cog("Onboarding")
         guest_role_id, temp_user_role_id, introduction_channel_id, new_welcome_channel_id, mention_role_id_1 = onboarding_cog.guest_role_id, onboarding_cog.temp_user_role_id, onboarding_cog.introduction_channel_id, onboarding_cog.new_welcome_channel_id, onboarding_cog.mention_role_id_1
+        
+        # 자기소개 채널에 게시
         if introduction_channel_id and (intro_ch := i.guild.get_channel(introduction_channel_id)):
             intro_embed = self.original_embed.copy()
             intro_embed.title = "ようこそ！新しい仲間です！"
             intro_embed.color = discord.Color.green()
             intro_embed.add_field(name="承認した公務員", value=i.user.mention, inline=False)
-            tasks.append(intro_ch.send(embed=intro_embed))
+            # [핵심] 자기소개 채널에 멘션 추가
+            tasks.append(intro_ch.send(content=member.mention, embed=intro_embed, allowed_mentions=discord.AllowedMentions(users=True)))
+
+        # 새로운 환영 채널에 메시지 (이 함수는 이미 내부에 멘션이 포함되어 있음)
         if new_welcome_channel_id and (nwc := i.guild.get_channel(new_welcome_channel_id)):
             tasks.append(self._send_new_welcome_message(member, nwc, mention_role_id_1))
+            
         async def send_dm():
             try: await member.send(f"お知らせ：「{i.guild.name}」での住人登録が公務員によって承認されました。これで全ての場所が利用可能です！")
             except discord.Forbidden: pass
         tasks.append(send_dm())
+        
         async def update_member_roles_and_nickname():
             try:
                 roles_to_add = []
@@ -209,7 +216,8 @@ class ApprovalView(ui.View):
             rejection_embed.add_field(name="拒否理由", value=self.rejection_reason or "理由が入力されませんでした。", inline=False)
             rejection_embed.add_field(name="処理者", value=i.user.mention, inline=False)
             rejection_embed.timestamp = i.created_at
-            tasks.append(rejection_ch.send(embed=rejection_embed))
+            # [핵심] 거절 로그 채널에 멘션 추가
+            tasks.append(rejection_ch.send(content=self.author.mention, embed=rejection_embed, allowed_mentions=discord.AllowedMentions(users=True)))
         async def send_dm():
             try: await self.author.send(f"お知らせ：「{i.guild.name}」での住人登録が公務員によって拒否されました。理由: 「{self.rejection_reason}」\nお手数ですが、もう一度 <#{onboarding_cog.panel_channel_id}> から登録をやり直してください。")
             except discord.Forbidden: pass
@@ -218,7 +226,6 @@ class ApprovalView(ui.View):
 
     async def _send_new_welcome_message(self, member: discord.Member, channel: discord.TextChannel, mention_role_id_1: int):
         mention_str = f"<@&{mention_role_id_1}>" if mention_role_id_1 else ""
-        # [핵심] content에 member.mention 추가
         content = f"# {member.mention} さんがDico森へ里入りしました！\n## 皆さんで歓迎しましょう！ {mention_str}"
         desc = ("Dico森は、皆さんの「森での暮らし」をより豊かにするための場所です。\n"
                 "様々なイベントや交流を通じて、楽しい思い出を作りましょう！\n\n"
