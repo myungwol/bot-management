@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (최종 수정본 - 쿨타임 로직 수정)
+# cogs/server/nicknames.py (최종 수정본 - 처리자 멘션 적용)
 
 import discord
 from discord.ext import commands
@@ -11,7 +11,6 @@ import logging
 # 로깅 설정
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
 if not logger.handlers:
     handler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -65,9 +64,7 @@ class NicknameApprovalView(ui.View):
 
     async def _send_result_and_refresh(self, result_embed: discord.Embed):
         nicknames_cog = self.bot.get_cog("Nicknames")
-        if not nicknames_cog or not nicknames_cog.panel_and_result_channel_id: 
-            logger.error("Nicknames Cog or result channel ID not found.")
-            return
+        if not nicknames_cog or not nicknames_cog.panel_and_result_channel_id: return
         result_channel = self.bot.get_channel(nicknames_cog.panel_and_result_channel_id)
         if result_channel:
             try:
@@ -96,7 +93,8 @@ class NicknameApprovalView(ui.View):
         result_embed.add_field(name="対象者", value=self.target_member.mention, inline=False)
         result_embed.add_field(name="変更前の名前", value=f"`{self.original_name}`", inline=True)
         result_embed.add_field(name="変更後の名前", value=f"`{final_name}`", inline=True)
-        result_embed.set_footer(text=f"承認者: {interaction.user.display_name} (公務員)")
+        # [핵심] 처리자를 이름 대신 멘션으로 변경
+        result_embed.set_footer(text=f"承認者: {interaction.user.mention} (公務員)")
         await self._send_result_and_refresh(result_embed)
         try: await interaction.message.delete()
         except discord.NotFound: pass
@@ -115,7 +113,8 @@ class NicknameApprovalView(ui.View):
         result_embed.add_field(name="申請した名前", value=f"`{self.new_name}`", inline=True)
         result_embed.add_field(name="現在の名前", value=f"`{self.original_name}`", inline=True)
         result_embed.add_field(name="拒否理由", value=modal.reason.value, inline=False)
-        result_embed.set_footer(text=f"処理者: {interaction.user.display_name} (公務員)")
+        # [핵심] 처리자를 이름 대신 멘션으로 변경
+        result_embed.set_footer(text=f"処理者: {interaction.user.mention} (公務員)")
         await self._send_result_and_refresh(result_embed)
         try: await interaction.message.delete()
         except discord.NotFound: pass
@@ -143,7 +142,6 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         if not approval_channel:
             return await interaction.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
         
-        # [핵심] 신청서가 정상적으로 제출된 이 시점에 쿨타임을 적용
         await set_cooldown(str(interaction.user.id), time.time())
         
         embed = discord.Embed(title="📝 名前変更申請", color=discord.Color.blue())
@@ -177,7 +175,6 @@ class NicknameChangerPanelView(ui.View):
         if not nicknames_cog or not nicknames_cog.approval_role_id:
             return await interaction.response.send_message("エラー: ニックネーム変更機能が設定されていません。管理者が設定を確認してください。", ephemeral=True)
         
-        # [수정] 버튼 클릭 시점에서는 쿨타임을 적용하지 않음
         await interaction.response.send_modal(NicknameChangeModal(approval_role_id=nicknames_cog.approval_role_id))
 
 class Nicknames(commands.Cog):
