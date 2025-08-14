@@ -1,4 +1,4 @@
-# cogs/games/user_profile.py (자동 재생성 기능이 적용된 최종본)
+# cogs/games/user_profile.py (명령어 통합 최종본)
 
 import discord
 from discord.ext import commands
@@ -156,32 +156,22 @@ class UserProfile(commands.Cog):
     async def load_user_profile_channel_config(self):
         self.inventory_panel_channel_id = await get_channel_id_from_db("inventory_panel_channel_id")
         logger.info(f"[UserProfile Cog] Loaded INVENTORY_PANEL_CHANNEL_ID: {self.inventory_panel_channel_id}")
-    async def regenerate_panel(self):
-        if self.inventory_panel_channel_id and (channel := self.bot.get_channel(self.inventory_panel_channel_id)):
-            old_id = await get_panel_id("inventory")
-            if old_id:
-                try: (await channel.fetch_message(old_id)).delete()
-                except (discord.NotFound, discord.Forbidden): pass
-            embed = discord.Embed(title="📦 持ち物", description="下のボタンを押して、あなたの持ち物を開きます。", color=discord.Color.from_rgb(200, 200, 200))
-            msg = await channel.send(embed=embed, view=InventoryPanelView())
-            await save_panel_id("inventory", msg.id, channel.id)
-            logger.info(f"✅ Inventory panel auto-regenerated in channel {channel.name}")
-        else:
-            logger.info("ℹ️ Inventory panel channel not set, skipping auto-regeneration.")
-    @app_commands.command(name="持ち物パネル設置", description="持ち物を開くパネルをチャンネルに設置します。")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_inventory_panel_command(self, i: discord.Interaction):
-        if not self.inventory_panel_channel_id:
-            return await i.response.send_message("エラー: まず `/setup set-channel` で `inventory_panel_channel_id` を設定してください。", ephemeral=True)
-        if i.channel.id != self.inventory_panel_channel_id:
-            return await i.response.send_message(f"このコマンドは <#{self.inventory_panel_channel_id}> でのみ使用できます。", ephemeral=True)
-        await i.response.defer(ephemeral=True)
-        try:
-            await self.regenerate_panel()
-            await i.followup.send("持ち物パネルを正常に設置しました。", ephemeral=True)
-        except Exception as e:
-            logger.error(f"Error during inventory panel setup command: {e}", exc_info=True)
-            await i.followup.send(f"❌ パネル設置中にエラーが発生しました: {e}", ephemeral=True)
+        
+    async def regenerate_panel(self, channel: discord.TextChannel | None = None):
+        if channel is None:
+            if self.inventory_panel_channel_id: channel = self.bot.get_channel(self.inventory_panel_channel_id)
+            else: logger.info("ℹ️ Inventory panel channel not set, skipping auto-regeneration."); return
+        if not channel: logger.warning("❌ Inventory panel channel could not be found."); return
+        
+        old_id = await get_panel_id("inventory")
+        if old_id:
+            try: (await channel.fetch_message(old_id)).delete()
+            except (discord.NotFound, discord.Forbidden): pass
+            
+        embed = discord.Embed(title="📦 持ち物", description="下のボタンを押して、あなたの持ち物を開きます。", color=discord.Color.from_rgb(200, 200, 200))
+        msg = await channel.send(embed=embed, view=InventoryPanelView())
+        await save_panel_id("inventory", msg.id, channel.id)
+        logger.info(f"✅ Inventory panel successfully regenerated in channel {channel.name}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(UserProfile(bot))
