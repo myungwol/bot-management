@@ -163,10 +163,14 @@ class UserProfile(commands.Cog):
             else: logger.info("ℹ️ Inventory panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Inventory panel channel could not be found."); return
         
-        old_id = await get_panel_id("inventory")
-        if old_id:
-            try: (await channel.fetch_message(old_id)).delete()
-            except (discord.NotFound, discord.Forbidden): pass
+        # [수정된 부분]
+        panel_info = await get_panel_id("inventory")
+        if panel_info and (old_id := panel_info.get('message_id')):
+            try:
+                message_to_delete = await channel.fetch_message(old_id)
+                await message_to_delete.delete()
+            except (discord.NotFound, discord.Forbidden):
+                pass
             
         embed = discord.Embed(title="📦 持ち物", description="下のボタンを押して、あなたの持ち物を開きます。", color=discord.Color.from_rgb(200, 200, 200))
         msg = await channel.send(embed=embed, view=InventoryPanelView())
