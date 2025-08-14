@@ -1,17 +1,14 @@
-# utils/database.py (get_auto_role_buttons 복구 최종본)
+# main.py (setup_hook 수정 최종본)
 
-import os
 import discord
-from supabase import create_client, AsyncClient
+from discord.ext import commands
+import os
+import asyncio
 import logging
 
-# [수정] system.py의 AutoRoleView를 가져오기 위해 import 경로 조정
-# 이 경로는 cogs/server/system.py 파일의 위치에 따라 정확해야 합니다.
-from cogs.server.system import AutoRoleView
-
-# [수정] 실제 존재하는 함수 이름으로 변경
-from utils.database import (get_all_channel_configs, 
-                           get_all_auto_role_panels, get_auto_role_buttons)
+# [수정] 새로운 setup_hook에 필요한 올바른 함수와 변수를 임포트합니다.
+from cogs.server.system import AutoRoleView, STATIC_AUTO_ROLE_PANELS
+from utils.database import (get_all_channel_configs, get_panel_id)
 
 # 로깅 기본 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -27,27 +24,26 @@ intents.message_content = True
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # 봇의 모든 채널 설정을 저장할 딕셔너리 (필요 시 사용)
-        self.channel_configs = {}
 
     async def setup_hook(self):
-        """ 봇이 재시작될 때 AutoRoleView를 다시 등록하는 핵심 기능 """
-        logger.info("------ [ 자동 역할 패널 View 재등록 시작 ] ------")
-        panels = await get_all_auto_role_panels()
-        if not panels:
-            logger.info("ℹ️ 재등록할 자동 역할 패널이 없습니다.")
-        else:
-            for panel_config in panels:
-                try:
-                    buttons_config = await get_auto_role_buttons(panel_config['message_id'])
-                    view = AutoRoleView(buttons_config)
-                    # message_id를 지정하여 봇에 View를 다시 인식시킴
-                    self.add_view(view, message_id=panel_config['message_id'])
-                    logger.info(f"✅ 자동 역할 패널 (ID: {panel_config['message_id']})의 View를 재등록했습니다.")
-                except Exception as e:
-                    logger.error(f"❌ 자동 역할 패널 (ID: {panel_config['message_id']}) 재등록 중 오류: {e}")
-        logger.info("------ [ 자동 역할 패널 View 재등록 완료 ] ------")
-
+        """ [변경] 봇이 시작될 때 새로운 방식의 View를 올바르게 다시 로드합니다. """
+        logger.info("------ [ 역할 패널 View 재등록 시작 ] ------")
+        
+        # 1. 코드에 정의된 모든 패널 설정을 반복합니다.
+        for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
+            try:
+                # 2. DB에서 해당 패널의 메시지 ID를 찾습니다.
+                panel_info = await get_panel_id(panel_key)
+                if panel_info and panel_info.get('message_id'):
+                    # 3. 새로운 방식에 맞게 View를 생성합니다. (전체 설정을 넘겨줍니다)
+                    view = AutoRoleView(panel_config)
+                    # 4. 해당 메시지 ID에 View를 다시 연결합니다.
+                    self.add_view(view, message_id=panel_info['message_id'])
+                    logger.info(f"✅ 역할 패널 View 재등록 성공: '{panel_key}' (ID: {panel_info['message_id']})")
+            except Exception as e:
+                logger.error(f"❌ 역할 패널 '{panel_key}' View 재등록 중 오류: {e}")
+        
+        logger.info("------ [ 역할 패널 View 재등록 완료 ] ------")
 
 bot = MyBot(command_prefix="/", intents=intents)
 
@@ -62,18 +58,8 @@ async def on_ready():
     except Exception as e:
         logger.error(f'❌ 명령어 동기화 중 오류가 발생했습니다: {e}')
 
-    # [수정] 봇 시작 시 모든 채널 설정을 한번만 DB에서 가져와 캐시에 저장
-    # database.py의 _cached_channel_configs 변수에 저장됨
     await get_all_channel_configs()
     logger.info("✅ 모든 채널 설정이 캐시되었습니다.")
-    
-    # [삭제] 더 이상 regenerate_all_panels 함수를 호출하지 않음
-    # 패널 생성/관리는 이제 /system setup-panels 명령어로 수행
-
-
-# [삭제] regenerate_all_panels 함수 전체를 삭제합니다.
-# 이 기능은 cogs/server/system.py의 'setup-panels' 명령어로 대체되었습니다.
-
 
 async def load_extensions():
     logger.info("------ [ Cog 로드 시작 ] ------")
@@ -88,15 +74,6 @@ async def load_extensions():
                     except Exception as e:
                         logger.error(f'❌ Cog 로드 실패: {folder}/{filename} | 오류: {e}', exc_info=True)
     logger.info("------ [ Cog 로드 완료 ] ------")
-# [복구] 자동 역할 버튼 정보를 가져오는 함수
-async def get_auto_role_buttons(message_id: int):
-    if not supabase: return []
-    try:
-        response = await supabase.table('auto_roles').select('*').eq('message_id', message_id).execute()
-        return response.data if response.data else []
-    except Exception as e:
-        logger.error(f"[DB Error] get_auto_role_buttons: {e}", exc_info=True)
-        return []
 
 async def main():
     async with bot:
@@ -106,10 +83,10 @@ async def main():
 if __name__ == "__main__":
     try:
         if BOT_TOKEN is None:
-            logger.critical("❌ BOT_TOKEN 환경 변수가 설정되지 않았습니다. Railway의 Variables를 확인해주세요.")
+            logger.critical("❌ BOT_TOKEN 환경 변수가 설정되지 않았습니다.")
         else:
             asyncio.run(main())
     except discord.errors.LoginFailure:
-        logger.critical("❌ 봇 토큰이 잘못되었습니다. Railway의 BOT_TOKEN 환경 변수를 확인해주세요.")
+        logger.critical("❌ 봇 토큰이 잘못되었습니다. BOT_TOKEN 환경 변수를 확인해주세요.")
     except Exception as e:
         logger.critical(f"🚨 봇 실행 중 치명적인 오류 발생: {e}", exc_info=True)
