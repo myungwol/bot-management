@@ -1,4 +1,3 @@
-
 # main.py (패널 자동 재생성 기능이 포함된 최종 안정화 버전)
 
 import discord
