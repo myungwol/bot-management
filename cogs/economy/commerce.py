@@ -194,10 +194,14 @@ class Commerce(commands.Cog):
             else: logger.info("ℹ️ Commerce panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Commerce panel channel could not be found."); return
         
-        old_id = await get_panel_id("commerce_main")
-        if old_id:
-            try: (await channel.fetch_message(old_id)).delete()
-            except (discord.NotFound, discord.Forbidden): pass
+        # [수정된 부분]
+        panel_info = await get_panel_id("commerce_main")
+        if panel_info and (old_id := panel_info.get('message_id')):
+            try:
+                message_to_delete = await channel.fetch_message(old_id)
+                await message_to_delete.delete()
+            except (discord.NotFound, discord.Forbidden):
+                pass
             
         embed = discord.Embed(title="💸 Dico森の暮らし", description="下のボタンを押して、商店でアイテムを購入したり、販売所で魚や収穫物を売却したりできます。", color=discord.Color.blue())
         msg = await channel.send(embed=embed, view=CommercePanelView())
