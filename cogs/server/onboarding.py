@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (최종 수정본 - 신청자 멘션 알림 추가)
+# cogs/server/onboarding.py (최종 수정본 - 자기소개 쿨타임 추가)
 
 import discord
 from discord.ext import commands
@@ -7,6 +7,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime
+import time # 쿨타임을 위해 time 모듈 임포트
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
@@ -17,7 +18,12 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-from utils.database import get_panel_id, save_panel_id, get_channel_id_from_db, get_role_id, get_auto_role_mappings
+# [수정] get_cooldown, set_cooldown 함수 임포트
+from utils.database import (get_panel_id, save_panel_id, get_channel_id_from_db, 
+                           get_role_id, get_auto_role_mappings, get_cooldown, set_cooldown)
+
+# 쿨타임 설정 (10분)
+INTRODUCTION_COOLDOWN_SECONDS = 10 * 60
 
 GUIDE_GIF_URL = "https://media.discordapp.net/attachments/1402228452106436689/1404406045635252266/welcome.gif?ex=689b128d&is=6899c10d&hm=e0226740554e16e44a6d8034c99c247ac174c38f53ea998aa0de600153e1c495&="
 GUIDE_PAGES = [
@@ -54,6 +60,10 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             if not approval_channel_id: return await interaction.followup.send("❌ エラー: 承認チャンネルIDが設定されていません。", ephemeral=True)
             approval_channel = interaction.guild.get_channel(approval_channel_id)
             if not approval_channel: return await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True)
+
+            # [핵심] 신청서 제출 시 쿨타임 적용
+            await set_cooldown(f"intro_{interaction.user.id}", time.time())
+            
             embed = discord.Embed(title="📝 新しい住人登録票が提出されました", description=f"**作成者:** {interaction.user.mention}", color=discord.Color.blue())
             embed.set_thumbnail(url=interaction.user.display_avatar.url)
             embed.add_field(name="名前", value=self.name.value, inline=False)
@@ -62,6 +72,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             embed.set_footer(text=f"リクエスト日時: {interaction.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            
             await approval_channel.send(
                 content=f"<@&{self.approval_role_id}> 新しい住人登録票が提出されました。",
                 embed=embed,
@@ -152,25 +163,18 @@ class ApprovalView(ui.View):
         tasks = []
         onboarding_cog = self.bot.get_cog("Onboarding")
         guest_role_id, temp_user_role_id, introduction_channel_id, new_welcome_channel_id, mention_role_id_1 = onboarding_cog.guest_role_id, onboarding_cog.temp_user_role_id, onboarding_cog.introduction_channel_id, onboarding_cog.new_welcome_channel_id, onboarding_cog.mention_role_id_1
-        
-        # 자기소개 채널에 게시
         if introduction_channel_id and (intro_ch := i.guild.get_channel(introduction_channel_id)):
             intro_embed = self.original_embed.copy()
             intro_embed.title = "ようこそ！新しい仲間です！"
             intro_embed.color = discord.Color.green()
             intro_embed.add_field(name="承認した公務員", value=i.user.mention, inline=False)
-            # [핵심] 자기소개 채널에 멘션 추가
             tasks.append(intro_ch.send(content=member.mention, embed=intro_embed, allowed_mentions=discord.AllowedMentions(users=True)))
-
-        # 새로운 환영 채널에 메시지 (이 함수는 이미 내부에 멘션이 포함되어 있음)
         if new_welcome_channel_id and (nwc := i.guild.get_channel(new_welcome_channel_id)):
             tasks.append(self._send_new_welcome_message(member, nwc, mention_role_id_1))
-            
         async def send_dm():
             try: await member.send(f"お知らせ：「{i.guild.name}」での住人登録が公務員によって承認されました。これで全ての場所が利用可能です！")
             except discord.Forbidden: pass
         tasks.append(send_dm())
-        
         async def update_member_roles_and_nickname():
             try:
                 roles_to_add = []
@@ -216,7 +220,6 @@ class ApprovalView(ui.View):
             rejection_embed.add_field(name="拒否理由", value=self.rejection_reason or "理由が入力されませんでした。", inline=False)
             rejection_embed.add_field(name="処理者", value=i.user.mention, inline=False)
             rejection_embed.timestamp = i.created_at
-            # [핵심] 거절 로그 채널에 멘션 추가
             tasks.append(rejection_ch.send(content=self.author.mention, embed=rejection_embed, allowed_mentions=discord.AllowedMentions(users=True)))
         async def send_dm():
             try: await self.author.send(f"お知らせ：「{i.guild.name}」での住人登録が公務員によって拒否されました。理由: 「{self.rejection_reason}」\nお手数ですが、もう一度 <#{onboarding_cog.panel_channel_id}> から登録をやり直してください。")
@@ -303,6 +306,15 @@ class OnboardingView(ui.View):
         except Exception as e: await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。\n`{e}`", ephemeral=True)
 
     async def create_introduction(self, interaction: discord.Interaction):
+        user_cooldown_key = f"intro_{interaction.user.id}"
+        last_request_time = await get_cooldown(user_cooldown_key)
+
+        if last_request_time and time.time() - last_request_time < INTRODUCTION_COOLDOWN_SECONDS:
+            remaining_time = INTRODUCTION_COOLDOWN_SECONDS - (time.time() - last_request_time)
+            minutes, seconds = divmod(int(remaining_time), 60)
+            await interaction.response.send_message(f"次の申請まであと {minutes}分{seconds}秒 お待ちください。", ephemeral=True)
+            return
+
         onboarding_cog = interaction.client.get_cog("Onboarding")
         approval_role_id = onboarding_cog.approval_role_id if onboarding_cog else 0
         await interaction.response.send_modal(IntroductionModal(approval_role_id=approval_role_id))
