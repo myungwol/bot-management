@@ -1,4 +1,4 @@
-# main.py (최종 수정본 - 기억 복구 기능 추가)
+# main.py (수정 제안본)
 
 import discord
 from discord.ext import commands
@@ -6,9 +6,9 @@ import os
 import asyncio
 import logging
 
-# [수정] system.py의 AutoRoleView를 가져오기 위해 import 경로 조정
+# system.py의 AutoRoleView를 가져오기 위해 import 경로 조정
 from cogs.server.system import AutoRoleView
-from utils.database import (get_channel_id_from_db, get_all_channel_configs, 
+from utils.database import (get_all_channel_configs_as_dict, # 수정: 딕셔너리로 한번에 가져오는 함수
                            get_all_auto_role_panels, get_auto_role_buttons)
 
 # 로깅 기본 설정
@@ -25,23 +25,28 @@ intents.message_content = True # on_message 이벤트를 위해 추가
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # 봇의 모든 채널 설정을 저장할 딕셔너리
+        self.channel_configs = {}
 
     async def setup_hook(self):
         """ 봇이 시작될 때 뷰(View)를 다시 로드하는 중요한 부분 """
-        logger.info("------ [ 自動役割パネルの再生成開始 ] ------")
+        logger.info("------ [ 자동 역할 패널 재생성 시작 ] ------")
         panels = await get_all_auto_role_panels()
         if not panels:
-            logger.info("ℹ️ 再生成する自動役割パネルがありません。")
+            logger.info("ℹ️ 재생성할 자동 역할 패널이 없습니다.")
         else:
             for panel_config in panels:
                 try:
+                    # 패널에 속한 버튼 정보들을 가져옵니다.
                     buttons_config = await get_auto_role_buttons(panel_config['message_id'])
+                    # 가져온 버튼 정보로 View를 생성합니다.
                     view = AutoRoleView(buttons_config)
+                    # 생성된 View를 봇에 다시 등록합니다. message_id를 꼭 지정해야 합니다.
                     self.add_view(view, message_id=panel_config['message_id'])
-                    logger.info(f"✅ 自動役割パネル (ID: {panel_config['message_id']}) のViewを再登録しました。")
+                    logger.info(f"✅ 자동 역할 패널 (ID: {panel_config['message_id']})의 View를 재등록했습니다.")
                 except Exception as e:
-                    logger.error(f"❌ 自動役割パネル (ID: {panel_config['message_id']}) の再生成中にエラー: {e}")
-        logger.info("------ [ 自動役割パネルの再生成完了 ] ------")
+                    logger.error(f"❌ 자동 역할 패널 (ID: {panel_config['message_id']}) 재생성 중 오류: {e}")
+        logger.info("------ [ 자동 역할 패널 재생성 완료 ] ------")
 
 bot = MyBot(command_prefix="/", intents=intents)
 
@@ -56,68 +61,88 @@ async def on_ready():
     except Exception as e:
         logger.error(f'❌ 명령어 동기화 중 오류가 발생했습니다: {e}')
 
-    await get_all_channel_configs()
-    logger.info("✅ 모든 채널 설정이 캐시되었습니다.")
+    # [수정] 봇 시작 시 모든 채널 설정을 한번만 DB에서 가져와 봇 인스턴스에 저장
+    bot.channel_configs = await get_all_channel_configs_as_dict()
+    if bot.channel_configs:
+        logger.info("✅ 모든 채널 설정이 캐시되었습니다.")
+    else:
+        logger.warning("⚠️ DB에서 채널 설정을 가져오지 못했거나 설정이 없습니다.")
     
-    await regenerate_all_panels()
+    # [수정] 캐시된 채널 설정을 인자로 전달하여 패널 재생성 함수 호출
+    await regenerate_all_panels(bot.channel_configs)
 
-async def regenerate_all_panels():
-    """DB에 저장된 채널 ID를 기반으로 모든 등록된 패널 메시지를 재생성합니다."""
-    logger.info("------ [ すべてのパネル再生成開始 ] ------")
+async def regenerate_all_panels(channel_configs: dict):
+    """
+    각 Cog에 정의된 정보를 기반으로 모든 패널 메시지를 재생성합니다.
+    [수정] 더 이상 main.py에 패널 정보를 하드코딩하지 않습니다.
+    """
+    logger.info("------ [ 모든 기능 패널 재생성 시작 ] ------")
     panel_tasks = []
-    
-    panel_configs = {
-        "Commerce": "commerce_panel_channel_id",
-        "Nicknames": "nickname_panel_channel_id",
-        "Onboarding": "onboarding_panel_channel_id",
-        "Fishing": "fishing_panel_channel_id",
-        "UserProfile": "inventory_panel_channel_id",
-    }
 
-    panel_regeneration_map = {
-        "Commerce": "regenerate_commerce_panel",
-        "Nicknames": "regenerate_panel",
-        "Onboarding": "regenerate_onboarding_panel",
-        "Fishing": "regenerate_fishing_panel",
-        "UserProfile": "regenerate_inventory_panel",
-    }
+    # 봇에 로드된 모든 Cog를 순회합니다.
+    for cog_name, cog in bot.cogs.items():
+        # [개선] 각 Cog가 패널 재생성에 필요한 정보를 스스로 갖도록 설계
+        # 예를 들어, Cog 내에 `get_panel_info` 라는 함수가 있는지 확인
+        if not hasattr(cog, 'get_panel_info'):
+            continue
 
-    for cog_name, channel_key in panel_configs.items():
-        cog = bot.get_cog(cog_name)
-        channel_id = await get_channel_id_from_db(channel_key)
+        panel_info = cog.get_panel_info()
+        channel_key = panel_info.get("channel_key")
+        regenerate_func_name = panel_info.get("regenerate_func_name")
+
+        if not channel_key or not regenerate_func_name:
+            continue
+            
+        # [수정] DB를 다시 조회하는 대신, on_ready에서 캐시한 설정값을 사용
+        channel_id = channel_configs.get(channel_key)
         
-        if cog and channel_id:
+        if channel_id:
             channel = bot.get_channel(channel_id)
             if channel:
-                regen_func_name = panel_regeneration_map.get(cog_name)
-                if hasattr(cog, regen_func_name):
-                    regen_func = getattr(cog, regen_func_name)
+                # Cog에 패널 재생성 함수가 있는지 확인
+                if hasattr(cog, regenerate_func_name):
+                    regen_func = getattr(cog, regenerate_func_name)
+                    # 재생성 작업을 비동기 태스크 목록에 추가
                     panel_tasks.append(regen_func(channel))
-                    logger.info(f"🔄 {cog_name} パネル再生中: {channel.name}")
+                    logger.info(f"🔄 '{cog_name}'의 패널을 '{channel.name}' 채널에 재생성 준비 완료.")
+                else:
+                    logger.warning(f"❓ '{cog_name}' Cog에 '{regenerate_func_name}' 함수가 정의되지 않았습니다.")
             else:
-                logger.warning(f"❌ {cog_name} パネルチャンネルが見つかりません: {channel_id}")
-        elif not channel_id:
-            logger.info(f"⚠️ {cog_name} パネルチャンネルIDがDBに設定されていません。")
+                logger.warning(f"❌ '{cog_name}'의 패널 채널을 찾을 수 없습니다 (ID: {channel_id}). 서버에서 삭제되었을 수 있습니다.")
+        else:
+            logger.info(f"ℹ️ '{cog_name}'의 패널 채널 ID가 DB에 설정되지 않았습니다 (Key: {channel_key}).")
 
     if panel_tasks:
-        await asyncio.gather(*panel_tasks, return_exceptions=True)
+        # asyncio.gather를 사용하여 모든 패널 재생성 작업을 동시에 실행
+        results = await asyncio.gather(*panel_tasks, return_exceptions=True)
+        
+        # [수정] gather 결과를 확인하여 실패한 작업을 로깅
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                # 어떤 태스크에서 에러가 났는지 식별하기 위해 추가적인 정보가 필요할 수 있습니다.
+                # 여기서는 간단히 에러 내용만 로깅합니다.
+                logger.error(f"❌ 패널 재생성 작업 중 오류 발생: {result}", exc_info=result)
     else:
-        logger.info("ℹ️ 再生成するパネル作業がありません。")
-    logger.info("------ [ すべてのパネル再生成完了 ] ------")
+        logger.info("ℹ️ 재생성할 패널 작업이 없습니다.")
+        
+    logger.info("------ [ 모든 기능 패널 재생성 완료 ] ------")
 
 async def load_extensions():
-    logger.info("------ [ Cog ロード開始 ] ------")
+    logger.info("------ [ Cog 로드 시작 ] ------")
+    # ./cogs 디렉토리의 모든 하위 폴더를 순회
     for folder in os.listdir('./cogs'):
         folder_path = os.path.join('cogs', folder)
         if os.path.isdir(folder_path):
+            # 하위 폴더 내의 파이썬 파일을 순회
             for filename in os.listdir(folder_path):
                 if filename.endswith('.py') and not filename.startswith('__'):
                     try:
+                        # f'cogs.폴더명.파일명' 형태로 확장자를 로드
                         await bot.load_extension(f'cogs.{folder}.{filename[:-3]}')
-                        logger.info(f'✅ Cog ロード成功: {folder}/{filename}')
+                        logger.info(f'✅ Cog 로드 성공: {folder}/{filename}')
                     except Exception as e:
-                        logger.error(f'❌ Cog ロード失敗: {folder}/{filename} | エラー: {e}', exc_info=True)
-    logger.info("------ [ Cog ロード完了 ] ------")
+                        logger.error(f'❌ Cog 로드 실패: {folder}/{filename} | 오류: {e}', exc_info=True)
+    logger.info("------ [ Cog 로드 완료 ] ------")
 
 async def main():
     async with bot:
