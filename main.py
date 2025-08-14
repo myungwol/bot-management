@@ -1,9 +1,8 @@
-# main.py (오류 수정 및 최종 정리본)
+# utils/database.py (get_auto_role_buttons 복구 최종본)
 
-import discord
-from discord.ext import commands
 import os
-import asyncio
+import discord
+from supabase import create_client, AsyncClient
 import logging
 
 # [수정] system.py의 AutoRoleView를 가져오기 위해 import 경로 조정
@@ -89,7 +88,15 @@ async def load_extensions():
                     except Exception as e:
                         logger.error(f'❌ Cog 로드 실패: {folder}/{filename} | 오류: {e}', exc_info=True)
     logger.info("------ [ Cog 로드 완료 ] ------")
-
+# [복구] 자동 역할 버튼 정보를 가져오는 함수
+async def get_auto_role_buttons(message_id: int):
+    if not supabase: return []
+    try:
+        response = await supabase.table('auto_roles').select('*').eq('message_id', message_id).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        logger.error(f"[DB Error] get_auto_role_buttons: {e}", exc_info=True)
+        return []
 
 async def main():
     async with bot:
