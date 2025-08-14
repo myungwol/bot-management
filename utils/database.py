@@ -1,14 +1,13 @@
-# utils/database.py (자동 역할 기억 기능 추가, 생략 없음)
+# utils/database.py (새로운 동적 시스템을 지원하는 최종 수정본)
 
 import os
 import discord
-from supabase import AsyncClient
+from supabase import create_client, AsyncClient
 import logging
 import re
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 # --- ⬇️ 역할 ID를 이곳에서 모두 관리합니다 ⬇️ ---
 # ◀◀◀ 여기에 있는 모든 '123...' 가짜 ID를 실제 디스코드 서버 역할 ID로 변경하세요! ◀◀◀
@@ -51,17 +50,128 @@ AUTO_ROLE_MAPPING = [
     },
 ]
 
-# Supabase 클라이언트 초기화
+# --- Supabase 클라이언트 초기화 ---
 supabase: AsyncClient = None
 try:
     url: str = os.environ.get("SUPABASE_URL")
     key: str = os.environ.get("SUPABASE_KEY")
     if not url or not key:
         raise ValueError("SUPABASE_URL 또는 SUPABASE_KEY 환경 변수가 설정되지 않았습니다.")
-    supabase = AsyncClient(supabase_url=url, supabase_key=key)
-    logger.info("✅ Supabase Async Client Created")
+    supabase = create_client(supabase_url=url, supabase_key=key)
+    logger.info("✅ Supabase 클라이언트가 성공적으로 생성되었습니다.")
 except Exception as e:
-    logger.error("❌ Supabase Async Client Creation Failed: %s", e, exc_info=True)
+    logger.error(f"❌ Supabase 클라이언트 생성 실패: {e}", exc_info=True)
+
+
+# --- ⬇️ [신규/수정] 동적 패널 시스템 함수 섹션 ⬇️ ---
+
+# --- 패널 임베드 관리 (embeds 테이블) ---
+async def save_embed_to_db(embed_key: str, embed_data: dict):
+    if not supabase: return
+    try:
+        await supabase.table('embeds').upsert({'embed_key': embed_key, 'embed_data': embed_data}).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] save_embed_to_db: {e}", exc_info=True)
+
+async def get_embed_from_db(embed_key: str) -> dict | None:
+    if not supabase: return None
+    try:
+        response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
+        return response.data[0]['embed_data'] if response.data else None
+    except Exception as e:
+        logger.error(f"[DB Error] get_embed_from_db: {e}", exc_info=True)
+        return None
+
+async def delete_embed_from_db(embed_key: str):
+    if not supabase: return
+    try:
+        await supabase.table('embeds').delete().eq('embed_key', embed_key).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] delete_embed_from_db: {e}", exc_info=True)
+
+
+# --- 패널 위치/메타데이터 관리 (panel_data 테이블) ---
+async def save_panel_id(panel_name: str, message_id: int, channel_id: int):
+    if not supabase: return
+    try:
+        await supabase.table('panel_data').upsert(
+            {"panel_name": panel_name, "message_id": message_id, "channel_id": channel_id}, 
+            on_conflict="panel_name"
+        ).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] save_panel_id: {e}", exc_info=True)
+
+async def get_panel_id(panel_name: str) -> dict | None:
+    if not supabase: return None
+    try:
+        res = await supabase.table('panel_data').select('message_id, channel_id').eq('panel_name', panel_name).limit(1).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        logger.error(f"[DB Error] get_panel_id: {e}", exc_info=True)
+        return None
+
+async def delete_panel_id(panel_name: str):
+    if not supabase: return
+    try:
+        await supabase.table('panel_data').delete().eq('panel_name', panel_name).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] delete_panel_id: {e}", exc_info=True)
+
+
+# --- [수정] 자동 역할 패널/버튼 관리 (봇 재시작 시 복구 및 동적 삭제 지원) ---
+async def add_auto_role_panel(message_id: int, guild_id: int, channel_id: int, title: str, description: str):
+    if not supabase: return
+    try:
+        await supabase.table('auto_role_panels').insert({
+            'message_id': message_id, 'guild_id': guild_id, 'channel_id': channel_id,
+            'title': title, 'description': description
+        }).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] add_auto_role_panel: {e}", exc_info=True)
+
+async def get_all_auto_role_panels():
+    if not supabase: return []
+    try:
+        response = await supabase.table('auto_role_panels').select('*').execute()
+        return response.data if response.data else []
+    except Exception as e:
+        logger.error(f"[DB Error] get_all_auto_role_panels: {e}", exc_info=True)
+        return []
+        
+async def delete_auto_role_panel(message_id: int):
+    if not supabase: return
+    try:
+        await supabase.table('auto_role_panels').delete().eq('message_id', message_id).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] delete_auto_role_panel: {e}", exc_info=True)
+
+async def add_auto_role_button(message_id: int, role_id: int, label: str, emoji: str | None, style: str):
+    if not supabase: return
+    try:
+        await supabase.table('auto_roles').insert({
+            'message_id': message_id, 'role_id': role_id, 
+            'button_label': label, 'button_emoji': emoji, 'button_style': style
+        }).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] add_auto_role_button: {e}", exc_info=True)
+
+async def remove_auto_role_button(message_id: int, role_id: int):
+    if not supabase: return
+    try:
+        await supabase.table('auto_roles').delete().match({'message_id': message_id, 'role_id': role_id}).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] remove_auto_role_button: {e}", exc_info=True)
+
+async def get_auto_role_buttons(message_id: int):
+    if not supabase: return []
+    try:
+        response = await supabase.table('auto_roles').select('*').eq('message_id', message_id).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        logger.error(f"[DB Error] get_auto_role_buttons: {e}", exc_info=True)
+        return []
+
+# --- ⬇️ [유지] 기존 기능 함수 섹션 ⬇️ ---
 
 _cached_channel_configs: dict = {}
 
@@ -98,84 +208,7 @@ async def remove_counter_config(channel_id: int):
     except Exception as e:
         logger.error(f"[DB Error] remove_counter_config: {e}", exc_info=True)
 
-async def save_embed_to_db(embed_key: str, embed_data: dict):
-    """임베드 데이터를 JSON 형태로 DB에 저장 또는 업데이트합니다."""
-    if not supabase: return
-    try:
-        # 'embeds'는 테이블 이름입니다. Supabase에서 미리 생성해야 합니다.
-        # 컬럼: embed_key (text, primary key), embed_data (jsonb)
-        await supabase.table('embeds').upsert({
-            'embed_key': embed_key,
-            'embed_data': embed_data
-        }).execute()
-    except Exception as e:
-        logger.error(f"[DB Error] save_embed_to_db: {e}", exc_info=True)
-
-async def get_embed_from_db(embed_key: str) -> dict | None:
-    """DB에서 임베드 데이터를 불러옵니다."""
-    if not supabase: return None
-    try:
-        response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
-        return response.data[0]['embed_data'] if response.data else None
-    except Exception as e:
-        logger.error(f"[DB Error] get_embed_from_db: {e}", exc_info=True)
-        return None
-
-async def delete_embed_from_db(embed_key: str):
-    """DB에서 임베드 데이터를 삭제합니다."""
-    if not supabase: return
-    try:
-        await supabase.table('embeds').delete().eq('embed_key', embed_key).execute()
-    except Exception as e:
-        logger.error(f"[DB Error] delete_embed_from_db: {e}", exc_info=True)
-
-# --- 자동 역할 패널/버튼 관리 함수 ---
-async def add_auto_role_panel(message_id: int, guild_id: int, channel_id: int, title: str, description: str):
-    if not supabase: return
-    try:
-        await supabase.table('auto_role_panels').insert({
-            'message_id': message_id,
-            'guild_id': guild_id,
-            'channel_id': channel_id,
-            'title': title,
-            'description': description
-        }).execute()
-    except Exception as e:
-        logger.error(f"[DB Error] add_auto_role_panel: {e}", exc_info=True)
-
-async def get_all_auto_role_panels():
-    if not supabase: return []
-    try:
-        response = await supabase.table('auto_role_panels').select('*').execute()
-        return response.data if response.data else []
-    except Exception as e:
-        logger.error(f"[DB Error] get_all_auto_role_panels: {e}", exc_info=True)
-        return []
-        
-async def add_auto_role_button(message_id: int, role_id: int, label: str, emoji: str | None, style: str):
-    if not supabase: return
-    try:
-        await supabase.table('auto_roles').insert({'message_id': message_id, 'role_id': role_id, 'button_label': label, 'button_emoji': emoji, 'button_style': style}).execute()
-    except Exception as e:
-        logger.error(f"[DB Error] add_auto_role_button: {e}", exc_info=True)
-
-async def remove_auto_role_button(message_id: int, role_id: int):
-    if not supabase: return
-    try:
-        await supabase.table('auto_roles').delete().match({'message_id': message_id, 'role_id': role_id}).execute()
-    except Exception as e:
-        logger.error(f"[DB Error] remove_auto_role_button: {e}", exc_info=True)
-
-async def get_auto_role_buttons(message_id: int):
-    if not supabase: return []
-    try:
-        response = await supabase.table('auto_roles').select('*').eq('message_id', message_id).execute()
-        return response.data if response.data else []
-    except Exception as e:
-        logger.error(f"[DB Error] get_auto_role_buttons: {e}", exc_info=True)
-        return []
-
-# --- 기존 데이터 관리 함수들 ---
+# --- 유저 데이터 관리 함수들 ---
 async def get_or_create_user(table_name: str, user_id_str: str, default_data: dict):
     if not supabase: return {}
     try:
@@ -269,22 +302,6 @@ async def set_user_gear(user_id_str: str, rod: str = None, bait: str = None):
     except Exception as e:
         logger.error(f"[DB Error] set_user_gear: {e}", exc_info=True)
 
-async def save_panel_id(name: str, mid: int):
-    if not supabase: return
-    try:
-        await supabase.table('panel_data').upsert({"panel_name": name, "message_id": str(mid)}, on_conflict="panel_name").execute()
-    except Exception as e:
-        logger.error(f"[DB Error] save_panel_id: {e}", exc_info=True)
-
-async def get_panel_id(name: str) -> int | None:
-    if not supabase: return None
-    try:
-        res = await supabase.table('panel_data').select('message_id').eq('panel_name', name).limit(1).execute()
-        return int(res.data[0]['message_id']) if res.data else None
-    except Exception as e:
-        logger.error(f"[DB Error] get_panel_id: {e}", exc_info=True)
-        return None
-
 async def save_channel_id_to_db(channel_key: str, object_id: int):
     if not supabase: return
     try:
@@ -347,6 +364,7 @@ async def set_cooldown(user_id_str: str, timestamp: float):
     except Exception as e:
         logger.error(f"[DB Error] set_cooldown: {e}", exc_info=True)
 
+# --- ⬇️ [유지] 하드코딩된 데이터베이스 (DB로 이전 전까지 임시 사용) ⬇️ ---
 CURRENCY_ICON = "🪙"
 ROLE_PREFIX_MAPPING = {
     933077535405789205: "一", 933077534994755654: "二", 933077536253050970: "三", 933077542699663390: "四", 1209471813319528468: "五",
