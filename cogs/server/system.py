@@ -380,6 +380,14 @@ class ServerSystem(commands.Cog):
         await delete_embed_from_db(panel_key)
         
         await interaction.followup.send(f"✅ `{panel_key}` 패널과 관련된 모든 데이터가 삭제되었습니다.", ephemeral=True)
-
+# utils/database.py 에 추가할 예시 함수
+async def delete_auto_role_panel(message_id: int):
+    if not supabase: return
+    try:
+        # ON DELETE CASCADE 설정 덕분에, auto_roles 테이블의 관련 버튼들도 함께 삭제됩니다.
+        await supabase.table('auto_role_panels').delete().eq('message_id', message_id).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] delete_auto_role_panel: {e}", exc_info=True)
+        
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
