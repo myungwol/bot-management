@@ -98,6 +98,37 @@ async def remove_counter_config(channel_id: int):
     except Exception as e:
         logger.error(f"[DB Error] remove_counter_config: {e}", exc_info=True)
 
+async def save_embed_to_db(embed_key: str, embed_data: dict):
+    """임베드 데이터를 JSON 형태로 DB에 저장 또는 업데이트합니다."""
+    if not supabase: return
+    try:
+        # 'embeds'는 테이블 이름입니다. Supabase에서 미리 생성해야 합니다.
+        # 컬럼: embed_key (text, primary key), embed_data (jsonb)
+        await supabase.table('embeds').upsert({
+            'embed_key': embed_key,
+            'embed_data': embed_data
+        }).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] save_embed_to_db: {e}", exc_info=True)
+
+async def get_embed_from_db(embed_key: str) -> dict | None:
+    """DB에서 임베드 데이터를 불러옵니다."""
+    if not supabase: return None
+    try:
+        response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
+        return response.data[0]['embed_data'] if response.data else None
+    except Exception as e:
+        logger.error(f"[DB Error] get_embed_from_db: {e}", exc_info=True)
+        return None
+
+async def delete_embed_from_db(embed_key: str):
+    """DB에서 임베드 데이터를 삭제합니다."""
+    if not supabase: return
+    try:
+        await supabase.table('embeds').delete().eq('embed_key', embed_key).execute()
+    except Exception as e:
+        logger.error(f"[DB Error] delete_embed_from_db: {e}", exc_info=True)
+
 # --- 자동 역할 패널/버튼 관리 함수 ---
 async def add_auto_role_panel(message_id: int, guild_id: int, channel_id: int, title: str, description: str):
     if not supabase: return
