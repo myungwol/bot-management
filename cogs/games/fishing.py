@@ -171,10 +171,14 @@ class Fishing(commands.Cog):
             else: logger.info("ℹ️ Fishing panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Fishing panel channel could not be found."); return
         
-        old_id = await get_panel_id("fishing")
-        if old_id:
-            try: (await channel.fetch_message(old_id)).delete()
-            except (discord.NotFound, discord.Forbidden): pass
+        # [수정된 부분]
+        panel_info = await get_panel_id("fishing")
+        if panel_info and (old_id := panel_info.get('message_id')):
+            try:
+                message_to_delete = await channel.fetch_message(old_id)
+                await message_to_delete.delete()
+            except (discord.NotFound, discord.Forbidden):
+                pass
         
         embed = discord.Embed(title="🎣 Dico森 釣り場", description="下のボタンを押して釣りを開始し、コインを獲得しましょう！", color=discord.Color.from_rgb(135, 206, 250))
         msg = await channel.send(embed=embed, view=FishingPanelView(self.bot, self.active_fishing_sessions_by_user))
