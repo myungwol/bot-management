@@ -81,6 +81,7 @@ try:
 except Exception as e:
     logger.error(f"❌ Supabase 클라이언트 생성 실패: {e}", exc_info=True)
 
+
 # --- ⬇️ 패널 및 DB 관리 함수 섹션 ⬇️ ---
 async def save_embed_to_db(embed_key: str, embed_data: dict):
     if not supabase: return
@@ -217,7 +218,7 @@ async def add_to_aquarium(user_id_str: str, fish_data: dict):
         await supabase.table('aquariums').insert(insert_data).execute()
     except Exception as e: logger.error(f"[DB Error] add_to_aquarium: {e}", exc_info=True)
 
-async def remove_fish_from_aquarium(fish_id: int): # <--- 누락되었던 함수
+async def remove_fish_from_aquarium(fish_id: int):
     if not supabase: return
     try: await supabase.table('aquariums').delete().eq('id', fish_id).execute()
     except Exception as e: logger.error(f"[DB Error] remove_fish_from_aquarium: {e}", exc_info=True)
@@ -287,7 +288,7 @@ async def get_channel_id_from_db(channel_key: str) -> int | None:
         return None
     except Exception as e: logger.error(f"[DB Error] get_channel_id_from_db: {e}", exc_info=True); return None
 
-async def save_channel_id_to_db(channel_key: str, object_id: int): # <--- 누락되었던 함수
+async def save_channel_id_to_db(channel_key: str, object_id: int):
     if not supabase: return
     try:
         await supabase.table('channel_configs').upsert({"channel_key": channel_key, "channel_id": object_id}, on_conflict="channel_key").execute()
