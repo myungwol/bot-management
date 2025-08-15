@@ -1,158 +1,112 @@
-# cogs/server/server_setup.py
+# cogs/server/server_setup.py (역할 DB 저장 기능만 남긴 최종본)
 
 import discord
 from discord.ext import commands
 from discord import app_commands
-import asyncio
-import re
 import logging
+
+# 데이터베이스 함수 임포트
+# [수정] save_channel_id_to_db -> save_role_id_to_db 같은 명확한 이름으로 변경 가정
+# 만약 utils/database.py에 역할 저장 함수가 save_channel_id_to_db로 되어있다면 그대로 사용
+from utils.database import save_channel_id_to_db as save_role_id_to_db
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)ss - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-from utils.database import save_channel_id_to_db, get_channel_id_from_db
-
-# 새로 정의된 역할 구조
+# 역할 구조 (데이터베이스 키와 실제 역할 이름을 매핑)
 ROLE_STRUCTURE = {
-    "職員": [
-        ("里長", 0xFF0000, "staff_mayor"),
-        ("助役", 0xFF5500, "staff_deputy"),
-        ("お巡り", 0x0077FF, "staff_police"),
-        ("祭りの委員", 0xFFBB00, "staff_festival"),
-        ("広報係", 0xAAAA00, "staff_pr"),
-        ("意匠係", 0x88CC00, "staff_design"),
-        ("書記", 0xCCCCCC, "staff_clerk"),
-        ("役場の職員", 0x888888, "staff_office"),
-        ("職員", 0x555555, "staff_general"),
-    ],
-    "住民": [
-        ("1等級住民", 0x990099, "resident_tier1"),
-        ("2等級住民", 0xBB00BB, "resident_tier2"),
-        ("3等級住民", 0xDD00DD, "resident_tier3"),
-        ("住民", 0xEE00EE, "resident_general"),
-        ("外部の人", 0xAAAAAA, "resident_outsider"), # '외부인'
-    ],
-    "情報": [
-        ("男性", 0x00A0FF, "info_male"),
-        ("女性", 0xFF66B2, "info_female"),
-        ("非公開", 0x777777, "info_private"), # '비공개'
-        ("70年代生まれ", 0x555555, "info_age_70s"), # '生' -> '生まれ'
-        ("80年代生まれ", 0x666666, "info_age_80s"),
-        ("90年代生まれ", 0x777777, "info_age_90s"),
-        ("00年代生まれ", 0x888888, "info_age_00s"),
-    ],
-    "通知": [
-        ("通話", 0x33FF33, "notify_voice"),
-        ("友達", 0x33FFBB, "notify_friends"),
-        ("ディスボード", 0x33BBFF, "notify_disboard"),
-        ("アップ", 0x9999FF, "notify_up"),
-    ],
-    "ゲーム": [
-        ("マインクラフト", 0xAAAAAA, "game_minecraft"),
-        ("ヴァロラント", 0xAAAAAA, "game_valorant"),
-        ("オーバーウォッチ", 0xAAAAAA, "game_overwatch"),
-        ("リーグ・オブ・レジェンド", 0xAAAAAA, "game_lol"),
-        ("麻雀", 0xAAAAAA, "game_mahjong"),
-        ("アモングアス", 0xAAAAAA, "game_amongus"),
-        ("モンスターハンター", 0xAAAAAA, "game_mh"), # 이름 수정
-        ("原神", 0xAAAAAA, "game_genshin"),
-        ("エーペックスレジェンズ", 0xAAAAAA, "game_apex"),
-        ("スプラトゥーン", 0xAAAAAA, "game_splatoon"),
-        ("ゴッドフィールド", 0xAAAAAA, "game_gf"),
-        ("スチーム", 0xAAAAAA, "platform_steam"),
-        ("スマートフォン", 0xAAAAAA, "platform_smartphone"),
-        ("スイッチ", 0xAAAAAA, "platform_switch"),
-    ]
+    # 'db_key': '실제 역할 이름'
+    "staff_mayor": "里長",
+    "staff_deputy": "助役",
+    "staff_police": "お巡り",
+    "staff_festival": "祭りの委員",
+    "staff_pr": "広報係",
+    "staff_design": "意匠係",
+    "staff_clerk": "書記",
+    "staff_office": "役場の職員",
+    "staff_general": "職員",
+    "resident_tier1": "1等級住民",
+    "resident_tier2": "2等級住民",
+    "resident_tier3": "3等級住民",
+    "resident_general": "住民",
+    "resident_outsider": "外部の人",
+    "info_male": "男性",
+    "info_female": "女性",
+    "info_private": "非公開",
+    "info_age_70s": "70年代生まれ",
+    "info_age_80s": "80年代生まれ",
+    "info_age_90s": "90年代生まれ",
+    "info_age_00s": "00年代生まれ",
+    "notify_voice": "通話",
+    "notify_friends": "友達",
+    "notify_disboard": "ディスボード",
+    "notify_up": "アップ",
+    "game_minecraft": "マインクラフト",
+    "game_valorant": "ヴァロラント",
+    "game_overwatch": "オーバーウォッチ",
+    "game_lol": "リーグ・オブ・レジェンド",
+    "game_mahjong": "麻雀",
+    "game_amongus": "アモングアス",
+    "game_mh": "モンスターハンター",
+    "game_genshin": "原神",
+    "game_apex": "エーペックスレジェンズ",
+    "game_splatoon": "スプラトゥーン",
+    "game_gf": "ゴッドフィールド",
+    "platform_steam": "スチーム",
+    "platform_smartphone": "スマートフォン",
+    "platform_switch": "スイッチ",
 }
 
 class ServerSetup(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        logger.info("ServerSetup Cog initialized (Roles-Only Mode).")
+        logger.info("ServerSetup Cog initialized (Role DB Sync Mode).")
 
-    async def _update_interaction_response(self, interaction: discord.Interaction, response_messages_list: list):
-        description_content = "".join(response_messages_list)
-        if len(description_content) > 4096:
-            description_content = description_content[:4090] + "\n..."
-        embed = discord.Embed(
-            title="⚙️ Dico森 役割設定",
-            description=description_content,
-            color=discord.Color.blue()
-        )
-        embed.set_footer(text="このメッセージは自動的に更新されます。")
-        try:
-            await interaction.edit_original_response(embed=embed)
-        except discord.HTTPException as e:
-            logger.error(f"HTTP error during interaction response update: {e}", exc_info=True)
-
-    async def _create_roles(self, guild: discord.Guild, interaction: discord.Interaction, response_messages_list: list):
-        logger.info("[_create_roles] Role creation/update process started.")
-        response_messages_list.append("\n\n**[ 役割の設置 ]**\n")
-        await self._update_interaction_response(interaction, response_messages_list)
-
-        for category_name, roles_data in ROLE_STRUCTURE.items():
-            response_messages_list.append(f"\n**{category_name}**\n")
-            logger.debug(f"[_create_roles] Processing role category: '{category_name}'")
-
-            for role_name, color_hex, role_key in roles_data:
-                logger.debug(f"[_create_roles] Starting to process role '{role_name}' (key: {role_key}).")
-                existing_role = discord.utils.get(guild.roles, name=role_name)
-
-                if existing_role:
-                    response_messages_list.append(f"　✔️ 役割 **{role_name}** は既に存在します。(ID: `{existing_role.id}`)\n")
-                    try:
-                        await save_channel_id_to_db(f"role_{role_key}", existing_role.id)
-                        logger.debug(f"[_create_roles] Successfully saved role ID for '{role_name}'.")
-                    except Exception as db_e:
-                        logger.error(f"[_create_roles] Failed to save role ID for '{role_name}' to DB: {db_e}", exc_info=True)
-                        response_messages_list.append(f"　❌ 役割 **{role_name}** のDB保存に失敗しました: {db_e}\n")
-                else:
-                    try:
-                        logger.info(f"[_create_roles] Attempting to create new role '{role_name}'...")
-                        new_role = await guild.create_role(name=role_name, color=discord.Color(color_hex))
-                        response_messages_list.append(f"　✅ 役割 **{role_name}** を作成しました。(ID: `{new_role.id}`)\n")
-                        try:
-                            await save_channel_id_to_db(f"role_{role_key}", new_role.id)
-                            logger.debug(f"[_create_roles] Successfully saved new role ID for '{role_name}'.")
-                        except Exception as db_e:
-                            logger.error(f"[_create_roles] Failed to save new role ID for '{role_name}' to DB: {db_e}", exc_info=True)
-                            response_messages_list.append(f"　❌ 新しい役割 **{role_name}** のDB保存に失敗しました: {db_e}\n")
-                        await asyncio.sleep(0.5)
-                    except discord.Forbidden:
-                        logger.error(f"[_create_roles] Permission error creating role '{role_name}'. Bot lacks 'Manage Roles' permission.", exc_info=True)
-                        response_messages_list.append(f"　❌ 役割 **{role_name}** の作成に失敗しました: 権限不足\n")
-                    except Exception as e:
-                        logger.error(f"[_create_roles] Unexpected error creating role '{role_name}': {e}", exc_info=True)
-                        response_messages_list.append(f"　❌ 役割 **{role_name}** の作成に失敗しました: {e}\n")
-
-            await self._update_interaction_response(interaction, response_messages_list)
-
-        logger.info("[_create_roles] Role creation/update process finished.")
-
-    @app_commands.command(name="役割設置", description="サーバーの役割を自動で設置します。")
+    @app_commands.command(name="役割db同期", description="[管理者] サーバーに存在する役割をDBに同期します。")
     @app_commands.checks.has_permissions(manage_roles=True)
-    async def setup_command(self, interaction: discord.Interaction):
+    async def sync_roles_to_db(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         guild = interaction.guild
+        
+        response_messages = ["**[ 役割DB同期 ]**\n"]
+        
+        success_count = 0
+        fail_count = 0
 
-        response_messages_list = ["⚙️ Dico森 サーバーの役割設定を開始します...\n"]
-        await self._update_interaction_response(interaction, response_messages_list)
+        # 서버에 있는 모든 역할 목록을 한 번만 가져옴
+        server_roles = {role.name: role.id for role in guild.roles}
 
-        logger.info("[setup_command] Initiating server setup (roles only).")
+        for db_key, role_name in ROLE_STRUCTURE.items():
+            # 서버 역할 목록에서 이름으로 역할 ID를 찾음
+            role_id = server_roles.get(role_name)
 
-        await self._create_roles(guild, interaction, response_messages_list)
+            if role_id:
+                try:
+                    # DB에 역할 ID 저장 (데이터베이스 키 형식에 맞게 'role_' 접두사 추가)
+                    full_db_key = f"role_{db_key}"
+                    await save_role_id_to_db(full_db_key, role_id)
+                    response_messages.append(f"✔️ **{role_name}** 役割をDBに同期しました。(ID: `{role_id}`)\n")
+                    success_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to save role ID for '{role_name}' to DB: {e}", exc_info=True)
+                    response_messages.append(f"❌ **{role_name}** 役割のDB保存中にエラーが発生しました: {e}\n")
+                    fail_count += 1
+            else:
+                # 서버에 해당 이름의 역할이 없는 경우
+                response_messages.append(f"⚠️ **{role_name}** 役割がサーバーに見つかりません。スキップします。\n")
+                fail_count += 1
 
-        response_messages_list.append("\n\n✅ 役割の設置が完了しました！")
-
-        await self._update_interaction_response(interaction, response_messages_list)
-        logger.info("[setup_command] Server role setup command completed.")
+        response_messages.append(f"\n✅ 同期完了 (成功: {success_count}件, 失敗/スキップ: {fail_count}件)")
+        
+        description_content = "".join(response_messages)
+        embed = discord.Embed(
+            title="⚙️ 役割データベース同期結果",
+            description=description_content,
+            color=discord.Color.green() if fail_count == 0 else discord.Color.orange()
+        )
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        logger.info(f"Role DB sync completed for guild {guild.id}. Success: {success_count}, Failed/Skipped: {fail_count}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSetup(bot))
