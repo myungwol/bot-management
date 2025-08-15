@@ -1,4 +1,4 @@
-# cogs/economy/commerce.py (삭제 후 재생성 로직 적용 최종본)
+# cogs/economy/commerce.py (수정됨)
 
 import discord
 from discord.ext import commands
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # 유틸리티 함수 임포트
 from utils.database import (
     ITEM_DATABASE, FISHING_LOOT, CURRENCY_ICON, ROD_HIERARCHY,
-    get_inventory, get_wallet, get_aquarium,
+    get_inventory, get_wallet, get_aquarium, update_wallet,
     save_panel_id, get_panel_id, get_id, supabase
 )
 
@@ -53,17 +53,21 @@ class ShopViewBase(ui.View):
         self.wallet_balance = wallet_data.get('balance', 0)
     async def update_view(self, interaction: discord.Interaction, temp_footer: Optional[str] = None):
         embed = self._build_embed(); self._build_components()
-        original_footer = embed.footer.text if embed.footer else None
+        original_footer = embed.footer.text if embed.footer else ""
         if temp_footer: embed.set_footer(text=temp_footer)
+        
+        # defer()가 이미 호출된 경우 followup.edit_message 사용
         if interaction.response.is_done():
+            # 모달에서 돌아온 경우, 원래 메시지를 수정하기 위해 followup을 사용해야 할 수 있습니다.
             await interaction.followup.edit_message(message_id=interaction.message.id, embed=embed, view=self)
         else:
             await interaction.response.edit_message(embed=embed, view=self)
+            
         if temp_footer:
             await asyncio.sleep(5)
             embed.set_footer(text=original_footer)
             try: await interaction.edit_original_response(embed=embed)
-            except discord.NotFound: pass
+            except (discord.NotFound, discord.HTTPException): pass
 
 class SellItemView(ShopViewBase):
     def __init__(self, user: discord.Member):
@@ -149,9 +153,11 @@ class BuyItemView(ShopViewBase):
     async def select_callback(self, interaction: discord.Interaction):
         name = interaction.data['values'][0]; data = ITEM_DATABASE.get(name); user = interaction.user; uid_str = str(user.id)
         footer_msg = ""
-        if not data: footer_msg = "❌ エラー：商品データが見つかりません。"; return await self.update_view(interaction, footer_msg)
+        if not data:
+            footer_msg = "❌ エラー：商品データが見つかりません。"; return await self.update_view(interaction, footer_msg)
         price = data['price']
-        if self.wallet_balance < price: footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
+        if self.wallet_balance < price:
+            footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
         try:
             if data['category'] == '里の役職':
                 await interaction.response.defer()
@@ -159,7 +165,8 @@ class BuyItemView(ShopViewBase):
                 if not role_id: raise ValueError(f"Role ID not found for key: {data['id_key']}")
                 role = interaction.guild.get_role(role_id)
                 if not role: raise ValueError("Role not found in guild.")
-                if role in user.roles: footer_msg = f"❌ すでにその役職をお持ちです。"; return await self.update_view(interaction, footer_msg)
+                if role in user.roles:
+                    footer_msg = f"❌ すでにその役職をお持ちです。"; return await self.update_view(interaction, footer_msg)
                 await update_wallet(user, -price); await user.add_roles(role)
                 self.wallet_balance -= price; footer_msg = f"✅ 「{role.name}」役職を購入しました！"
             elif data.get("is_upgrade_item"):
@@ -174,12 +181,14 @@ class BuyItemView(ShopViewBase):
                 footer_msg = f"✅ **{name}**にアップグレードしました！"
             else:
                 max_buyable = self.wallet_balance // price if price > 0 else 0
-                if max_buyable == 0: footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
+                if max_buyable == 0:
+                    footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
                 modal = QuantityModal("購入数量入力", f"{name}の購入数量", f"最大 {max_buyable}個まで購入可能です", max_buyable)
                 await interaction.response.send_modal(modal); await modal.wait()
                 if modal.value is None: return
                 qty = modal.value; total_price = price * qty
-                if self.wallet_balance < total_price: footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
+                if self.wallet_balance < total_price:
+                    footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
                 await supabase.rpc('buy_item', {'user_id_param': uid_str, 'item_name_param': name, 'quantity_param': qty, 'total_price_param': total_price}).execute()
                 self.wallet_balance -= total_price; self.inventory[name] = self.inventory.get(name, 0) + qty
                 footer_msg = f"✅ **{name}**を{qty}個購入し、持ち物に入れました。"
@@ -206,13 +215,19 @@ class CommercePanelView(ui.View):
 
 class Commerce(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot = bot; self.bot.add_view(CommercePanelView(self))
+        self.bot = bot
         self.commerce_panel_channel_id: Optional[int] = None
         logger.info("Commerce Cog가 성공적으로 초기화되었습니다.")
+
+    # [수정] 영구 View 등록을 위한 함수 추가
+    def register_persistent_views(self):
+        self.bot.add_view(CommercePanelView(self))
+
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.commerce_panel_channel_id = get_id("commerce_panel_channel_id")
         logger.info(f"[Commerce Cog] 상점 패널 채널 ID 로드: {self.commerce_panel_channel_id}")
+
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
