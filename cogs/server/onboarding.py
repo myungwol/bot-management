@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (역할 흐름 변경 최종본)
+# cogs/server/onboarding.py (import 오류 수정 최종본)
 
 import discord
 from discord.ext import commands
@@ -14,9 +14,9 @@ from typing import List, Dict, Any, Optional
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# 유틸리티 함수 임포트
+# [오류 수정] 누락되었던 get_panel_id를 import 목록에 다시 추가합니다.
 from utils.database import (
-    get_id, save_panel_id, get_auto_role_mappings, get_cooldown, set_cooldown
+    get_id, save_panel_id, get_panel_id, get_auto_role_mappings, get_cooldown, set_cooldown
 )
 
 # --- 설정 상수 ---
@@ -43,8 +43,7 @@ GUIDE_PAGES = [
 
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer()
+    async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
@@ -53,27 +52,18 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
     hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
 
-    def __init__(self, cog_instance: 'Onboarding'):
-        super().__init__()
-        self.onboarding_cog = cog_instance
-
+    def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id:
-                await interaction.followup.send("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True)
-                return
+            if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id: await interaction.followup.send("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True); return
             approval_channel = interaction.guild.get_channel(self.onboarding_cog.approval_channel_id)
-            if not approval_channel:
-                await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True)
-                return
+            if not approval_channel: await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
             await set_cooldown(f"intro_{interaction.user.id}", time.time())
             embed = discord.Embed(title="📝 新しい住人登録票が提出されました", description=f"**作成者:** {interaction.user.mention}", color=discord.Color.blue())
             if interaction.user.display_avatar: embed.set_thumbnail(url=interaction.user.display_avatar.url)
-            embed.add_field(name="名前", value=self.name.value, inline=False)
-            embed.add_field(name="年齢", value=self.age.value, inline=False)
-            embed.add_field(name="性別", value=self.gender.value, inline=False)
-            embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
+            embed.add_field(name="名前", value=self.name.value, inline=False); embed.add_field(name="年齢", value=self.age.value, inline=False)
+            embed.add_field(name="性別", value=self.gender.value, inline=False); embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
             await approval_channel.send(content=f"<@&{self.onboarding_cog.approval_role_id}> 新しい住人登録票が提出されました。", embed=embed, view=view)
@@ -84,103 +74,74 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
 
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
-        super().__init__(timeout=None)
-        self.author_id = author.id
-        self.original_embed = original_embed
-        self.onboarding_cog = cog_instance
-        self.rejection_reason: Optional[str] = None
-
+        super().__init__(timeout=None); self.author_id = author.id; self.original_embed = original_embed
+        self.onboarding_cog = cog_instance; self.rejection_reason: Optional[str] = None
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
-        if not approval_role_id:
-            await interaction.response.send_message("❌ エラー: 承認役割IDが設定されていません。", ephemeral=True)
-            return False
+        if not approval_role_id: await interaction.response.send_message("❌ エラー: 承認役割IDが設定されていません。", ephemeral=True); return False
         if not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
-            await interaction.response.send_message("❌ このボタンを押す権限がありません。", ephemeral=True)
-            return False
+            await interaction.response.send_message("❌ このボタンを押す権限がありません。", ephemeral=True); return False
         return True
-
     def _parse_birth_year(self, text: str) -> Optional[int]:
         text = text.strip().lower()
         if "非公開" in text or "ひこうかい" in text: return 0
         era_patterns = {'heisei': r'(?:h|平成)\s*(\d{1,2})', 'showa': r'(?:s|昭和)\s*(\d{1,2})', 'reiwa': r'(?:r|令和)\s*(\d{1,2})'}
         era_start_years = {"heisei": 1989, "showa": 1926, "reiwa": 2019}
         for era, pattern in era_patterns.items():
-            match = re.search(pattern, text)
-            if match: return era_start_years[era] + int(match.group(1)) - 1
-        dai_match = re.search(r'(\d{1,2})\s*代', text)
-        if dai_match: return datetime.now().year - (int(dai_match.group(1)) + 5)
-        year_match = re.search(r'(\d{2,4})', text)
-        if year_match and ("年" in text or "生まれ" in text):
-            year = int(year_match.group(1))
-            if year < 100: year += 1900 if year > datetime.now().year % 100 else 2000
-            return year
-        age_match = re.search(r'(\d+)', text)
-        if age_match and ("歳" in text or "才" in text): return datetime.now().year - int(age_match.group(1))
+            if match := re.search(pattern, text): return era_start_years[era] + int(match.group(1)) - 1
+        if dai_match := re.search(r'(\d{1,2})\s*代', text): return datetime.now().year - (int(dai_match.group(1)) + 5)
+        if year_match := re.search(r'(\d{2,4})', text):
+            if "年" in text or "生まれ" in text:
+                year = int(year_match.group(1))
+                return year + (1900 if year > datetime.now().year % 100 else 2000) if year < 100 else year
+        if age_match := re.search(r'(\d+)', text):
+            if "歳" in text or "才" in text: return datetime.now().year - int(age_match.group(1))
         return None
-
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
         member = interaction.guild.get_member(self.author_id)
-        if not member:
-            await interaction.response.send_message("❌ エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True)
-            return
+        if not member: await interaction.response.send_message("❌ エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True); return
         status_text = "承認" if is_approved else "拒否"
         if not is_approved:
-            rejection_modal = RejectionReasonModal()
-            await interaction.response.send_modal(rejection_modal)
+            rejection_modal = RejectionReasonModal(); await interaction.response.send_modal(rejection_modal)
             if await rejection_modal.wait(): return
             self.rejection_reason = rejection_modal.reason.value
-        else:
-            await interaction.response.defer()
+        else: await interaction.response.defer()
         for item in self.children: item.disabled = True
         try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
         except (discord.NotFound, discord.HTTPException): pass
-        tasks = []
+        tasks = [self._send_notifications(interaction.user, member, is_approved)]
         if is_approved:
-            tasks.append(self._grant_roles(member))
-            tasks.append(self._update_nickname(member))
-            tasks.append(self._send_public_welcome(member))
-        tasks.append(self._send_notifications(interaction.user, member, is_approved))
+            tasks.extend([self._grant_roles(member), self._update_nickname(member), self._send_public_welcome(member)])
         results = await asyncio.gather(*tasks, return_exceptions=True)
         failed_tasks = [res for res in results if isinstance(res, Exception)]
         if failed_tasks:
-            error_report = f"❌ **{status_text} 처리 중 일부 작업에 실패했습니다:**\n"
-            for error in failed_tasks: error_report += f"- `{type(error).__name__}: {error}`\n"
+            error_report = f"❌ **{status_text} 처리 중 일부 작업에 실패했습니다:**\n" + "".join(f"- `{type(e).__name__}: {e}`\n" for e in failed_tasks)
             await interaction.followup.send(error_report, ephemeral=True)
-        else:
-            await interaction.followup.send(f"✅ {status_text}処理が正常に完了しました。", ephemeral=True)
+        else: await interaction.followup.send(f"✅ {status_text}処理が正常に完了しました。", ephemeral=True)
         try: await interaction.message.delete()
         except (discord.NotFound, discord.HTTPException): pass
-
     async def _grant_roles(self, member: discord.Member) -> None:
-        roles_to_add = []
-        guild = member.guild
-        if (resident_role_id := get_id("role_resident")) and (role := guild.get_role(resident_role_id)):
-            roles_to_add.append(role)
+        roles_to_add, guild = [], member.guild
+        if (rid := get_id("role_resident")) and (r := guild.get_role(rid)): roles_to_add.append(r)
         gender_field = next((f.value for f in self.original_embed.fields if f.name == "性別"), "")
         for rule in get_auto_role_mappings():
             if any(k.lower() in gender_field.lower() for k in rule["keywords"]):
-                if (role_id := get_id(rule["role_id_key"])) and (role := guild.get_role(role_id)):
-                    roles_to_add.append(role); break
+                if (rid := get_id(rule["role_id_key"])) and (r := guild.get_role(rid)): roles_to_add.append(r); break
         age_field = next((f.value for f in self.original_embed.fields if f.name == "年齢"), "")
         birth_year = self._parse_birth_year(age_field)
         if birth_year == 0:
-            if (role_id := get_id("role_info_age_private")) and (role := guild.get_role(role_id)): roles_to_add.append(role)
+            if (rid := get_id("role_info_age_private")) and (r := guild.get_role(rid)): roles_to_add.append(r)
         elif birth_year:
             for mapping in AGE_ROLE_MAPPING:
                 if birth_year in mapping["range"]:
-                    if (role_id := get_id(mapping["key"])) and (role := guild.get_role(role_id)):
-                        roles_to_add.append(role); break
+                    if (rid := get_id(mapping["key"])) and (r := guild.get_role(rid)): roles_to_add.append(r); break
         if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="자기소개서 승인")
-        if (guest_role_id := get_id("role_guest")) and (role := guild.get_role(guest_role_id)) and role in member.roles:
-            await member.remove_roles(role, reason="자기소개서 승인 완료")
-
+        if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles:
+            await member.remove_roles(r, reason="자기소개서 승인 완료")
     async def _update_nickname(self, member: discord.Member) -> None:
-        nick_cog = self.onboarding_cog.bot.get_cog("Nicknames")
-        name_field = next((f.value for f in self.original_embed.fields if f.name == "名前"), None)
-        if nick_cog and name_field: await nick_cog.update_nickname(member, base_name_override=name_field)
-    
+        if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := next((f.value for f in self.original_embed.fields if f.name == "名前"), None)):
+            await nick_cog.update_nickname(member, base_name_override=name_field)
     async def _send_public_welcome(self, member: discord.Member) -> None:
         guild = member.guild
         if (ch_id := self.onboarding_cog.introduction_channel_id) and (ch := guild.get_channel(ch_id)):
@@ -188,7 +149,6 @@ class ApprovalView(ui.View):
             await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         if (ch_id := self.onboarding_cog.new_welcome_channel_id) and (ch := guild.get_channel(ch_id)):
             await self._send_new_welcome_message(ch, member, self.onboarding_cog.mention_role_id_1)
-
     async def _send_notifications(self, moderator: discord.Member, member: discord.Member, is_approved: bool) -> None:
         guild = member.guild
         if is_approved:
@@ -201,7 +161,6 @@ class ApprovalView(ui.View):
                 embed = self.original_embed.copy(); embed.title = "❌ 住人登録が拒否されました"; embed.color = discord.Color.red(); embed.description = f"**対象者:** {member.mention}"
                 embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False); embed.add_field(name="処理者", value=moderator.mention, inline=False)
                 await ch.send(embed=embed)
-
     async def _send_new_welcome_message(self, channel: discord.TextChannel, member: discord.Member, mention_role_id: Optional[int]):
         mention = f"<@&{mention_role_id}>" if mention_role_id else ""
         content = f"# {member.mention} さんがDico森へ里入りしました！\n## 皆さんで歓迎しましょう！ {mention}"
@@ -211,7 +170,6 @@ class ApprovalView(ui.View):
         embed = discord.Embed(description=desc, color=0xFFFFE0)
         try: await channel.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
         except Exception as e: logger.error(f"Error sending new welcome message: {e}", exc_info=True)
-
     @ui.button(label='承認', style=discord.ButtonStyle.success, custom_id='approve_button_final')
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label='拒否', style=discord.ButtonStyle.danger, custom_id='reject_button_final')
@@ -261,26 +219,19 @@ class OnboardingPanelView(ui.View):
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.bot.add_view(OnboardingPanelView(self))
+        self.bot = bot; self.bot.add_view(OnboardingPanelView(self))
         self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.new_welcome_channel_id: Optional[int] = None; self.approval_role_id: Optional[int] = None
         self.guest_role_id: Optional[int] = None; self.mention_role_id_1: Optional[int] = None
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
-        self.panel_channel_id = get_id("onboarding_panel_channel_id")
-        self.approval_channel_id = get_id("onboarding_approval_channel_id")
-        self.introduction_channel_id = get_id("introduction_channel_id")
-        self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
-        self.new_welcome_channel_id = get_id("new_welcome_channel_id")
-        self.approval_role_id = get_id("role_approval")
-        self.guest_role_id = get_id("role_guest")
-        self.mention_role_id_1 = get_id("role_mention_role_1")
+        self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
+        self.introduction_channel_id = get_id("introduction_channel_id"); self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
+        self.new_welcome_channel_id = get_id("new_welcome_channel_id"); self.approval_role_id = get_id("role_approval")
+        self.guest_role_id = get_id("role_guest"); self.mention_role_id_1 = get_id("role_mention_role_1")
         logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
-        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel or (self.bot.get_channel(self.panel_channel_id) if self.panel_channel_id else None)
         if not target_channel:
@@ -296,8 +247,7 @@ class Onboarding(commands.Cog):
                 live_message = await target_channel.fetch_message(message_id)
                 await live_message.edit(embed=embed, view=view)
                 logger.info(f"✅ 온보딩 패널을 성공적으로 업데이트했습니다. (채널: #{target_channel.name})")
-            except discord.NotFound:
-                live_message = None
+            except discord.NotFound: live_message = None
         if not live_message:
             new_message = await target_channel.send(embed=embed, view=view)
             await save_panel_id("onboarding", new_message.id, target_channel.id)
