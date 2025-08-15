@@ -1,4 +1,4 @@
-# cogs/games/user_profile.py (실행 순서 문제 해결 최종본)
+# cogs/games/user_profile.py (삭제 후 재생성 로직 적용 최종본)
 
 import discord
 from discord.ext import commands
@@ -152,20 +152,17 @@ class UserProfile(commands.Cog):
             if channel_id: target_channel = self.bot.get_channel(channel_id)
             else: logger.info("ℹ️ 프로필 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
         if not target_channel: logger.warning("❌ Inventory panel channel could not be found."); return
+        panel_info = get_panel_id("profile")
+        if panel_info and (old_id := panel_info.get('message_id')):
+            try:
+                old_message = await target_channel.fetch_message(old_id)
+                await old_message.delete()
+            except (discord.NotFound, discord.Forbidden): pass
         embed = discord.Embed(title="📦 持ち物", description="下のボタンを押して、あなたの持ち物を開きます。", color=0xC8C8C8)
         view = InventoryPanelView(self)
-        panel_info = get_panel_id("profile"); message_id = panel_info.get('message_id') if panel_info else None
-        live_message = None
-        if message_id:
-            try:
-                live_message = await target_channel.fetch_message(message_id)
-                await live_message.edit(embed=embed, view=view)
-                logger.info(f"✅ 프로필 패널을 성공적으로 업데이트했습니다. (채널: #{target_channel.name})")
-            except discord.NotFound: live_message = None
-        if not live_message:
-            new_message = await target_channel.send(embed=embed, view=view)
-            await save_panel_id("profile", new_message.id, target_channel.id)
-            logger.info(f"✅ 프로필 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
+        new_message = await target_channel.send(embed=embed, view=view)
+        await save_panel_id("profile", new_message.id, target_channel.id)
+        logger.info(f"✅ 프로필 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(UserProfile(bot))
