@@ -1,4 +1,4 @@
-# cogs/server/system.py (모든 역할 포함 및 문법 오류 수정 최종본)
+# cogs/server/system.py (삭제 후 재생성 로직 적용 최종본)
 
 import discord
 from discord.ext import commands
@@ -34,7 +34,6 @@ STATIC_AUTO_ROLE_PANELS = {
                 {"role_id_key": "role_notify_disboard", "label": "ディスボード", "description": "Disboard通知を受け取ります。"},
                 {"role_id_key": "role_notify_up", "label": "アップ", "description": "Up通知を受け取ります。"},
             ],
-            # [수정] 모든 게임 역할을 다시 포함시켰습니다.
             "games": [
                 {"role_id_key": "role_game_minecraft", "label": "マインクラフト", "description": "マインクラフト関連の募集に参加します。"},
                 {"role_id_key": "role_game_valorant", "label": "ヴァロラント", "description": "ヴァロラント関連の募集に参加します。"},
@@ -123,26 +122,25 @@ class ServerSystem(commands.Cog):
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
             try:
-                target_channel = channel or (self.bot.get_channel(get_id(panel_config['channel_key'])) if get_id(panel_config['channel_key']) else None)
-                if not target_channel:
-                    logger.info(f"ℹ️ '{panel_key}' 패널 채널이 DB에 설정되지 않아 생성을 건너뜁니다.")
-                    continue
+                target_channel = channel
+                if target_channel is None:
+                    channel_id = get_id(panel_config['channel_key'])
+                    if not channel_id or not (target_channel := self.bot.get_channel(channel_id)):
+                        logger.info(f"ℹ️ '{panel_key}' 패널 채널이 DB에 설정되지 않아 생성을 건너뜁니다.")
+                        continue
+                panel_info = get_panel_id(panel_key)
+                if panel_info and (old_id := panel_info.get('message_id')):
+                    try:
+                        old_message = await target_channel.fetch_message(old_id)
+                        await old_message.delete()
+                    except (discord.NotFound, discord.Forbidden): pass
                 embed = discord.Embed.from_dict(panel_config['embed'])
                 view = AutoRoleView(panel_config)
-                panel_info = get_panel_id(panel_key)
-                message_id = panel_info.get('message_id') if panel_info else None
-                live_message = None
-                if message_id:
-                    try:
-                        live_message = await target_channel.fetch_message(message_id)
-                        await live_message.edit(embed=embed, view=view)
-                        logger.info(f"✅ '{panel_key}' 패널을 성공적으로 업데이트했습니다.")
-                    except discord.NotFound: live_message = None
-                if not live_message:
-                    new_message = await target_channel.send(embed=embed, view=view)
-                    await save_panel_id(panel_key, new_message.id, target_channel.id)
-                    logger.info(f"✅ '{panel_key}' 패널을 성공적으로 새로 생성했습니다.")
-            except Exception as e: logger.error(f"❌ '{panel_key}' 패널 처리 중 오류가 발생했습니다: {e}", exc_info=True)
+                new_message = await target_channel.send(embed=embed, view=view)
+                await save_panel_id(panel_key, new_message.id, target_channel.id)
+                logger.info(f"✅ '{panel_key}' 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
+            except Exception as e:
+                logger.error(f"❌ '{panel_key}' 패널 처리 중 오류가 발생했습니다: {e}", exc_info=True)
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
@@ -171,20 +169,13 @@ class ServerSystem(commands.Cog):
     @app_commands.command(name="setup", description="[管理者] ボットの各種チャンネルを設定またはパネルを設置します。")
     @app_commands.describe(setting_type="設定したい項目を選択してください。", channel="設定対象のチャンネルを指定してください。")
     @app_commands.choices(setting_type=[
-        app_commands.Choice(name="[パネル] 役割パネル", value="panel_roles"),
-        app_commands.Choice(name="[パネル] 案内パネル (オンボーディング)", value="panel_onboarding"),
-        app_commands.Choice(name="[パネル] 名前変更パネル", value="panel_nicknames"),
-        app_commands.Choice(name="[パネル] 商店街パネル (売買)", value="panel_commerce"),
-        app_commands.Choice(name="[パネル] 釣り場パネル", value="panel_fishing"),
-        app_commands.Choice(name="[パネル] 持ち物パネル", value="panel_profile"),
-        app_commands.Choice(name="[チャンネル] 自己紹介承認チャンネル", value="channel_onboarding_approval"),
-        app_commands.Choice(name="[チャンネル] 名前変更承認チャンネル", value="channel_nickname_approval"),
-        app_commands.Choice(name="[チャンネル] 新規参加者歓迎チャンネル", value="channel_new_welcome"),
-        app_commands.Choice(name="[ログ] 名前変更ログ", value="log_nickname"),
-        app_commands.Choice(name="[ログ] 釣りログ", value="log_fishing"),
-        app_commands.Choice(name="[ログ] コインログ", value="log_coin"),
-        app_commands.Choice(name="[ログ] 自己紹介承認ログ", value="log_intro_approval"),
-        app_commands.Choice(name="[ログ] 自己紹介拒否ログ", value="log_intro_rejection"),
+        app_commands.Choice(name="[パネル] 役割パネル", value="panel_roles"), app_commands.Choice(name="[パネル] 案内パネル (オンボーディング)", value="panel_onboarding"),
+        app_commands.Choice(name="[パネル] 名前変更パネル", value="panel_nicknames"), app_commands.Choice(name="[パネル] 商店街パネル (売買)", value="panel_commerce"),
+        app_commands.Choice(name="[パネル] 釣り場パネル", value="panel_fishing"), app_commands.Choice(name="[パネル] 持ち物パネル", value="panel_profile"),
+        app_commands.Choice(name="[チャンネル] 自己紹介承認チャンネル", value="channel_onboarding_approval"), app_commands.Choice(name="[チャンネル] 名前変更承認チャンネル", value="channel_nickname_approval"),
+        app_commands.Choice(name="[チャンネル] 新規参加者歓迎チャンネル", value="channel_new_welcome"), app_commands.Choice(name="[ログ] 名前変更ログ", value="log_nickname"),
+        app_commands.Choice(name="[ログ] 釣りログ", value="log_fishing"), app_commands.Choice(name="[ログ] コインログ", value="log_coin"),
+        app_commands.Choice(name="[ログ] 自己紹介承認ログ", value="log_intro_approval"), app_commands.Choice(name="[ログ] 自己紹介拒否ログ", value="log_intro_rejection"),
     ])
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_unified(self, interaction: discord.Interaction, setting_type: str, channel: discord.TextChannel):
@@ -209,8 +200,7 @@ class ServerSystem(commands.Cog):
         if not config: await interaction.followup.send("❌ 無効な設定タイプです。", ephemeral=True); return
         try:
             db_key, friendly_name = config['key'], config['friendly_name']
-            await save_id_to_db(db_key, channel.id)
-            logger.info(f"'{db_key}' 설정을 DB에 저장했습니다: {channel.id}")
+            await save_id_to_db(db_key, channel.id); logger.info(f"'{db_key}' 설정을 DB에 저장했습니다: {channel.id}")
             if config["type"] == "panel":
                 cog_to_run = self.bot.get_cog(config["cog"])
                 if not cog_to_run or not hasattr(cog_to_run, 'regenerate_panel'): await interaction.followup.send(f"❌ '{config['cog']}' Cogが見つからないか、'regenerate_panel' 関数がありません。", ephemeral=True); return
@@ -219,8 +209,7 @@ class ServerSystem(commands.Cog):
             elif config["type"] == "channel":
                 target_cog = self.bot.get_cog(config["cog_name"])
                 if target_cog and hasattr(target_cog, 'load_all_configs'):
-                    await target_cog.load_all_configs()
-                    logger.info(f"✅ '{config['cog_name']}' Cog의 설정을 실시간으로 새로고침했습니다.")
+                    await target_cog.load_all_configs(); logger.info(f"✅ '{config['cog_name']}' Cog의 설정을 실시간으로 새로고침했습니다.")
                 await interaction.followup.send(f"✅ `{channel.mention}`を**{friendly_name}**として設定しました。", ephemeral=True)
         except Exception as e:
             logger.error(f"통합 설정 명령어({setting_type}) 처리 중 오류 발생: {e}", exc_info=True)
