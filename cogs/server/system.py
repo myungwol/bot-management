@@ -1,10 +1,10 @@
-# cogs/server/system.py (최종 완성 버전)
+# cogs/server/system.py (최종 안정화 버전)
 
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
 import logging
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
@@ -14,10 +14,7 @@ from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_d
 STATIC_AUTO_ROLE_PANELS = {
     "main_roles": {
         "channel_key": "auto_role_channel_id",
-        "embed_data": {
-            "category_selection": {"title": "📜 役割選択", "description": "下のメニューから希望する役割のカテゴリーを選択してください！", "color": 0x5865F2},
-            "role_selection": {"title": "📜 {category_name}", "description": "下のメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。", "color": 0x5865F2}
-        },
+        "embed": {"title": "📜 役割選択", "description": "下のメニューから希望する役割のカテゴリーを選択してください！\n選択は即時反映されます。", "color": 0x5865F2},
         "categories": [
             {"id": "notifications", "label": "通知役割", "emoji": "📢", "description": "サーバーの各種通知に関する役割を選択します。"},
             {"id": "games", "label": "ゲーム役割", "emoji": "🎮", "description": "プレイするゲームに関する役割を選択します。"},
@@ -28,101 +25,74 @@ class AutoRoleView(ui.View):
     def __init__(self, panel_config: dict):
         super().__init__(timeout=None)
         self.panel_config = panel_config
-        # View의 현재 상태를 관리합니다: 'category' 또는 'roles'
-        self.current_state: str = 'category'
-        self.current_category_id: Optional[str] = None
-        self.update_components()
 
-    def update_components(self, interaction: Optional[discord.Interaction] = None):
-        """View의 상태에 따라 버튼과 드롭다운을 다시 그리는 함수"""
-        self.clear_items()
-        
-        if self.current_state == 'category':
-            options = [discord.SelectOption(label=c['label'], value=c['id'], emoji=c.get('emoji'), description=c.get('description')) for c in self.panel_config.get("categories", [])]
-            if options:
-                select = ui.Select(placeholder="役割のカテゴリーを選択してください...", options=options, custom_id="main_category_select")
-                select.callback = self.on_category_select
+        # View가 초기화될 때 모든 카테고리에 대한 드롭다운 메뉴를 미리 생성합니다.
+        member_roles = set() # 실제 역할은 콜백에서 가져옵니다.
+        for category in self.panel_config.get("categories", []):
+            category_id = category['id']
+            category_name = category['label']
+            category_roles = self.panel_config.get("roles", {}).get(category_id, [])
+            
+            # 역할이 25개를 넘을 경우를 대비한 청크 분리
+            role_chunks = [category_roles[i:i + 25] for i in range(0, len(category_roles), 25)]
+
+            if not role_chunks:
+                continue
+
+            for i, chunk in enumerate(role_chunks):
+                options = [discord.SelectOption(label=info['label'], value=str(get_id(info.get('role_id_key'))), description=info.get('description')) for info in chunk if get_id(info.get('role_id_key')) is not None]
+                
+                if not options:
+                    continue
+
+                # 각 드롭다운에 고유한 custom_id를 부여합니다. (카테고리 정보 포함)
+                select = ui.Select(
+                    placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})",
+                    min_values=0, max_values=len(options),
+                    options=options,
+                    custom_id=f"auto_role_select:{category_id}"
+                )
+                select.callback = self.select_callback
                 self.add_item(select)
-        
-        elif self.current_state == 'roles' and self.current_category_id:
-            category_name = next((c['label'] for c in self.panel_config['categories'] if c['id'] == self.current_category_id), "Unknown")
-            category_roles = self.panel_config.get("roles", {}).get(self.current_category_id, [])
-            
-            if interaction:
-                current_user_role_ids = {r.id for r in interaction.user.roles}
-                role_chunks = [category_roles[i:i + 25] for i in range(0, len(category_roles), 25)]
 
-                for i, chunk in enumerate(role_chunks):
-                    options = [discord.SelectOption(label=info['label'], value=str(get_id(info['role_id_key'])), default=(get_id(info['role_id_key']) in current_user_role_ids)) for info in chunk if get_id(info['role_id_key'])]
-                    if options:
-                        self.add_item(ui.Select(placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})", min_values=0, max_values=len(options), options=options, custom_id=f"role_chunk_{i}"))
-
-            update_button = ui.Button(label="役割を更新", style=discord.ButtonStyle.success, custom_id="update_roles_final", emoji="✅")
-            update_button.callback = self.on_update_roles
-            self.add_item(update_button)
-            
-            back_button = ui.Button(label="戻る", style=discord.ButtonStyle.grey, custom_id="back_to_category")
-            back_button.callback = self.on_back
-            self.add_item(back_button)
-
-    async def on_category_select(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        self.current_category_id = interaction.data['values'][0]
-        self.current_state = 'roles'
-        
-        self.update_components(interaction)
-        
-        embed_data = self.panel_config['embed_data']['role_selection']
-        category_name = next((c['label'] for c in self.panel_config['categories'] if c['id'] == self.current_category_id), "")
-        embed = discord.Embed.from_dict(embed_data)
-        embed.title = embed.title.format(category_name=category_name)
-        
-        await interaction.edit_original_response(embed=embed, view=self)
-
-    async def on_back(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        self.current_category_id = None
-        self.current_state = 'category'
-        self.update_components()
-        
-        embed = discord.Embed.from_dict(self.panel_config['embed_data']['category_selection'])
-        await interaction.edit_original_response(embed=embed, view=self)
-
-    async def on_update_roles(self, interaction: discord.Interaction):
+    async def select_callback(self, interaction: discord.Interaction):
+        # defer()를 먼저 호출하여 상호작용 실패를 방지합니다.
         await interaction.response.defer(ephemeral=True)
-        
-        if not self.current_category_id:
-            await interaction.followup.send("エラーが発生しました。もう一度お試しください。", ephemeral=True)
+
+        user = interaction.user
+        if not isinstance(user, discord.Member):
             return
 
-        member = interaction.user
-        category_roles = self.panel_config.get("roles", {}).get(self.current_category_id, [])
+        # custom_id에서 카테고리 정보를 추출합니다.
+        category_id = interaction.data['custom_id'].split(':')[1]
+        
+        # 이 카테고리에 속한 모든 역할의 ID 목록을 가져옵니다.
+        category_roles = self.panel_config.get("roles", {}).get(category_id, [])
         all_category_role_ids = {rid for role in category_roles if (rid := get_id(role.get('role_id_key')))}
 
-        selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
-        current_ids = {role.id for role in member.roles}
+        # 사용자가 현재 선택한 역할들의 ID
+        selected_ids = {int(value) for value in interaction.data['values']}
         
-        to_add_ids = selected_ids - current_ids
-        to_remove_ids = (all_category_role_ids - selected_ids) & current_ids
+        # 사용자가 원래 가지고 있던 역할들의 ID
+        current_user_role_ids = {role.id for role in user.roles}
+
+        # 추가할 역할: (사용자가 선택한 역할) - (원래 가지고 있던 역할)
+        to_add_ids = selected_ids - current_user_role_ids
         
+        # 제거할 역할: (이 카테고리의 모든 역할 - 사용자가 선택한 역할) & (원래 가지고 있던 역할)
+        to_remove_ids = (all_category_role_ids - selected_ids) & current_user_role_ids
+
         try:
             guild = interaction.guild
             if to_add_ids:
                 roles_to_add = [r for r_id in to_add_ids if (r := guild.get_role(r_id))]
-                if roles_to_add: await member.add_roles(*roles_to_add, reason="自動役割選択")
+                if roles_to_add: await user.add_roles(*roles_to_add, reason="自動役割選択")
             if to_remove_ids:
                 roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
-                if roles_to_remove: await member.remove_roles(*roles_to_remove, reason="自動役割選択")
-            
-            await interaction.followup.send("✅ 役割が正常に更新されました。", ephemeral=True)
-            
-            # 성공 후, 다시 카테고리 선택 화면으로 돌아갑니다.
-            self.current_category_id = None
-            self.current_state = 'category'
-            self.update_components()
-            embed = discord.Embed.from_dict(self.panel_config['embed_data']['category_selection'])
-            await interaction.edit_original_response(embed=embed, view=self)
+                if roles_to_remove: await user.remove_roles(*roles_to_remove, reason="自動役割選択")
 
+            # 사용자에게만 보이는 임시 메시지로 성공을 알립니다.
+            await interaction.followup.send("✅ 役割が更新されました。", ephemeral=True)
         except Exception as e:
             logger.error(f"역할 업데이트 콜백 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
@@ -158,9 +128,7 @@ class ServerSystem(commands.Cog):
                         old_message = await target_channel.fetch_message(old_id)
                         await old_message.delete()
                     except (discord.NotFound, discord.Forbidden): pass
-                
-                # 초기 상태의 임베드를 사용합니다.
-                embed = discord.Embed.from_dict(panel_config['embed_data']['category_selection'])
+                embed = discord.Embed.from_dict(panel_config['embed'])
                 view = AutoRoleView(panel_config)
                 new_message = await target_channel.send(embed=embed, view=view)
                 await save_panel_id(panel_key, new_message.id, target_channel.id)
@@ -168,7 +136,6 @@ class ServerSystem(commands.Cog):
             except Exception as e:
                 logger.error(f"❌ '{panel_key}' 패널 처리 중 오류가 발생했습니다: {e}", exc_info=True)
 
-    # ... 나머지 Cog 리스너 및 명령어는 이전과 동일하게 유지 ...
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         if member.bot: return
