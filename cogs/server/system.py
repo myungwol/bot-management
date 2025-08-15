@@ -1,4 +1,4 @@
-# cogs/server/system.py (들여쓰기 오류가 수정된 완전한 최종본)
+# cogs/server/system.py (명령어 통합 최종본)
 
 import discord
 from discord.ext import commands, tasks
@@ -217,133 +217,101 @@ class ServerSystem(commands.Cog):
         if before.roles != after.roles or before.premium_since != after.premium_since:
             self._schedule_counter_update(after.guild)
 
-    setup_group = app_commands.Group(name="setup", description="[管理者] ボットの主要機能を設定します。")
-    @setup_group.command(name="panel", description="指定されたチャンネルに機能パネルを設置します。")
-    @app_commands.describe(channel="パネルを設置するチャンネル", panel_type="設置するパネルの種類")
-    @app_commands.choices(panel_type=[
-        app_commands.Choice(name="役割パネル", value="roles"),
-        app_commands.Choice(name="案内パネル (オンボーディング)", value="onboarding"),
-        app_commands.Choice(name="名前変更パネル", value="nicknames"),
-        app_commands.Choice(name="商店街パネル (売買)", value="commerce"),
-        app_commands.Choice(name="釣り場パネル", value="fishing"),
-        app_commands.Choice(name="持ち物パネル", value="profile"),
+    # [수정된 부분] 모든 설정 명령어를 이 하나로 통합
+    @app_commands.command(name="setup", description="[管理者] ボットの各種チャンネルを設定またはパネルを設置します。")
+    @app_commands.describe(
+        setting_type="設定したい項目を選択してください。",
+        channel="設定対象のチャンネルを指定してください。"
+    )
+    @app_commands.choices(setting_type=[
+        # 패널 설치
+        app_commands.Choice(name="[パネル] 役割パネル", value="panel_roles"),
+        app_commands.Choice(name="[パネル] 案内パネル (オンボーディング)", value="panel_onboarding"),
+        app_commands.Choice(name="[パネル] 名前変更パネル", value="panel_nicknames"),
+        app_commands.Choice(name="[パネル] 商店街パネル (売買)", value="panel_commerce"),
+        app_commands.Choice(name="[パネル] 釣り場パネル", value="panel_fishing"),
+        app_commands.Choice(name="[パネル] 持ち物パネル", value="panel_profile"),
+        # 기능 채널 설정
+        app_commands.Choice(name="[チャンネル] 自己紹介承認チャンネル", value="channel_onboarding_approval"),
+        app_commands.Choice(name="[チャンネル] 名前変更承認チャンネル", value="channel_nickname_approval"),
+        app_commands.Choice(name="[チャンネル] 新規参加者歓迎チャンネル", value="channel_new_welcome"),
+        # 로그 채널 설정
+        app_commands.Choice(name="[ログ] 名前変更ログ", value="log_nickname"),
+        app_commands.Choice(name="[ログ] 釣りログ", value="log_fishing"),
+        app_commands.Choice(name="[ログ] コインログ", value="log_coin"),
+        app_commands.Choice(name="[ログ] 自己紹介承認ログ", value="log_intro_approval"),
+        app_commands.Choice(name="[ログ] 自己紹介拒否ログ", value="log_intro_rejection"),
     ])
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_panel(self, interaction: discord.Interaction, channel: discord.TextChannel, panel_type: str):
+    async def setup_unified(self, interaction: discord.Interaction, setting_type: str, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
-        panel_map = {
-            "roles": {"cog": "ServerSystem", "key": "auto_role_channel_id"},
-            "onboarding": {"cog": "Onboarding", "key": "onboarding_panel_channel_id"},
-            "nicknames": {"cog": "Nicknames", "key": "nickname_panel_channel_id"},
-            "commerce": {"cog": "Commerce", "key": "commerce_panel_channel_id"},
-            "fishing": {"cog": "Fishing", "key": "fishing_panel_channel_id"},
-            "profile": {"cog": "UserProfile", "key": "inventory_panel_channel_id"},
+
+        # 모든 설정 정보를 하나의 딕셔너리로 관리
+        setup_map = {
+            # 패널 정보
+            "panel_roles": {"type": "panel", "cog": "ServerSystem", "key": "auto_role_channel_id", "friendly_name": "役割パネル"},
+            "panel_onboarding": {"type": "panel", "cog": "Onboarding", "key": "onboarding_panel_channel_id", "friendly_name": "案内パネル"},
+            "panel_nicknames": {"type": "panel", "cog": "Nicknames", "key": "nickname_panel_channel_id", "friendly_name": "名前変更パネル"},
+            "panel_commerce": {"type": "panel", "cog": "Commerce", "key": "commerce_panel_channel_id", "friendly_name": "商店街パネル"},
+            "panel_fishing": {"type": "panel", "cog": "Fishing", "key": "fishing_panel_channel_id", "friendly_name": "釣り場パネル"},
+            "panel_profile": {"type": "panel", "cog": "UserProfile", "key": "inventory_panel_channel_id", "friendly_name": "持ち物パネル"},
+            # 기능 채널 정보
+            "channel_onboarding_approval": {"type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id", "friendly_name": "自己紹介承認チャンネル"},
+            "channel_nickname_approval": {"type": "channel", "cog_name": "Nicknames", "key": "nickname_approval_channel_id", "friendly_name": "名前変更承認チャンネル"},
+            "channel_new_welcome": {"type": "channel", "cog_name": "Onboarding", "key": "new_welcome_channel_id", "friendly_name": "新規参加者歓迎チャンネル"},
+            # 로그 채널 정보
+            "log_nickname": {"type": "channel", "cog_name": "Nicknames", "key": "nickname_log_channel_id", "friendly_name": "名前変更ログ"},
+            "log_fishing": {"type": "channel", "cog_name": "Fishing", "key": "fishing_log_channel_id", "friendly_name": "釣りログ"},
+            "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "コインログ"},
+            "log_intro_approval": {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id", "friendly_name": "自己紹介承認ログ"},
+            "log_intro_rejection": {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id", "friendly_name": "自己紹介拒否ログ"},
         }
-        config = panel_map.get(panel_type)
-        if not config: return await interaction.followup.send("❌ 無効なパネルタイプです。", ephemeral=True)
-        cog_to_run = self.bot.get_cog(config["cog"])
-        if not cog_to_run or not hasattr(cog_to_run, 'regenerate_panel'):
-            return await interaction.followup.send(f"❌ '{config['cog']}' Cogが見つからないか、'regenerate_panel' 関数がありません。", ephemeral=True)
-        try:
-            await cog_to_run.regenerate_panel(channel)
-            await save_channel_id_to_db(config["key"], channel.id)
-            self.bot.channel_configs[config["key"]] = channel.id
-            await interaction.followup.send(f"✅ `{channel.mention}` に **{panel_type}** パネルを設置しました。", ephemeral=True)
-        except Exception as e:
-            logger.error(f"Panel setup command failed for {panel_type}: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ パネル設置中にエラーが発生しました: {e}", ephemeral=True)
-            
-    # [새로 추가된 명령어]
-    @setup_group.command(name="functional-channel", description="[管理者] 各種機能の動作チャンネルを設定します。")
-    @app_commands.describe(channel="設定するチャンネル", channel_type="設定するチャンネルの種類")
-    @app_commands.choices(channel_type=[
-        app_commands.Choice(name="自己紹介承認チャンネル", value="onboarding_approval"),
-        app_commands.Choice(name="名前変更承認チャンネル", value="nickname_approval"),
-        app_commands.Choice(name="新規参加者歓迎チャンネル", value="new_welcome"),
-    ])
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_functional_channel(self, interaction: discord.Interaction, channel: discord.TextChannel, channel_type: str):
-        await interaction.response.defer(ephemeral=True)
-        
-        channel_map = {
-            "onboarding_approval": {"key": "onboarding_approval_channel_id", "cog_name": "Onboarding", "friendly_name": "自己紹介承認"},
-            "nickname_approval": {"key": "nickname_approval_channel_id", "cog_name": "Nicknames", "friendly_name": "名前変更承認"},
-            "new_welcome": {"key": "new_welcome_channel_id", "cog_name": "Onboarding", "friendly_name": "新規参加者歓迎"},
-        }
-        
-        config = channel_map.get(channel_type)
+
+        config = setup_map.get(setting_type)
         if not config:
-            return await interaction.followup.send("❌ 無効なチャンネルタイプです。", ephemeral=True)
+            return await interaction.followup.send("❌ 無効な設定タイプです。", ephemeral=True)
 
         try:
-            db_key = config["key"]
-            cog_name = config["cog_name"]
-            friendly_name = config["friendly_name"]
+            if config["type"] == "panel":
+                cog_to_run = self.bot.get_cog(config["cog"])
+                if not cog_to_run or not hasattr(cog_to_run, 'regenerate_panel'):
+                    return await interaction.followup.send(f"❌ '{config['cog']}' Cogが見つからないか、'regenerate_panel' 関数がありません。", ephemeral=True)
+                
+                await cog_to_run.regenerate_panel(channel)
+                await save_channel_id_to_db(config["key"], channel.id)
+                self.bot.channel_configs[config["key"]] = channel.id
+                await interaction.followup.send(f"✅ `{channel.mention}` に **{config['friendly_name']}** を設置しました。", ephemeral=True)
             
-            await save_channel_id_to_db(db_key, channel.id)
-            self.bot.channel_configs[db_key] = channel.id
-            
-            target_cog = self.bot.get_cog(cog_name)
-            if target_cog:
-                setattr(target_cog, db_key, channel.id) 
-                logger.info(f"✅ Live updated {cog_name}'s {db_key} to {channel.id}")
-            else:
-                logger.warning(f"Could not find cog {cog_name} to update attribute live.")
+            elif config["type"] == "channel":
+                db_key = config["key"]
+                cog_name = config["cog_name"]
+                
+                await save_channel_id_to_db(db_key, channel.id)
+                self.bot.channel_configs[db_key] = channel.id
+                
+                target_cog = self.bot.get_cog(cog_name)
+                if target_cog:
+                    setattr(target_cog, db_key, channel.id) 
+                    logger.info(f"✅ Live updated {cog_name}'s {db_key} to {channel.id}")
+                
+                await interaction.followup.send(f"✅ `{channel.mention}`を**{config['friendly_name']}**として設定しました。", ephemeral=True)
 
-            await interaction.followup.send(f"✅ `{channel.mention}`を**{friendly_name}**チャンネルとして設定しました。", ephemeral=True)
         except Exception as e:
-            logger.error(f"Functional channel setup command failed for {channel_type}: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ チャンネル設定中にエラーが発生しました: {e}", ephemeral=True)
+            logger.error(f"Unified setup command failed for {setting_type}: {e}", exc_info=True)
+            await interaction.followup.send(f"❌ 設定中にエラーが発生しました: {e}", ephemeral=True)
 
-    @setup_group.command(name="log-channel", description="[管理者] 各種機能のログチャンネルを設定します。")
-    @app_commands.describe(channel="ログを送信するチャンネル", log_type="設定するログの種類")
-    @app_commands.choices(log_type=[
-        app_commands.Choice(name="名前変更ログ", value="nickname_log"),
-        app_commands.Choice(name="釣りログ", value="fishing_log"),
-        app_commands.Choice(name="コインログ", value="coin_log"),
-        app_commands.Choice(name="自己紹介承認ログ", value="intro_approval_log"),
-        app_commands.Choice(name="自己紹介拒否ログ", value="intro_rejection_log"),
-    ])
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_log_channel(self, interaction: discord.Interaction, channel: discord.TextChannel, log_type: str):
-        await interaction.response.defer(ephemeral=True)
-        
-        log_channel_map = {
-            "nickname_log": {"key": "nickname_log_channel_id", "cog_name": "Nicknames", "friendly_name": "名前変更ログ"},
-            "fishing_log": {"key": "fishing_log_channel_id", "cog_name": "Fishing", "friendly_name": "釣りログ"},
-            "coin_log": {"key": "coin_log_channel_id", "cog_name": "EconomyCore", "friendly_name": "コインログ"},
-            "intro_approval_log": {"key": "introduction_channel_id", "cog_name": "Onboarding", "friendly_name": "自己紹介承認ログ"},
-            "intro_rejection_log": {"key": "introduction_rejection_log_channel_id", "cog_name": "Onboarding", "friendly_name": "自己紹介拒否ログ"}
-        }
-        
-        config = log_channel_map.get(log_type)
-        if not config:
-            return await interaction.followup.send("❌ 無効なログタイプです。", ephemeral=True)
 
-        try:
-            db_key = config["key"]
-            cog_name = config["cog_name"]
-            friendly_name = config["friendly_name"]
-            
-            await save_channel_id_to_db(db_key, channel.id)
-            self.bot.channel_configs[db_key] = channel.id
-            
-            target_cog = self.bot.get_cog(cog_name)
-            if target_cog:
-                setattr(target_cog, db_key, channel.id) 
-                logger.info(f"✅ Live updated {cog_name}'s {db_key} to {channel.id}")
-            
-            await interaction.followup.send(f"✅ `{channel.mention}`を**{friendly_name}**チャンネルとして設定しました。", ephemeral=True)
-        except Exception as e:
-            logger.error(f"Log channel setup command failed for {log_type}: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ チャンネル設定中にエラーが発生しました: {e}", ephemeral=True)
-
-    @setup_group.command(name="welcome-message", description="歓迎メッセージの編集機を作成します。")
+    # 환영/작별 메시지 편집기 생성 명령어는 별도로 유지 (메시지 편집기 생성이므로)
+    setup_group = app_commands.Group(name="message", description="[管理者] 送信するメッセージの内容を編集します。")
+    
+    @setup_group.command(name="welcome", description="歓迎メッセージの編集機を作成します。")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_welcome_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'welcome_embed', "歓迎メッセージ")
-    @setup_group.command(name="farewell-message", description="お別れメッセージの編集機を作成します。")
+    
+    @setup_group.command(name="farewell", description="お別れメッセージの編集機を作成します。")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_farewell_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'farewell_embed', "お別れメッセージ")
+    
     async def create_message_editor(self, i: discord.Interaction, ch: discord.TextChannel, key: str, name: str):
         await i.response.defer(ephemeral=True)
         embed_data = await get_embed_from_db(key) or {"title": f"{name} タイトル", "description": f"{name} の説明を入力してください。"}
@@ -351,6 +319,7 @@ class ServerSystem(commands.Cog):
         msg = await ch.send(content=f"**{name} 編集機**", embed=embed)
         await msg.edit(view=EmbedEditorView(msg, key))
         await i.followup.send(f"`{ch.mention}` に {name} 編集機を作成しました。", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
