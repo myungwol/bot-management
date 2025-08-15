@@ -31,9 +31,9 @@ ROLE_KEY_MAP = {
 
     # 알림
     "role_mention_role_1": "全体通知",
-    "role_notify_festival": "祭り",
     "role_notify_voice": "通話",
     "role_notify_friends": "友達",
+    "role_notify_festival": "祭り",
     "role_notify_disboard": "ディスボード",
     "role_notify_up": "アップ",
 
