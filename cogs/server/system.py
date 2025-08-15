@@ -1,4 +1,4 @@
-# cogs/server/system.py (최종 안정화 버전)
+# cogs/server/system.py (버튼 방식 최종 버전)
 
 import discord
 from discord.ext import commands
@@ -21,67 +21,65 @@ STATIC_AUTO_ROLE_PANELS = {
         ],
         "roles": { "notifications": [ {"role_id_key": "role_mention_role_1", "label": "サーバー全体通知"}, {"role_id_key": "role_notify_voice", "label": "通話"}, {"role_id_key": "role_notify_friends", "label": "友達"}, {"role_id_key": "role_notify_festival", "label": "祭り"}, {"role_id_key": "role_notify_disboard", "label": "ディスボード"}, {"role_id_key": "role_notify_up", "label": "アップ"}], "games": [ {"role_id_key": "role_game_minecraft", "label": "マインクラフト"}, {"role_id_key": "role_game_valorant", "label": "ヴァロラント"}, {"role_id_key": "role_game_overwatch", "label": "オーバーウォッチ"}, {"role_id_key": "role_game_lol", "label": "リーグ・オブ・レジェンド"}, {"role_id_key": "role_game_mahjong", "label": "麻雀"}, {"role_id_key": "role_game_amongus", "label": "アモングアス"}, {"role_id_key": "role_game_mh", "label": "モンスターハンター"}, {"role_id_key": "role_game_genshin", "label": "原神"}, {"role_id_key": "role_game_apex", "label": "エーペックスレジェンズ"}, {"role_id_key": "role_game_splatoon", "label": "スプラトゥーン"}, {"role_id_key": "role_game_gf", "label": "ゴッドフィールド"}, {"role_id_key": "role_platform_steam", "label": "スチーム"}, {"role_id_key": "role_platform_smartphone", "label": "スマートフォン"}, {"role_id_key": "role_platform_switch", "label": "スイッチ"}]}}}
 
+class RoleSelectView(ui.View):
+    def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
+        super().__init__(timeout=300)
+        self.member = member
+        self.all_category_role_ids = {rid for role in category_roles if (rid := get_id(role.get('role_id_key')))}
+        
+        current_user_role_ids = {r.id for r in self.member.roles}
+        role_chunks = [category_roles[i:i + 25] for i in range(0, len(category_roles), 25)]
+
+        if not role_chunks or not self.all_category_role_ids:
+            self.add_item(ui.Button(label="設定された役割がありません", disabled=True))
+            return
+
+        for i, chunk in enumerate(role_chunks):
+            options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in chunk if (rid := get_id(info.get('role_id_key')))]
+            if options:
+                self.add_item(ui.Select(placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})", min_values=0, max_values=len(options), options=options, custom_id=f"role_select_dynamic_{i}"))
+
+    @ui.button(label="役割を更新", style=discord.ButtonStyle.primary, custom_id="update_roles_button", emoji="✅", row=4)
+    async def update_roles_callback(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        
+        selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
+        current_ids = {role.id for role in self.member.roles}
+        
+        to_add_ids = selected_ids - current_ids
+        to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
+        
+        try:
+            guild = interaction.guild
+            if to_add_ids:
+                roles_to_add = [r for r_id in to_add_ids if (r := guild.get_role(r_id))]
+                if roles_to_add: await self.member.add_roles(*roles_to_add, reason="自動役割選択")
+            if to_remove_ids:
+                roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
+                if roles_to_remove: await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
+
+            button.disabled = True
+            for item in self.children:
+                if isinstance(item, ui.Select): item.disabled = True
+            
+            await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self)
+            self.stop()
+        except Exception as e:
+            logger.error(f"역할 업데이트 콜백 중 오류: {e}", exc_info=True)
+            await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
+
 class AutoRoleView(ui.View):
     def __init__(self, panel_config: dict):
         super().__init__(timeout=None)
         self.panel_config = panel_config
+        # [핵심] 생성된 임시 View를 저장하여 참조를 잃어버리지 않도록 합니다.
+        self.active_select_view = None
+        
         options = [discord.SelectOption(label=c['label'], value=c['id'], emoji=c.get('emoji'), description=c.get('description')) for c in self.panel_config.get("categories", [])]
         if options:
             select = ui.Select(placeholder="役割のカテゴリーを選択してください...", options=options, custom_id=f"autorole_category_select:{panel_config.get('channel_key', 'default')}")
             select.callback = self.category_select_callback
             self.add_item(select)
-    
-    class RoleSelect(ui.View):
-        def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
-            super().__init__(timeout=180)
-            self.member = member
-            self.all_category_role_ids = {rid for role in category_roles if (rid := get_id(role.get('role_id_key')))}
-            self.create_selects(category_roles, category_name)
-
-        def create_selects(self, category_roles: List[Dict[str, Any]], category_name: str):
-            current_user_role_ids = {r.id for r in self.member.roles}
-            role_chunks = [category_roles[i:i + 25] for i in range(0, len(category_roles), 25)]
-
-            if not role_chunks or not self.all_category_role_ids:
-                self.add_item(ui.Button(label="設定された役割がありません", disabled=True))
-                return
-
-            for i, chunk in enumerate(role_chunks):
-                options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in chunk if (rid := get_id(info.get('role_id_key')))]
-                if options:
-                    select = ui.Select(
-                        placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})",
-                        min_values=0, max_values=len(options),
-                        options=options, custom_id=f"role_select_final_{i}"
-                    )
-                    select.callback = self.select_callback
-                    self.add_item(select)
-
-        async def select_callback(self, interaction: discord.Interaction):
-            await interaction.response.defer() # 응답을 defer하지만, 아무 메시지도 보내지 않아 상호작용이 조용히 끝나도록 합니다.
-            
-            selected_ids = set()
-            for item in self.children:
-                if isinstance(item, ui.Select):
-                    selected_ids.update(int(value) for value in item.values)
-
-            current_ids = {role.id for role in self.member.roles}
-            
-            to_add_ids = selected_ids - current_ids
-            to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
-            
-            try:
-                guild = interaction.guild
-                if to_add_ids:
-                    roles_to_add = [r for r_id in to_add_ids if (r := guild.get_role(r_id))]
-                    if roles_to_add: await self.member.add_roles(*roles_to_add, reason="自動役割選択")
-                if to_remove_ids:
-                    roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
-                    if roles_to_remove: await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
-            except Exception as e:
-                logger.error(f"역할 업데이트 콜백 중 오류: {e}", exc_info=True)
-                # 사용자에게 오류를 알리고 싶다면 아래 주석을 해제하세요.
-                # await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
 
     async def category_select_callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -89,15 +87,20 @@ class AutoRoleView(ui.View):
         category_info = next((c for c in self.panel_config.get("categories", []) if c['id'] == category_id), None)
         category_name = category_info['label'] if category_info else category_id.capitalize()
         category_roles = self.panel_config.get("roles", {}).get(category_id, [])
+
         if not category_roles:
             await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True)
             return
+
         embed = discord.Embed(
             title=f"「{category_name}」役割選択",
-            description="下のメニューで希望する役割をすべて選択してください。\n選択は**即時反映**されます。",
+            description="下のドロップダウンメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。",
             color=discord.Color.blue()
         )
-        await interaction.followup.send(embed=embed, view=self.RoleSelect(interaction.user, category_roles, category_name), ephemeral=True)
+        
+        # [핵심] 생성된 임시 View를 클래스 변수에 저장합니다.
+        self.active_select_view = RoleSelectView(interaction.user, category_roles, category_name)
+        await interaction.followup.send(embed=embed, view=self.active_select_view, ephemeral=True)
 
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
