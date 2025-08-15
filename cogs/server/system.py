@@ -1,4 +1,4 @@
-# cogs/server/system.py (상호작용 실패 문제 최종 해결)
+# cogs/server/system.py (디버깅 로그 추가 최종본)
 
 import discord
 from discord.ext import commands
@@ -28,9 +28,9 @@ STATIC_AUTO_ROLE_PANELS = {
         "roles": {
             "notifications": [
                 {"role_id_key": "role_mention_role_1", "label": "サーバー全体通知", "description": "サーバーの重要なお知らせを受け取ります。"},
+                {"role_id_key": "role_notify_festival", "label": "祭り", "description": "お祭りやイベント関連の通知を受け取ります。"},
                 {"role_id_key": "role_notify_voice", "label": "通話", "description": "通話募集の通知を受け取ります。"},
                 {"role_id_key": "role_notify_friends", "label": "友達", "description": "友達募集の通知を受け取ります。"},
-                {"role_id_key": "role_notify_festival", "label": "祭り", "description": "お祭りやイベント関連の通知を受け取ります。"},
                 {"role_id_key": "role_notify_disboard", "label": "ディスボード", "description": "Disboard通知を受け取ります。"},
                 {"role_id_key": "role_notify_up", "label": "アップ", "description": "Up通知を受け取ります。"},
             ],
@@ -73,36 +73,61 @@ class RoleSelectView(ui.View):
         self.add_item(update_button)
 
     async def update_roles_callback(self, interaction: discord.Interaction):
+        # [디버깅] 1. 콜백 함수 시작
+        logger.info(f"[디버깅] update_roles_callback 시작 (사용자: {interaction.user.id})")
         await interaction.response.defer(ephemeral=True)
         
         selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
         current_ids = {role.id for role in self.member.roles}
         
+        # [디버깅] 2. 선택된 역할 및 현재 역할 정보
+        logger.info(f"[디버깅] 선택된 역할 ID: {selected_ids}")
+        logger.info(f"[디버깅] 이 카테고리의 모든 역할 ID: {self.all_category_role_ids}")
+        logger.info(f"[디버깅] 사용자의 현재 역할 ID: {current_ids}")
+        
         to_add_ids = selected_ids - current_ids
         to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
+        
+        # [디버깅] 3. 추가/제거할 역할 계산 결과
+        logger.info(f"[디버깅] 추가할 역할 ID: {to_add_ids}")
+        logger.info(f"[디버깅] 제거할 역할 ID: {to_remove_ids}")
         
         try:
             guild = interaction.guild
             if to_add_ids:
                 roles_to_add = [r for r_id in to_add_ids if (r := guild.get_role(r_id))]
+                # [디버깅] 4. 실제 역할 추가 직전
+                logger.info(f"[디버깅] 실제 추가할 역할 객체: {[r.name for r in roles_to_add]}")
                 if roles_to_add:
                     await self.member.add_roles(*roles_to_add, reason="自動役割選択")
+                    # [디버깅] 5. 역할 추가 완료
+                    logger.info("[디버깅] 역할 추가 API 호출 완료")
             
             if to_remove_ids:
                 roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
+                # [디버깅] 6. 실제 역할 제거 직전
+                logger.info(f"[디버깅] 실제 제거할 역할 객체: {[r.name for r in roles_to_remove]}")
                 if roles_to_remove:
                     await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
+                    # [디버깅] 7. 역할 제거 완료
+                    logger.info("[디버깅] 역할 제거 API 호출 완료")
             
             for item in self.children: 
                 item.disabled = True
             
-            # [수정] 새로운 메시지를 보내는 대신, 기존 메시지를 수정하여 응답합니다.
+            # [디버깅] 8. 최종 응답 전송 직전
+            logger.info("[디버깅] 최종 응답(edit_original_response) 호출 직전")
             await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self)
+            # [디버깅] 9. 최종 응답 완료
+            logger.info("[디버깅] 최종 응답 완료, 콜백 정상 종료")
             self.stop()
         except Exception as e:
-            logger.error(f"역할 업데이트 중 오류: {e}", exc_info=True)
-            # [수정] 오류 발생 시에도 기존 메시지를 수정하여 사용자에게 알립니다.
-            await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
+            # [디버깅] 오류 발생!
+            logger.error(f"❌ 역할 업데이트 중 오류 발생: {e}", exc_info=True)
+            try:
+                await interaction.edit_original_response(content=f"❌ 処理中にエラーが発生しました。\n`{e}`", view=None)
+            except Exception as e2:
+                logger.error(f"❌ 오류 메시지 전송조차 실패: {e2}", exc_info=True)
 
 class AutoRoleView(ui.View):
     def __init__(self, panel_config: dict):
@@ -131,6 +156,8 @@ class AutoRoleView(ui.View):
         view = RoleSelectView(interaction.user, category_roles, category_name)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
+# ... 나머지 ServerSystem 클래스와 다른 함수들은 이전과 동일하므로 생략하고 그대로 두시면 됩니다 ...
+# (이 파일의 아래 부분은 수정할 필요가 없습니다)
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
