@@ -1,4 +1,4 @@
-# cogs/server/system.py (수정됨)
+# cogs/server/system.py (상호작용 실패 문제 최종 해결)
 
 import discord
 from discord.ext import commands
@@ -28,9 +28,9 @@ STATIC_AUTO_ROLE_PANELS = {
         "roles": {
             "notifications": [
                 {"role_id_key": "role_mention_role_1", "label": "サーバー全体通知", "description": "サーバーの重要なお知らせを受け取ります。"},
-                {"role_id_key": "role_notify_festival", "label": "祭り", "description": "お祭りやイベント関連の通知を受け取ります。"},
                 {"role_id_key": "role_notify_voice", "label": "通話", "description": "通話募集の通知を受け取ります。"},
                 {"role_id_key": "role_notify_friends", "label": "友達", "description": "友達募集の通知を受け取ります。"},
+                {"role_id_key": "role_notify_festival", "label": "祭り", "description": "お祭りやイベント関連の通知を受け取ります。"},
                 {"role_id_key": "role_notify_disboard", "label": "ディスボード", "description": "Disboard通知を受け取ります。"},
                 {"role_id_key": "role_notify_up", "label": "アップ", "description": "Up通知を受け取ります。"},
             ],
@@ -61,7 +61,7 @@ class RoleSelectView(ui.View):
         self.all_category_role_ids = {rid for role in category_roles if (rid := get_id(role.get('role_id_key')))}
         current_user_role_ids = {r.id for r in self.member.roles}
         role_chunks = [category_roles[i:i + 25] for i in range(0, len(category_roles), 25)]
-        if not role_chunks: 
+        if not role_chunks or not self.all_category_role_ids: 
             self.add_item(ui.Button(label="設定された役割がありません", disabled=True))
             return
         for i, chunk in enumerate(role_chunks):
@@ -73,7 +73,6 @@ class RoleSelectView(ui.View):
         self.add_item(update_button)
 
     async def update_roles_callback(self, interaction: discord.Interaction):
-        # [수정] 상호작용 실패 오류를 막기 위해 defer()를 추가합니다.
         await interaction.response.defer(ephemeral=True)
         
         selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
@@ -97,27 +96,26 @@ class RoleSelectView(ui.View):
             for item in self.children: 
                 item.disabled = True
             
-            await interaction.followup.send("✅ 役割が正常に更新されました。", view=self)
+            # [수정] 새로운 메시지를 보내는 대신, 기존 메시지를 수정하여 응답합니다.
+            await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self)
             self.stop()
         except Exception as e:
             logger.error(f"역할 업데이트 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
+            # [수정] 오류 발생 시에도 기존 메시지를 수정하여 사용자에게 알립니다.
+            await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
 
 class AutoRoleView(ui.View):
     def __init__(self, panel_config: dict):
-        # timeout=None과 custom_id를 모두 설정해야 영구 View로 제대로 작동합니다.
         super().__init__(timeout=None)
         self.panel_config = panel_config
         options = [discord.SelectOption(label=c['label'], value=c['id'], emoji=c.get('emoji'), description=c.get('description')) for c in self.panel_config.get("categories", [])]
         
         if options:
-            # 각 View 컴포넌트에 고유한 custom_id를 부여하는 것이 좋습니다.
-            category_select = ui.Select(placeholder="役割のカテゴリーを選択してください...", options=options, custom_id=f"autorole_category_select:{panel_config['channel_key']}")
+            category_select = ui.Select(placeholder="役割のカテゴリーを選択してください...", options=options, custom_id=f"autorole_category_select:{panel_config.get('channel_key', 'default')}")
             category_select.callback = self.category_select_callback
             self.add_item(category_select)
 
     async def category_select_callback(self, interaction: discord.Interaction):
-        # defer의 thinking=True 옵션은 초기 응답이 오래 걸릴 때 유용합니다.
         await interaction.response.defer(ephemeral=True, thinking=True)
         
         category_id = interaction.data['values'][0]
@@ -142,8 +140,6 @@ class ServerSystem(commands.Cog):
         logger.info("ServerSystem Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
-        # cog_load 시점에서 설정을 불러오도록 변경합니다.
-        # on_ready에서 전체 DB 로드 후, 각 cog의 load_all_configs가 다시 호출되어 값을 덮어씁니다.
         await self.load_all_configs()
 
     async def load_all_configs(self):
@@ -262,7 +258,6 @@ class ServerSystem(commands.Cog):
             elif config["type"] == "channel":
                 target_cog = self.bot.get_cog(config["cog_name"])
                 if target_cog and hasattr(target_cog, 'load_all_configs'):
-                    # DB에 저장 후, 해당 Cog의 설정을 실시간으로 새로고침합니다.
                     await target_cog.load_all_configs()
                     logger.info(f"✅ '{config['cog_name']}' Cog의 설정을 실시간으로 새로고침했습니다.")
                 await interaction.followup.send(f"✅ `{channel.mention}`を**{friendly_name}**として設定しました。", ephemeral=True)
