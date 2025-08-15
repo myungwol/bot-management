@@ -63,7 +63,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
 class ApprovalView(ui.View):
-    # ... (이 클래스는 이미 defer() 처리가 잘 되어 있으므로 변경 없음) ...
+    # 이 클래스는 이미 defer() 처리가 잘 되어 있으므로 변경 없음
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.author_id = author.id; self.original_embed = original_embed
         self.onboarding_cog = cog_instance; self.rejection_reason: Optional[str] = None
@@ -175,85 +175,62 @@ class OnboardingView(ui.View):
         if page["type"] == "info": self.add_item(ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next")).callback = self.go_next
         elif page["type"] == "action": self.add_item(ui.Button(label=page.get("button_label", "確認"), style=discord.ButtonStyle.success, custom_id="onboarding_action")).callback = self.do_action
         elif page["type"] == "intro": self.add_item(ui.Button(label="住人登録票を作成する", style=discord.ButtonStyle.success, custom_id="onboarding_intro")).callback = self.create_introduction
-    async def _update_message(self, i: discord.Interaction):
+    async def _update_message(self, interaction: discord.Interaction):
         page = GUIDE_PAGES[self.current_step]
         embed = discord.Embed(title=page["title"], description=page["description"], color=discord.Color.purple())
         if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
         if page.get("rules"): embed.add_field(name="⚠️ ルール", value=page["rules"], inline=False)
-        self.update_view(); await i.edit_original_response(embed=embed, view=self)
-    async def go_previous(self, i: discord.Interaction):
-        await i.response.defer()
-        self.current_step -= 1; await self._update_message(i)
-    async def go_next(self, i: discord.Interaction):
-        await i.response.defer()
-        self.current_step += 1; await self._update_message(i)
-    async def do_action(self, i: discord.Interaction):
-        await i.response.defer() # [수정] defer()를 함수 맨 위로 이동
+        self.update_view()
+        # defer()가 이미 호출되었으므로, followup이나 edit_original_response를 사용해야 합니다.
+        if interaction.response.is_done():
+            await interaction.edit_original_response(embed=embed, view=self)
+
+    async def go_previous(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        if self.current_step > 0: self.current_step -= 1
+        await self._update_message(interaction)
+
+    async def go_next(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        if self.current_step < len(GUIDE_PAGES) - 1: self.current_step += 1
+        await self._update_message(interaction)
+
+    async def do_action(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         try:
             page_data = GUIDE_PAGES[self.current_step]
             role_id = get_id(page_data.get("role_key"))
-            if not role_id or not (role := i.guild.get_role(role_id)):
-                await i.followup.send("エラー: 役職が見つかりません。", ephemeral=True); return # [수정] followup.send 사용
-            if role not in i.user.roles: await i.user.add_roles(role)
-            self.current_step += 1; await self._update_message(i)
-        except Exception as e: await i.followup.send(f"❌ エラー: {e}", ephemeral=True)
-    async def create_introduction(self, i: discord.Interaction):
-        # [수정] 이 함수는 modal을 보내므로 defer()를 사용하지 않습니다. 대신, DB 조회를 먼저 수행합니다.
-        key = f"intro_{i.user.id}"; last_time = await get_cooldown(key)
+            if not role_id or not (role := interaction.guild.get_role(role_id)):
+                await interaction.followup.send("エラー: 役職が見つかりません。", ephemeral=True); return
+            if role not in interaction.user.roles: await interaction.user.add_roles(role)
+            if self.current_step < len(GUIDE_PAGES) - 1: self.current_step += 1
+            await self._update_message(interaction)
+        except Exception as e: await interaction.followup.send(f"❌ エラー: {e}", ephemeral=True)
+
+    async def create_introduction(self, interaction: discord.Interaction):
+        key = f"intro_{interaction.user.id}"; last_time = await get_cooldown(key)
         if last_time and time.time() - last_time < INTRODUCTION_COOLDOWN_SECONDS:
             rem = INTRODUCTION_COOLDOWN_SECONDS - (time.time() - last_time)
-            await i.response.send_message(f"次の申請まであと {int(rem/60)}分 お待ちください。", ephemeral=True); return
-        await i.response.send_modal(IntroductionModal(self.onboarding_cog))
+            await interaction.response.send_message(f"次の申請まであと {int(rem/60)}分 お待ちください。", ephemeral=True); return
+        await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
 
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
     @ui.button(label="里の案内・住人登録を始める", style=discord.ButtonStyle.success, custom_id="start_onboarding_button_final")
-    async def start_onboarding(self, i: discord.Interaction, b: ui.Button):
-        await i.response.defer(ephemeral=True) # [수정] defer()를 가장 먼저 호출
+    async def start_onboarding(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             page = GUIDE_PAGES[0]
             embed = discord.Embed(title=page["title"], description=page["description"], color=discord.Color.purple())
             if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
-            # [수정] defer() 뒤에는 followup.send()를 사용
-            await i.followup.send(embed=embed, view=OnboardingView(self.onboarding_cog), ephemeral=True)
+            await interaction.followup.send(embed=embed, view=OnboardingView(self.onboarding_cog), ephemeral=True)
         except Exception as e:
             logger.error(f"온보딩 시작 중 오류: {e}", exc_info=True)
-            if not i.response.is_done(): await i.response.send_message("오류가 발생했습니다.", ephemeral=True)
+            if not interaction.response.is_done(): await interaction.response.send_message("오류가 발생했습니다.", ephemeral=True)
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.bot.add_view(OnboardingPanelView(self))
         self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
-        self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
-        self.new_welcome_channel_id: Optional[int] = None; self.approval_role_id: Optional[int] = None
-        self.guest_role_id: Optional[int] = None; self.mention_role_id_1: Optional[int] = None
-        logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-    async def cog_load(self): await self.load_all_configs()
-    async def load_all_configs(self):
-        self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
-        self.introduction_channel_id = get_id("introduction_channel_id"); self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
-        self.new_welcome_channel_id = get_id("new_welcome_channel_id"); self.approval_role_id = get_id("role_approval")
-        self.guest_role_id = get_id("role_guest"); self.mention_role_id_1 = get_id("role_mention_role_1")
-        logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
-    async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
-        target_channel = channel
-        if target_channel is None:
-            channel_id = get_id("onboarding_panel_channel_id")
-            if channel_id: target_channel = self.bot.get_channel(channel_id)
-            else: logger.info("ℹ️ 온보딩 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
-        if not target_channel: logger.warning("❌ Onboarding panel channel could not be found."); return
-        panel_info = get_panel_id("onboarding")
-        if panel_info and (old_id := panel_info.get('message_id')):
-            try:
-                old_message = await target_channel.fetch_message(old_id)
-                await old_message.delete()
-            except (discord.NotFound, discord.Forbidden): pass
-        embed = discord.Embed(title="🏡 新米住人の方へ", description="この里へようこそ！\n下のボタンを押して、里での暮らし方を確認し、住人登録を始めましょう。", color=discord.Color.gold())
-        view = OnboardingPanelView(self)
-        new_message = await target_channel.send(embed=embed, view=view)
-        await save_panel_id("onboarding", new_message.id, target_channel.id)
-        logger.info(f"✅ 온보딩 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(Onboarding(bot))
+      
