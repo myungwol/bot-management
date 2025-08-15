@@ -1,12 +1,10 @@
-# cogs/economy/commerce.py (명령어 통합 최종본)
+# cogs/economy/commerce.py (DB 자동 로딩 방식 적용 최종본)
 
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
-import asyncio
 import logging
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -15,7 +13,7 @@ from utils.database import (
     get_inventory, update_inventory, get_wallet, update_wallet,
     get_aquarium, remove_fish_from_aquarium,
     save_panel_id, get_panel_id,
-    get_channel_id_from_db
+    get_id
 )
 
 SELL_CATEGORIES = ["魚", "アイテム"]
@@ -138,8 +136,10 @@ class BuyItemView(ui.View):
             await i.response.defer(ephemeral=True)
             try:
                 if data['category'] == '里の役職':
-                    role = i.guild.get_role(data['id']);
-                    if not role: raise ValueError("Role not found.")
+                    role_id = get_id(data['id_key'])
+                    if not role_id: raise ValueError(f"Role ID not found for key: {data['id_key']}")
+                    role = i.guild.get_role(role_id);
+                    if not role: raise ValueError("Role not found in guild.")
                     if role in user.roles: return await i.followup.send(f"すでにその役職をお持ちです。", ephemeral=True)
                     await update_wallet(user, -price); await user.add_roles(role); await i.followup.send(f"「{role.name}」役職を購入しました！", ephemeral=True)
                 else: # is_upgrade_item
@@ -185,7 +185,7 @@ class Commerce(commands.Cog):
         await self.load_commerce_channel_config()
 
     async def load_commerce_channel_config(self):
-        self.commerce_panel_channel_id = await get_channel_id_from_db("commerce_panel_channel_id")
+        self.commerce_panel_channel_id = get_id("commerce_panel_channel_id")
         logger.info(f"[Commerce Cog] Loaded COMMERCE_PANEL_CHANNEL_ID: {self.commerce_panel_channel_id}")
 
     async def regenerate_panel(self, channel: discord.TextChannel | None = None):
@@ -194,18 +194,16 @@ class Commerce(commands.Cog):
             else: logger.info("ℹ️ Commerce panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Commerce panel channel could not be found."); return
         
-        # [수정된 부분]
-        panel_info = await get_panel_id("commerce_main")
+        panel_info = await get_panel_id("commerce")
         if panel_info and (old_id := panel_info.get('message_id')):
             try:
                 message_to_delete = await channel.fetch_message(old_id)
                 await message_to_delete.delete()
-            except (discord.NotFound, discord.Forbidden):
-                pass
+            except (discord.NotFound, discord.Forbidden): pass
             
         embed = discord.Embed(title="💸 Dico森の暮らし", description="下のボタンを押して、商店でアイテムを購入したり、販売所で魚や収穫物を売却したりできます。", color=discord.Color.blue())
         msg = await channel.send(embed=embed, view=CommercePanelView())
-        await save_panel_id("commerce_main", msg.id, channel.id)
+        await save_panel_id("commerce", msg.id, channel.id)
         logger.info(f"✅ Commerce panel successfully regenerated in channel {channel.name}")
 
 async def setup(bot: commands.Bot):
