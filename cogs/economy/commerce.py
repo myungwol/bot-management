@@ -1,4 +1,4 @@
-# cogs/economy/commerce.py (실행 순서 문제 해결 최종본)
+# cogs/economy/commerce.py (데이터 정합성, 성능, UX 대폭 개선 최종본)
 
 import discord
 from discord.ext import commands
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # 유틸리티 함수 임포트
 from utils.database import (
     ITEM_DATABASE, FISHING_LOOT, CURRENCY_ICON, ROD_HIERARCHY,
-    get_inventory, get_wallet, get_aquarium,
+    get_inventory, update_wallet, get_wallet, get_aquarium,
     save_panel_id, get_panel_id, get_id, supabase
 )
 
@@ -53,9 +53,13 @@ class ShopViewBase(ui.View):
         self.wallet_balance = wallet_data.get('balance', 0)
     async def update_view(self, interaction: discord.Interaction, temp_footer: Optional[str] = None):
         embed = self._build_embed(); self._build_components()
-        original_footer = embed.footer.text
+        original_footer = embed.footer.text if embed.footer else None
         if temp_footer: embed.set_footer(text=temp_footer)
-        await interaction.response.edit_message(embed=embed, view=self)
+        # Check if the interaction is from a modal, which might not have an initial message to edit
+        if interaction.response.is_done():
+            await interaction.followup.edit_message(message_id=interaction.message.id, embed=embed, view=self)
+        else:
+            await interaction.response.edit_message(embed=embed, view=self)
         if temp_footer:
             await asyncio.sleep(5)
             embed.set_footer(text=original_footer)
@@ -66,7 +70,7 @@ class SellItemView(ShopViewBase):
     def __init__(self, user: discord.Member):
         super().__init__(user); self.current_category = SELL_CATEGORIES[0]
     def _build_embed(self) -> discord.Embed:
-        return discord.Embed(title=f"📦 販売所 - 「{self.current_category}」", description="下のドロップダウンメニューから売りたいアイテムを選択してください。", color=discord.Color.orange())
+        return discord.Embed(title=f"📦 販売所 - 「{self.current_category}」", description=f"下のドロップダウンメニューから売りたいアイテムを選択してください。\n現在の所持金: `{self.wallet_balance:,}`{CURRENCY_ICON}", color=discord.Color.orange())
     def _build_components(self):
         self.clear_items()
         for cat in SELL_CATEGORIES:
@@ -93,6 +97,7 @@ class SellItemView(ShopViewBase):
         uid_str = str(self.user.id); footer_msg = ""
         try:
             if sell_type == "fish":
+                await interaction.response.defer() # Fish selling doesn't use a modal
                 fish_id = int(target)
                 fish_data = next((f for f in self.aquarium if f.get('id') == fish_id), None)
                 if not fish_data: raise ValueError("選択された魚が見つかりません。")
@@ -116,45 +121,77 @@ class SellItemView(ShopViewBase):
         except Exception as e:
             logger.error(f"판매 처리 중 오류: {e}", exc_info=True)
             footer_msg = f"❌ 販売に失敗しました。アイテムが不足しているか、エラーが発生しました。"; await self.fetch_data()
-        if isinstance(interaction.message, discord.WebhookMessage): await self.update_view(interaction, footer_msg)
-        else: await self.update_view(interaction, footer_msg)
+        await self.update_view(interaction, footer_msg)
 
 class BuyItemView(ShopViewBase):
-    # BuyItemView는 SellItemView와 유사하게 리팩토링이 필요합니다.
-    # 제공된 SellItemView 코드를 참고하여 동일한 패턴(fetch_data, _build_embed, _build_components, RPC 호출 등)을 적용해주세요.
-    # 시간 관계상 여기서는 기존 코드를 유지하지만, 실제 운영 시에는 반드시 리팩토링을 권장합니다.
     def __init__(self, user: discord.Member):
         super().__init__(user); self.current_category_index = 0
+    def _build_embed(self) -> discord.Embed:
+        category = BUY_CATEGORIES[self.current_category_index]
+        embed = discord.Embed(title=f"🏪 Dico森商店 - 「{category}」", description=f"下のドロップダウンメニューから購入したい商品を選択してください。\n現在の所持金: `{self.wallet_balance:,}`{CURRENCY_ICON}", color=discord.Color.from_rgb(173, 216, 230))
+        embed.set_footer(text=f"ページ {self.current_category_index + 1}/{len(BUY_CATEGORIES)}"); return embed
     def _build_components(self):
-        self.clear_items(); is_first = self.current_category_index == 0; is_last = self.current_category_index >= len(BUY_CATEGORIES) - 1
+        self.clear_items()
+        is_first, is_last = self.current_category_index == 0, self.current_category_index >= len(BUY_CATEGORIES) - 1
         prev_btn = ui.Button(label="◀ 前", disabled=is_first, row=0); next_btn = ui.Button(label="次 ▶", disabled=is_last, row=0)
-        prev_btn.callback = self.prev_category_callback; next_btn.callback = self.next_category_callback; self.add_item(prev_btn); self.add_item(next_btn)
+        prev_btn.callback = self.prev_category_callback; next_btn.callback = self.next_category_callback
+        self.add_item(prev_btn); self.add_item(next_btn)
         category = BUY_CATEGORIES[self.current_category_index]
         items = {n: d for n, d in ITEM_DATABASE.items() if d.get('category') == category and d.get("buyable", False)}
         options = [discord.SelectOption(label=n, value=n, description=f"{d['price']}{CURRENCY_ICON} - {d.get('description', '')}"[:100], emoji=d.get('emoji')) for n, d in items.items()]
         select = ui.Select(placeholder=f"「{category}」カテゴリの商品を選択" if options else "商品準備中...", options=options or [discord.SelectOption(label="...")], disabled=not options, row=1)
         select.callback = self.select_callback; self.add_item(select)
-    def _build_embed(self) -> discord.Embed:
-        category = BUY_CATEGORIES[self.current_category_index]
-        embed = discord.Embed(title=f"🏪 Dico森商店 - 「{category}」", description="下のドロップダウンメニューから購入したい商品を選択してください。", color=discord.Color.from_rgb(173, 216, 230))
-        embed.set_footer(text=f"ページ {self.current_category_index + 1}/{len(BUY_CATEGORIES)}"); return embed
     async def prev_category_callback(self, i: discord.Interaction):
         if self.current_category_index > 0: self.current_category_index -= 1
         await self.update_view(i)
     async def next_category_callback(self, i: discord.Interaction):
         if self.current_category_index < len(BUY_CATEGORIES) - 1: self.current_category_index += 1
         await self.update_view(i)
-    async def select_callback(self, i: discord.Interaction):
-        name = i.data['values'][0]; data = ITEM_DATABASE.get(name); user = i.user; uid_str = str(user.id)
-        if not data: return await i.response.send_message("エラー：商品データが見つかりません。", ephemeral=True)
-        balance = (await get_wallet(user.id)).get('balance', 0); price = data['price']
-        if balance < price: return await i.response.send_message(f"残高が不足しています。", ephemeral=True)
-        if data['category'] == '里の役職' or data.get("is_upgrade_item"):
-            # ... (이하 구매 로직은 설명을 위해 기존 코드 유지)
-        else:
-            # ...
-            pass
-        if self.message: self.update_view(i) # This needs to be refactored like SellItemView
+    async def select_callback(self, interaction: discord.Interaction):
+        name = interaction.data['values'][0]; data = ITEM_DATABASE.get(name); user = interaction.user; uid_str = str(user.id)
+        footer_msg = ""
+        if not data: footer_msg = "❌ エラー：商品データが見つかりません。"; return await self.update_view(interaction, footer_msg)
+        price = data['price']
+        if self.wallet_balance < price: footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
+        try:
+            if data['category'] == '里の役職':
+                await interaction.response.defer()
+                role_id = get_id(data['id_key'])
+                if not role_id: raise ValueError(f"Role ID not found for key: {data['id_key']}")
+                role = interaction.guild.get_role(role_id)
+                if not role: raise ValueError("Role not found in guild.")
+                if role in user.roles: footer_msg = f"❌ すでにその役職をお持ちです。"; return await self.update_view(interaction, footer_msg)
+                await update_wallet(user, -price)
+                await user.add_roles(role)
+                self.wallet_balance -= price
+                footer_msg = f"✅ 「{role.name}」役職を購入しました！"
+            elif data.get("is_upgrade_item"):
+                await interaction.response.defer()
+                current_rank = -1
+                for idx, rod in enumerate(ROD_HIERARCHY):
+                    if self.inventory.get(rod, 0) > 0: current_rank = idx
+                if ROD_HIERARCHY.index(name) <= current_rank:
+                    footer_msg = "❌ すでにその装備またはより良い装備を持っています。"; return await self.update_view(interaction, footer_msg)
+                await supabase.rpc('buy_item', {'user_id_param': uid_str, 'item_name_param': name, 'quantity_param': 1, 'total_price_param': price}).execute()
+                self.wallet_balance -= price
+                self.inventory[name] = self.inventory.get(name, 0) + 1
+                footer_msg = f"✅ **{name}**にアップグレードしました！"
+            else:
+                max_buyable = self.wallet_balance // price if price > 0 else 0
+                if max_buyable == 0: footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
+                modal = QuantityModal("購入数量入力", f"{name}の購入数量", f"最大 {max_buyable}個まで購入可能です", max_buyable)
+                await interaction.response.send_modal(modal); await modal.wait()
+                if modal.value is None: return
+                qty = modal.value; total_price = price * qty
+                if self.wallet_balance < total_price: footer_msg = "❌ 残高が不足しています。"; return await self.update_view(interaction, footer_msg)
+                await supabase.rpc('buy_item', {'user_id_param': uid_str, 'item_name_param': name, 'quantity_param': qty, 'total_price_param': total_price}).execute()
+                self.wallet_balance -= total_price
+                self.inventory[name] = self.inventory.get(name, 0) + qty
+                footer_msg = f"✅ **{name}**を{qty}個購入し、持ち物に入れました。"
+        except Exception as e:
+            logger.error(f"구매 처리 중 오류: {e}", exc_info=True)
+            footer_msg = "❌ 購入処理中にエラーが発生しました。"; await self.fetch_data()
+        await self.update_view(interaction, footer_msg)
 
 class CommercePanelView(ui.View):
     def __init__(self, cog_instance: 'Commerce'):
@@ -162,15 +199,13 @@ class CommercePanelView(ui.View):
     @ui.button(label="🏪 商店に入る", style=discord.ButtonStyle.success, custom_id="open_shop_view_v3")
     async def open_shop(self, i: discord.Interaction, b: ui.Button):
         await i.response.defer(ephemeral=True, thinking=True)
-        view = BuyItemView(i.user) # Refactored BuyItemView should be used here
-        await view.fetch_data()
+        view = BuyItemView(i.user); await view.fetch_data()
         embed = view._build_embed(); view._build_components()
         view.message = await i.followup.send(embed=embed, view=view, ephemeral=True)
     @ui.button(label="📦 販売所に入る", style=discord.ButtonStyle.danger, custom_id="open_market_view_v3")
     async def open_market(self, i: discord.Interaction, b: ui.Button):
         await i.response.defer(ephemeral=True, thinking=True)
-        view = SellItemView(i.user)
-        await view.fetch_data()
+        view = SellItemView(i.user); await view.fetch_data()
         embed = view._build_embed(); view._build_components()
         view.message = await i.followup.send(embed=embed, view=view, ephemeral=True)
 
