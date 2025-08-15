@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (import 오류 수정 최종본)
+# cogs/server/onboarding.py (실행 순서 문제 해결 최종본)
 
 import discord
 from discord.ext import commands
@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Optional
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# [오류 수정] 누락되었던 get_panel_id를 import 목록에 다시 추가합니다.
+# 유틸리티 함수 임포트
 from utils.database import (
     get_id, save_panel_id, get_panel_id, get_auto_role_mappings, get_cooldown, set_cooldown
 )
@@ -233,10 +233,12 @@ class Onboarding(commands.Cog):
         self.guest_role_id = get_id("role_guest"); self.mention_role_id_1 = get_id("role_mention_role_1")
         logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
-        target_channel = channel or (self.bot.get_channel(self.panel_channel_id) if self.panel_channel_id else None)
-        if not target_channel:
-            logger.info("ℹ️ 온보딩 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다.")
-            return
+        target_channel = channel
+        if target_channel is None:
+            channel_id = get_id("onboarding_panel_channel_id")
+            if channel_id: target_channel = self.bot.get_channel(channel_id)
+            else: logger.info("ℹ️ 온보딩 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
+        if not target_channel: logger.warning("❌ Onboarding panel channel could not be found."); return
         embed = discord.Embed(title="🏡 新米住人の方へ", description="この里へようこそ！\n下のボタンを押して、里での暮らし方を確認し、住人登録を始めましょう。", color=discord.Color.gold())
         view = OnboardingPanelView(self)
         panel_info = get_panel_id("onboarding")
