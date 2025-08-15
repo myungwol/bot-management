@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (반응 없음 버그 수정 최종본)
+# cogs/server/nicknames.py (버튼 비활성화 오류 수정 최종본)
 
 import discord
 from discord.ext import commands
@@ -38,12 +38,12 @@ def calculate_weighted_length(name: str) -> int:
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction):
+        # [수정] 거절 사유 제출 시에는 defer()만 호출하고 followup은 reject 함수에서 처리
         await interaction.response.defer()
 
 class NicknameApprovalView(ui.View):
     def __init__(self, member: discord.Member, new_name: str, bot: commands.Bot, approval_role_id: int):
         super().__init__(timeout=None)
-        # [수정] 전체 멤버 객체 대신 ID만 저장하여 최신 상태를 유지하도록 함
         self.target_member_id = member.id
         self.new_name = new_name
         self.bot = bot
@@ -51,11 +51,10 @@ class NicknameApprovalView(ui.View):
 
     async def _check_permission(self, i: discord.Interaction) -> bool:
         if not self.approval_role_id or not isinstance(i.user, discord.Member) or not any(r.id == self.approval_role_id for r in i.user.roles):
-            await i.response.send_message("このボタンを押す権限がありません。", ephemeral=True)
+            await i.response.send_message("このボタンを押す権한がありません。", ephemeral=True)
             return False
         return True
 
-    # [수정] 함수 이름을 명확하게 변경하고 로직을 단순화
     async def _send_log_message(self, result_embed: discord.Embed, target_member: discord.Member):
         cog = self.bot.get_cog("Nicknames")
         if not cog or not cog.nickname_log_channel_id:
@@ -73,7 +72,6 @@ class NicknameApprovalView(ui.View):
         if not await self._check_permission(i): return
         await i.response.defer()
 
-        # [수정] 버튼 클릭 시점에 최신 멤버 정보를 다시 가져옴
         member = i.guild.get_member(self.target_member_id)
         if not member:
             await i.followup.send("エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True)
@@ -81,7 +79,9 @@ class NicknameApprovalView(ui.View):
             except discord.NotFound: pass
             return
             
-        [item.disable() for item in self.children]
+        # [수정된 부분] item.disable() -> item.disabled = True
+        for item in self.children:
+            item.disabled = True
         try: await i.edit_original_response(view=self)
         except discord.NotFound: pass
         
@@ -106,7 +106,6 @@ class NicknameApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button):
         if not await self._check_permission(i): return
 
-        # [수정] 버튼 클릭 시점에 최신 멤버 정보를 다시 가져옴
         member = i.guild.get_member(self.target_member_id)
         if not member:
             await i.response.send_message("エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True)
@@ -115,9 +114,15 @@ class NicknameApprovalView(ui.View):
             return
 
         modal = RejectionReasonModal(); await i.response.send_modal(modal)
-        if await modal.wait(): return
+        # modal.wait()는 modal이 닫힐 때까지 기다림
+        timed_out = await modal.wait()
+        if timed_out or modal.reason.value is None:
+            # 타임아웃 되거나 모달이 그냥 닫히면 아무것도 안 함
+            return
         
-        [item.disable() for item in self.children]
+        # [수정된 부분] item.disable() -> item.disabled = True
+        for item in self.children:
+            item.disabled = True
         try: await i.edit_original_response(view=self)
         except discord.NotFound: pass
         
@@ -150,7 +155,6 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         embed = discord.Embed(title="📝 名前変更申請", color=discord.Color.blue())
         embed.add_field(name="申請者", value=i.user.mention, inline=False).add_field(name="現在の名前", value=i.user.display_name, inline=False).add_field(name="希望の名前", value=name, inline=False)
         
-        # [수정] i.user가 아닌 i.member를 전달하여 항상 Member 객체를 보장
         applicant_member = i.guild.get_member(i.user.id)
         if not applicant_member:
              return await i.followup.send("エラー: 申請者情報を見つけられません。", ephemeral=True)
@@ -171,7 +175,7 @@ class NicknameChangerPanelView(ui.View):
         if not cog or not cog.approval_role_id: return await i.response.send_message("エラー: 機能が設定されていません。", ephemeral=True)
         await i.response.send_modal(NicknameChangeModal(approval_role_id=cog.approval_role_id))
 
-# --- メイン Cog クラス ---
+# --- メイン Cog 클래스 ---
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.bot.add_view(NicknameChangerPanelView())
