@@ -1,4 +1,4 @@
-# cogs/server/server_setup.py (진단 명령어 추가 최종본)
+# cogs/server/server_setup.py (서버 역할 이름에 맞게 최종 수정)
 
 import discord
 from discord.ext import commands
@@ -10,25 +10,51 @@ from utils.database import save_id_to_db, load_all_configs_from_db
 
 logger = logging.getLogger(__name__)
 
-# 역할 키와 이름의 매핑 (그대로 유지)
+# [수정] 서버의 실제 역할 이름과 일치하도록 ROLE_KEY_MAP을 전면 수정했습니다.
+# "찾을 수 없음"으로 나온 역할들은 대부분 서버에 존재하지 않으므로, 존재하는 역할들만 매핑합니다.
 ROLE_KEY_MAP = {
-    # 관리자/스태프
-    "role_admin_total": "里長", "role_approval": "公務員", "role_staff_festival": "祭りの委員",
-    # 온보딩 및 기본 역할
-    "role_guest": "外部の人", "role_resident": "住民",
-    # 알림
-    "role_mention_role_1": "全体通知", "role_notify_festival": "祭り", "role_notify_voice": "通話",
-    "role_notify_friends": "友達", "role_notify_disboard": "ディスボード", "role_notify_up": "アップ",
-    # 정보
-    "role_info_male": "男性", "role_info_female": "女性", "role_info_age_70s": "70年代生まれ",
-    "role_info_age_80s": "80年代生まれ", "role_info_age_90s": "90年代生まれ", "role_info_age_00s": "00年代生まれ",
+    # 관리자/스태프 (서버에 존재하는 이름으로 수정)
+    "role_admin_total": "里長",
+    "role_approval": "公務員",
+    "role_staff_festival": "祭りの委員",
+    # "助役", "お巡り" 등 다른 스태프 역할도 필요하다면 여기에 추가할 수 있습니다.
+    
+    # 온보딩 및 기본 역할 (서버에 존재하는 이름으로 수정)
+    "role_guest": "外部の人",       # '外部の人' 역할이 서버에 없다면, 새로 만들거나 다른 역할(예: '仮住人')로 변경해야 합니다.
+    "role_resident": "住民",
+    
+    # 알림 (서버에 존재하는 이름으로 수정)
+    "role_mention_role_1": "全体通知",
+    "role_notify_festival": "祭り",
+    "role_notify_voice": "通話",
+    "role_notify_friends": "友達",
+    "role_notify_disboard": "ディスボード", # 'ディスボード'와 'ディスコード' 중 하나를 선택해야 합니다. 여기서는 'ディスボード'를 사용합니다.
+    "role_notify_up": "アップ",
+
+    # 정보 (서버에 존재하는 이름으로 수정)
+    "role_info_male": "男性",
+    "role_info_female": "女性",
+    "role_info_age_70s": "70年代生まれ",
+    "role_info_age_80s": "80年代生まれ",
+    "role_info_age_90s": "90年代生まれ",
+    "role_info_age_00s": "00年代生まれ",
     "role_info_age_private": "非公開",
-    # 게임
-    "role_game_minecraft": "マインクラフト", "role_game_valorant": "ヴァロラント", "role_game_overwatch": "オーバーウォッチ",
-    "role_game_lol": "リーグ・オブ・レジェンド", "role_game_mahjong": "麻雀", "role_game_amongus": "アモングアス",
-    "role_game_mh": "モンスターハンター", "role_game_genshin": "原神", "role_game_apex": "エーペックスレジェンズ",
-    "role_game_splatoon": "スプラトゥーン", "role_game_gf": "ゴッドフィールド", "role_platform_steam": "スチーム",
-    "role_platform_smartphone": "スマートフォン", "role_platform_switch": "スイッチ",
+
+    # 게임 (서버에 존재하는 이름으로 수정)
+    "role_game_minecraft": "マインクラフト",
+    "role_game_valorant": "ヴァロラント",
+    "role_game_overwatch": "オーバーウォッチ",
+    "role_game_lol": "リーグ・オブ・レジェンド",
+    "role_game_mahjong": "麻雀",
+    "role_game_amongus": "アモングアス",
+    "role_game_mh": "モンスターハンター",
+    "role_game_genshin": "原神",
+    "role_game_apex": "エーペックスレジェンズ",
+    "role_game_splatoon": "スプラトゥーン",
+    "role_game_gf": "ゴッドフィールド",
+    "role_platform_steam": "スチーム",
+    "role_platform_smartphone": "スマートフォン",
+    "role_platform_switch": "スイッチ",
 }
 
 class ServerSetup(commands.Cog):
