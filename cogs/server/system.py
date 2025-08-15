@@ -217,7 +217,6 @@ class ServerSystem(commands.Cog):
         if before.roles != after.roles or before.premium_since != after.premium_since:
             self._schedule_counter_update(after.guild)
 
-    # [수정] 모든 명령어는 이 클래스 내부에 올바르게 들여쓰기 되어야 합니다.
     setup_group = app_commands.Group(name="setup", description="[管理者] ボットの主要機能を設定します。")
     @setup_group.command(name="panel", description="指定されたチャンネルに機能パネルを設置します。")
     @app_commands.describe(channel="パネルを設置するチャンネル", panel_type="設置するパネルの種類")
@@ -254,10 +253,10 @@ class ServerSystem(commands.Cog):
             logger.error(f"Panel setup command failed for {panel_type}: {e}", exc_info=True)
             await interaction.followup.send(f"❌ パネル設置中にエラーが発生しました: {e}", ephemeral=True)
 
-    # [새로 추가된 명령어]
     @setup_group.command(name="log-channel", description="[管理者] 各種機能のログチャンネルを設定します。")
     @app_commands.describe(channel="ログを送信するチャンネル", log_type="設定するログの種類")
     @app_commands.choices(log_type=[
+        app_commands.Choice(name="名前変更ログ", value="nickname_log"),
         app_commands.Choice(name="釣りログ", value="fishing_log"),
         app_commands.Choice(name="コインログ", value="coin_log"),
         app_commands.Choice(name="自己紹介承認ログ", value="intro_approval_log"),
@@ -268,6 +267,7 @@ class ServerSystem(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         log_channel_map = {
+            "nickname_log": {"key": "nickname_log_channel_id", "cog_name": "Nicknames", "friendly_name": "名前変更ログ"},
             "fishing_log": {"key": "fishing_log_channel_id", "cog_name": "Fishing", "friendly_name": "釣りログ"},
             "coin_log": {"key": "coin_log_channel_id", "cog_name": "EconomyCore", "friendly_name": "コインログ"},
             "intro_approval_log": {"key": "introduction_channel_id", "cog_name": "Onboarding", "friendly_name": "自己紹介承認ログ"},
@@ -283,16 +283,11 @@ class ServerSystem(commands.Cog):
             cog_name = config["cog_name"]
             friendly_name = config["friendly_name"]
             
-            # 1. DB에 저장
             await save_channel_id_to_db(db_key, channel.id)
-            
-            # 2. 봇의 중앙 캐시 업데이트
             self.bot.channel_configs[db_key] = channel.id
             
-            # 3. 해당 Cog의 속성을 직접 업데이트하여 즉시 적용
             target_cog = self.bot.get_cog(cog_name)
             if target_cog:
-                # 예: fishing_cog의 'fishing_log_channel_id' 속성을 channel.id로 설정
                 setattr(target_cog, db_key, channel.id) 
                 logger.info(f"✅ Live updated {cog_name}'s {db_key} to {channel.id}")
             
