@@ -233,4 +233,35 @@ class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.bot.add_view(OnboardingPanelView(self))
         self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
-      
+        self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
+        self.new_welcome_channel_id: Optional[int] = None; self.approval_role_id: Optional[int] = None
+        self.guest_role_id: Optional[int] = None; self.mention_role_id_1: Optional[int] = None
+        logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
+    async def cog_load(self): await self.load_all_configs()
+    async def load_all_configs(self):
+        self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
+        self.introduction_channel_id = get_id("introduction_channel_id"); self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
+        self.new_welcome_channel_id = get_id("new_welcome_channel_id"); self.approval_role_id = get_id("role_approval")
+        self.guest_role_id = get_id("role_guest"); self.mention_role_id_1 = get_id("role_mention_role_1")
+        logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
+    async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
+        target_channel = channel
+        if target_channel is None:
+            channel_id = get_id("onboarding_panel_channel_id")
+            if channel_id: target_channel = self.bot.get_channel(channel_id)
+            else: logger.info("ℹ️ 온보딩 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
+        if not target_channel: logger.warning("❌ Onboarding panel channel could not be found."); return
+        panel_info = get_panel_id("onboarding")
+        if panel_info and (old_id := panel_info.get('message_id')):
+            try:
+                old_message = await target_channel.fetch_message(old_id)
+                await old_message.delete()
+            except (discord.NotFound, discord.Forbidden): pass
+        embed = discord.Embed(title="🏡 新米住人の方へ", description="この里へようこそ！\n下のボタンを押して、里での暮らし方を確認し、住人登録を始めましょう。", color=discord.Color.gold())
+        view = OnboardingPanelView(self)
+        new_message = await target_channel.send(embed=embed, view=view)
+        await save_panel_id("onboarding", new_message.id, target_channel.id)
+        logger.info(f"✅ 온보딩 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Onboarding(bot))
