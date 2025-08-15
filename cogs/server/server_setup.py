@@ -1,60 +1,57 @@
-# cogs/server/server_setup.py (역할 DB 저장 기능만 남긴 최종본)
+# cogs/server/server_setup.py (DB 역할 정보 관리 유틸리티 최종본)
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
 
-# 데이터베이스 함수 임포트
-# [수정] save_channel_id_to_db -> save_role_id_to_db 같은 명확한 이름으로 변경 가정
-# 만약 utils/database.py에 역할 저장 함수가 save_channel_id_to_db로 되어있다면 그대로 사용
-from utils.database import save_channel_id_to_db as save_role_id_to_db
+from utils.database import save_id_to_db
 
-# 로깅 설정
 logger = logging.getLogger(__name__)
 
-# 역할 구조 (데이터베이스 키와 실제 역할 이름을 매핑)
-ROLE_STRUCTURE = {
-    # 'db_key': '실제 역할 이름'
-    "staff_mayor": "里長",
-    "staff_deputy": "助役",
-    "staff_police": "お巡り",
-    "staff_festival": "祭りの委員",
-    "staff_pr": "広報係",
-    "staff_design": "意匠係",
-    "staff_clerk": "書記",
-    "staff_office": "役場の職員",
-    "staff_general": "職員",
-    "resident_tier1": "1等級住民",
-    "resident_tier2": "2等級住民",
-    "resident_tier3": "3等級住民",
-    "resident_general": "住民",
-    "resident_outsider": "外部の人",
-    "info_male": "男性",
-    "info_female": "女性",
-    "info_private": "非公開",
-    "info_age_70s": "70年代生まれ",
-    "info_age_80s": "80年代生まれ",
-    "info_age_90s": "90年代生まれ",
-    "info_age_00s": "00年代生まれ",
-    "notify_voice": "通話",
-    "notify_friends": "友達",
-    "notify_disboard": "ディスボード",
-    "notify_up": "アップ",
-    "game_minecraft": "マインクラフト",
-    "game_valorant": "ヴァロラント",
-    "game_overwatch": "オーバーウォッチ",
-    "game_lol": "リーグ・オブ・レジェンド",
-    "game_mahjong": "麻雀",
-    "game_amongus": "アモングアス",
-    "game_mh": "モンスターハンター",
-    "game_genshin": "原神",
-    "game_apex": "エーペックスレジェンズ",
-    "game_splatoon": "スプラトゥーン",
-    "game_gf": "ゴッドフィールド",
-    "platform_steam": "スチーム",
-    "platform_smartphone": "スマートフォン",
-    "platform_switch": "スイッチ",
+# [수정] DB에 저장할 역할 키와 실제 역할 이름의 매핑
+ROLE_KEY_MAP = {
+    # 관리자/스태프
+    "role_admin_total": "里長", # 예시, 실제 역할 이름과 맞추세요
+    "role_approval": "公務員",  # 예시
+    "role_staff_festival": "祭りの委員",
+    # 온보딩
+    "role_temp_user": "仮住人",
+    "role_guest": "外部の人",
+    "role_mention_role_1": "全体通知",
+    "role_onboarding_step_1": "온보딩 1단계",
+    "role_onboarding_step_2": "온보딩 2단계",
+    "role_onboarding_step_3": "온보딩 3단계",
+    "role_onboarding_step_4": "온보딩 4단계",
+    # 정보
+    "role_info_male": "男性",
+    "role_info_female": "女性",
+    "role_info_age_70s": "70年代生まれ",
+    "role_info_age_80s": "80年代生まれ",
+    "role_info_age_90s": "90年代生まれ",
+    "role_info_age_00s": "00年代生まれ",
+    "role_info_age_private": "非公開",
+    # 알림
+    "role_notify_festival": "祭り",
+    "role_notify_voice": "通話",
+    "role_notify_friends": "友達",
+    "role_notify_disboard": "ディスボード",
+    "role_notify_up": "アップ",
+    # 게임
+    "role_game_minecraft": "マインクラフト",
+    "role_game_valorant": "ヴァロラント",
+    "role_game_overwatch": "オーバーウォッチ",
+    "role_game_lol": "リーグ・オブ・レジェンド",
+    "role_game_mahjong": "麻雀",
+    "role_game_amongus": "アモングアス",
+    "role_game_mh": "モンスターハンター",
+    "role_game_genshin": "原神",
+    "role_game_apex": "エーペックスレジェンズ",
+    "role_game_splatoon": "スプラトゥーン",
+    "role_game_gf": "ゴッドフィールド",
+    "role_platform_steam": "スチーム",
+    "role_platform_smartphone": "スマートフォン",
+    "role_platform_switch": "スイッチ",
 }
 
 class ServerSetup(commands.Cog):
@@ -69,44 +66,37 @@ class ServerSetup(commands.Cog):
         guild = interaction.guild
         
         response_messages = ["**[ 役割DB同期 ]**\n"]
-        
         success_count = 0
         fail_count = 0
 
-        # 서버에 있는 모든 역할 목록을 한 번만 가져옴
         server_roles = {role.name: role.id for role in guild.roles}
 
-        for db_key, role_name in ROLE_STRUCTURE.items():
-            # 서버 역할 목록에서 이름으로 역할 ID를 찾음
+        for db_key, role_name in ROLE_KEY_MAP.items():
             role_id = server_roles.get(role_name)
 
             if role_id:
                 try:
-                    # DB에 역할 ID 저장 (데이터베이스 키 형식에 맞게 'role_' 접두사 추가)
-                    full_db_key = f"role_{db_key}"
-                    await save_role_id_to_db(full_db_key, role_id)
-                    response_messages.append(f"✔️ **{role_name}** 役割をDBに同期しました。(ID: `{role_id}`)\n")
+                    await save_id_to_db(db_key, role_id)
+                    response_messages.append(f"✔️ **{role_name}** -> `{db_key}`\n")
                     success_count += 1
                 except Exception as e:
-                    logger.error(f"Failed to save role ID for '{role_name}' to DB: {e}", exc_info=True)
-                    response_messages.append(f"❌ **{role_name}** 役割のDB保存中にエラーが発生しました: {e}\n")
+                    response_messages.append(f"❌ **{role_name}** DB 저장 오류: {e}\n")
                     fail_count += 1
             else:
-                # 서버에 해당 이름의 역할이 없는 경우
-                response_messages.append(f"⚠️ **{role_name}** 役割がサーバーに見つかりません。スキップします。\n")
+                response_messages.append(f"⚠️ **{role_name}** 역할을 찾을 수 없습니다.\n")
                 fail_count += 1
 
-        response_messages.append(f"\n✅ 同期完了 (成功: {success_count}件, 失敗/スキップ: {fail_count}件)")
+        response_messages.append(f"\n✅ 동기화 완료 (성공: {success_count} / 실패: {fail_count})")
         
         description_content = "".join(response_messages)
         embed = discord.Embed(
-            title="⚙️ 役割データベース同期結果",
+            title="⚙️ 역할 데이터베이스 동기화 결과",
             description=description_content,
             color=discord.Color.green() if fail_count == 0 else discord.Color.orange()
         )
         
         await interaction.followup.send(embed=embed, ephemeral=True)
-        logger.info(f"Role DB sync completed for guild {guild.id}. Success: {success_count}, Failed/Skipped: {fail_count}")
+        logger.info(f"Role DB sync completed. Success: {success_count}, Fail: {fail_count}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSetup(bot))
