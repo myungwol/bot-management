@@ -1,4 +1,4 @@
-# cogs/server/system.py (구조 개선 최종본)
+# cogs/server/system.py (UI 상태 관리 최종 해결)
 
 import discord
 from discord.ext import commands
@@ -31,31 +31,9 @@ class AutoRoleView(ui.View):
             select.callback = self.category_select_callback
             self.add_item(select)
 
-    # [수정] RoleSelectView를 완전히 제거하고, 아래 RoleSelect 클래스를 사용하도록 변경
-    async def category_select_callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        
-        category_id = interaction.data['values'][0]
-        category_info = next((c for c in self.panel_config.get("categories", []) if c['id'] == category_id), None)
-        category_name = category_info['label'] if category_info else category_id.capitalize()
-        category_roles = self.panel_config.get("roles", {}).get(category_id, [])
-
-        if not category_roles:
-            await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title=f"「{category_name}」役割選択",
-            description="下のメニューで希望する役割をすべて選択してください。\n選択は**即時反映**されます。",
-            color=discord.Color.blue()
-        )
-        # 동적으로 View를 생성하여 참조가 사라지지 않도록 합니다.
-        await interaction.followup.send(embed=embed, view=self.RoleSelect(interaction.user, category_roles, category_name), ephemeral=True)
-
-    # [수정] 역할 선택 메뉴를 더 단순하고 안정적인 내부 클래스로 재구성
     class RoleSelect(ui.View):
         def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
-            super().__init__(timeout=180) # 3분 후 비활성화
+            super().__init__(timeout=180)
             self.member = member
             self.all_category_role_ids = {rid for role in category_roles if (rid := get_id(role.get('role_id_key')))}
             self.create_selects(category_roles, category_name)
@@ -82,7 +60,6 @@ class AutoRoleView(ui.View):
         async def select_callback(self, interaction: discord.Interaction):
             await interaction.response.defer(ephemeral=True)
             
-            # 모든 드롭다운 메뉴에서 선택된 ID들을 하나로 합칩니다.
             selected_ids = set()
             for item in self.children:
                 if isinstance(item, ui.Select):
@@ -102,11 +79,30 @@ class AutoRoleView(ui.View):
                     roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
                     if roles_to_remove: await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
 
-                # 성공 메시지를 임시로 보냄
-                await interaction.followup.send("✅ 役割が更新されました。", ephemeral=True)
+                # [수정] followup.send 대신 edit_original_response를 사용하여 기존 메시지를 수정합니다.
+                for item in self.children:
+                    item.disabled = True
+                await interaction.edit_original_response(content="✅ 役割が更新されました。", view=self)
+                self.stop()
             except Exception as e:
                 logger.error(f"역할 업데이트 콜백 중 오류: {e}", exc_info=True)
-                await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
+                await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
+
+    async def category_select_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        category_id = interaction.data['values'][0]
+        category_info = next((c for c in self.panel_config.get("categories", []) if c['id'] == category_id), None)
+        category_name = category_info['label'] if category_info else category_id.capitalize()
+        category_roles = self.panel_config.get("roles", {}).get(category_id, [])
+        if not category_roles:
+            await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True)
+            return
+        embed = discord.Embed(
+            title=f"「{category_name}」役割選択",
+            description="下のメニューで希望する役割をすべて選択してください。\n選択は**即時反映**されます。",
+            color=discord.Color.blue()
+        )
+        await interaction.followup.send(embed=embed, view=self.RoleSelect(interaction.user, category_roles, category_name), ephemeral=True)
 
 
 # ... 나머지 ServerSystem 클래스는 수정 없이 그대로 유지 ...
