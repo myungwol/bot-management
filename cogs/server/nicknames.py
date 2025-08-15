@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (명령어 통합 최종본)
+# cogs/server/nicknames.py (반응 없음 버그 수정 최종본)
 
 import discord
 from discord.ext import commands
@@ -43,8 +43,11 @@ class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
 class NicknameApprovalView(ui.View):
     def __init__(self, member: discord.Member, new_name: str, bot: commands.Bot, approval_role_id: int):
         super().__init__(timeout=None)
-        self.target_member = member; self.new_name = new_name; self.bot = bot
-        self.original_name = member.display_name; self.approval_role_id = approval_role_id
+        # [수정] 전체 멤버 객체 대신 ID만 저장하여 최신 상태를 유지하도록 함
+        self.target_member_id = member.id
+        self.new_name = new_name
+        self.bot = bot
+        self.approval_role_id = approval_role_id
 
     async def _check_permission(self, i: discord.Interaction) -> bool:
         if not self.approval_role_id or not isinstance(i.user, discord.Member) or not any(r.id == self.approval_role_id for r in i.user.roles):
@@ -52,63 +55,79 @@ class NicknameApprovalView(ui.View):
             return False
         return True
 
-    async def _send_result_and_refresh(self, result_embed: discord.Embed):
+    # [수정] 함수 이름을 명확하게 변경하고 로직을 단순화
+    async def _send_log_message(self, result_embed: discord.Embed, target_member: discord.Member):
         cog = self.bot.get_cog("Nicknames")
-        if not cog: return
+        if not cog or not cog.nickname_log_channel_id:
+            logger.warning("Nickname log channel is not set. Skipping log message.")
+            return
 
-        # 1. 로그 메시지 전송 (지정된 로그 채널이 있으면 그곳으로, 없으면 패널 채널로)
-        log_channel_id = cog.nickname_log_channel_id or cog.panel_and_result_channel_id
-        if log_channel_id and (log_ch := self.bot.get_channel(log_channel_id)):
+        if (log_ch := self.bot.get_channel(cog.nickname_log_channel_id)):
             try:
-                await log_ch.send(content=self.target_member.mention, embed=result_embed, allowed_mentions=discord.AllowedMentions(users=True))
+                await log_ch.send(content=target_member.mention, embed=result_embed, allowed_mentions=discord.AllowedMentions(users=True))
             except Exception as e:
                 logger.error(f"Failed to send nickname result log: {e}", exc_info=True)
-
-        # 2. 패널 자동 재생성 (별도의 로그 채널을 사용하지 않을 경우에만, 패널을 맨 아래로 내리기 위해)
-        if not cog.nickname_log_channel_id:
-            if cog.panel_and_result_channel_id and (panel_ch := self.bot.get_channel(cog.panel_and_result_channel_id)):
-                try:
-                    await cog.regenerate_panel(panel_ch)
-                except Exception as e:
-                    logger.error(f"Failed to regenerate nickname panel after result: {e}", exc_info=True)
-
 
     @ui.button(label="承認", style=discord.ButtonStyle.success)
     async def approve(self, i: discord.Interaction, b: ui.Button):
         if not await self._check_permission(i): return
-        await i.response.defer(); [item.disable() for item in self.children]
+        await i.response.defer()
+
+        # [수정] 버튼 클릭 시점에 최신 멤버 정보를 다시 가져옴
+        member = i.guild.get_member(self.target_member_id)
+        if not member:
+            await i.followup.send("エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True)
+            try: await i.message.delete()
+            except discord.NotFound: pass
+            return
+            
+        [item.disable() for item in self.children]
         try: await i.edit_original_response(view=self)
         except discord.NotFound: pass
         
-        final_name = self.new_name
         try:
             cog = self.bot.get_cog("Nicknames")
-            final_name = await cog.get_final_nickname(self.target_member, base_name_override=self.new_name)
-            await self.target_member.edit(nick=final_name)
-        except Exception as e: return await i.followup.send(f"ニックネームの変更中にエラー: {e}", ephemeral=True)
+            final_name = await cog.get_final_nickname(member, base_name_override=self.new_name)
+            await member.edit(nick=final_name)
+        except Exception as e:
+            await i.followup.send(f"ニックネームの変更中にエラーが発生しました: {e}", ephemeral=True)
+            return
             
         embed = discord.Embed(title="✅ 名前変更のお知らせ (承認)", color=discord.Color.green())
-        embed.add_field(name="対象者", value=self.target_member.mention, inline=False)
+        embed.add_field(name="対象者", value=member.mention, inline=False)
         embed.add_field(name="変更後の名前", value=f"`{final_name}`", inline=True)
         embed.add_field(name="承認者", value=f"{i.user.mention} (公務員)", inline=False)
-        await self._send_result_and_refresh(embed)
+        
+        await self._send_log_message(embed, target_member=member)
         try: await i.message.delete()
         except discord.NotFound: pass
 
     @ui.button(label="拒否", style=discord.ButtonStyle.danger)
     async def reject(self, i: discord.Interaction, b: ui.Button):
         if not await self._check_permission(i): return
+
+        # [수정] 버튼 클릭 시점에 최신 멤버 정보를 다시 가져옴
+        member = i.guild.get_member(self.target_member_id)
+        if not member:
+            await i.response.send_message("エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True)
+            try: await i.message.delete()
+            except discord.NotFound: pass
+            return
+
         modal = RejectionReasonModal(); await i.response.send_modal(modal)
         if await modal.wait(): return
+        
         [item.disable() for item in self.children]
-        try: await i.message.edit(view=self)
+        try: await i.edit_original_response(view=self)
         except discord.NotFound: pass
+        
         embed = discord.Embed(title="❌ 名前変更のお知らせ (拒否)", color=discord.Color.red())
-        embed.add_field(name="対象者", value=self.target_member.mention, inline=False)
+        embed.add_field(name="対象者", value=member.mention, inline=False)
         embed.add_field(name="申請した名前", value=f"`{self.new_name}`", inline=True)
         embed.add_field(name="拒否理由", value=modal.reason.value, inline=False)
         embed.add_field(name="処理者", value=f"{i.user.mention} (公務員)", inline=False)
-        await self._send_result_and_refresh(embed)
+        
+        await self._send_log_message(embed, target_member=member)
         try: await i.message.delete()
         except discord.NotFound: pass
 
@@ -120,13 +139,23 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         name = self.new_name.value
         if not ALLOWED_NICKNAME_PATTERN.match(name): return await i.followup.send("❌ エラー: 名前に絵文字や特殊文字は使用できません。", ephemeral=True)
         if (length := calculate_weighted_length(name)) > 8: return await i.followup.send(f"❌ エラー: 名前の長さがルールを超えています。(現在: **{length}/8**)", ephemeral=True)
+        
         cog = i.client.get_cog("Nicknames")
-        if not cog or not cog.approval_channel_id or not cog.approval_role_id: return await i.followup.send("エラー: ニックネーム機能が正しく設定されていません。", ephemeral=True)
-        if not (ch := i.guild.get_channel(cog.approval_channel_id)): return await i.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
+        if not cog or not cog.approval_channel_id or not cog.approval_role_id:
+            return await i.followup.send("エラー: ニックネーム機能が正しく設定されていません。", ephemeral=True)
+        if not (ch := i.guild.get_channel(cog.approval_channel_id)):
+            return await i.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
+            
         await set_cooldown(str(i.user.id), time.time())
         embed = discord.Embed(title="📝 名前変更申請", color=discord.Color.blue())
         embed.add_field(name="申請者", value=i.user.mention, inline=False).add_field(name="現在の名前", value=i.user.display_name, inline=False).add_field(name="希望の名前", value=name, inline=False)
-        await ch.send(f"<@&{self.approval_role_id}> 新しい名前変更の申請があります。", embed=embed, view=NicknameApprovalView(i.user, name, i.client, self.approval_role_id))
+        
+        # [수정] i.user가 아닌 i.member를 전달하여 항상 Member 객체를 보장
+        applicant_member = i.guild.get_member(i.user.id)
+        if not applicant_member:
+             return await i.followup.send("エラー: 申請者情報を見つけられません。", ephemeral=True)
+
+        await ch.send(f"<@&{self.approval_role_id}> 新しい名前変更の申請があります。", embed=embed, view=NicknameApprovalView(applicant_member, name, i.client, self.approval_role_id))
         await i.followup.send("名前の変更申請を提出しました。", ephemeral=True)
 
 class NicknameChangerPanelView(ui.View):
@@ -142,7 +171,7 @@ class NicknameChangerPanelView(ui.View):
         if not cog or not cog.approval_role_id: return await i.response.send_message("エラー: 機能が設定されていません。", ephemeral=True)
         await i.response.send_modal(NicknameChangeModal(approval_role_id=cog.approval_role_id))
 
-# --- 메인 Cog 클래스 ---
+# --- メイン Cog クラス ---
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.bot.add_view(NicknameChangerPanelView())
