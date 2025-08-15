@@ -1,4 +1,4 @@
-# cogs/server/system.py (디버깅 로그 추가 최종본)
+# cogs/server/system.py (심층 디버깅 로그 추가 버전)
 
 import discord
 from discord.ext import commands
@@ -11,12 +11,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%
 logger = logging.getLogger(__name__)
 
 # 유틸리티 함수 임포트
-from utils.database import (
-    get_id, save_id_to_db,
-    save_panel_id, get_panel_id, get_embed_from_db
-)
+from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db
 
-# --- 역할 패널 설정 데이터 ---
+# ... (STATIC_AUTO_ROLE_PANELS 부분은 변경 없음) ...
 STATIC_AUTO_ROLE_PANELS = {
     "main_roles": {
         "channel_key": "auto_role_channel_id",
@@ -57,38 +54,45 @@ STATIC_AUTO_ROLE_PANELS = {
 class RoleSelectView(ui.View):
     def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
         super().__init__(timeout=300)
+        # [디버깅] RoleSelectView 객체가 생성되는 시점을 로그로 남깁니다.
+        logger.info(f"[디버깅] RoleSelectView __init__ 시작 (사용자: {member.id}, 카테고리: {category_name})")
         self.member = member
         self.all_category_role_ids = {rid for role in category_roles if (rid := get_id(role.get('role_id_key')))}
+        
+        # [디버깅] DB에서 가져온 역할 ID가 몇 개인지 확인합니다.
+        logger.info(f"[디버깅] 이 카테고리에서 찾은 유효한 역할 ID 개수: {len(self.all_category_role_ids)}")
+        if not self.all_category_role_ids:
+            logger.warning("[디버깅] 유효한 역할 ID가 하나도 없어 메뉴가 제대로 작동하지 않을 수 있습니다.")
+
         current_user_role_ids = {r.id for r in self.member.roles}
         role_chunks = [category_roles[i:i + 25] for i in range(0, len(category_roles), 25)]
         if not role_chunks or not self.all_category_role_ids: 
             self.add_item(ui.Button(label="設定された役割がありません", disabled=True))
+            logger.info("[디버깅] 설정된 역할이 없어 비활성화된 버튼을 추가했습니다.")
             return
+            
         for i, chunk in enumerate(role_chunks):
             options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in chunk if (rid := get_id(info.get('role_id_key')))]
             if options: 
                 self.add_item(ui.Select(placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})", min_values=0, max_values=len(options), options=options, custom_id=f"role_select_{i}"))
+        
         update_button = ui.Button(label="役割を更新", style=discord.ButtonStyle.primary, custom_id="update_roles", emoji="✅")
         update_button.callback = self.update_roles_callback
         self.add_item(update_button)
+        logger.info("[디버깅] RoleSelectView __init__ 완료")
 
     async def update_roles_callback(self, interaction: discord.Interaction):
-        # [디버깅] 1. 콜백 함수 시작
         logger.info(f"[디버깅] update_roles_callback 시작 (사용자: {interaction.user.id})")
         await interaction.response.defer(ephemeral=True)
         
         selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
         current_ids = {role.id for role in self.member.roles}
         
-        # [디버깅] 2. 선택된 역할 및 현재 역할 정보
         logger.info(f"[디버깅] 선택된 역할 ID: {selected_ids}")
-        logger.info(f"[디버깅] 이 카테고리의 모든 역할 ID: {self.all_category_role_ids}")
-        logger.info(f"[디버깅] 사용자의 현재 역할 ID: {current_ids}")
         
         to_add_ids = selected_ids - current_ids
         to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
         
-        # [디버깅] 3. 추가/제거할 역할 계산 결과
         logger.info(f"[디버깅] 추가할 역할 ID: {to_add_ids}")
         logger.info(f"[디버깅] 제거할 역할 ID: {to_remove_ids}")
         
@@ -96,33 +100,26 @@ class RoleSelectView(ui.View):
             guild = interaction.guild
             if to_add_ids:
                 roles_to_add = [r for r_id in to_add_ids if (r := guild.get_role(r_id))]
-                # [디버깅] 4. 실제 역할 추가 직전
                 logger.info(f"[디버깅] 실제 추가할 역할 객체: {[r.name for r in roles_to_add]}")
                 if roles_to_add:
                     await self.member.add_roles(*roles_to_add, reason="自動役割選択")
-                    # [디버깅] 5. 역할 추가 완료
                     logger.info("[디버깅] 역할 추가 API 호출 완료")
             
             if to_remove_ids:
                 roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
-                # [디버깅] 6. 실제 역할 제거 직전
                 logger.info(f"[디버깅] 실제 제거할 역할 객체: {[r.name for r in roles_to_remove]}")
                 if roles_to_remove:
                     await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
-                    # [디버깅] 7. 역할 제거 완료
                     logger.info("[디버깅] 역할 제거 API 호출 완료")
             
             for item in self.children: 
                 item.disabled = True
             
-            # [디버깅] 8. 최종 응답 전송 직전
             logger.info("[디버깅] 최종 응답(edit_original_response) 호출 직전")
             await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self)
-            # [디버깅] 9. 최종 응답 완료
             logger.info("[디버깅] 최종 응답 완료, 콜백 정상 종료")
             self.stop()
         except Exception as e:
-            # [디버깅] 오류 발생!
             logger.error(f"❌ 역할 업데이트 중 오류 발생: {e}", exc_info=True)
             try:
                 await interaction.edit_original_response(content=f"❌ 処理中にエラーが発生しました。\n`{e}`", view=None)
@@ -141,23 +138,32 @@ class AutoRoleView(ui.View):
             self.add_item(category_select)
 
     async def category_select_callback(self, interaction: discord.Interaction):
+        # [디버깅] 카테고리 선택 콜백이 시작되었는지 확인합니다.
+        logger.info(f"[디버깅] category_select_callback 시작 (사용자: {interaction.user.id})")
         await interaction.response.defer(ephemeral=True, thinking=True)
         
         category_id = interaction.data['values'][0]
+        # [디버깅] 사용자가 어떤 카테고리를 선택했는지 확인합니다.
+        logger.info(f"[디버깅] 선택된 카테고리 ID: {category_id}")
+        
         category_info = next((c for c in self.panel_config.get("categories", []) if c['id'] == category_id), None)
         category_name = category_info['label'] if category_info else category_id.capitalize()
         
         category_roles = self.panel_config.get("roles", {}).get(category_id, [])
         if not category_roles:
+            logger.warning(f"[디버깅] '{category_name}' 카테고리에 설정된 역할 목록이 비어있습니다.")
             await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True)
             return
             
         embed = discord.Embed(title=f"「{category_name}」役割選択", description="下のドロップダウンメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。", color=discord.Color.blue())
+        
+        # [디버깅] RoleSelectView를 생성하기 직전입니다.
+        logger.info("[디버깅] RoleSelectView 생성 및 전송 준비...")
         view = RoleSelectView(interaction.user, category_roles, category_name)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        logger.info("[디버깅] RoleSelectView가 포함된 메시지 전송 완료.")
 
-# ... 나머지 ServerSystem 클래스와 다른 함수들은 이전과 동일하므로 생략하고 그대로 두시면 됩니다 ...
-# (이 파일의 아래 부분은 수정할 필요가 없습니다)
+# ... 나머지 ServerSystem 클래스 코드는 이전과 동일하게 유지 ...
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
