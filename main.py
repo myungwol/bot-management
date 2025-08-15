@@ -24,18 +24,18 @@ class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    # [수정] 글로벌 상호작용 리스너 (버그 수정)
     async def on_interaction(self, interaction: discord.Interaction):
         custom_id = interaction.data.get("custom_id", "N/A")
         logger.info(f"[GLOBAL INTERACTION] ID:{custom_id} | Type:{interaction.type} | User:{interaction.user.id}")
         
-        # [수정] super().on_interaction(interaction) 대신 올바른 dispatch 이벤트를 사용합니다.
-        # 이것이 모든 상호작용 관련 콜백 함수(버튼, 메뉴 등)를 찾아 실행해주는 핵심입니다.
+        # [수정] super() 호출 대신, 봇의 기본 이벤트 처리기(dispatcher)를 호출합니다.
+        # 이것이 모든 버튼/메뉴 콜백 함수를 찾아 실행해주는 핵심입니다.
         self.dispatch('interaction', interaction)
 
     async def setup_hook(self):
         await self.load_all_extensions()
         
-        # 영구 View 등록
         for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
             self.add_view(AutoRoleView(panel_config))
         logger.info(f"✅ {len(STATIC_AUTO_ROLE_PANELS)}개의 AutoRoleView가 등록되었습니다.")
