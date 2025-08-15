@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (버튼 비활성화 오류 수정 최종본)
+# cogs/server/nicknames.py (TypeError 버그 수정 최종본)
 
 import discord
 from discord.ext import commands
@@ -38,7 +38,6 @@ def calculate_weighted_length(name: str) -> int:
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction):
-        # [수정] 거절 사유 제출 시에는 defer()만 호출하고 followup은 reject 함수에서 처리
         await interaction.response.defer()
 
 class NicknameApprovalView(ui.View):
@@ -51,7 +50,7 @@ class NicknameApprovalView(ui.View):
 
     async def _check_permission(self, i: discord.Interaction) -> bool:
         if not self.approval_role_id or not isinstance(i.user, discord.Member) or not any(r.id == self.approval_role_id for r in i.user.roles):
-            await i.response.send_message("このボタンを押す権한がありません。", ephemeral=True)
+            await i.response.send_message("このボタンを押す権限がありません。", ephemeral=True)
             return False
         return True
 
@@ -79,7 +78,6 @@ class NicknameApprovalView(ui.View):
             except discord.NotFound: pass
             return
             
-        # [수정된 부분] item.disable() -> item.disabled = True
         for item in self.children:
             item.disabled = True
         try: await i.edit_original_response(view=self)
@@ -87,9 +85,11 @@ class NicknameApprovalView(ui.View):
         
         try:
             cog = self.bot.get_cog("Nicknames")
-            final_name = await cog.get_final_nickname(member, base_name_override=self.new_name)
+            # [수정된 부분] 잘못된 인자 이름 'base_name_override'를 올바른 'base_name'으로 수정
+            final_name = await cog.get_final_nickname(member, base_name=self.new_name)
             await member.edit(nick=final_name)
         except Exception as e:
+            logger.error(f"Error during nickname approval process: {e}", exc_info=True)
             await i.followup.send(f"ニックネームの変更中にエラーが発生しました: {e}", ephemeral=True)
             return
             
@@ -114,13 +114,10 @@ class NicknameApprovalView(ui.View):
             return
 
         modal = RejectionReasonModal(); await i.response.send_modal(modal)
-        # modal.wait()는 modal이 닫힐 때까지 기다림
         timed_out = await modal.wait()
         if timed_out or modal.reason.value is None:
-            # 타임아웃 되거나 모달이 그냥 닫히면 아무것도 안 함
             return
         
-        # [수정된 부분] item.disable() -> item.disabled = True
         for item in self.children:
             item.disabled = True
         try: await i.edit_original_response(view=self)
@@ -203,12 +200,27 @@ class Nicknames(commands.Cog):
             base = base[:32 - prefix_len]
             nick = f"『{prefix}』{base}" if prefix else base
         return nick
+    
+    # [새로 추가된 부분] Onboarding Cog와의 연동을 위한 함수
+    async def update_nickname(self, member: discord.Member, base_name_override: str):
+        """
+        Onboarding Cog에서 호출하기 위한 헬퍼 함수입니다.
+        새로운 기본 이름을 기반으로 최종 닉네임을 계산하고 적용합니다.
+        """
+        try:
+            final_name = await self.get_final_nickname(member, base_name=base_name_override)
+            if member.nick != final_name:
+                await member.edit(nick=final_name)
+        except discord.Forbidden:
+            logger.warning(f"Onboarding: Missing permissions to change nickname for {member.display_name}")
+        except Exception as e:
+            logger.error(f"Onboarding: Failed to update nickname for {member.display_name}: {e}", exc_info=True)
         
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if after.bot or before.roles == after.roles: return
         base_name = (after.nick or after.name).split('』')[-1].strip()
-        new_nick = await self.get_final_nickname(after, base_name)
+        new_nick = await self.get_final_nickname(after, base_name=base_name)
         if after.nick != new_nick:
             try: await after.edit(nick=new_nick)
             except discord.Forbidden: pass
@@ -216,7 +228,7 @@ class Nicknames(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         if member.bot: return; await asyncio.sleep(2)
-        new_nick = await self.get_final_nickname(member, member.name)
+        new_nick = await self.get_final_nickname(member, base_name=member.name)
         if member.nick != new_nick:
             try: await member.edit(nick=new_nick)
             except discord.Forbidden: pass
