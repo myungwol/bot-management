@@ -1,4 +1,4 @@
-# cogs/games/user_profile.py (명령어 통합 최종본)
+# cogs/games/user_profile.py (DB 자동 로딩 방식 적용 최종본)
 
 import discord
 from discord.ext import commands
@@ -6,7 +6,6 @@ from discord import app_commands, ui
 from math import ceil
 import logging
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,7 @@ from utils.database import (
     get_user_gear, set_user_gear, CURRENCY_ICON,
     ROLE_PREFIX_MAPPING, ITEM_DATABASE, ROD_HIERARCHY,
     save_panel_id, get_panel_id,
-    get_channel_id_from_db
+    get_id
 )
 
 CATEGORIES = ["プロフィール", "装備", "アイテム", "魚", "農業", "ペット"]
@@ -154,7 +153,7 @@ class UserProfile(commands.Cog):
     async def cog_load(self):
         await self.load_user_profile_channel_config()
     async def load_user_profile_channel_config(self):
-        self.inventory_panel_channel_id = await get_channel_id_from_db("inventory_panel_channel_id")
+        self.inventory_panel_channel_id = get_id("inventory_panel_channel_id")
         logger.info(f"[UserProfile Cog] Loaded INVENTORY_PANEL_CHANNEL_ID: {self.inventory_panel_channel_id}")
         
     async def regenerate_panel(self, channel: discord.TextChannel | None = None):
@@ -163,18 +162,16 @@ class UserProfile(commands.Cog):
             else: logger.info("ℹ️ Inventory panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Inventory panel channel could not be found."); return
         
-        # [수정된 부분]
-        panel_info = await get_panel_id("inventory")
+        panel_info = await get_panel_id("profile")
         if panel_info and (old_id := panel_info.get('message_id')):
             try:
                 message_to_delete = await channel.fetch_message(old_id)
                 await message_to_delete.delete()
-            except (discord.NotFound, discord.Forbidden):
-                pass
+            except (discord.NotFound, discord.Forbidden): pass
             
         embed = discord.Embed(title="📦 持ち物", description="下のボタンを押して、あなたの持ち物を開きます。", color=discord.Color.from_rgb(200, 200, 200))
         msg = await channel.send(embed=embed, view=InventoryPanelView())
-        await save_panel_id("inventory", msg.id, channel.id)
+        await save_panel_id("profile", msg.id, channel.id)
         logger.info(f"✅ Inventory panel successfully regenerated in channel {channel.name}")
 
 async def setup(bot: commands.Bot):
