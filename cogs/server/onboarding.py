@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (상호작용 실패 오류 해결 최종본)
+# cogs/server/onboarding.py (수정됨)
 
 import discord
 from discord.ext import commands
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # 유틸리티 함수 임포트
 from utils.database import (
-    get_id, save_panel_id, get_panel_id, get_auto_role_mappings, get_cooldown, set_cooldown
+    get_id, save_panel_id, get_panel_id, get_auto_role_mappings, get_cooldown, set_cooldown, get_embed_from_db
 )
 
 # --- 설정 상수 ---
@@ -46,9 +46,11 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id: await interaction.followup.send("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True); return
+            if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id:
+                await interaction.followup.send("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True); return
             approval_channel = interaction.guild.get_channel(self.onboarding_cog.approval_channel_id)
-            if not approval_channel: await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
+            if not approval_channel:
+                await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
             await set_cooldown(f"intro_{interaction.user.id}", time.time())
             embed = discord.Embed(title="📝 新しい住人登録票が提出されました", description=f"**作成者:** {interaction.user.mention}", color=discord.Color.blue())
             if interaction.user.display_avatar: embed.set_thumbnail(url=interaction.user.display_avatar.url)
@@ -63,13 +65,13 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
 class ApprovalView(ui.View):
-    # 이 클래스는 이미 defer() 처리가 잘 되어 있으므로 변경 없음
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.author_id = author.id; self.original_embed = original_embed
         self.onboarding_cog = cog_instance; self.rejection_reason: Optional[str] = None
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
-        if not approval_role_id: await interaction.response.send_message("❌ エラー: 承認役割IDが設定されていません。", ephemeral=True); return False
+        if not approval_role_id:
+            await interaction.response.send_message("❌ エラー: 承認役割IDが設定されていません。", ephemeral=True); return False
         if not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
             await interaction.response.send_message("❌ このボタンを押す権限がありません。", ephemeral=True); return False
         return True
@@ -91,7 +93,8 @@ class ApprovalView(ui.View):
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
         member = interaction.guild.get_member(self.author_id)
-        if not member: await interaction.response.send_message("❌ エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True); return
+        if not member:
+            await interaction.response.send_message("❌ エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True); return
         status_text = "承認" if is_approved else "拒否"
         if not is_approved:
             rejection_modal = RejectionReasonModal(); await interaction.response.send_modal(rejection_modal)
@@ -171,30 +174,34 @@ class OnboardingView(ui.View):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.current_step = current_step; self.update_view()
     def update_view(self):
         self.clear_items(); page = GUIDE_PAGES[self.current_step]
-        if self.current_step > 0: self.add_item(ui.Button(label="◀ 前へ", style=discord.ButtonStyle.secondary, custom_id="onboarding_prev", row=1)).callback = self.go_previous
-        if page["type"] == "info": self.add_item(ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next")).callback = self.go_next
-        elif page["type"] == "action": self.add_item(ui.Button(label=page.get("button_label", "確認"), style=discord.ButtonStyle.success, custom_id="onboarding_action")).callback = self.do_action
-        elif page["type"] == "intro": self.add_item(ui.Button(label="住人登録票を作成する", style=discord.ButtonStyle.success, custom_id="onboarding_intro")).callback = self.create_introduction
+        if self.current_step > 0:
+            prev_button = ui.Button(label="◀ 前へ", style=discord.ButtonStyle.secondary, custom_id="onboarding_prev", row=1)
+            prev_button.callback = self.go_previous; self.add_item(prev_button)
+        if page["type"] == "info":
+            next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next")
+            next_button.callback = self.go_next; self.add_item(next_button)
+        elif page["type"] == "action":
+            action_button = ui.Button(label=page.get("button_label", "確認"), style=discord.ButtonStyle.success, custom_id="onboarding_action")
+            action_button.callback = self.do_action; self.add_item(action_button)
+        elif page["type"] == "intro":
+            intro_button = ui.Button(label="住人登録票を作成する", style=discord.ButtonStyle.success, custom_id="onboarding_intro")
+            intro_button.callback = self.create_introduction; self.add_item(intro_button)
     async def _update_message(self, interaction: discord.Interaction):
         page = GUIDE_PAGES[self.current_step]
         embed = discord.Embed(title=page["title"], description=page["description"], color=discord.Color.purple())
         if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
         if page.get("rules"): embed.add_field(name="⚠️ ルール", value=page["rules"], inline=False)
         self.update_view()
-        # defer()가 이미 호출되었으므로, followup이나 edit_original_response를 사용해야 합니다.
         if interaction.response.is_done():
             await interaction.edit_original_response(embed=embed, view=self)
-
     async def go_previous(self, interaction: discord.Interaction):
         await interaction.response.defer()
         if self.current_step > 0: self.current_step -= 1
         await self._update_message(interaction)
-
     async def go_next(self, interaction: discord.Interaction):
         await interaction.response.defer()
         if self.current_step < len(GUIDE_PAGES) - 1: self.current_step += 1
         await self._update_message(interaction)
-
     async def do_action(self, interaction: discord.Interaction):
         await interaction.response.defer()
         try:
@@ -206,7 +213,6 @@ class OnboardingView(ui.View):
             if self.current_step < len(GUIDE_PAGES) - 1: self.current_step += 1
             await self._update_message(interaction)
         except Exception as e: await interaction.followup.send(f"❌ エラー: {e}", ephemeral=True)
-
     async def create_introduction(self, interaction: discord.Interaction):
         key = f"intro_{interaction.user.id}"; last_time = await get_cooldown(key)
         if last_time and time.time() - last_time < INTRODUCTION_COOLDOWN_SECONDS:
@@ -231,12 +237,18 @@ class OnboardingPanelView(ui.View):
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot = bot; self.bot.add_view(OnboardingPanelView(self))
+        self.bot = bot
         self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.new_welcome_channel_id: Optional[int] = None; self.approval_role_id: Optional[int] = None
         self.guest_role_id: Optional[int] = None; self.mention_role_id_1: Optional[int] = None
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
+    
+    # [수정] 영구 View 등록을 위한 함수 추가
+    def register_persistent_views(self):
+        self.bot.add_view(OnboardingPanelView(self))
+        # ApprovalView는 동적으로 생성되므로 등록할 필요 없음
+    
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
