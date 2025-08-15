@@ -1,4 +1,4 @@
-# cogs/games/fishing.py (삭제 후 재생성 로직 적용 최종본)
+# cogs/games/fishing.py (수정됨)
 
 import discord
 from discord.ext import commands
@@ -42,7 +42,8 @@ class FishingGameView(ui.View):
             await asyncio.sleep(random.uniform(*self.bite_range))
             if self.is_finished(): return
             self.game_state = "biting"
-            if isinstance(catch_button := self.children[0], ui.Button):
+            # self.children은 리스트이므로, 첫 번째 아이템이 버튼인지 확인
+            if self.children and isinstance(catch_button := self.children[0], ui.Button):
                 catch_button.style = discord.ButtonStyle.danger; catch_button.label = "釣り上げる！"
             embed = discord.Embed(title="❗ アタリが来た！", description="今だ！ボタンを押して釣り上げよう！", color=discord.Color.red())
             if self.message: await self.message.edit(embed=embed, view=self)
@@ -61,7 +62,7 @@ class FishingGameView(ui.View):
         weights = [item['weight'] * (1 + self.rod_bonus if 'base_value' in item else 1) for item in FISHING_LOOT]
         catch_proto = random.choices(FISHING_LOOT, weights=weights, k=1)[0]
         user_mention = self.player.mention; is_big_catch = log_publicly = False
-        if "min_size" in catch_proto:
+        if "min_size" in catch_proto: # 물고기를 잡은 경우
             log_publicly = True
             size = round(random.uniform(catch_proto["min_size"], catch_proto["max_size"]), 1)
             await add_to_aquarium(str(self.player.id), {"name": catch_proto['name'], "size": size, "emoji": catch_proto['emoji']})
@@ -72,7 +73,7 @@ class FishingGameView(ui.View):
             embed = discord.Embed(title=title, description=desc, color=color)
             embed.add_field(name="魚", value=f"{catch_proto['emoji']} **{catch_proto['name']}**", inline=True)
             embed.add_field(name="サイズ", value=f"`{size}`cm", inline=True)
-        else:
+        else: # 아이템(쓰레기 등)을 잡은 경우
             value = catch_proto.get('value', 0)
             if value > 0: await update_wallet(self.player, value)
             log_publicly = catch_proto.get("log_publicly", False)
@@ -97,6 +98,7 @@ class FishingGameView(ui.View):
     async def _send_result(self, embed: discord.Embed, log_publicly: bool = False, is_big_catch: bool = False):
         footer_private = f"残りのエサ: 一般({self.remaining_baits.get('一般の釣りエサ', 0)}個) / 高級({self.remaining_baits.get('高級釣りエサ', 0)}個)"
         footer_public = f"使用した装備: {self.used_rod} / {self.used_bait}"
+        # [로그 문제 해결 지점] fishing_cog.fishing_log_channel_id가 제대로 로드되면 로그가 전송됩니다.
         if log_publicly and (fishing_cog := self.bot.get_cog("Fishing")) and (log_ch_id := fishing_cog.fishing_log_channel_id) and (log_ch := self.bot.get_channel(log_ch_id)):
             public_embed = embed.copy(); public_embed.set_footer(text=footer_public)
             content = self.player.mention if is_big_catch else None
@@ -157,15 +159,22 @@ class FishingPanelView(ui.View):
 
 class Fishing(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot = bot; self.active_fishing_sessions_by_user: Set[int] = set()
-        self.bot.add_view(FishingPanelView(self.bot, self))
-        self.fishing_panel_channel_id: Optional[int] = None; self.fishing_log_channel_id: Optional[int] = None
+        self.bot = bot
+        self.active_fishing_sessions_by_user: Set[int] = set()
+        self.fishing_panel_channel_id: Optional[int] = None
+        self.fishing_log_channel_id: Optional[int] = None
         logger.info("Fishing Cog가 성공적으로 초기화되었습니다.")
+
+    # [수정] 영구 View 등록을 위한 함수 추가
+    def register_persistent_views(self):
+        self.bot.add_view(FishingPanelView(self.bot, self))
+        
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.fishing_panel_channel_id = get_id("fishing_panel_channel_id")
         self.fishing_log_channel_id = get_id("fishing_log_channel_id")
         logger.info(f"[Fishing Cog] 낚시 패널/로그 채널 ID 로드 완료.")
+        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
