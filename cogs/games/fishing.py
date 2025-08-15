@@ -1,4 +1,4 @@
-# cogs/games/fishing.py (명령어 통합 최종본)
+# cogs/games/fishing.py (DB 자동 로딩 방식 적용 최종본)
 
 import discord
 from discord.ext import commands
@@ -7,7 +7,6 @@ import random
 import asyncio
 import logging
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,7 @@ from utils.database import (
     update_wallet, get_inventory, update_inventory, add_to_aquarium,
     get_user_gear, set_user_gear, FISHING_LOOT, ITEM_DATABASE,
     CURRENCY_ICON, save_panel_id, get_panel_id,
-    get_channel_id_from_db
+    get_id
 )
 
 BIG_CATCH_THRESHOLD = 70.0
@@ -160,8 +159,8 @@ class Fishing(commands.Cog):
         logger.info("Fishing Cog initialized.")
     async def cog_load(self): await self.load_fishing_channel_config()
     async def load_fishing_channel_config(self):
-        self.fishing_panel_channel_id = await get_channel_id_from_db("fishing_panel_channel_id")
-        self.fishing_log_channel_id = await get_channel_id_from_db("fishing_log_channel_id")
+        self.fishing_panel_channel_id = get_id("fishing_panel_channel_id")
+        self.fishing_log_channel_id = get_id("fishing_log_channel_id")
         logger.info(f"[Fishing Cog] Loaded FISHING_PANEL_CHANNEL_ID: {self.fishing_panel_channel_id}")
         logger.info(f"[Fishing Cog] Loaded FISHING_LOG_CHANNEL_ID: {self.fishing_log_channel_id}")
         
@@ -171,14 +170,12 @@ class Fishing(commands.Cog):
             else: logger.info("ℹ️ Fishing panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Fishing panel channel could not be found."); return
         
-        # [수정된 부분]
         panel_info = await get_panel_id("fishing")
         if panel_info and (old_id := panel_info.get('message_id')):
             try:
                 message_to_delete = await channel.fetch_message(old_id)
                 await message_to_delete.delete()
-            except (discord.NotFound, discord.Forbidden):
-                pass
+            except (discord.NotFound, discord.Forbidden): pass
         
         embed = discord.Embed(title="🎣 Dico森 釣り場", description="下のボタンを押して釣りを開始し、コインを獲得しましょう！", color=discord.Color.from_rgb(135, 206, 250))
         msg = await channel.send(embed=embed, view=FishingPanelView(self.bot, self.active_fishing_sessions_by_user))
