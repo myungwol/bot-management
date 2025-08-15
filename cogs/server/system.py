@@ -1,4 +1,4 @@
-# cogs/server/system.py (명령어 통합 최종본)
+# cogs/server/system.py (명령어 통합 및 실시간 업데이트 버그 수정 최종본)
 
 import discord
 from discord.ext import commands, tasks
@@ -217,25 +217,21 @@ class ServerSystem(commands.Cog):
         if before.roles != after.roles or before.premium_since != after.premium_since:
             self._schedule_counter_update(after.guild)
 
-    # [수정된 부분] 모든 설정 명령어를 이 하나로 통합
     @app_commands.command(name="setup", description="[管理者] ボットの各種チャンネルを設定またはパネルを設置します。")
     @app_commands.describe(
         setting_type="設定したい項目を選択してください。",
         channel="設定対象のチャンネルを指定してください。"
     )
     @app_commands.choices(setting_type=[
-        # 패널 설치
         app_commands.Choice(name="[パネル] 役割パネル", value="panel_roles"),
         app_commands.Choice(name="[パネル] 案内パネル (オンボーディング)", value="panel_onboarding"),
         app_commands.Choice(name="[パネル] 名前変更パネル", value="panel_nicknames"),
         app_commands.Choice(name="[パネル] 商店街パネル (売買)", value="panel_commerce"),
         app_commands.Choice(name="[パネル] 釣り場パネル", value="panel_fishing"),
         app_commands.Choice(name="[パネル] 持ち物パネル", value="panel_profile"),
-        # 기능 채널 설정
         app_commands.Choice(name="[チャンネル] 自己紹介承認チャンネル", value="channel_onboarding_approval"),
         app_commands.Choice(name="[チャンネル] 名前変更承認チャンネル", value="channel_nickname_approval"),
         app_commands.Choice(name="[チャンネル] 新規参加者歓迎チャンネル", value="channel_new_welcome"),
-        # 로그 채널 설정
         app_commands.Choice(name="[ログ] 名前変更ログ", value="log_nickname"),
         app_commands.Choice(name="[ログ] 釣りログ", value="log_fishing"),
         app_commands.Choice(name="[ログ] コインログ", value="log_coin"),
@@ -246,25 +242,22 @@ class ServerSystem(commands.Cog):
     async def setup_unified(self, interaction: discord.Interaction, setting_type: str, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
 
-        # 모든 설정 정보를 하나의 딕셔너리로 관리
+        # [수정된 부분] 실시간 업데이트를 위한 각 Cog의 실제 변수 이름(attr)을 추가
         setup_map = {
-            # 패널 정보
             "panel_roles": {"type": "panel", "cog": "ServerSystem", "key": "auto_role_channel_id", "friendly_name": "役割パネル"},
             "panel_onboarding": {"type": "panel", "cog": "Onboarding", "key": "onboarding_panel_channel_id", "friendly_name": "案内パネル"},
             "panel_nicknames": {"type": "panel", "cog": "Nicknames", "key": "nickname_panel_channel_id", "friendly_name": "名前変更パネル"},
             "panel_commerce": {"type": "panel", "cog": "Commerce", "key": "commerce_panel_channel_id", "friendly_name": "商店街パネル"},
             "panel_fishing": {"type": "panel", "cog": "Fishing", "key": "fishing_panel_channel_id", "friendly_name": "釣り場パネル"},
             "panel_profile": {"type": "panel", "cog": "UserProfile", "key": "inventory_panel_channel_id", "friendly_name": "持ち物パネル"},
-            # 기능 채널 정보
-            "channel_onboarding_approval": {"type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id", "friendly_name": "自己紹介承認チャンネル"},
-            "channel_nickname_approval": {"type": "channel", "cog_name": "Nicknames", "key": "nickname_approval_channel_id", "friendly_name": "名前変更承認チャンネル"},
-            "channel_new_welcome": {"type": "channel", "cog_name": "Onboarding", "key": "new_welcome_channel_id", "friendly_name": "新規参加者歓迎チャンネル"},
-            # 로그 채널 정보
-            "log_nickname": {"type": "channel", "cog_name": "Nicknames", "key": "nickname_log_channel_id", "friendly_name": "名前変更ログ"},
-            "log_fishing": {"type": "channel", "cog_name": "Fishing", "key": "fishing_log_channel_id", "friendly_name": "釣りログ"},
-            "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "コインログ"},
-            "log_intro_approval": {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id", "friendly_name": "自己紹介承認ログ"},
-            "log_intro_rejection": {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id", "friendly_name": "自己紹介拒否ログ"},
+            "channel_onboarding_approval": {"type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id", "attr": "approval_channel_id", "friendly_name": "自己紹介承認チャンネル"},
+            "channel_nickname_approval": {"type": "channel", "cog_name": "Nicknames", "key": "nickname_approval_channel_id", "attr": "approval_channel_id", "friendly_name": "名前変更承認チャンネル"},
+            "channel_new_welcome": {"type": "channel", "cog_name": "Onboarding", "key": "new_welcome_channel_id", "attr": "new_welcome_channel_id", "friendly_name": "新規参加者歓迎チャンネル"},
+            "log_nickname": {"type": "channel", "cog_name": "Nicknames", "key": "nickname_log_channel_id", "attr": "nickname_log_channel_id", "friendly_name": "名前変更ログ"},
+            "log_fishing": {"type": "channel", "cog_name": "Fishing", "key": "fishing_log_channel_id", "attr": "fishing_log_channel_id", "friendly_name": "釣りログ"},
+            "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "attr": "coin_log_channel_id", "friendly_name": "コインログ"},
+            "log_intro_approval": {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id", "attr": "introduction_channel_id", "friendly_name": "自己紹介承認ログ"},
+            "log_intro_rejection": {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id", "attr": "rejection_log_channel_id", "friendly_name": "自己紹介拒否ログ"},
         }
 
         config = setup_map.get(setting_type)
@@ -285,14 +278,18 @@ class ServerSystem(commands.Cog):
             elif config["type"] == "channel":
                 db_key = config["key"]
                 cog_name = config["cog_name"]
+                # [수정된 부분] attr에 지정된 실제 변수 이름을 사용하도록 변경
+                attribute_to_set = config.get("attr", db_key)
                 
                 await save_channel_id_to_db(db_key, channel.id)
                 self.bot.channel_configs[db_key] = channel.id
                 
                 target_cog = self.bot.get_cog(cog_name)
                 if target_cog:
-                    setattr(target_cog, db_key, channel.id) 
-                    logger.info(f"✅ Live updated {cog_name}'s {db_key} to {channel.id}")
+                    setattr(target_cog, attribute_to_set, channel.id) 
+                    logger.info(f"✅ Live updated {cog_name}'s {attribute_to_set} to {channel.id}")
+                else:
+                    logger.warning(f"Could not find cog {cog_name} to update attribute live.")
                 
                 await interaction.followup.send(f"✅ `{channel.mention}`を**{config['friendly_name']}**として設定しました。", ephemeral=True)
 
@@ -300,8 +297,6 @@ class ServerSystem(commands.Cog):
             logger.error(f"Unified setup command failed for {setting_type}: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 設定中にエラーが発生しました: {e}", ephemeral=True)
 
-
-    # 환영/작별 메시지 편집기 생성 명령어는 별도로 유지 (메시지 편집기 생성이므로)
     setup_group = app_commands.Group(name="message", description="[管理者] 送信するメッセージの内容を編集します。")
     
     @setup_group.command(name="welcome", description="歓迎メッセージの編集機を作成します。")
@@ -319,7 +314,6 @@ class ServerSystem(commands.Cog):
         msg = await ch.send(content=f"**{name} 編集機**", embed=embed)
         await msg.edit(view=EmbedEditorView(msg, key))
         await i.followup.send(f"`{ch.mention}` に {name} 編集機を作成しました。", ephemeral=True)
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
