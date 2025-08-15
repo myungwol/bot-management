@@ -1,24 +1,21 @@
-# cogs/server/nicknames.py (TypeError 버그 수정 최종본)
+# cogs/server/nicknames.py (DB 자동 로딩 방식 적용 최종본)
 
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
 import re
-from datetime import timedelta
+import asyncio
 import time
 import logging
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# 데이터베이스 함수 임포트
 from utils.database import (
     get_panel_id, save_panel_id, get_cooldown, set_cooldown, 
-    get_channel_id_from_db, get_role_id, save_channel_id_to_db
+    get_id
 )
 
-# 설정값
 ALLOWED_NICKNAME_PATTERN = re.compile(r"^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4e00-\u9faf]+$")
 NICKNAME_PREFIX_HIERARCHY_NAMES = [
     "里長", "助役", "お巡り", "祭りの委員", "広報係", "意匠係", "書記", "役場の職員", "職員",
@@ -34,7 +31,6 @@ def calculate_weighted_length(name: str) -> int:
         else: total_length += 1
     return total_length
 
-# --- View / Modal 클래스들 ---
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction):
@@ -49,7 +45,7 @@ class NicknameApprovalView(ui.View):
         self.approval_role_id = approval_role_id
 
     async def _check_permission(self, i: discord.Interaction) -> bool:
-        if not self.approval_role_id or not isinstance(i.user, discord.Member) or not any(r.id == self.approval_role_id for r in i.user.roles):
+        if not self.approval_role_id or not isinstance(i.user, discord.Member) or not any(role.id == self.approval_role_id for role in i.user.roles):
             await i.response.send_message("このボタンを押す権限がありません。", ephemeral=True)
             return False
         return True
@@ -59,7 +55,6 @@ class NicknameApprovalView(ui.View):
         if not cog or not cog.nickname_log_channel_id:
             logger.warning("Nickname log channel is not set. Skipping log message.")
             return
-
         if (log_ch := self.bot.get_channel(cog.nickname_log_channel_id)):
             try:
                 await log_ch.send(content=target_member.mention, embed=result_embed, allowed_mentions=discord.AllowedMentions(users=True))
@@ -70,34 +65,27 @@ class NicknameApprovalView(ui.View):
     async def approve(self, i: discord.Interaction, b: ui.Button):
         if not await self._check_permission(i): return
         await i.response.defer()
-
         member = i.guild.get_member(self.target_member_id)
         if not member:
             await i.followup.send("エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True)
             try: await i.message.delete()
             except discord.NotFound: pass
             return
-            
-        for item in self.children:
-            item.disabled = True
+        for item in self.children: item.disabled = True
         try: await i.edit_original_response(view=self)
         except discord.NotFound: pass
-        
         try:
             cog = self.bot.get_cog("Nicknames")
-            # [수정된 부분] 잘못된 인자 이름 'base_name_override'를 올바른 'base_name'으로 수정
             final_name = await cog.get_final_nickname(member, base_name=self.new_name)
             await member.edit(nick=final_name)
         except Exception as e:
             logger.error(f"Error during nickname approval process: {e}", exc_info=True)
             await i.followup.send(f"ニックネームの変更中にエラーが発生しました: {e}", ephemeral=True)
             return
-            
         embed = discord.Embed(title="✅ 名前変更のお知らせ (承認)", color=discord.Color.green())
         embed.add_field(name="対象者", value=member.mention, inline=False)
         embed.add_field(name="変更後の名前", value=f"`{final_name}`", inline=True)
         embed.add_field(name="承認者", value=f"{i.user.mention} (公務員)", inline=False)
-        
         await self._send_log_message(embed, target_member=member)
         try: await i.message.delete()
         except discord.NotFound: pass
@@ -105,30 +93,23 @@ class NicknameApprovalView(ui.View):
     @ui.button(label="拒否", style=discord.ButtonStyle.danger)
     async def reject(self, i: discord.Interaction, b: ui.Button):
         if not await self._check_permission(i): return
-
         member = i.guild.get_member(self.target_member_id)
         if not member:
             await i.response.send_message("エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True)
             try: await i.message.delete()
             except discord.NotFound: pass
             return
-
         modal = RejectionReasonModal(); await i.response.send_modal(modal)
         timed_out = await modal.wait()
-        if timed_out or modal.reason.value is None:
-            return
-        
-        for item in self.children:
-            item.disabled = True
+        if timed_out or modal.reason.value is None: return
+        for item in self.children: item.disabled = True
         try: await i.edit_original_response(view=self)
         except discord.NotFound: pass
-        
         embed = discord.Embed(title="❌ 名前変更のお知らせ (拒否)", color=discord.Color.red())
         embed.add_field(name="対象者", value=member.mention, inline=False)
         embed.add_field(name="申請した名前", value=f"`{self.new_name}`", inline=True)
         embed.add_field(name="拒否理由", value=modal.reason.value, inline=False)
         embed.add_field(name="処理者", value=f"{i.user.mention} (公務員)", inline=False)
-        
         await self._send_log_message(embed, target_member=member)
         try: await i.message.delete()
         except discord.NotFound: pass
@@ -141,21 +122,17 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         name = self.new_name.value
         if not ALLOWED_NICKNAME_PATTERN.match(name): return await i.followup.send("❌ エラー: 名前に絵文字や特殊文字は使用できません。", ephemeral=True)
         if (length := calculate_weighted_length(name)) > 8: return await i.followup.send(f"❌ エラー: 名前の長さがルールを超えています。(現在: **{length}/8**)", ephemeral=True)
-        
         cog = i.client.get_cog("Nicknames")
         if not cog or not cog.approval_channel_id or not cog.approval_role_id:
             return await i.followup.send("エラー: ニックネーム機能が正しく設定されていません。", ephemeral=True)
         if not (ch := i.guild.get_channel(cog.approval_channel_id)):
             return await i.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
-            
         await set_cooldown(str(i.user.id), time.time())
         embed = discord.Embed(title="📝 名前変更申請", color=discord.Color.blue())
         embed.add_field(name="申請者", value=i.user.mention, inline=False).add_field(name="現在の名前", value=i.user.display_name, inline=False).add_field(name="希望の名前", value=name, inline=False)
-        
         applicant_member = i.guild.get_member(i.user.id)
         if not applicant_member:
              return await i.followup.send("エラー: 申請者情報を見つけられません。", ephemeral=True)
-
         await ch.send(f"<@&{self.approval_role_id}> 新しい名前変更の申請があります。", embed=embed, view=NicknameApprovalView(applicant_member, name, i.client, self.approval_role_id))
         await i.followup.send("名前の変更申請を提出しました。", ephemeral=True)
 
@@ -172,11 +149,10 @@ class NicknameChangerPanelView(ui.View):
         if not cog or not cog.approval_role_id: return await i.response.send_message("エラー: 機能が設定されていません。", ephemeral=True)
         await i.response.send_modal(NicknameChangeModal(approval_role_id=cog.approval_role_id))
 
-# --- メイン Cog 클래스 ---
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.bot.add_view(NicknameChangerPanelView())
-        self.panel_and_result_channel_id: int | None = None
+        self.panel_channel_id: int | None = None
         self.approval_channel_id: int | None = None
         self.approval_role_id: int | None = None
         self.nickname_log_channel_id: int | None = None
@@ -185,11 +161,11 @@ class Nicknames(commands.Cog):
     async def cog_load(self): await self.load_nickname_channel_configs()
     
     async def load_nickname_channel_configs(self):
-        self.panel_and_result_channel_id = await get_channel_id_from_db("nickname_panel_channel_id")
-        self.approval_channel_id = await get_channel_id_from_db("nickname_approval_channel_id")
-        self.nickname_log_channel_id = await get_channel_id_from_db("nickname_log_channel_id")
-        self.approval_role_id = get_role_id("approval_role")
-        logger.info(f"[Nicknames Cog] Loaded Configs: Panel={self.panel_and_result_channel_id}, Approval={self.approval_channel_id}, Log={self.nickname_log_channel_id}")
+        self.panel_channel_id = get_id("nickname_panel_channel_id")
+        self.approval_channel_id = get_id("nickname_approval_channel_id")
+        self.nickname_log_channel_id = get_id("nickname_log_channel_id")
+        self.approval_role_id = get_id("role_approval")
+        logger.info(f"[Nicknames Cog] Loaded Configs: Panel={self.panel_channel_id}, Approval={self.approval_channel_id}, Log={self.nickname_log_channel_id}")
         
     async def get_final_nickname(self, member: discord.Member, base_name: str) -> str:
         prefix = next((p for p in NICKNAME_PREFIX_HIERARCHY_NAMES if discord.utils.get(member.roles, name=p)), None)
@@ -201,12 +177,7 @@ class Nicknames(commands.Cog):
             nick = f"『{prefix}』{base}" if prefix else base
         return nick
     
-    # [새로 추가된 부분] Onboarding Cog와의 연동을 위한 함수
     async def update_nickname(self, member: discord.Member, base_name_override: str):
-        """
-        Onboarding Cog에서 호출하기 위한 헬퍼 함수입니다.
-        새로운 기본 이름을 기반으로 최종 닉네임을 계산하고 적용합니다.
-        """
         try:
             final_name = await self.get_final_nickname(member, base_name=base_name_override)
             if member.nick != final_name:
@@ -235,7 +206,7 @@ class Nicknames(commands.Cog):
             
     async def regenerate_panel(self, channel: discord.TextChannel | None = None):
         if channel is None:
-            if self.panel_and_result_channel_id: channel = self.bot.get_channel(self.panel_and_result_channel_id)
+            if self.panel_channel_id: channel = self.bot.get_channel(self.panel_channel_id)
             else: logger.info("ℹ️ Nickname panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Nickname panel channel could not be found."); return
         
