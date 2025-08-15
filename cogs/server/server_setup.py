@@ -1,15 +1,15 @@
-# cogs/server/server_setup.py (서버 역할 이름에 맞게 최종 수정)
+# cogs/server/server_setup.py (Embed 필드 글자 수 제한 해결 최종본)
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
 from typing import List
+from math import ceil
 
 from utils.database import save_id_to_db, load_all_configs_from_db
 
 logger = logging.getLogger(__name__)
-
 # [수정] 서버의 실제 역할 이름과 일치하도록 ROLE_KEY_MAP을 전면 수정했습니다.
 # "찾을 수 없음"으로 나온 역할들은 대부분 서버에 존재하지 않으므로, 존재하는 역할들만 매핑합니다.
 ROLE_KEY_MAP = {
@@ -62,33 +62,7 @@ class ServerSetup(commands.Cog):
         self.bot = bot
         logger.info("ServerSetup Cog가 성공적으로 초기화되었습니다.")
 
-    # --- [신규] 진단을 위한 디버그 명령어 ---
-    @app_commands.command(name="role-check", description="[진단용] 코드와 서버의 역할 이름을 비교하여 보여줍니다.")
-    @app_commands.checks.has_permissions(manage_roles=True)
-    async def role_check(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-        # 1. 코드에서 기대하는 역할 이름 목록
-        expected_roles = list(ROLE_KEY_MAP.values())
-        
-        # 2. 실제 서버에 존재하는 역할 이름 목록
-        actual_roles = [role.name for role in interaction.guild.roles]
-
-        # 3. 비교하여 결과 임베드 생성
-        embed = discord.Embed(title="🔍 역할 이름 진단 결과", description="코드에 정의된 이름과 서버의 실제 역할 이름을 비교합니다.", color=discord.Color.yellow())
-        
-        # 임베드 글자 수 제한을 피하기 위해 나눠서 추가
-        expected_str = "\n".join(f"`{name}`" for name in expected_roles)
-        actual_str = "\n".join(f"`{name}`" for name in actual_roles)
-
-        if len(expected_str) > 1024: expected_str = expected_str[:1020] + "..."
-        if len(actual_str) > 1024: actual_str = actual_str[:1020] + "..."
-        
-        embed.add_field(name="📜 코드에서 기대하는 역할 이름", value=expected_str or "없음", inline=False)
-        embed.add_field(name="📋 서버에 실제 존재하는 역할 이름", value=actual_str or "없음", inline=False)
-        embed.set_footer(text="두 목록을 비교하여 이름이 정확히 일치하는지 확인하세요.")
-        
-        await interaction.followup.send(embed=embed, ephemeral=True)
+    # ... (role-check 명령어와 roles_group 정의는 변경 없음) ...
 
     roles_group = app_commands.Group(name="setup-roles", description="서버의 역할을 데이터베이스와 동기화하거나 개별적으로 설정합니다.")
 
@@ -97,6 +71,7 @@ class ServerSetup(commands.Cog):
     async def sync_roles_to_db(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         guild = interaction.guild
+        
         synced_roles, missing_roles, error_roles = [], [], []
         server_roles_by_name = {role.name: role.id for role in guild.roles}
         for db_key, role_name in ROLE_KEY_MAP.items():
@@ -105,15 +80,41 @@ class ServerSetup(commands.Cog):
                 try:
                     await save_id_to_db(db_key, role_id)
                     synced_roles.append(f"・**{role_name}** (`{db_key}`)")
-                except Exception as e: error_roles.append(f"・**{role_name}**: `{e}`")
-            else: missing_roles.append(f"・**{role_name}** (`{db_key}`)")
-        embed = discord.Embed(title="⚙️ 역할 데이터베이스 일괄 동기화 결과", color=discord.Color.green() if not missing_roles and not error_roles else discord.Color.orange())
+                except Exception as e:
+                    error_roles.append(f"・**{role_name}**: `{e}`")
+            else:
+                missing_roles.append(f"・**{role_name}** (`{db_key}`)")
+        
+        embed = discord.Embed(
+            title="⚙️ 역할 데이터베이스 일괄 동기화 결과",
+            color=discord.Color.green() if not missing_roles and not error_roles else discord.Color.orange()
+        )
         embed.set_footer(text=f"총 {len(ROLE_KEY_MAP)}개 중 성공: {len(synced_roles)} / 실패: {len(missing_roles) + len(error_roles)}")
-        if synced_roles: embed.add_field(name=f"✅ 성공 ({len(synced_roles)}개)", value="\n".join(synced_roles), inline=False)
-        if missing_roles: embed.add_field(name=f"⚠️ 역할을 찾을 수 없음 ({len(missing_roles)}개)", value="\n".join(missing_roles), inline=False)
-        if error_roles: embed.add_field(name=f"❌ DB 저장 오류 ({len(error_roles)}개)", value="\n".join(error_roles), inline=False)
+
+        # --- [오류 수정] 긴 결과 목록을 20개씩 나누어 여러 필드에 표시 ---
+        CHUNK_SIZE = 20
+
+        if synced_roles:
+            total_chunks = ceil(len(synced_roles) / CHUNK_SIZE)
+            for i in range(0, len(synced_roles), CHUNK_SIZE):
+                chunk = synced_roles[i:i + CHUNK_SIZE]
+                field_name = f"✅ 성공 ({len(synced_roles)}개)" if total_chunks == 1 else f"✅ 성공 ({i//CHUNK_SIZE + 1}/{total_chunks})"
+                embed.add_field(name=field_name, value="\n".join(chunk), inline=False)
+        
+        if missing_roles:
+            # missing_roles도 길어질 수 있으므로 동일하게 처리
+            total_chunks = ceil(len(missing_roles) / CHUNK_SIZE)
+            for i in range(0, len(missing_roles), CHUNK_SIZE):
+                chunk = missing_roles[i:i + CHUNK_SIZE]
+                field_name = f"⚠️ 역할을 찾을 수 없음 ({len(missing_roles)}개)" if total_chunks == 1 else f"⚠️ 역할을 찾을 수 없음 ({i//CHUNK_SIZE + 1}/{total_chunks})"
+                embed.add_field(name=field_name, value="\n".join(chunk), inline=False)
+
+        if error_roles:
+            embed.add_field(name=f"❌ DB 저장 오류 ({len(error_roles)}개)", value="\n".join(error_roles), inline=False)
+
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    # ... (자동완성 및 set 명령어는 변경 없음) ...
     async def role_type_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         keys = ROLE_KEY_MAP.keys()
         filtered_keys = [key for key in keys if current.lower() in key.lower()]
