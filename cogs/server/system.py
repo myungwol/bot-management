@@ -252,6 +252,48 @@ class ServerSystem(commands.Cog):
         except Exception as e:
             logger.error(f"Panel setup command failed for {panel_type}: {e}", exc_info=True)
             await interaction.followup.send(f"❌ パネル設置中にエラーが発生しました: {e}", ephemeral=True)
+            
+    # [새로 추가된 명령어]
+    @setup_group.command(name="functional-channel", description="[管理者] 各種機能の動作チャンネルを設定します。")
+    @app_commands.describe(channel="設定するチャンネル", channel_type="設定するチャンネルの種類")
+    @app_commands.choices(channel_type=[
+        app_commands.Choice(name="自己紹介承認チャンネル", value="onboarding_approval"),
+        app_commands.Choice(name="名前変更承認チャンネル", value="nickname_approval"),
+        app_commands.Choice(name="新規参加者歓迎チャンネル", value="new_welcome"),
+    ])
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def setup_functional_channel(self, interaction: discord.Interaction, channel: discord.TextChannel, channel_type: str):
+        await interaction.response.defer(ephemeral=True)
+        
+        channel_map = {
+            "onboarding_approval": {"key": "onboarding_approval_channel_id", "cog_name": "Onboarding", "friendly_name": "自己紹介承認"},
+            "nickname_approval": {"key": "nickname_approval_channel_id", "cog_name": "Nicknames", "friendly_name": "名前変更承認"},
+            "new_welcome": {"key": "new_welcome_channel_id", "cog_name": "Onboarding", "friendly_name": "新規参加者歓迎"},
+        }
+        
+        config = channel_map.get(channel_type)
+        if not config:
+            return await interaction.followup.send("❌ 無効なチャンネルタイプです。", ephemeral=True)
+
+        try:
+            db_key = config["key"]
+            cog_name = config["cog_name"]
+            friendly_name = config["friendly_name"]
+            
+            await save_channel_id_to_db(db_key, channel.id)
+            self.bot.channel_configs[db_key] = channel.id
+            
+            target_cog = self.bot.get_cog(cog_name)
+            if target_cog:
+                setattr(target_cog, db_key, channel.id) 
+                logger.info(f"✅ Live updated {cog_name}'s {db_key} to {channel.id}")
+            else:
+                logger.warning(f"Could not find cog {cog_name} to update attribute live.")
+
+            await interaction.followup.send(f"✅ `{channel.mention}`を**{friendly_name}**チャンネルとして設定しました。", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Functional channel setup command failed for {channel_type}: {e}", exc_info=True)
+            await interaction.followup.send(f"❌ チャンネル設定中にエラーが発生しました: {e}", ephemeral=True)
 
     @setup_group.command(name="log-channel", description="[管理者] 各種機能のログチャンネルを設定します。")
     @app_commands.describe(channel="ログを送信するチャンネル", log_type="設定するログの種類")
