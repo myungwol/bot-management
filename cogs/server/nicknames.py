@@ -54,11 +54,24 @@ class NicknameApprovalView(ui.View):
 
     async def _send_result_and_refresh(self, result_embed: discord.Embed):
         cog = self.bot.get_cog("Nicknames")
-        if not cog or not cog.panel_and_result_channel_id or not (ch := self.bot.get_channel(cog.panel_and_result_channel_id)): return
-        try:
-            await ch.send(content=self.target_member.mention, embed=result_embed, allowed_mentions=discord.AllowedMentions(users=True))
-            await cog.regenerate_panel(ch)
-        except Exception as e: logger.error(f"Failed to send result or regenerate panel: {e}", exc_info=True)
+        if not cog: return
+
+        # 1. 로그 메시지 전송 (지정된 로그 채널이 있으면 그곳으로, 없으면 패널 채널로)
+        log_channel_id = cog.nickname_log_channel_id or cog.panel_and_result_channel_id
+        if log_channel_id and (log_ch := self.bot.get_channel(log_channel_id)):
+            try:
+                await log_ch.send(content=self.target_member.mention, embed=result_embed, allowed_mentions=discord.AllowedMentions(users=True))
+            except Exception as e:
+                logger.error(f"Failed to send nickname result log: {e}", exc_info=True)
+
+        # 2. 패널 자동 재생성 (별도의 로그 채널을 사용하지 않을 경우에만, 패널을 맨 아래로 내리기 위해)
+        if not cog.nickname_log_channel_id:
+            if cog.panel_and_result_channel_id and (panel_ch := self.bot.get_channel(cog.panel_and_result_channel_id)):
+                try:
+                    await cog.regenerate_panel(panel_ch)
+                except Exception as e:
+                    logger.error(f"Failed to regenerate nickname panel after result: {e}", exc_info=True)
+
 
     @ui.button(label="承認", style=discord.ButtonStyle.success)
     async def approve(self, i: discord.Interaction, b: ui.Button):
@@ -133,14 +146,21 @@ class NicknameChangerPanelView(ui.View):
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.bot.add_view(NicknameChangerPanelView())
-        self.panel_and_result_channel_id: int | None = None; self.approval_channel_id: int | None = None; self.approval_role_id: int | None = None
+        self.panel_and_result_channel_id: int | None = None
+        self.approval_channel_id: int | None = None
+        self.approval_role_id: int | None = None
+        self.nickname_log_channel_id: int | None = None
         logger.info("Nicknames Cog initialized.")
+        
     async def cog_load(self): await self.load_nickname_channel_configs()
+    
     async def load_nickname_channel_configs(self):
         self.panel_and_result_channel_id = await get_channel_id_from_db("nickname_panel_channel_id")
         self.approval_channel_id = await get_channel_id_from_db("nickname_approval_channel_id")
+        self.nickname_log_channel_id = await get_channel_id_from_db("nickname_log_channel_id")
         self.approval_role_id = get_role_id("approval_role")
-        logger.info(f"[Nicknames Cog] Loaded Configs: Panel={self.panel_and_result_channel_id}, Approval={self.approval_channel_id}")
+        logger.info(f"[Nicknames Cog] Loaded Configs: Panel={self.panel_and_result_channel_id}, Approval={self.approval_channel_id}, Log={self.nickname_log_channel_id}")
+        
     async def get_final_nickname(self, member: discord.Member, base_name: str) -> str:
         prefix = next((p for p in NICKNAME_PREFIX_HIERARCHY_NAMES if discord.utils.get(member.roles, name=p)), None)
         base = base_name.strip() or member.name
@@ -150,6 +170,7 @@ class Nicknames(commands.Cog):
             base = base[:32 - prefix_len]
             nick = f"『{prefix}』{base}" if prefix else base
         return nick
+        
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if after.bot or before.roles == after.roles: return
@@ -158,6 +179,7 @@ class Nicknames(commands.Cog):
         if after.nick != new_nick:
             try: await after.edit(nick=new_nick)
             except discord.Forbidden: pass
+            
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         if member.bot: return; await asyncio.sleep(2)
@@ -172,7 +194,6 @@ class Nicknames(commands.Cog):
             else: logger.info("ℹ️ Nickname panel channel not set, skipping auto-regeneration."); return
         if not channel: logger.warning("❌ Nickname panel channel could not be found."); return
         
-        # [수정된 부분]
         panel_info = await get_panel_id("nickname_changer")
         if panel_info and (old_id := panel_info.get('message_id')):
             try:
