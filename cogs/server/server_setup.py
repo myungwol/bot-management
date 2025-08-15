@@ -1,4 +1,4 @@
-# cogs/server/server_setup.py (자동완성 기능으로 25개 선택지 제한 해결)
+# cogs/server/server_setup.py (진단 명령어 추가 최종본)
 
 import discord
 from discord.ext import commands
@@ -36,12 +36,39 @@ class ServerSetup(commands.Cog):
         self.bot = bot
         logger.info("ServerSetup Cog가 성공적으로 초기화되었습니다.")
 
+    # --- [신규] 진단을 위한 디버그 명령어 ---
+    @app_commands.command(name="role-check", description="[진단용] 코드와 서버의 역할 이름을 비교하여 보여줍니다.")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def role_check(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        # 1. 코드에서 기대하는 역할 이름 목록
+        expected_roles = list(ROLE_KEY_MAP.values())
+        
+        # 2. 실제 서버에 존재하는 역할 이름 목록
+        actual_roles = [role.name for role in interaction.guild.roles]
+
+        # 3. 비교하여 결과 임베드 생성
+        embed = discord.Embed(title="🔍 역할 이름 진단 결과", description="코드에 정의된 이름과 서버의 실제 역할 이름을 비교합니다.", color=discord.Color.yellow())
+        
+        # 임베드 글자 수 제한을 피하기 위해 나눠서 추가
+        expected_str = "\n".join(f"`{name}`" for name in expected_roles)
+        actual_str = "\n".join(f"`{name}`" for name in actual_roles)
+
+        if len(expected_str) > 1024: expected_str = expected_str[:1020] + "..."
+        if len(actual_str) > 1024: actual_str = actual_str[:1020] + "..."
+        
+        embed.add_field(name="📜 코드에서 기대하는 역할 이름", value=expected_str or "없음", inline=False)
+        embed.add_field(name="📋 서버에 실제 존재하는 역할 이름", value=actual_str or "없음", inline=False)
+        embed.set_footer(text="두 목록을 비교하여 이름이 정확히 일치하는지 확인하세요.")
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
     roles_group = app_commands.Group(name="setup-roles", description="서버의 역할을 데이터베이스와 동기화하거나 개별적으로 설정합니다.")
 
     @roles_group.command(name="sync", description="[管理者] サーバーのすべての役割を名前基準でDBと一括同期します。")
     @app_commands.checks.has_permissions(manage_roles=True)
     async def sync_roles_to_db(self, interaction: discord.Interaction):
-        # 이 명령어는 변경 사항이 없습니다.
         await interaction.response.defer(ephemeral=True, thinking=True)
         guild = interaction.guild
         synced_roles, missing_roles, error_roles = [], [], []
@@ -61,40 +88,24 @@ class ServerSetup(commands.Cog):
         if error_roles: embed.add_field(name=f"❌ DB 저장 오류 ({len(error_roles)}개)", value="\n".join(error_roles), inline=False)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    # --- [신규] 'role_type' 파라미터를 위한 자동완성 함수 ---
     async def role_type_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        """사용자가 입력하는 'current' 값에 따라 ROLE_KEY_MAP의 키 목록을 필터링하여 반환합니다."""
         keys = ROLE_KEY_MAP.keys()
-        # 사용자가 입력한 내용이 포함된 키만 필터링 (대소문자 무시)
         filtered_keys = [key for key in keys if current.lower() in key.lower()]
-        # 최대 25개의 추천 목록을 생성하여 반환
-        return [
-            app_commands.Choice(name=key, value=key)
-            for key in filtered_keys[:25]
-        ]
+        return [app_commands.Choice(name=key, value=key) for key in filtered_keys[:25]]
 
-    # --- [수정] 개별 역할 설정 명령어 ---
     @roles_group.command(name="set", description="[管理者] 特定の役割一つを選択してDBに設定します。")
     @app_commands.describe(role_type="データベースに保存する役割の種類を入力してください。", role="サーバーに実際に存在する役割を選択してください。")
-    @app_commands.autocomplete(role_type=role_type_autocomplete) # role_type 파라미터에 자동완성 함수를 연결
+    @app_commands.autocomplete(role_type=role_type_autocomplete)
     @app_commands.checks.has_permissions(manage_roles=True)
     async def set_role_in_db(self, interaction: discord.Interaction, role_type: str, role: discord.Role):
-        # [수정] role_type의 타입을 Literal에서 str으로 변경했습니다.
-        
-        # [추가] 사용자가 자동완성 목록에서 선택하지 않고 임의의 값을 입력했을 경우를 대비한 유효성 검사
         if role_type not in ROLE_KEY_MAP:
             await interaction.response.send_message(f"❌ 「{role_type}」は無効な役割タイプです。リストから選択してください。", ephemeral=True)
             return
-
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             await save_id_to_db(role_type, role.id)
             await load_all_configs_from_db()
-            embed = discord.Embed(
-                title="✅ 역할 설정 완료",
-                description=f"データベースの`{role_type}`キーに{role.mention}役割が正常に連結されました。",
-                color=discord.Color.blue()
-            )
+            embed = discord.Embed(title="✅ 역할 설정 완료", description=f"データベースの`{role_type}`キーに{role.mention}役割が正常に連結されました。", color=discord.Color.blue())
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
             logger.error(f"개별 역할 설정 중 오류: {e}", exc_info=True)
