@@ -1,4 +1,4 @@
-# main.py (버그 수정 최종본)
+# main.py (최종 클린 버전)
 
 import discord
 from discord.ext import commands
@@ -24,14 +24,8 @@ class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    # [수정] 글로벌 상호작용 리스너 (버그 수정)
-    async def on_interaction(self, interaction: discord.Interaction):
-        custom_id = interaction.data.get("custom_id", "N/A")
-        logger.info(f"[GLOBAL INTERACTION] ID:{custom_id} | Type:{interaction.type} | User:{interaction.user.id}")
-        
-        # [수정] super() 호출 대신, 봇의 기본 이벤트 처리기(dispatcher)를 호출합니다.
-        # 이것이 모든 버튼/메뉴 콜백 함수를 찾아 실행해주는 핵심입니다.
-        self.dispatch('interaction', interaction)
+    # [수정] 문제가 되었던 on_interaction 함수를 완전히 제거합니다.
+    # 라이브러리의 기본 처리 방식이 가장 안정적입니다.
 
     async def setup_hook(self):
         await self.load_all_extensions()
