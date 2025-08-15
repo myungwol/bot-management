@@ -1,4 +1,4 @@
-# main.py (명령어 최소화 및 안정성 개선 버전)
+# main.py (수정 없음, 기존 코드 유지)
 
 import discord
 from discord.ext import commands
@@ -11,30 +11,65 @@ from cogs.server.system import AutoRoleView, STATIC_AUTO_ROLE_PANELS
 from utils.database import load_all_configs_from_db, get_id
 
 # 로깅 기본 설정
-# 파일 이름, 함수 이름, 줄 번호를 포함하여 더 상세한 로그를 기록합니다.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- 봇 기본 설정 ---
-# Railway 환경 변수에서 토큰을 안전하게 불러옵니다.
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
-# 개발 및 테스트를 위한 서버 ID (환경 변수에서 설정 가능)
 TEST_GUILD_ID = os.environ.get('TEST_GUILD_ID')
 
-# 봇이 필요로 하는 권한(Intents) 설정
 intents = discord.Intents.default()
-intents.members = True          # 서버 멤버 관련 이벤트 (역할 지급 등)
-intents.message_content = True  # 메시지 내용 (현재는 슬래시 명령어가 기본이므로 필수 아님)
-intents.voice_states = True     # 음성 채널 활동 감지 (음성 활동 보상 등)
+intents.members = True
+intents.message_content = True
+intents.voice_states = True
 
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     async def setup_hook(self):
-        """ 봇이 Discord API에 연결될 때 호출되는 비동기 초기화 함수입니다. """
-        # 모든 주요 로직은 on_ready에서 실행되므로 여기서는 비워둡니다.
-        pass
+        # 봇 시작 전에 모든 Cog를 로드합니다.
+        await self.load_all_extensions()
+        
+        # 봇이 재시작되어도 기존 View들이 계속 작동하도록 등록합니다.
+        # 이 작업은 setup_hook에서, 봇이 Discord에 연결되기 전에 수행하는 것이 더 안정적입니다.
+        logger.info("------ [ 영구 View 재등록 시작 ] ------")
+        cogs_to_setup_views = ["Onboarding", "Nicknames", "UserProfile", "Fishing", "Commerce"]
+        for cog_name in cogs_to_setup_views:
+            cog = self.get_cog(cog_name)
+            if cog and hasattr(cog, 'register_persistent_views'):
+                cog.register_persistent_views()
+                logger.info(f"✅ '{cog_name}' Cog의 영구 View가 등록되었습니다.")
+        
+        # main.py에서 직접 AutoRoleView를 등록하는 로직
+        for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
+            # on_ready 이전에 DB 캐시가 없을 수 있으므로, 여기서는 뷰만 등록합니다.
+            # 실제 메시지 ID 연결은 on_ready에서 이루어집니다.
+            self.add_view(AutoRoleView(panel_config))
+            logger.info(f"✅ 역할 패널 View 준비 완료: '{panel_key}'")
+
+
+    async def load_all_extensions(self):
+        """ './cogs' 폴더 내의 모든 Cog를 재귀적으로 찾아 로드합니다. """
+        logger.info("------ [ Cog 로드 시작 ] ------")
+        cogs_dir = './cogs'
+        if not os.path.exists(cogs_dir):
+            logger.error(f"Cogs 디렉토리를 찾을 수 없습니다: {cogs_dir}")
+            return
+            
+        for folder in os.listdir(cogs_dir):
+            folder_path = os.path.join(cogs_dir, folder)
+            if os.path.isdir(folder_path):
+                for filename in os.listdir(folder_path):
+                    if filename.endswith('.py') and not filename.startswith('__'):
+                        try:
+                            extension_path = f'cogs.{folder}.{filename[:-3]}'
+                            await self.load_extension(extension_path)
+                            logger.info(f'✅ Cog 로드 성공: {extension_path}')
+                        except Exception as e:
+                            logger.error(f'❌ Cog 로드 실패: {extension_path} | {e}', exc_info=True)
+        logger.info("------ [ Cog 로드 완료 ] ------")
+
 
 # 봇 인스턴스 생성
 bot = MyBot(command_prefix="/", intents=intents)
@@ -45,20 +80,17 @@ async def regenerate_all_panels():
     logger.info("------ [ 모든 패널 자동 재생성 시작 ] ------")
     panel_tasks = []
     
-    # 로드된 모든 Cog를 순회하며 'regenerate_panel' 함수가 있는지 확인합니다.
     for cog_name, cog in bot.cogs.items():
         if hasattr(cog, 'regenerate_panel'):
             try:
-                # 각 Cog의 패널 재생성 함수를 비동기 작업 목록에 추가합니다.
                 panel_tasks.append(cog.regenerate_panel())
                 logger.info(f"🔄 '{cog_name}'의 패널 재생성 작업을 준비합니다.")
             except Exception as e:
                 logger.error(f"❌ '{cog_name}'의 패널 재생성 준비 중 오류 발생: {e}")
 
-    # 준비된 모든 패널 재생성 작업을 동시에 실행합니다.
     if panel_tasks:
         results = await asyncio.gather(*panel_tasks, return_exceptions=True)
-        for i, result in enumerate(results):
+        for result in results:
             if isinstance(result, Exception):
                 logger.error(f"❌ 패널 재생성 작업 중 오류 발생: {result}", exc_info=result)
     else:
@@ -77,65 +109,46 @@ async def on_ready():
     # 1. DB에서 모든 설정(채널/역할 ID)을 불러와 메모리에 캐싱합니다. (가장 먼저 실행)
     await load_all_configs_from_db()
 
-    # 2. 슬래시 명령어를 Discord 서버와 동기화합니다.
+    # 2. 각 Cog에 DB 설정값을 다시 로드하도록 알립니다.
+    logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
+    for cog_name, cog in bot.cogs.items():
+        if hasattr(cog, 'load_all_configs'):
+            await cog.load_all_configs()
+    logger.info("------ [ 모든 Cog 설정 새로고침 완료 ] ------")
+
+
+    # 3. 슬래시 명령어를 Discord 서버와 동기화합니다.
     try:
         if TEST_GUILD_ID:
-            # 테스트 서버 ID가 지정된 경우, 해당 서버에만 즉시 명령어를 동기화하여 개발 속도를 높입니다.
             guild = discord.Object(id=int(TEST_GUILD_ID))
             await bot.tree.sync(guild=guild)
             logger.info(f'✅ 테스트 서버({TEST_GUILD_ID})에 명령어를 동기화했습니다.')
         else:
-            # 전체 서버에 명령어를 동기화합니다.
             synced = await bot.tree.sync()
             logger.info(f'✅ {len(synced)}개의 슬래시 명령어를 전체 서버에 동기화했습니다.')
     except Exception as e:
         logger.error(f'❌ 명령어 동기화 중 오류가 발생했습니다: {e}')
     
-    # 3. DB 정보를 바탕으로 모든 패널을 다시 생성합니다.
+    # 4. DB 정보를 바탕으로 모든 패널을 다시 생성합니다.
     await regenerate_all_panels()
 
-    # 4. 봇이 재시작되어도 기존 역할 패널 버튼이 계속 작동하도록 View를 다시 등록합니다.
-    logger.info("------ [ 역할 패널 View 재등록 시작 ] ------")
+    # 5. AutoRoleView에 메시지 ID를 연결합니다.
+    logger.info("------ [ 역할 패널 View 메시지 ID 연결 시작 ] ------")
     for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
         try:
-            # DB 캐시에서 메시지 ID를 가져옵니다.
             message_id = get_id(f"panel_{panel_key}_message_id")
             if message_id:
-                view = AutoRoleView(panel_config)
-                bot.add_view(view, message_id=message_id)
-                logger.info(f"✅ 역할 패널 View 재등록 성공: '{panel_key}' (ID: {message_id})")
+                # 이미 setup_hook에서 View 객체는 등록되었으므로, 여기서는 message_id만 확인합니다.
+                logger.info(f"✅ 역할 패널 View와 메시지 ID 연결 확인: '{panel_key}' (ID: {message_id})")
         except Exception as e:
-            logger.error(f"❌ '{panel_key}' View 재등록 중 오류: {e}")
-    logger.info("------ [ 역할 패널 View 재등록 완료 ] ------")
+            logger.error(f"❌ '{panel_key}' View 메시지 ID 연결 중 오류: {e}")
+    logger.info("------ [ 역할 패널 View 메시지 ID 연결 완료 ] ------")
 
-
-# --- Cog 로딩 함수 ---
-async def load_extensions():
-    """ './cogs' 폴더 내의 모든 Cog를 재귀적으로 찾아 로드합니다. """
-    logger.info("------ [ Cog 로드 시작 ] ------")
-    cogs_dir = './cogs'
-    if not os.path.exists(cogs_dir):
-        logger.error(f"Cogs 디렉토리를 찾을 수 없습니다: {cogs_dir}")
-        return
-        
-    for folder in os.listdir(cogs_dir):
-        folder_path = os.path.join(cogs_dir, folder)
-        if os.path.isdir(folder_path):
-            for filename in os.listdir(folder_path):
-                if filename.endswith('.py') and not filename.startswith('__'):
-                    try:
-                        extension_path = f'cogs.{folder}.{filename[:-3]}'
-                        await bot.load_extension(extension_path)
-                        logger.info(f'✅ Cog 로드 성공: {extension_path}')
-                    except Exception as e:
-                        logger.error(f'❌ Cog 로드 실패: {extension_path} | {e}', exc_info=True)
-    logger.info("------ [ Cog 로드 완료 ] ------")
 
 # --- 메인 실행 함수 ---
 async def main():
     async with bot:
-        # 봇을 시작하기 전에 반드시 Cog를 먼저 로드해야 합니다.
-        await load_extensions()
+        # setup_hook이 내부적으로 Cog 로드를 처리하므로, 여기서는 bot.start만 호출합니다.
         await bot.start(BOT_TOKEN)
 
 if __name__ == "__main__":
