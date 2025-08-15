@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (삭제 후 재생성 로직 적용 최종본)
+# cogs/server/onboarding.py (상호작용 실패 오류 해결 최종본)
 
 import discord
 from discord.ext import commands
@@ -42,7 +42,6 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
     gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
     hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
-
     def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -64,6 +63,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
 class ApprovalView(ui.View):
+    # ... (이 클래스는 이미 defer() 처리가 잘 되어 있으므로 변경 없음) ...
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.author_id = author.id; self.original_embed = original_embed
         self.onboarding_cog = cog_instance; self.rejection_reason: Optional[str] = None
@@ -181,21 +181,28 @@ class OnboardingView(ui.View):
         if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
         if page.get("rules"): embed.add_field(name="⚠️ ルール", value=page["rules"], inline=False)
         self.update_view(); await i.edit_original_response(embed=embed, view=self)
-    async def go_previous(self, i: discord.Interaction): await i.response.defer(); self.current_step -= 1; await self._update_message(i)
-    async def go_next(self, i: discord.Interaction): await i.response.defer(); self.current_step += 1; await self._update_message(i)
+    async def go_previous(self, i: discord.Interaction):
+        await i.response.defer()
+        self.current_step -= 1; await self._update_message(i)
+    async def go_next(self, i: discord.Interaction):
+        await i.response.defer()
+        self.current_step += 1; await self._update_message(i)
     async def do_action(self, i: discord.Interaction):
-        page_data, role_id = GUIDE_PAGES[self.current_step], get_id(page_data.get("role_key"))
-        if not role_id or not (role := i.guild.get_role(role_id)): return await i.response.send_message("エラー: 役職が見つかりません。", ephemeral=True)
+        await i.response.defer() # [수정] defer()를 함수 맨 위로 이동
         try:
-            await i.response.defer()
+            page_data = GUIDE_PAGES[self.current_step]
+            role_id = get_id(page_data.get("role_key"))
+            if not role_id or not (role := i.guild.get_role(role_id)):
+                await i.followup.send("エラー: 役職が見つかりません。", ephemeral=True); return # [수정] followup.send 사용
             if role not in i.user.roles: await i.user.add_roles(role)
             self.current_step += 1; await self._update_message(i)
         except Exception as e: await i.followup.send(f"❌ エラー: {e}", ephemeral=True)
     async def create_introduction(self, i: discord.Interaction):
+        # [수정] 이 함수는 modal을 보내므로 defer()를 사용하지 않습니다. 대신, DB 조회를 먼저 수행합니다.
         key = f"intro_{i.user.id}"; last_time = await get_cooldown(key)
         if last_time and time.time() - last_time < INTRODUCTION_COOLDOWN_SECONDS:
             rem = INTRODUCTION_COOLDOWN_SECONDS - (time.time() - last_time)
-            return await i.response.send_message(f"次の申請まであと {int(rem/60)}分 お待ちください。", ephemeral=True)
+            await i.response.send_message(f"次の申請まであと {int(rem/60)}分 お待ちください。", ephemeral=True); return
         await i.response.send_modal(IntroductionModal(self.onboarding_cog))
 
 class OnboardingPanelView(ui.View):
@@ -203,10 +210,16 @@ class OnboardingPanelView(ui.View):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
     @ui.button(label="里の案内・住人登録を始める", style=discord.ButtonStyle.success, custom_id="start_onboarding_button_final")
     async def start_onboarding(self, i: discord.Interaction, b: ui.Button):
-        page = GUIDE_PAGES[0]
-        embed = discord.Embed(title=page["title"], description=page["description"], color=discord.Color.purple())
-        if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
-        await i.response.send_message(embed=embed, view=OnboardingView(self.onboarding_cog), ephemeral=True)
+        await i.response.defer(ephemeral=True) # [수정] defer()를 가장 먼저 호출
+        try:
+            page = GUIDE_PAGES[0]
+            embed = discord.Embed(title=page["title"], description=page["description"], color=discord.Color.purple())
+            if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
+            # [수정] defer() 뒤에는 followup.send()를 사용
+            await i.followup.send(embed=embed, view=OnboardingView(self.onboarding_cog), ephemeral=True)
+        except Exception as e:
+            logger.error(f"온보딩 시작 중 오류: {e}", exc_info=True)
+            if not i.response.is_done(): await i.response.send_message("오류가 발생했습니다.", ephemeral=True)
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
