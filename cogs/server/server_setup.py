@@ -1,4 +1,5 @@
-# cogs/server/server_setup.py (수정 없음, 기존 코드 유지)
+# cogs/server/server_setup.py (온보딩 역할 이름 매핑 최종본)
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -10,6 +11,7 @@ from utils.database import save_id_to_db, load_all_configs_from_db
 
 logger = logging.getLogger(__name__)
 
+# [수정] 서버에 필요한 모든 역할 키를 이 곳에서 통합 관리합니다.
 ROLE_KEY_MAP = {
     # 관리자/스태프
     "role_admin_total": "里長",
@@ -20,6 +22,13 @@ ROLE_KEY_MAP = {
     "role_guest": "外部の人",
     "role_resident": "住民",
     
+    # --- [수정] 온보딩 진행 단계 역할을 서버의 실제 역할 이름과 매핑 ---
+    "role_onboarding_step_1": "════════════ゲーム══════════",
+    "role_onboarding_step_2": "═════════════通知═══════════",
+    "role_onboarding_step_3": "═════════════情報═══════════",
+    "role_onboarding_step_4": "═════════════住人═══════════",
+    # ----------------------------------------------------
+
     # 알림
     "role_mention_role_1": "全体通知",
     "role_notify_festival": "祭り",
@@ -123,7 +132,7 @@ class ServerSetup(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             await save_id_to_db(role_type, role.id)
-            await load_all_configs_from_db() # 이것보다는 각 cog의 reload를 호출하는게 낫지만, 일단은 유지
+            await load_all_configs_from_db()
             embed = discord.Embed(title="✅ 역할 설정 완료", description=f"データベースの`{role_type}`キーに{role.mention}役割が正常に連結されました。", color=discord.Color.blue())
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
