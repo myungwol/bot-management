@@ -1,4 +1,4 @@
-# cogs/server/system.py (임시 View 참조 문제 해결 최종본)
+# cogs/server/system.py (버튼 생성 방식 변경 및 최종 디버깅)
 
 import discord
 from discord.ext import commands
@@ -6,14 +6,11 @@ from discord import app_commands, ui
 import logging
 from typing import Optional, List, Dict, Any
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# 유틸리티 함수 임포트
 from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db
 
-# ... (STATIC_AUTO_ROLE_PANELS 부분은 변경 없음) ...
 STATIC_AUTO_ROLE_PANELS = {
     "main_roles": {
         "channel_key": "auto_role_channel_id",
@@ -22,34 +19,8 @@ STATIC_AUTO_ROLE_PANELS = {
             {"id": "notifications", "label": "通知役割", "emoji": "📢", "description": "サーバーの各種通知に関する役割を選択します。"},
             {"id": "games", "label": "ゲーム役割", "emoji": "🎮", "description": "プレイするゲームに関する役割を選択します。"},
         ],
-        "roles": {
-            "notifications": [
-                {"role_id_key": "role_mention_role_1", "label": "サーバー全体通知", "description": "サーバーの重要なお知らせを受け取ります。"},
-                {"role_id_key": "role_notify_festival", "label": "祭り", "description": "お祭りやイベント関連の通知を受け取ります。"},
-                {"role_id_key": "role_notify_voice", "label": "通話", "description": "通話募集の通知を受け取ります。"},
-                {"role_id_key": "role_notify_friends", "label": "友達", "description": "友達募集の通知を受け取ります。"},
-                {"role_id_key": "role_notify_disboard", "label": "ディスボード", "description": "Disboard通知を受け取ります。"},
-                {"role_id_key": "role_notify_up", "label": "アップ", "description": "Up通知を受け取ります。"},
-            ],
-            "games": [
-                {"role_id_key": "role_game_minecraft", "label": "マインクラフト", "description": "マインクラフト関連の募集に参加します。"},
-                {"role_id_key": "role_game_valorant", "label": "ヴァロラント", "description": "ヴァロラント関連の募集に参加します。"},
-                {"role_id_key": "role_game_overwatch", "label": "オーバーウォッチ", "description": "オーバーウォッチ関連の募集に参加します。"},
-                {"role_id_key": "role_game_lol", "label": "リーグ・オブ・レジェンド", "description": "LoL関連の募集に参加します。"},
-                {"role_id_key": "role_game_mahjong", "label": "麻雀", "description": "麻雀関連の募集に参加します。"},
-                {"role_id_key": "role_game_amongus", "label": "アモングアス", "description": "Among Us関連の募集に参加します。"},
-                {"role_id_key": "role_game_mh", "label": "モンスターハンター", "description": "モンハン関連の募集に参加します。"},
-                {"role_id_key": "role_game_genshin", "label": "原神", "description": "原神関連の募集に参加します。"},
-                {"role_id_key": "role_game_apex", "label": "エーペックスレジェンズ", "description": "Apex Legends関連の募集に参加します。"},
-                {"role_id_key": "role_game_splatoon", "label": "スプラトゥーン", "description": "スプラトゥーン関連の募集に参加します。"},
-                {"role_id_key": "role_game_gf", "label": "ゴッドフィールド", "description": "ゴッドフィールド関連の募集に参加します。"},
-                {"role_id_key": "role_platform_steam", "label": "スチーム", "description": "Steamでプレイするゲームの募集に参加します。"},
-                {"role_id_key": "role_platform_smartphone", "label": "スマートフォン", "description": "スマホゲームの募集に参加します。"},
-                {"role_id_key": "role_platform_switch", "label": "スイッチ", "description": "Nintendo Switchゲームの募集に参加します。"},
-            ]
-        }
-    }
-}
+        "roles": { "notifications": [ {"role_id_key": "role_mention_role_1", "label": "サーバー全体通知"}, {"role_id_key": "role_notify_voice", "label": "通話"}, {"role_id_key": "role_notify_friends", "label": "友達"}, {"role_id_key": "role_notify_festival", "label": "祭り"}, {"role_id_key": "role_notify_disboard", "label": "ディスボード"}, {"role_id_key": "role_notify_up", "label": "アップ"}], "games": [ {"role_id_key": "role_game_minecraft", "label": "マインクラフト"}, {"role_id_key": "role_game_valorant", "label": "ヴァロラント"}, {"role_id_key": "role_game_overwatch", "label": "オーバーウォッチ"}, {"role_id_key": "role_game_lol", "label": "リーグ・オブ・レジェンド"}, {"role_id_key": "role_game_mahjong", "label": "麻雀"}, {"role_id_key": "role_game_amongus", "label": "アモングアス"}, {"role_id_key": "role_game_mh", "label": "モンスターハンター"}, {"role_id_key": "role_game_genshin", "label": "原神"}, {"role_id_key": "role_game_apex", "label": "エーペックスレジェンズ"}, {"role_id_key": "role_game_splatoon", "label": "スプラトゥーン"}, {"role_id_key": "role_game_gf", "label": "ゴッドフィールド"}, {"role_id_key": "role_platform_steam", "label": "スチーム"}, {"role_id_key": "role_platform_smartphone", "label": "スマートフォン"}, {"role_id_key": "role_platform_switch", "label": "スイッチ"}]}}}
+
 class RoleSelectView(ui.View):
     def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
         super().__init__(timeout=300)
@@ -64,42 +35,44 @@ class RoleSelectView(ui.View):
             options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in chunk if (rid := get_id(info.get('role_id_key')))]
             if options:
                 self.add_item(ui.Select(placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})", min_values=0, max_values=len(options), options=options, custom_id=f"role_select_{i}"))
-        update_button = ui.Button(label="役割を更新", style=discord.ButtonStyle.primary, custom_id="update_roles", emoji="✅")
-        update_button.callback = self.update_roles_callback
-        self.add_item(update_button)
+        # [수정] 버튼 콜백을 __init__에서 할당하지 않고, 아래의 데코레이터 방식만 사용합니다.
+        # update_button = ui.Button(...) -> 이 부분은 데코레이터가 자동으로 처리해줍니다.
 
-    async def update_roles_callback(self, interaction: discord.Interaction):
+    # [수정] 버튼 생성 및 콜백을 데코레이터 방식으로 변경
+    @ui.button(label="役割を更新", style=discord.ButtonStyle.primary, custom_id="update_roles", emoji="✅", row=4)
+    async def update_roles_callback(self, interaction: discord.Interaction, button: ui.Button):
+        logger.info(f"[디버깅] update_roles_callback 시작 (사용자: {interaction.user.id})")
         await interaction.response.defer(ephemeral=True)
+        
         selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
         current_ids = {role.id for role in self.member.roles}
+        
         to_add_ids = selected_ids - current_ids
         to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
+        
         try:
             guild = interaction.guild
             if to_add_ids:
                 roles_to_add = [r for r_id in to_add_ids if (r := guild.get_role(r_id))]
-                if roles_to_add:
-                    await self.member.add_roles(*roles_to_add, reason="自動役割選択")
+                if roles_to_add: await self.member.add_roles(*roles_to_add, reason="自動役割選択")
             if to_remove_ids:
                 roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
-                if roles_to_remove:
-                    await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
+                if roles_to_remove: await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
+            
+            button.disabled = True
             for item in self.children:
-                item.disabled = True
+                if isinstance(item, ui.Select): item.disabled = True
+            
             await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self)
             self.stop()
         except Exception as e:
-            logger.error(f"역할 업데이트 중 오류 발생: {e}", exc_info=True)
-            try:
-                await interaction.edit_original_response(content=f"❌ 処理中にエラーが発生しました。", view=None)
-            except discord.HTTPException:
-                pass # The original interaction might have expired.
+            logger.error(f"❌ 역할 업데이트 중 오류 발생: {e}", exc_info=True)
+            await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
 
 class AutoRoleView(ui.View):
     def __init__(self, panel_config: dict):
         super().__init__(timeout=None)
         self.panel_config = panel_config
-        # [수정] View를 참조할 변수를 추가합니다.
         self.active_select_view = None
         options = [discord.SelectOption(label=c['label'], value=c['id'], emoji=c.get('emoji'), description=c.get('description')) for c in self.panel_config.get("categories", [])]
         if options:
@@ -117,12 +90,10 @@ class AutoRoleView(ui.View):
             await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True)
             return
         embed = discord.Embed(title=f"「{category_name}」役割選択", description="下のドロップダウンメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。", color=discord.Color.blue())
-        
-        # [수정] 생성된 View를 self.active_select_view에 저장하여 참조를 유지합니다.
         self.active_select_view = RoleSelectView(interaction.user, category_roles, category_name)
         await interaction.followup.send(embed=embed, view=self.active_select_view, ephemeral=True)
 
-# ... 나머지 ServerSystem 클래스 코드는 변경 없이 그대로 유지 ...
+# ... 나머지 ServerSystem 클래스는 수정 없이 그대로 유지 ...
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
