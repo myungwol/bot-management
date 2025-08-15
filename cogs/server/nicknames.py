@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (실행 순서 문제 해결 최종본)
+# cogs/server/nicknames.py (삭제 후 재생성 로직 적용 최종본)
 
 import discord
 from discord.ext import commands
@@ -41,16 +41,12 @@ class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
 class NicknameApprovalView(ui.View):
     def __init__(self, member: discord.Member, new_name: str, cog_instance: 'Nicknames'):
         super().__init__(timeout=None)
-        self.target_member_id = member.id
-        self.new_name = new_name
-        self.nicknames_cog = cog_instance
-
+        self.target_member_id = member.id; self.new_name = new_name; self.nicknames_cog = cog_instance
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.nicknames_cog.approval_role_id
         if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(r.id == approval_role_id for r in interaction.user.roles):
             await interaction.response.send_message("❌ このボタンを押す権限がありません。", ephemeral=True); return False
         return True
-
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
         member = interaction.guild.get_member(self.target_member_id)
@@ -81,7 +77,6 @@ class NicknameApprovalView(ui.View):
         else: await interaction.followup.send(f"✅ {status_text} 処理が正常に完了しました。", ephemeral=True)
         try: await interaction.message.delete()
         except discord.NotFound: pass
-
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
             embed = discord.Embed(title="✅ 名前変更のお知らせ (承認)", color=discord.Color.green())
@@ -92,7 +87,6 @@ class NicknameApprovalView(ui.View):
             embed.add_field(name="拒否理由", value=reason or "理由未入力", inline=False)
         embed.add_field(name="対象者", value=member.mention, inline=False); embed.add_field(name="処理者", value=moderator.mention, inline=False)
         return embed
-
     async def _send_log_message(self, result_embed: discord.Embed, target_member: discord.Member):
         if (log_ch_id := self.nicknames_cog.nickname_log_channel_id) and (log_ch := self.nicknames_cog.bot.get_channel(log_ch_id)):
             await log_ch.send(embed=result_embed)
@@ -138,10 +132,8 @@ class Nicknames(commands.Cog):
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
-        self.panel_channel_id = get_id("nickname_panel_channel_id")
-        self.approval_channel_id = get_id("nickname_approval_channel_id")
-        self.nickname_log_channel_id = get_id("nickname_log_channel_id")
-        self.approval_role_id = get_id("role_approval")
+        self.panel_channel_id = get_id("nickname_panel_channel_id"); self.approval_channel_id = get_id("nickname_approval_channel_id")
+        self.nickname_log_channel_id = get_id("nickname_log_channel_id"); self.approval_role_id = get_id("role_approval")
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
     async def get_final_nickname(self, member: discord.Member, base_name: str) -> str:
         prefix = None
@@ -152,17 +144,14 @@ class Nicknames(commands.Cog):
         nick = f"{prefix}{base}" if prefix else base
         if len(nick) > 32:
             prefix_len = len(prefix) if prefix else 0
-            base = base[:32 - prefix_len]
-            nick = f"{prefix}{base}" if prefix else base
+            base = base[:32 - prefix_len]; nick = f"{prefix}{base}" if prefix else base
         return nick
     async def update_nickname(self, member: discord.Member, base_name_override: str):
         try:
             final_name = await self.get_final_nickname(member, base_name=base_name_override)
             if member.nick != final_name: await member.edit(nick=final_name, reason="온보딩 완료")
-        except discord.Forbidden:
-            logger.warning(f"Onboarding: {member.display_name}의 닉네임을 변경할 권한이 없습니다."); raise
-        except Exception as e:
-            logger.error(f"Onboarding: {member.display_name}의 닉네임 업데이트 실패: {e}", exc_info=True); raise
+        except discord.Forbidden: logger.warning(f"Onboarding: {member.display_name}의 닉네임을 변경할 권한이 없습니다."); raise
+        except Exception as e: logger.error(f"Onboarding: {member.display_name}의 닉네임 업데이트 실패: {e}", exc_info=True); raise
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if after.bot or before.roles == after.roles: return
@@ -181,20 +170,17 @@ class Nicknames(commands.Cog):
             if channel_id: target_channel = self.bot.get_channel(channel_id)
             else: logger.info("ℹ️ 닉네임 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
         if not target_channel: logger.warning("❌ Nickname panel channel could not be found."); return
+        panel_info = get_panel_id("nickname_changer")
+        if panel_info and (old_id := panel_info.get('message_id')):
+            try:
+                old_message = await target_channel.fetch_message(old_id)
+                await old_message.delete()
+            except (discord.NotFound, discord.Forbidden): pass
         embed = discord.Embed(title="📝 名前変更案内", description="サーバーで使用する名前を変更したい場合は、下のボタンを押して申請してください。", color=discord.Color.blurple())
         view = NicknameChangerPanelView(self)
-        panel_info = get_panel_id("nickname_changer"); message_id = panel_info.get('message_id') if panel_info else None
-        live_message = None
-        if message_id:
-            try:
-                live_message = await target_channel.fetch_message(message_id)
-                await live_message.edit(embed=embed, view=view)
-                logger.info(f"✅ 닉네임 패널을 성공적으로 업데이트했습니다. (채널: #{target_channel.name})")
-            except discord.NotFound: live_message = None
-        if not live_message:
-            new_message = await target_channel.send(embed=embed, view=view)
-            await save_panel_id("nickname_changer", new_message.id, target_channel.id)
-            logger.info(f"✅ 닉네임 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
+        new_message = await target_channel.send(embed=embed, view=view)
+        await save_panel_id("nickname_changer", new_message.id, target_channel.id)
+        logger.info(f"✅ 닉네임 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Nicknames(bot))
