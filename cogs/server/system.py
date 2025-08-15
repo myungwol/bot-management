@@ -1,4 +1,4 @@
-# cogs/server/system.py (DB 키 규칙 일치 최종 수정본)
+# cogs/server/system.py (DB 자동 로딩 방식 적용 최종본)
 
 import discord
 from discord.ext import commands, tasks
@@ -11,14 +11,11 @@ from typing import Optional
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# [수정] 새로운 DB 함수 임포트
 from utils.database import (
-    get_id as get_channel_id, get_role_id,
-    save_id_to_db as save_channel_id_to_db,
+    get_id, save_id_to_db,
     save_panel_id, get_panel_id, get_embed_from_db
 )
 
-# [수정] DB 키 이름(role_id_key)을 database.py의 get_role_id 함수 규칙에 맞게 변경 (접두사 'role_' 제거)
 STATIC_AUTO_ROLE_PANELS = {
     "main_roles": {
         "channel_key": "auto_role_channel_id",
@@ -29,40 +26,39 @@ STATIC_AUTO_ROLE_PANELS = {
         ],
         "roles": {
             "notifications": [
-                {"role_id_key": "mention_role_1", "label": "サーバー全体通知", "description": "サーバーの重要なお知らせを受け取ります。"},
-                {"role_id_key": "notify_festival", "label": "祭り", "description": "お祭りやイベント関連の通知を受け取ります。"},
-                {"role_id_key": "notify_voice", "label": "通話", "description": "通話募集の通知を受け取ります。"},
-                {"role_id_key": "notify_friends", "label": "友達", "description": "友達募集の通知を受け取ります。"},
-                {"role_id_key": "notify_disboard", "label": "ディスボード", "description": "Disboard通知を受け取ります。"},
-                {"role_id_key": "notify_up", "label": "アップ", "description": "Up通知を受け取ります。"},
+                {"role_id_key": "role_mention_role_1", "label": "サーバー全体通知", "description": "サーバーの重要なお知らせを受け取ります。"},
+                {"role_id_key": "role_notify_festival", "label": "祭り", "description": "お祭りやイベント関連の通知を受け取ります。"},
+                {"role_id_key": "role_notify_voice", "label": "通話", "description": "通話募集の通知を受け取ります。"},
+                {"role_id_key": "role_notify_friends", "label": "友達", "description": "友達募集の通知を受け取ります。"},
+                {"role_id_key": "role_notify_disboard", "label": "ディスボード", "description": "Disboard通知を受け取ります。"},
+                {"role_id_key": "role_notify_up", "label": "アップ", "description": "Up通知を受け取ります。"},
             ],
             "games": [
-                {"role_id_key": "game_minecraft", "label": "マインクラフト", "description": "マインクラフト関連の募集に参加します。"},
-                {"role_id_key": "game_valorant", "label": "ヴァロラント", "description": "ヴァロラント関連の募集に参加します。"},
-                {"role_id_key": "game_overwatch", "label": "オーバーウォッチ", "description": "オーバーウォッチ関連の募集に参加します。"},
-                {"role_id_key": "game_lol", "label": "リーグ・オブ・レジェンド", "description": "LoL関連の募集に参加します。"},
-                {"role_id_key": "game_mahjong", "label": "麻雀", "description": "麻雀関連の募集に参加します。"},
-                {"role_id_key": "game_amongus", "label": "アモングアス", "description": "Among Us関連の募集に参加します。"},
-                {"role_id_key": "game_mh", "label": "モンスターハンター", "description": "モンハン関連の募集に参加します。"},
-                {"role_id_key": "game_genshin", "label": "原神", "description": "原神関連の募集に参加します。"},
-                {"role_id_key": "game_apex", "label": "エーペックスレジェンズ", "description": "Apex Legends関連の募集に参加します。"},
-                {"role_id_key": "game_splatoon", "label": "スプラトゥーン", "description": "スプラトゥーン関連の募集に参加します。"},
-                {"role_id_key": "game_gf", "label": "ゴッドフィールド", "description": "ゴッドフィールド関連の募集に参加します。"},
-                {"role_id_key": "platform_steam", "label": "スチーム", "description": "Steamでプレイするゲームの募集に参加します。"},
-                {"role_id_key": "platform_smartphone", "label": "スマートフォン", "description": "スマホゲームの募集に参加します。"},
-                {"role_id_key": "platform_switch", "label": "スイッチ", "description": "Nintendo Switchゲームの募集に参加します。"},
+                {"role_id_key": "role_game_minecraft", "label": "マインクラフト", "description": "マインクラフト関連の募集に参加します。"},
+                {"role_id_key": "role_game_valorant", "label": "ヴァロラント", "description": "ヴァロラント関連の募集に参加します。"},
+                {"role_id_key": "role_game_overwatch", "label": "オーバーウォッチ", "description": "オーバーウォッチ関連の募集に参加します。"},
+                {"role_id_key": "role_game_lol", "label": "リーグ・オブ・レジェンド", "description": "LoL関連の募集に参加します。"},
+                {"role_id_key": "role_game_mahjong", "label": "麻雀", "description": "麻雀関連の募集に参加します。"},
+                {"role_id_key": "role_game_amongus", "label": "アモングアス", "description": "Among Us関連の募集に参加します。"},
+                {"role_id_key": "role_game_mh", "label": "モンスターハンター", "description": "モンハン関連の募集に参加します。"},
+                {"role_id_key": "role_game_genshin", "label": "原神", "description": "原神関連の募集に参加します。"},
+                {"role_id_key": "role_game_apex", "label": "エーペックスレジェンズ", "description": "Apex Legends関連の募集に参加します。"},
+                {"role_id_key": "role_game_splatoon", "label": "スプラトゥーン", "description": "スプラトゥーン関連の募集に参加します。"},
+                {"role_id_key": "role_game_gf", "label": "ゴッドフィールド", "description": "ゴッドフィールド関連の募集に参加します。"},
+                {"role_id_key": "role_platform_steam", "label": "スチーム", "description": "Steamでプレイするゲームの募集に参加します。"},
+                {"role_id_key": "role_platform_smartphone", "label": "スマートフォン", "description": "スマホゲームの募集に参加します。"},
+                {"role_id_key": "role_platform_switch", "label": "スイッチ", "description": "Nintendo Switchゲームの募集に参加します。"},
             ]
         }
     }
 }
 
-# --- View / Modal 정의 ---
 class EphemeralRoleSelectView(ui.View):
     def __init__(self, member: discord.Member, category_roles: list, all_category_role_ids: set[int]):
         super().__init__(timeout=180)
         self.member = member; self.all_category_role_ids = all_category_role_ids
         current_user_role_ids = {r.id for r in self.member.roles}
-        options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in category_roles if (rid := get_role_id(info['role_id_key']))]
+        options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in category_roles if (rid := get_id(info['role_id_key']))]
         self.role_select = ui.Select(placeholder="希望する役割をすべて選択してください...", min_values=0, max_values=len(options) or 1, options=options)
         self.role_select.callback = self.select_callback; self.add_item(self.role_select)
     async def select_callback(self, i: discord.Interaction):
@@ -85,31 +81,9 @@ class AutoRoleView(ui.View):
         await i.response.defer(ephemeral=True); category_id = i.data['custom_id'].split(':')[1]
         category_roles = self.panel_config.get("roles", {}).get(category_id, [])
         if not category_roles: return await i.followup.send("選択したカテゴリーに設定された役割がありません。", ephemeral=True)
-        all_ids = {get_role_id(r['role_id_key']) for r in category_roles if get_role_id(r['role_id_key'])}
+        all_ids = {get_id(r['role_id_key']) for r in category_roles if get_id(r['role_id_key'])}
         embed = discord.Embed(title=f"「{category_id.capitalize()}」役割選択", description="下のドロップダウンメニューで希望する役割をすべて選択してください。", color=discord.Color.blue())
         await i.followup.send(embed=embed, view=EphemeralRoleSelectView(i.user, category_roles, all_ids), ephemeral=True)
-
-class EmbedEditModal(ui.Modal, title="埋め込み内容編集"):
-    def __init__(self, embed: discord.Embed):
-        super().__init__(); self.embed = embed
-        self.embed_title = ui.TextInput(label="タイトル", default=embed.title, required=False, max_length=256)
-        self.embed_description = ui.TextInput(label="説明 (\\n = 改行)", style=discord.TextStyle.paragraph, default=embed.description, required=False, max_length=4000)
-        self.add_item(self.embed_title); self.add_item(self.embed_description)
-    async def on_submit(self, i: discord.Interaction):
-        self.embed.title = self.embed_title.value; self.embed.description = self.embed_description.value.replace('\\n', '\n')
-        await i.response.edit_message(embed=self.embed)
-
-class EmbedEditorView(ui.View):
-    def __init__(self, message: discord.Message, embed_key: str):
-        super().__init__(timeout=None); self.message = message; self.embed_key = embed_key
-    @ui.button(label="タイトル/説明を編集", emoji="✍️")
-    async def edit_content(self, i: discord.Interaction, b: ui.Button): await i.response.send_modal(EmbedEditModal(self.message.embeds[0]))
-    @ui.button(label="DBに保存", style=discord.ButtonStyle.success, emoji="💾")
-    async def save_to_db(self, i: discord.Interaction, b: ui.Button):
-        await i.response.defer(ephemeral=True); await save_embed_to_db(self.embed_key, self.message.embeds[0].to_dict())
-        await i.followup.send(f"✅ DBに「{self.embed_key}」キーで保存しました。", ephemeral=True)
-    @ui.button(label="編集機を削除", style=discord.ButtonStyle.danger, emoji="🗑️")
-    async def delete_editor(self, i: discord.Interaction, b: ui.Button): await self.message.delete(); self.stop()
 
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -117,32 +91,23 @@ class ServerSystem(commands.Cog):
         self.welcome_channel_id: Optional[int] = None
         self.farewell_channel_id: Optional[int] = None
         self.temp_user_role_id: Optional[int] = None
-        self.counter_configs: list = []
-        self.update_tasks: dict[int, asyncio.Task] = {}
         logger.info("ServerSystem Cog initialized.")
 
     async def cog_load(self):
         await self.load_all_configs()
-        self.update_counters_loop.start()
-
-    def cog_unload(self):
-        self.update_counters_loop.cancel()
-        for task in self.update_tasks.values(): task.cancel()
 
     async def load_all_configs(self):
-        self.welcome_channel_id = get_channel_id("welcome_channel_id")
-        self.farewell_channel_id = get_channel_id("farewell_channel_id")
-        self.temp_user_role_id = get_role_id("temp_user")
-        # counter_configs는 다른 테이블을 사용하므로 그대로 둡니다.
-        # self.counter_configs = await get_counter_configs() 
-        logger.info("[ServerSystem Cog] Loaded all configurations.")
+        self.welcome_channel_id = get_id("welcome_channel_id")
+        self.farewell_channel_id = get_id("farewell_channel_id")
+        self.temp_user_role_id = get_id("role_temp_user")
+        logger.info("[ServerSystem Cog] Loaded configurations.")
     
     async def regenerate_panel(self, channel: discord.TextChannel | None = None):
         for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
             try:
                 target_channel = channel
                 if target_channel is None:
-                    channel_id = get_channel_id(panel_config['channel_key'])
+                    channel_id = get_id(panel_config['channel_key'])
                     if not channel_id or not (target_channel := self.bot.get_channel(channel_id)):
                         logger.info(f"ℹ️ '{panel_key}' パネルチャンネルがDBに設定されていないため、スキップします。")
                         continue
@@ -165,23 +130,8 @@ class ServerSystem(commands.Cog):
                     new_message = await target_channel.send(embed=embed, view=view)
                     await save_panel_id(panel_key, new_message.id, target_channel.id)
                     logger.info(f"✅ '{panel_key}' パネルを新規作成しました。")
-
             except Exception as e:
                 logger.error(f"❌ '{panel_key}' パネルの処理中にエラーが発生しました: {e}", exc_info=True)
-
-    def _schedule_counter_update(self, guild: discord.Guild):
-        guild_id = guild.id
-        if guild_id in self.update_tasks and not self.update_tasks[guild_id].done(): self.update_tasks[guild_id].cancel()
-        self.update_tasks[guild_id] = asyncio.create_task(self.delayed_update(guild))
-
-    async def delayed_update(self, guild: discord.Guild):
-        await asyncio.sleep(5)
-        # 카운터 기능은 현재 사용하지 않으므로 주석 처리
-        # await self.update_all_counters(guild)
-
-    # (카운터 관련 로직은 현재 사용하지 않으므로 주석 처리 또는 삭제 가능)
-    # async def update_all_counters(self, guild: discord.Guild): ...
-    # @tasks.loop(minutes=10) ...
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
@@ -196,7 +146,6 @@ class ServerSystem(commands.Cog):
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 try: await ch.send(f"@everyone, {member.mention}", embed=embed, allowed_mentions=discord.AllowedMentions(everyone=True, users=True))
                 except Exception as e: logger.error(f"歓迎メッセージの送信に失敗しました: {e}")
-        self._schedule_counter_update(member.guild)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
@@ -207,18 +156,9 @@ class ServerSystem(commands.Cog):
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 try: await ch.send(embed=embed)
                 except Exception as e: logger.error(f"お別れメッセージの送信に失敗しました: {e}")
-        self._schedule_counter_update(member.guild)
-
-    @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
-        if before.roles != after.roles or before.premium_since != after.premium_since:
-            self._schedule_counter_update(after.guild)
 
     @app_commands.command(name="setup", description="[管理者] ボットの各種チャンネルを設定またはパネルを設置します。")
-    @app_commands.describe(
-        setting_type="設定したい項目を選択してください。",
-        channel="設定対象のチャンネルを指定してください。"
-    )
+    @app_commands.describe(setting_type="設定したい項目を選択してください。", channel="設定対象のチャンネルを指定してください。")
     @app_commands.choices(setting_type=[
         app_commands.Choice(name="[パネル] 役割パネル", value="panel_roles"),
         app_commands.Choice(name="[パネル] 案内パネル (オンボーディング)", value="panel_onboarding"),
@@ -266,8 +206,8 @@ class ServerSystem(commands.Cog):
                 if not cog_to_run or not hasattr(cog_to_run, 'regenerate_panel'):
                     return await interaction.followup.send(f"❌ '{config['cog']}' Cogが見つからないか、'regenerate_panel' 関数がありません。", ephemeral=True)
                 
+                await save_id_to_db(config["key"], channel.id)
                 await cog_to_run.regenerate_panel(channel)
-                await save_channel_id_to_db(config["key"], channel.id)
                 await interaction.followup.send(f"✅ `{channel.mention}` に **{config['friendly_name']}** を設置しました。", ephemeral=True)
             
             elif config["type"] == "channel":
@@ -275,7 +215,7 @@ class ServerSystem(commands.Cog):
                 cog_name = config["cog_name"]
                 attribute_to_set = config.get("attr", db_key)
                 
-                await save_channel_id_to_db(db_key, channel.id)
+                await save_id_to_db(db_key, channel.id)
                 
                 target_cog = self.bot.get_cog(cog_name)
                 if target_cog:
@@ -289,24 +229,6 @@ class ServerSystem(commands.Cog):
         except Exception as e:
             logger.error(f"Unified setup command failed for {setting_type}: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 設定中にエラーが発生しました: {e}", ephemeral=True)
-
-    setup_group = app_commands.Group(name="message", description="[管理者] 送信するメッセージの内容を編集します。")
-    
-    @setup_group.command(name="welcome", description="歓迎メッセージの編集機を作成します。")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_welcome_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'welcome_embed', "歓迎メッセージ")
-    
-    @setup_group.command(name="farewell", description="お別れメッセージの編集機を作成します。")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup_farewell_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'farewell_embed', "お別れメッセージ")
-    
-    async def create_message_editor(self, i: discord.Interaction, ch: discord.TextChannel, key: str, name: str):
-        await i.response.defer(ephemeral=True)
-        embed_data = await get_embed_from_db(key) or {"title": f"{name} タイトル", "description": f"{name} の説明を入力してください。"}
-        embed = discord.Embed.from_dict(embed_data)
-        msg = await ch.send(content=f"**{name} 編集機**", embed=embed)
-        await msg.edit(view=EmbedEditorView(msg, key))
-        await i.followup.send(f"`{ch.mention}` に {name} 編集機を作成しました。", ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
