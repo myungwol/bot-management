@@ -1,4 +1,4 @@
-# cogs/server/system.py (UI 상태 관리 최종 해결)
+# cogs/server/system.py (최종 안정화 버전)
 
 import discord
 from discord.ext import commands
@@ -30,7 +30,7 @@ class AutoRoleView(ui.View):
             select = ui.Select(placeholder="役割のカテゴリーを選択してください...", options=options, custom_id=f"autorole_category_select:{panel_config.get('channel_key', 'default')}")
             select.callback = self.category_select_callback
             self.add_item(select)
-
+    
     class RoleSelect(ui.View):
         def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
             super().__init__(timeout=180)
@@ -58,7 +58,7 @@ class AutoRoleView(ui.View):
                     self.add_item(select)
 
         async def select_callback(self, interaction: discord.Interaction):
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer() # 응답을 defer하지만, 아무 메시지도 보내지 않아 상호작용이 조용히 끝나도록 합니다.
             
             selected_ids = set()
             for item in self.children:
@@ -78,15 +78,10 @@ class AutoRoleView(ui.View):
                 if to_remove_ids:
                     roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
                     if roles_to_remove: await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
-
-                # [수정] followup.send 대신 edit_original_response를 사용하여 기존 메시지를 수정합니다.
-                for item in self.children:
-                    item.disabled = True
-                await interaction.edit_original_response(content="✅ 役割が更新されました。", view=self)
-                self.stop()
             except Exception as e:
                 logger.error(f"역할 업데이트 콜백 중 오류: {e}", exc_info=True)
-                await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
+                # 사용자에게 오류를 알리고 싶다면 아래 주석을 해제하세요.
+                # await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
 
     async def category_select_callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -104,8 +99,6 @@ class AutoRoleView(ui.View):
         )
         await interaction.followup.send(embed=embed, view=self.RoleSelect(interaction.user, category_roles, category_name), ephemeral=True)
 
-
-# ... 나머지 ServerSystem 클래스는 수정 없이 그대로 유지 ...
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
