@@ -254,6 +254,53 @@ class ServerSystem(commands.Cog):
             logger.error(f"Panel setup command failed for {panel_type}: {e}", exc_info=True)
             await interaction.followup.send(f"❌ パネル設置中にエラーが発生しました: {e}", ephemeral=True)
 
+    # [새로 추가된 명령어]
+    @setup_group.command(name="log-channel", description="[管理者] 各種機能のログチャンネルを設定します。")
+    @app_commands.describe(channel="ログを送信するチャンネル", log_type="設定するログの種類")
+    @app_commands.choices(log_type=[
+        app_commands.Choice(name="釣りログ", value="fishing_log"),
+        app_commands.Choice(name="コインログ", value="coin_log"),
+        app_commands.Choice(name="自己紹介承認ログ", value="intro_approval_log"),
+        app_commands.Choice(name="自己紹介拒否ログ", value="intro_rejection_log"),
+    ])
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def setup_log_channel(self, interaction: discord.Interaction, channel: discord.TextChannel, log_type: str):
+        await interaction.response.defer(ephemeral=True)
+        
+        log_channel_map = {
+            "fishing_log": {"key": "fishing_log_channel_id", "cog_name": "Fishing", "friendly_name": "釣りログ"},
+            "coin_log": {"key": "coin_log_channel_id", "cog_name": "EconomyCore", "friendly_name": "コインログ"},
+            "intro_approval_log": {"key": "introduction_channel_id", "cog_name": "Onboarding", "friendly_name": "自己紹介承認ログ"},
+            "intro_rejection_log": {"key": "introduction_rejection_log_channel_id", "cog_name": "Onboarding", "friendly_name": "自己紹介拒否ログ"}
+        }
+        
+        config = log_channel_map.get(log_type)
+        if not config:
+            return await interaction.followup.send("❌ 無効なログタイプです。", ephemeral=True)
+
+        try:
+            db_key = config["key"]
+            cog_name = config["cog_name"]
+            friendly_name = config["friendly_name"]
+            
+            # 1. DB에 저장
+            await save_channel_id_to_db(db_key, channel.id)
+            
+            # 2. 봇의 중앙 캐시 업데이트
+            self.bot.channel_configs[db_key] = channel.id
+            
+            # 3. 해당 Cog의 속성을 직접 업데이트하여 즉시 적용
+            target_cog = self.bot.get_cog(cog_name)
+            if target_cog:
+                # 예: fishing_cog의 'fishing_log_channel_id' 속성을 channel.id로 설정
+                setattr(target_cog, db_key, channel.id) 
+                logger.info(f"✅ Live updated {cog_name}'s {db_key} to {channel.id}")
+            
+            await interaction.followup.send(f"✅ `{channel.mention}`を**{friendly_name}**チャンネルとして設定しました。", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Log channel setup command failed for {log_type}: {e}", exc_info=True)
+            await interaction.followup.send(f"❌ チャンネル設定中にエラーが発生しました: {e}", ephemeral=True)
+
     @setup_group.command(name="welcome-message", description="歓迎メッセージの編集機を作成します。")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_welcome_message(self, i: discord.Interaction, c: discord.TextChannel): await self.create_message_editor(i, c, 'welcome_embed', "歓迎メッセージ")
