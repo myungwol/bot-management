@@ -1,25 +1,22 @@
-# cogs/economy/core.py (최종 확인 버전)
+# cogs/economy/core.py (DB 자동 로딩 방식 적용 최종본)
 
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import random
-from datetime import datetime
-import logging
 import asyncio
 from collections import defaultdict
+import logging
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 from utils.database import (
     get_wallet, update_wallet, get_activity_data,
     update_activity_data, CURRENCY_ICON,
-    get_channel_id_from_db, get_role_id
+    get_id
 )
 
-# 설정값
 EXCLUDED_VOICE_CHANNEL_IDS = []
 CHAT_MESSAGE_REQUIREMENT = 10
 CHAT_REWARD_MIN = 5
@@ -41,8 +38,8 @@ class EconomyCore(commands.Cog):
         await self.load_config_from_db()
 
     async def load_config_from_db(self):
-        self.coin_log_channel_id = await get_channel_id_from_db("coin_log_channel_id")
-        self.admin_role_id = get_role_id("admin_total")
+        self.coin_log_channel_id = get_id("coin_log_channel_id")
+        self.admin_role_id = get_id("role_admin_total")
         logger.info(f"[EconomyCore Cog] Loaded COIN_LOG_CHANNEL_ID: {self.coin_log_channel_id}")
         logger.info(f"[EconomyCore Cog] Loaded ADMIN_ROLE_ID: {self.admin_role_id}")
 
@@ -91,7 +88,6 @@ class EconomyCore(commands.Cog):
                         if not member.bot and member.voice and not member.voice.self_deaf and not member.voice.self_mute:
                             user_id_str = str(member.id)
                             await update_activity_data(user_id_str, voice_increment=1)
-
                             activity_data = await get_activity_data(user_id_str)
                             current_minutes = activity_data.get('voice_minutes', 0)
 
@@ -158,7 +154,6 @@ class EconomyCore(commands.Cog):
             await interaction.response.send_message(embed=embed)
         else:
             await interaction.response.send_message("コイン削減中にエラーが発生しました。", ephemeral=True)
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(EconomyCore(bot))
