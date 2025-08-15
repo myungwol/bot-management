@@ -1,4 +1,4 @@
-# utils/database.py (ID 자동 로딩 최종본)
+# utils/database.py (누락된 함수 복구 최종본)
 
 import os
 import discord
@@ -12,10 +12,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # --- ⬇️ 역할 ID 관리 ⬇️ ---
-# [수정] 이제 모든 ID는 DB에서 자동으로 불러오므로, 이 목록은 비워둡니다.
-ROLE_ID_CONFIG: Dict[str, int] = {}
-
-# [수정] DB에서 불러온 모든 ID를 저장할 전역 캐시
 _cached_ids: Dict[str, int] = {}
 
 # --- ⬇️ 자기소개 기반 자동 역할 부여 규칙 (성별) ⬇️ ---
@@ -39,7 +35,6 @@ ROLE_PREFIX_MAPPING = {
 }
 ROD_HIERARCHY = ["古い釣竿", "カーボン釣竿", "専門家用の釣竿", "伝説の釣竿"]
 
-# [수정] 역할 구매 시 ID를 직접 넣는 대신, DB에서 찾아올 키를 지정
 ITEM_DATABASE = {
     "住人票Lv.1": {"id_key": "role_resident_tier1", "price": 100, "category": "里の役職", "description": "基本的な特典が含まれています。", "emoji": "1️⃣", "buyable": True, "sellable": False},
     "住人票Lv.2": {"id_key": "role_resident_tier2", "price": 50, "category": "里の役職", "description": "追加のチャンネルへのアクセスが可能になります。", "emoji": "2️⃣", "buyable": True, "sellable": False},
@@ -94,7 +89,19 @@ async def save_id_to_db(key: str, object_id: int):
     except Exception as e:
         logger.error(f"[DB Error] save_id_to_db for key '{key}': {e}", exc_info=True)
 
-# [수정] 이제 panel_id도 channel_configs 테이블에 저장
+# [복구된 함수들]
+async def save_embed_to_db(embed_key: str, embed_data: dict):
+    if not supabase: return
+    try: await supabase.table('embeds').upsert({'embed_key': embed_key, 'embed_data': embed_data}).execute()
+    except Exception as e: logger.error(f"[DB Error] save_embed_to_db: {e}", exc_info=True)
+
+async def get_embed_from_db(embed_key: str) -> dict | None:
+    if not supabase: return None
+    try:
+        response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
+        return response.data[0]['embed_data'] if response.data else None
+    except Exception as e: logger.error(f"[DB Error] get_embed_from_db: {e}", exc_info=True); return None
+
 async def save_panel_id(panel_name: str, message_id: int, channel_id: int):
     await save_id_to_db(f"panel_{panel_name}_message_id", message_id)
     await save_id_to_db(f"panel_{panel_name}_channel_id", channel_id)
@@ -119,7 +126,6 @@ async def get_or_create_user(table_name: str, user_id_str: str, default_data: di
         return response.data[0] if response.data else {}
     except Exception as e: logger.error(f"[DB Error] get_or_create_user on '{table_name}': {e}", exc_info=True); return {}
 
-# (이하 나머지 함수들은 변경 없이 동일)
 async def get_wallet(user_id: int):
     return await get_or_create_user('wallets', str(user_id), {"balance": 0}) or {"balance": 0}
 
