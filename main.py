@@ -24,9 +24,6 @@ class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    # [수정] 문제가 되었던 on_interaction 함수를 완전히 제거합니다.
-    # 라이브러리의 기본 처리 방식이 가장 안정적입니다.
-
     async def setup_hook(self):
         await self.load_all_extensions()
         
