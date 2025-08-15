@@ -1,4 +1,4 @@
-# cogs/server/system.py (명령어 통합 및 실시간 업데이트 버그 수정 최종본)
+# cogs/server/system.py (이벤트 알림 역할 추가 최종본)
 
 import discord
 from discord.ext import commands, tasks
@@ -21,7 +21,7 @@ from utils.database import (
     save_channel_id_to_db
 )
 
-# --- 코드 기반 패널 데이터 구조 ---
+# [수정된 부분] "notifications" 역할 목록에 "祭り" 알림 역할 추가
 STATIC_AUTO_ROLE_PANELS = {
     "main_roles": {
         "channel_key": "auto_role_channel_id",
@@ -33,11 +33,33 @@ STATIC_AUTO_ROLE_PANELS = {
         "roles": {
             "notifications": [
                 {"role_id_key": "mention_role_1", "label": "サーバー全体通知", "description": "サーバーの重要なお知らせを受け取ります。"},
+                # "祭り" 역할을 staff_festival 대신 notify_festival 키를 사용하도록 변경
+                {"role_id_key": "notify_voice", "label": "通話", "description": "通話募集の通知を受け取ります。"},
+                {"role_id_key": "notify_friends", "label": "友達", "description": "友達募集の通知を受け取ります。"},
+                {"role_id_key": "notify_festival", "label": "祭り", "description": "お祭りやイベント関連の通知を受け取ります。"},
+                {"role_id_key": "notify_disboard", "label": "ディスボード", "description": "Disboard通知を受け取ります。"},
+                {"role_id_key": "notify_up", "label": "アップ", "description": "Up通知を受け取ります。"},
             ],
-            "games": []
+            "games": [
+                {"role_id_key": "game_minecraft", "label": "マインクラフト", "description": "マインクラフト関連の募集に参加します。"},
+                {"role_id_key": "game_valorant", "label": "ヴァロラント", "description": "ヴァロラント関連の募集に参加します。"},
+                {"role_id_key": "game_overwatch", "label": "オーバーウォッチ", "description": "オーバーウォッチ関連の募集に参加します。"},
+                {"role_id_key": "game_lol", "label": "リーグ・オブ・レジェンド", "description": "LoL関連の募集に参加します。"},
+                {"role_id_key": "game_mahjong", "label": "麻雀", "description": "麻雀関連の募集に参加します。"},
+                {"role_id_key": "game_amongus", "label": "アモングアス", "description": "Among Us関連の募集に参加します。"},
+                {"role_id_key": "game_mh", "label": "モンスターハンター", "description": "モンハン関連の募集に参加します。"},
+                {"role_id_key": "game_genshin", "label": "原神", "description": "原神関連の募集に参加します。"},
+                {"role_id_key": "game_apex", "label": "エーペックスレジェンズ", "description": "Apex Legends関連の募集に参加します。"},
+                {"role_id_key": "game_splatoon", "label": "スプラトゥーン", "description": "スプラトゥーン関連の募集に参加します。"},
+                {"role_id_key": "game_gf", "label": "ゴッドフィールド", "description": "ゴッドフィールド関連の募集に参加します。"},
+                {"role_id_key": "platform_steam", "label": "スチーム", "description": "Steamでプレイするゲームの募集に参加します。"},
+                {"role_id_key": "platform_smartphone", "label": "スマートフォン", "description": "スマホゲームの募集に参加します。"},
+                {"role_id_key": "platform_switch", "label": "スイッチ", "description": "Nintendo Switchゲームの募集に参加します。"},
+            ]
         }
     }
 }
+
 
 # --- View / Modal 정의 ---
 class EphemeralRoleSelectView(ui.View):
@@ -242,7 +264,6 @@ class ServerSystem(commands.Cog):
     async def setup_unified(self, interaction: discord.Interaction, setting_type: str, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True)
 
-        # [수정된 부분] 실시간 업데이트를 위한 각 Cog의 실제 변수 이름(attr)을 추가
         setup_map = {
             "panel_roles": {"type": "panel", "cog": "ServerSystem", "key": "auto_role_channel_id", "friendly_name": "役割パネル"},
             "panel_onboarding": {"type": "panel", "cog": "Onboarding", "key": "onboarding_panel_channel_id", "friendly_name": "案内パネル"},
@@ -278,7 +299,6 @@ class ServerSystem(commands.Cog):
             elif config["type"] == "channel":
                 db_key = config["key"]
                 cog_name = config["cog_name"]
-                # [수정된 부분] attr에 지정된 실제 변수 이름을 사용하도록 변경
                 attribute_to_set = config.get("attr", db_key)
                 
                 await save_channel_id_to_db(db_key, channel.id)
