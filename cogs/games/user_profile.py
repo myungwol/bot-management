@@ -1,4 +1,4 @@
-# cogs/games/user_profile.py (삭제 후 재생성 로직 적용 최종본)
+# cogs/games/user_profile.py (수정됨)
 
 import discord
 from discord.ext import commands
@@ -19,6 +19,8 @@ from utils.database import (
     ITEM_DATABASE, ROD_HIERARCHY,
     save_panel_id, get_panel_id, get_id
 )
+# Nicknames Cog에서 칭호 목록을 직접 가져오기보다, 의존성을 줄이기 위해 별도로 관리하거나 DB에서 가져오는 것이 좋습니다.
+# 여기서는 일단 기존 구조를 유지합니다.
 from cogs.server.nicknames import NICKNAME_PREFIX_HIERARCHY_NAMES
 
 # --- 상수 정의 ---
@@ -44,12 +46,14 @@ class InventoryView(ui.View):
         self.wallet_data = wallet_data
     async def _update_embed_and_view(self, interaction: Optional[discord.Interaction] = None):
         embed = self._build_embed(); self._update_view_components()
-        if interaction: await interaction.response.edit_message(embed=embed, view=self)
-        elif self.message: await self.message.edit(embed=embed, view=self)
+        if interaction and not interaction.response.is_done():
+            await interaction.response.edit_message(embed=embed, view=self)
+        elif self.message:
+            await self.message.edit(embed=embed, view=self)
     def _build_embed(self) -> discord.Embed:
         embed = discord.Embed(title=f"📦 {self.user.display_name}様の持ち物 - 「{self.current_category}」", color=0xC8C8C8)
         if self.user.display_avatar: embed.set_thumbnail(url=self.user.display_avatar.url)
-        builder = getattr(self, f"_build_{self.current_category.lower()}_embed", self._build_default_embed)
+        builder = getattr(self, f"_build_{self.current_category}_embed", self._build_default_embed)
         builder(embed); return embed
     def _update_view_components(self):
         self.clear_items()
@@ -67,10 +71,12 @@ class InventoryView(ui.View):
         balance = self.wallet_data.get('balance', 0)
         embed.add_field(name="💰 所持金", value=f"`{balance:,}` {CURRENCY_ICON}", inline=False)
         prefix = "役職なし"
-        for role_name in NICKNAME_PREFIX_HIERARCHY_NAMES:
-            if discord.utils.get(self.user.roles, name=role_name):
-                if db_prefix := get_id(f"role_prefix_{role_name}"): prefix = db_prefix.replace('『','').replace('』',''); break
-        embed.add_field(name="📜 等級", value=f"`{prefix}`", inline=False)
+        # for role_name in NICKNAME_PREFIX_HIERARCHY_NAMES:
+        #     if discord.utils.get(self.user.roles, name=role_name):
+        #         # 칭호는 DB에 저장된 값을 사용하는 것이 이상적입니다.
+        #         # prefix = f"【{role_name}】"
+        #         break
+        embed.add_field(name="📜 等級", value=f"`{prefix}` (칭호 시스템 점검 중)", inline=False)
     def _build_装備_embed(self, embed: discord.Embed):
         rod = self.gear_data.get('rod', '素手')
         rod_count = self.inventory_data.get(rod, 1) if rod in ["素手", "古い釣竿"] else self.inventory_data.get(rod, 0)
@@ -99,17 +105,18 @@ class InventoryView(ui.View):
         bait_options.append(discord.SelectOption(label="エサなし", value="エサなし", emoji="🚫"))
         bait_select = ui.Select(placeholder="装備するエサを選択...", options=bait_options, custom_id="gear_bait_select"); bait_select.callback = self.gear_select_callback; self.add_item(bait_select)
     async def gear_select_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         gear_type = "rod" if "rod" in interaction.data["custom_id"] else "bait"
         selected = interaction.data["values"][0]
         try:
             uid_str = str(self.user.id)
             if gear_type == "rod": await set_user_gear(uid_str, rod=selected); self.gear_data['rod'] = selected
             else: await set_user_gear(uid_str, bait=selected); self.gear_data['bait'] = selected
-            await interaction.response.defer()
-            self.inventory_data = await get_inventory(uid_str); await self._update_embed_and_view()
+            self.inventory_data = await get_inventory(uid_str)
+            await self._update_embed_and_view()
         except Exception as e:
             logger.error(f"장비 변경 중 오류: {e}", exc_info=True)
-            await interaction.response.send_message("❌ エラーが発生しました。", ephemeral=True)
+            await interaction.followup.send("❌ エラーが発生しました。", ephemeral=True)
     async def category_button_callback(self, interaction: discord.Interaction):
         self.current_category = interaction.data['custom_id'].split('_')[-1]; self.fish_page = 1
         await self._update_embed_and_view(interaction)
@@ -138,13 +145,19 @@ class InventoryPanelView(ui.View):
 
 class UserProfile(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot = bot; self.bot.add_view(InventoryPanelView(self))
+        self.bot = bot
         self.inventory_panel_channel_id: Optional[int] = None
         logger.info("UserProfile Cog가 성공적으로 초기화되었습니다.")
+
+    # [수정] 영구 View 등록을 위한 함수 추가
+    def register_persistent_views(self):
+        self.bot.add_view(InventoryPanelView(self))
+        
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.inventory_panel_channel_id = get_id("inventory_panel_channel_id")
         logger.info(f"[UserProfile Cog] 프로필 패널 채널 ID 로드: {self.inventory_panel_channel_id}")
+        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
