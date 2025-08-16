@@ -1,13 +1,13 @@
-# cogs/admin/panel_manager.py (통합 수정)
+# cogs/admin/config_menu.py (새 파일)
 
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
 import logging
-from typing import List, Literal, Optional
+from typing import List, Dict, Any, Literal
 
 from utils.database import (
-    get_embed_from_db, save_embed_to_db, 
+    get_embed_from_db, save_embed_to_db,
     get_panel_components_from_db, save_panel_component_to_db
 )
 
@@ -16,13 +16,11 @@ logger = logging.getLogger(__name__)
 PANEL_KEYS = ["onboarding", "roles", "nicknames", "commerce", "fishing", "profile"]
 EMBED_KEYS = [
     "welcome_embed", "farewell_embed", 
-    "panel_roles", "panel_onboarding", "panel_nicknames", 
+    "panel_onboarding", "panel_roles", "panel_nicknames", 
     "panel_commerce", "panel_fishing", "panel_profile",
     "onboarding_step_0", "onboarding_step_1", "onboarding_step_2",
-    "onboarding_step_3", "onboarding_step_4", "onboarding_step_5",
-    "log_coin_gain", "log_coin_transfer", "log_coin_admin"
+    "onboarding_step_3", "onboarding_step_4", "onboarding_step_5"
 ]
-
 BUTTON_STYLES_MAP = {
     "primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
     "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger,
@@ -34,6 +32,7 @@ class EmbedEditModal(ui.Modal, title="埋め込みメッセージ編集"):
     modal_description = ui.TextInput(label="説明", style=discord.TextStyle.paragraph, required=True, max_length=4000)
     modal_color = ui.TextInput(label="色コード (例: #5865F2)", style=discord.TextStyle.short, required=False, max_length=7)
     modal_footer = ui.TextInput(label="フッターテキスト", style=discord.TextStyle.short, required=False, max_length=2048)
+
     def __init__(self, embed_key: str, current_data: dict):
         super().__init__()
         self.embed_key = embed_key
@@ -41,19 +40,27 @@ class EmbedEditModal(ui.Modal, title="埋め込みメッセージ編集"):
         self.modal_description.default = current_data.get("description", "")
         self.modal_color.default = f"#{current_data.get('color', 0):06x}" if current_data.get('color') else ""
         self.modal_footer.default = current_data.get("footer", {}).get("text", "")
+
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
+        color = self.modal_color.value
         try:
-            color_value = int(self.modal_color.value.lstrip('#'), 16) if self.modal_color.value else DEFAULT_EMBED_DATA["color"]
+            color_value = int(color.lstrip('#'), 16) if color else 0x5865F2
         except ValueError:
-            await interaction.followup.send("❌ 無効な色コードです。`#RRGGBB`の形式で入力してください。", ephemeral=True); return
+            await interaction.followup.send("❌ 無効な色コードです。`#RRGGBB`の形式で入力してください。", ephemeral=True)
+            return
+
         embed_data = {
-            "title": self.modal_title.value, "description": self.modal_description.value,
-            "color": color_value, "footer": {"text": self.modal_footer.value}
+            "title": self.modal_title.value,
+            "description": self.modal_description.value,
+            "color": color_value,
+            "footer": {"text": self.modal_footer.value}
         }
+
         try:
             await save_embed_to_db(self.embed_key, embed_data)
-            await interaction.followup.send(f"✅ **`{self.embed_key}`** の埋め込みを保存しました。", embed=discord.Embed.from_dict(embed_data), ephemeral=True)
+            preview_embed = discord.Embed.from_dict(embed_data)
+            await interaction.followup.send(f"✅ **`{self.embed_key}`** の埋め込みを正常に保存しました。\nプレビュー:", embed=preview_embed, ephemeral=True)
         except Exception as e:
             logger.error(f"임베드 저장 중 오류: {e}", exc_info=True)
             await interaction.followup.send(f"❌ データベースへの保存中にエラーが発生しました。", ephemeral=True)
@@ -62,12 +69,14 @@ class ButtonEditModal(ui.Modal, title="ボタン編集"):
     label = ui.TextInput(label="ボタンのテキスト", style=discord.TextStyle.short, required=True, max_length=80)
     emoji = ui.TextInput(label="絵文字", style=discord.TextStyle.short, required=False, max_length=50)
     row = ui.TextInput(label="行 (0-4, 空白で自動)", style=discord.TextStyle.short, required=False, max_length=1)
+
     def __init__(self, component_data: dict):
         super().__init__()
         self.component_data = component_data
         self.label.default = component_data.get('label')
         self.emoji.default = component_data.get('emoji')
         self.row.default = str(component_data.get('row', ''))
+
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         try:
@@ -75,10 +84,13 @@ class ButtonEditModal(ui.Modal, title="ボタン編集"):
             if not (0 <= row_val <= 4):
                 await interaction.followup.send("❌ 行は0から4までの数字でなければなりません。", ephemeral=True); return
         except ValueError:
-            await interaction.followup.send("❌ 行には数字を入力してください。", ephemeral=True); return
+            await interaction.followup.send("❌ 行には数字を入力してください。", ephemeral=True)
+            return
+            
         self.component_data['label'] = self.label.value
         self.component_data['emoji'] = self.emoji.value or None
         self.component_data['row'] = row_val
+
         try:
             await save_panel_component_to_db(self.component_data)
             await interaction.followup.send(f"✅ **`{self.component_data['component_key']}`** ボタンを保存しました。", ephemeral=True)
@@ -86,82 +98,64 @@ class ButtonEditModal(ui.Modal, title="ボタン編集"):
             logger.error(f"버튼 저장 중 오류: {e}", exc_info=True)
             await interaction.followup.send(f"❌ データベースへの保存中にエラーが発生しました。", ephemeral=True)
 
+class ConfigMenuView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(PanelSelect())
+
+    @discord.ui.select(placeholder="設定する項目を選択してください...", custom_id="config_menu_select", options=[
+        discord.SelectOption(label=f"埋め込み: {key}", value=f"embed:{key}") for key in EMBED_KEYS
+    ] + [
+        discord.SelectOption(label=f"ボタン: {panel}:{comp['component_key']}", value=f"button:{panel}:{comp['component_key']}")
+        for panel in PANEL_KEYS for comp in (asyncio.run(get_panel_components_from_db(panel)) or [])
+    ])
+    async def select_callback(self, interaction: discord.Interaction, select: ui.Select):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
+        selected = select.values[0]
+        target_type, target_key, sub_key = selected.split(':') if ":" in selected else (selected.split(':')[0], selected.split(':')[1], None)
+
+        if target_type == "embed":
+            current_data = await get_embed_from_db(target_key) or DEFAULT_EMBED_DATA
+            modal = EmbedEditModal(target_key, current_data)
+            await interaction.response.send_modal(modal)
+            
+        elif target_type == "button":
+            panel_key = target_key # select.values[0].split(':')[1]
+            component_key = sub_key # select.values[0].split(':')[2]
+            
+            components = await get_panel_components_from_db(panel_key)
+            if not components or not (target_comp := next((c for c in components if c['component_key'] == component_key), None)):
+                await interaction.followup.send("❌ 該当のボタンが見つかりません。", ephemeral=True)
+                return
+            modal = ButtonEditModal(target_comp)
+            await interaction.response.send_modal(modal)
+
 class PanelManager(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         logger.info("PanelManager Cog가 성공적으로 초기화되었습니다.")
 
-    panel_group = app_commands.Group(name="panel", description="パネルと埋め込みメッセージを管理します。")
-
-    async def panel_key_autocomplete(self, i: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        return [app_commands.Choice(name=k, value=k) for k in PANEL_KEYS if current.lower() in k.lower()]
-    async def embed_key_autocomplete(self, i: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        return [app_commands.Choice(name=k, value=k) for k in EMBED_KEYS if current.lower() in k.lower()]
-
-    @panel_group.command(name="edit", description="[管理者] パネルの埋め込みやボタンを編集します。")
-    @app_commands.describe(
-        edit_target="編集したい対象 (埋め込み or ボタン)",
-        panel_key="対象のパネル (ボタン編集時のみ)",
-        target_key="編集したい埋め込み/ボタンのキー"
-    )
-    @app_commands.choices(edit_target=[
-        app_commands.Choice(name="埋め込み (Embed)", value="embed"),
-        app_commands.Choice(name="ボタン (Button)", value="button"),
-    ])
-    @app_commands.autocomplete(panel_key=panel_key_autocomplete)
+    @app_commands.command(name="manager", description="[管理者] 봇의 모든 UI 설정을 관리합니다.")
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def set_panel(self, interaction: discord.Interaction, edit_target: str, target_key: str, panel_key: Optional[str] = None):
-        if edit_target == "embed":
-            if target_key not in EMBED_KEYS:
-                await interaction.response.send_message("❌ 無効な埋め込みキーです。", ephemeral=True); return
-            current_data = await get_embed_from_db(target_key) or DEFAULT_EMBED_DATA
-            await interaction.response.send_modal(EmbedEditModal(target_key, current_data))
+    async def open_config_menu(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
         
-        elif edit_target == "button":
-            if not panel_key:
-                await interaction.response.send_message("❌ ボタンを編集するにはパネルを選択する必要があります。", ephemeral=True); return
-            components = await get_panel_components_from_db(panel_key)
-            if not components or not (target_comp := next((c for c in components if c['component_key'] == target_key), None)):
-                await interaction.response.send_message("❌ 該当のボタンが見つかりません。", ephemeral=True); return
-            await interaction.response.send_modal(ButtonEditModal(target_comp))
+        # 모든 설정 요소들을 보여주는 ConfigMenuView를 생성합니다.
+        view = ConfigMenuView()
+        
+        # ConfigMenuView가 제대로 생성되었는지 확인합니다.
+        if view is None:
+            logger.error("❌ ConfigMenuView 초기화 실패")
+            await interaction.followup.send("❌ 오류가 발생했습니다. 봇 개발자에게 문의해주세요.", ephemeral=True)
+            return
 
-    @panel_group.command(name="style", description="[管理者] パネルのボタンの色を変更します。")
-    @app_commands.describe(panel_key="対象のパネル", component_key="編集したいボタン", style="新しい色")
-    @app_commands.autocomplete(panel_key=panel_key_autocomplete)
-    @app_commands.choices(style=[app_commands.Choice(name=k, value=k) for k in BUTTON_STYLES_MAP.keys()])
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def style_button(self, interaction: discord.Interaction, panel_key: str, component_key: str, style: str):
-        await interaction.response.defer(ephemeral=True)
-        components = await get_panel_components_from_db(panel_key)
-        if not components or not (target_comp := next((c for c in components if c['component_key'] == component_key), None)):
-            await interaction.followup.send("❌ 該当のボタンが見つかりません。", ephemeral=True); return
-        target_comp['style'] = style
+        # 사용자에게 ConfigMenuView를 전송합니다.
         try:
-            await save_panel_component_to_db(target_comp)
-            await interaction.followup.send(f"✅ **`{component_key}`** ボタンの色を **{style}** に変更しました。", ephemeral=True)
+            await interaction.followup.send("⚙️ 봇 설정メニュー", view=view, ephemeral=True)
         except Exception as e:
-            logger.error(f"버튼 스타일 저장 중 오류: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ データベースへの保存中にエラーが発生しました。", ephemeral=True)
-            
-    @panel_group.command(name="refresh", description="[管理者] パネルを現在のDB設定で再生成します。")
-    @app_commands.describe(panel_key="再生成したいパネル")
-    @app_commands.autocomplete(panel_key=panel_key_autocomplete)
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def refresh_panel(self, interaction: discord.Interaction, panel_key: str):
-        await interaction.response.defer(ephemeral=True)
-        cog_map = {"onboarding": "Onboarding", "roles": "ServerSystem", "nicknames": "Nicknames", "commerce": "Commerce", "fishing": "Fishing", "profile": "UserProfile"}
-        cog_name = cog_map.get(panel_key)
-        if not cog_name or not (cog := self.bot.get_cog(cog_name)):
-            await interaction.followup.send(f"❌ **`{panel_key}`** に対応するCogが見つかりません。", ephemeral=True); return
-        if hasattr(cog, 'regenerate_panel'):
-            try:
-                await cog.regenerate_panel()
-                await interaction.followup.send(f"✅ **`{panel_key}`** パネルを正常に再生成しました。", ephemeral=True)
-            except Exception as e:
-                logger.error(f"패널 새로고침 중 오류: {e}", exc_info=True)
-                await interaction.followup.send(f"❌ パネルの再生成中にエラーが発生しました。", ephemeral=True)
-        else:
-            await interaction.followup.send(f"❌ **`{cog_name}`** Cogに `regenerate_panel` 関数がありません。", ephemeral=True)
+            logger.error(f"❌ ConfigMenuView 전송 실패: {e}", exc_info=True)
+            await interaction.followup.send("❌ 오류가 발생했습니다。봇 개발자에게 문의해주세요.", ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PanelManager(bot))
