@@ -96,22 +96,22 @@ UI_ROLE_KEY_MAP = {
 
     # --- 온보딩 진행 역할 (구분선, 닉네임 접두사 X) ---
     "role_onboarding_step_1": {
-        "name": "━━━━━━ ゲーム ━━━━━━",
+        "name": "════════════ゲーム══════════",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_2": {
-        "name": "━━━━━━ 通知 ━━━━━━",
+        "name": "═════════════通知═══════════",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_3": {
-        "name": "━━━━━━ 情報 ━━━━━━",
+        "name": "═════════════情報═══════════",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_4": {
-        "name": "━━━━━━ 住民 ━━━━━━",
+        "name": "═════════════住人═══════════",
         "is_prefix": False,
         "priority": 0
     },
@@ -155,12 +155,12 @@ UI_ROLE_KEY_MAP = {
 
     # --- 알림 역할 (닉네임 접두사 X) ---
     "role_notify_voice": {
-        "name": "通話のおさそい",
+        "name": "通話",
         "is_prefix": False,
         "priority": 0
     },
     "role_notify_friends": {
-        "name": "お友達ぼしゅう",
+        "name": "友達",
         "is_prefix": False,
         "priority": 0
     },
