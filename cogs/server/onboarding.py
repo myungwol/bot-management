@@ -139,7 +139,7 @@ class ApprovalView(ui.View):
             except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다.")
             if (ch_id := self.onboarding_cog.rejection_log_channel_id) and (ch := guild.get_channel(ch_id)):
                 embed = discord.Embed(title="❌ 住人登録が拒否されました", color=discord.Color.red())
-                embed.add_field(name="住民", value=member.mention, inline=False)
+                embed.add_field(name="旅の人", value=member.mention, inline=False)
                 for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
                 embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False); embed.add_field(name="担当者", value=moderator.mention, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
