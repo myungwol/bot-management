@@ -9,9 +9,7 @@ from typing import Optional, List, Dict, Any
 
 from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, save_id_to_db, get_config
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
-
 
 # --- [신규] DB에서 가져온 Embed 데이터에 변수를 안전하게 적용하는 헬퍼 함수 ---
 def format_embed_from_db(embed_data: dict, **kwargs) -> discord.Embed:
