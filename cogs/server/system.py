@@ -36,54 +36,86 @@ def format_embed_from_db(embed_data: dict, **kwargs) -> discord.Embed:
         logger.error(f"임베드 최종 생성 중 오류 발생: {e}", exc_info=True)
         return discord.Embed.from_dict(embed_data)
 
-# --- [수정] 역할 선택 View (다시 원래 방식으로) ---
-class RoleSelectView(ui.View):
-    def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
-        # [수정] timeout을 None으로 설정하지 않습니다. (임시 View)
-        super().__init__(timeout=300)
+# --- [신규] 모든 것을 관리하는 단일 영구 View ---
+class AutoRoleManagerView(ui.View):
+    def __init__(self, panel_config: dict):
+        super().__init__(timeout=None)
+        self.panel_config = panel_config
+        self.build_initial_view()
+
+    def build_initial_view(self):
+        """초기 상태 (카테고리 선택) View를 구성합니다."""
+        self.clear_items()
+        options = [
+            discord.SelectOption(label=c['label'], value=c['id'], emoji=c.get('emoji'), description=c.get('description'))
+            for c in self.panel_config.get("categories", [])
+        ]
+        if options:
+            select = ui.Select(placeholder="役割のカテゴリーを選択してください...", options=options, custom_id=f"roles_category_select")
+            select.callback = self.category_select_callback
+            self.add_item(select)
+
+    def build_role_selection_view(self, interaction: discord.Interaction, category_id: str):
+        """역할 선택 상태의 View를 구성합니다."""
+        self.clear_items()
         
-        self.category_name = category_name # 나중에 역할 ID를 찾기 위해 카테고리 이름을 저장합니다.
+        category_info = next((c for c in self.panel_config.get("categories", []) if c['id'] == category_id), None)
+        category_name = category_info['label'] if category_info else category_id.capitalize()
+        category_roles = self.panel_config.get("roles", {}).get(category_id, [])
         
-        current_user_role_ids = {r.id for r in member.roles}
+        current_user_role_ids = {r.id for r in interaction.user.roles}
         role_chunks = [category_roles[i:i + 25] for i in range(0, len(category_roles), 25)]
+
         if not role_chunks:
             self.add_item(ui.Button(label="設定された役割がありません", disabled=True))
-            return
+        else:
+            for i, chunk in enumerate(role_chunks):
+                options = [
+                    discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids))
+                    for info in chunk if (rid := get_id(info.get('role_id_key')))
+                ]
+                if options:
+                    select = ui.Select(placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})", min_values=0, max_values=len(options), options=options, custom_id=f"roles_select_chunk_{i}")
+                    self.add_item(select)
+        
+        # 버튼 추가
+        update_button = ui.Button(label="役割を更新", style=discord.ButtonStyle.primary, custom_id="roles_update_button", emoji="✅", row=4)
+        update_button.callback = self.update_roles_callback
+        self.add_item(update_button)
 
-        for i, chunk in enumerate(role_chunks):
-            options = [
-                discord.SelectOption(
-                    label=info['label'], value=str(rid),
-                    description=info.get('description'), default=(rid in current_user_role_ids)
-                ) for info in chunk if (rid := get_id(info.get('role_id_key')))
-            ]
-            if options:
-                self.add_item(ui.Select(
-                    placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})",
-                    min_values=0, max_values=len(options), options=options,
-                    custom_id=f"dynamic_role_select_{i}" # custom_id는 여전히 가집니다.
-                ))
+        back_button = ui.Button(label="◀ カテゴリー選択に戻る", style=discord.ButtonStyle.secondary, custom_id="roles_back_button", row=4)
+        back_button.callback = self.back_to_categories_callback
+        self.add_item(back_button)
 
-    @ui.button(label="役割を更新", style=discord.ButtonStyle.primary, custom_id="dynamic_update_roles_button", emoji="✅", row=4)
-    async def update_roles_callback(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.defer(ephemeral=True)
+    async def category_select_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer() # 응답 시간을 벌기 위해 defer() 대신 사용
+        values = interaction.data.get("values", [])
+        if not values: return
+        category_id = values[0]
         
-        # [수정] 현재 카테고리에 해당하는 모든 역할 ID를 다시 계산합니다.
-        static_panels = get_config("STATIC_AUTO_ROLE_PANELS", {})
-        all_roles_in_view = []
-        for panel_config in static_panels.values():
-            for cat_id, roles in panel_config.get("roles", {}).items():
-                category_info = next((c for c in panel_config.get("categories", []) if c['id'] == cat_id), None)
-                if category_info and category_info['label'] == self.category_name:
-                    all_roles_in_view.extend(roles)
+        self.build_role_selection_view(interaction, category_id)
+        await interaction.edit_original_response(content="下のドロップダウンメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。", view=self)
+
+    async def back_to_categories_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        self.build_initial_view()
+        await interaction.edit_original_response(content=None, view=self)
+
+    async def update_roles_callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         
-        all_category_role_ids = {rid for role in all_roles_in_view if (rid := get_id(role.get('role_id_key')))}
-        
+        # View에 표시된 모든 역할 ID를 다시 가져옵니다.
+        all_possible_role_ids = set()
+        for item in self.children:
+            if isinstance(item, ui.Select):
+                for option in item.options:
+                    all_possible_role_ids.add(int(option.value))
+
         selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
         current_ids = {role.id for role in interaction.user.roles}
         
         to_add_ids = selected_ids - current_ids
-        to_remove_ids = (all_category_role_ids - selected_ids) & current_ids
+        to_remove_ids = (all_possible_role_ids - selected_ids) & current_ids
         
         try:
             if to_add_ids:
@@ -93,44 +125,13 @@ class RoleSelectView(ui.View):
                 roles_to_remove = [r for r_id in to_remove_ids if (r := interaction.guild.get_role(r_id))]
                 if roles_to_remove: await interaction.user.remove_roles(*roles_to_remove, reason="自動役割選択")
             
-            button.disabled = True
-            for item in self.children:
-                item.disabled = True
+            # 성공 메시지와 함께 View 비활성화
+            for item in self.children: item.disabled = True
             await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self)
             self.stop()
         except Exception as e:
             logger.error(f"역할 업데이트 콜백 중 오류: {e}", exc_info=True)
             await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
-
-# --- 역할 카테고리 선택 View (AutoRoleView) ---
-class AutoRoleView(ui.View):
-    def __init__(self, panel_config: dict):
-        super().__init__(timeout=None)
-        self.panel_config = panel_config
-        options = [discord.SelectOption(label=c['label'], value=c['id'], emoji=c.get('emoji'), description=c.get('description')) for c in self.panel_config.get("categories", [])]
-        if options:
-            select = ui.Select(placeholder="役割のカテゴリーを選択してください...", options=options, custom_id=f"autorole_category_select:{panel_config.get('channel_key', 'default')}")
-            select.callback = self.category_select_callback
-            self.add_item(select)
-            
-    async def category_select_callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            values = interaction.data.get("values", []);
-            if not values: await interaction.followup.send("❌ 選択が無効です。", ephemeral=True); return
-            category_id = values[0]
-            category_info = next((c for c in self.panel_config.get("categories", []) if c['id'] == category_id), None)
-            category_name = category_info['label'] if category_info else category_id.capitalize()
-            category_roles = self.panel_config.get("roles", {}).get(category_id, [])
-            if not category_roles: await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True); return
-            embed = discord.Embed(title=f"「{category_name}」役割選択", description="下のドロップダウンメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。", color=discord.Color.blue())
-            
-            # [수정] 다시 원래의 RoleSelectView를 사용합니다.
-            view = RoleSelectView(interaction.user, category_roles, category_name)
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-        except Exception as e:
-            logger.error(f"역할 카테고리 선택 콜백 중 오류: {e}", exc_info=True)
-            if interaction.response.is_done(): await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
 
 # --- ServerSystem Cog ---
 class ServerSystem(commands.Cog):
@@ -140,14 +141,13 @@ class ServerSystem(commands.Cog):
         self.guest_role_id: Optional[int] = None
         logger.info("ServerSystem Cog가 성공적으로 초기화되었습니다.")
 
-    # [수정] RoleActionView 등록 부분을 삭제합니다.
     async def register_persistent_views(self):
         static_panels = get_config("STATIC_AUTO_ROLE_PANELS", {})
         for panel_config in static_panels.values():
-            self.bot.add_view(AutoRoleView(panel_config))
-        logger.info(f"✅ {len(static_panels)}개의 역할 관련 View가 등록되었습니다.")
+            self.bot.add_view(AutoRoleManagerView(panel_config)) # [수정] 새로운 통합 View를 등록
+        logger.info(f"✅ {len(static_panels)}개의 역할 관리 View가 등록되었습니다.")
 
-    # ... 이하 나머지 코드는 변경 사항 없습니다 (이전과 동일) ...
+    # ... 이하 코드는 이전과 동일합니다. ...
     async def cog_load(self): await self.load_configs()
     async def load_configs(self):
         self.welcome_channel_id = get_id("new_welcome_channel_id"); self.farewell_channel_id = get_id("farewell_channel_id")
@@ -168,7 +168,9 @@ class ServerSystem(commands.Cog):
                 embed_data = await get_embed_from_db(panel_config['embed_key'])
                 if not embed_data:
                     logger.warning(f"DB에서 '{panel_config['embed_key']}' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다."); continue
-                embed = discord.Embed.from_dict(embed_data); view = AutoRoleView(panel_config)
+                embed = discord.Embed.from_dict(embed_data)
+                # [수정] 새로운 통합 View를 사용
+                view = AutoRoleManagerView(panel_config)
                 new_message = await target_channel.send(embed=embed, view=view)
                 await save_panel_id(panel_key, new_message.id, target_channel.id)
                 logger.info(f"✅ '{panel_key}' 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
