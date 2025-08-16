@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (제출 속도 개선)
+# cogs/server/onboarding.py (승인 로그 형식 수정)
 
 import discord
 from discord.ext import commands
@@ -47,24 +47,18 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         super().__init__()
         self.onboarding_cog = cog_instance
 
-    # [수정] 시간이 걸리는 작업을 별도 함수로 분리합니다.
     async def _post_submission_tasks(self, interaction: discord.Interaction, approval_channel: discord.TextChannel):
         try:
-            # 백그라운드에서 쿨다운 설정 및 관리자 채널에 메시지 전송
             await set_cooldown(f"intro_{interaction.user.id}", time.time())
-            
             embed = discord.Embed(title="📝 新しい住人登録票が提出されました", description=f"**作成者:** {interaction.user.mention}", color=discord.Color.blue())
             if interaction.user.display_avatar: 
                 embed.set_thumbnail(url=interaction.user.display_avatar.url)
-            
             embed.add_field(name="名前", value=self.name.value, inline=False)
             embed.add_field(name="年齢", value=self.age.value, inline=False)
             embed.add_field(name="性別", value=self.gender.value, inline=False)
             embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
-            
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
-            
             await approval_channel.send(
                 content=f"<@&{self.onboarding_cog.approval_role_id}> 新しい住人登録票が提出されました。",
                 embed=embed, 
@@ -73,22 +67,15 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         except Exception as e:
             logger.error(f"자기소개서 백그라운드 처리 중 오류: {e}", exc_info=True)
 
-    # [수정] on_submit 함수는 사용자에게 즉시 응답하고, 나머지 작업은 백그라운드로 넘깁니다.
     async def on_submit(self, interaction: discord.Interaction):
-        # 1. 필수 설정이 되어 있는지 빠르게 확인합니다.
         if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id:
             await interaction.response.send_message("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True)
             return
-            
         approval_channel = interaction.guild.get_channel(self.onboarding_cog.approval_channel_id)
         if not approval_channel:
             await interaction.response.send_message("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True)
             return
-
-        # 2. 사용자에게 즉시 응답하여 빠른 피드백을 줍니다.
         await interaction.response.send_message("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
-        
-        # 3. 시간이 걸리는 작업은 백그라운드에서 실행하도록 예약합니다.
         asyncio.create_task(self._post_submission_tasks(interaction, approval_channel))
 
 class ApprovalView(ui.View):
@@ -131,9 +118,12 @@ class ApprovalView(ui.View):
         for item in self.children: item.disabled = True
         try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
         except (discord.NotFound, discord.HTTPException): pass
+        
         tasks = [self._send_notifications(interaction.user, member, is_approved)]
         if is_approved:
-            tasks.extend([self._grant_roles(member), self._update_nickname(member), self._send_public_welcome(member)])
+            # [수정] 처리자를 _send_public_welcome 함수로 넘겨줍니다.
+            tasks.extend([self._grant_roles(member), self._update_nickname(member), self._send_public_welcome(interaction.user, member)])
+            
         results = await asyncio.gather(*tasks, return_exceptions=True)
         failed_tasks = [res for res in results if isinstance(res, Exception)]
         if failed_tasks:
@@ -163,13 +153,22 @@ class ApprovalView(ui.View):
     async def _update_nickname(self, member: discord.Member) -> None:
         if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := next((f.value for f in self.original_embed.fields if f.name == "名前"), None)):
             await nick_cog.update_nickname(member, base_name_override=name_field)
-    async def _send_public_welcome(self, member: discord.Member) -> None:
+            
+    # [수정] moderator 인자를 받도록 함수 시그니처를 변경합니다.
+    async def _send_public_welcome(self, moderator: discord.Member, member: discord.Member) -> None:
         guild = member.guild
         if (ch_id := self.onboarding_cog.introduction_channel_id) and (ch := guild.get_channel(ch_id)):
-            embed = self.original_embed.copy(); embed.title = "ようこそ！新しい仲間です！"; embed.color = discord.Color.green()
-            await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+            embed = self.original_embed.copy()
+            embed.title = "ようこそ！新しい仲間です！"
+            embed.color = discord.Color.green()
+            # [수정] 처리자 필드를 추가합니다.
+            embed.add_field(name="処理者", value=moderator.mention, inline=False)
+            # [수정] 임베드 밖의 멘션을 제거합니다.
+            await ch.send(embed=embed)
+            
         if (ch_id := self.onboarding_cog.new_welcome_channel_id) and (ch := guild.get_channel(ch_id)):
             await self._send_new_welcome_message(ch, member, self.onboarding_cog.mention_role_id_1)
+            
     async def _send_notifications(self, moderator: discord.Member, member: discord.Member, is_approved: bool) -> None:
         guild = member.guild
         if is_approved:
