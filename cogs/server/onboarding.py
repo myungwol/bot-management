@@ -27,9 +27,9 @@ class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
 
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
-    age = ui.TextInput(label="年齢", placeholder="例：20代、90年生まれ、30歳、非公開", required=True, max_length=20)
+    age = ui.TextInput(label="年齢", placeholder="例：20代、90年生、30歳、非公開", required=True, max_length=20)
     gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
-    hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
+    hobby = ui.TextInput(label="趣味", placeholder="趣味を自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
     async def on_submit(self, interaction: discord.Interaction):
