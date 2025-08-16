@@ -128,9 +128,9 @@ class ApprovalView(ui.View):
             embed = discord.Embed(title="📝 自己紹介", color=discord.Color.green())
             embed.add_field(name="住民", value=member.mention, inline=False)
             
-            # 자기소개서의 필드를 그대로 추가합니다.
+            # 모든 필드를 한 줄씩(inline=False) 추가합니다.
             for field in self.original_embed.fields:
-                embed.add_field(name=field.name, value=field.value, inline=True)
+                embed.add_field(name=field.name, value=field.value, inline=False)
             
             embed.add_field(name="担当者", value=moderator.mention, inline=False)
             if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
@@ -152,9 +152,9 @@ class ApprovalView(ui.View):
                 embed = discord.Embed(title="❌ 住人登録が拒否されました", color=discord.Color.red())
                 embed.add_field(name="住民", value=member.mention, inline=False)
                 
-                # 자기소개서 필드를 그대로 추가합니다.
+                # 모든 필드를 한 줄씩(inline=False) 추가합니다.
                 for field in self.original_embed.fields:
-                    embed.add_field(name=field.name, value=field.value, inline=True)
+                    embed.add_field(name=field.name, value=field.value, inline=False)
                 
                 embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False)
                 embed.add_field(name="担当者", value=moderator.mention, inline=False)
