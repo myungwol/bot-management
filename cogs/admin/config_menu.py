@@ -1,4 +1,4 @@
-# cogs/admin/config_menu.py (UI 중앙 관리 시스템의 핵심)
+# cogs/admin/config_menu.py (Modal 전송 오류 수정 완료)
 
 import discord
 from discord.ext import commands
@@ -14,25 +14,16 @@ from utils.database import (
 
 logger = logging.getLogger(__name__)
 
-# [수정] 관리할 모든 패널과 임베드의 키 목록을 중앙에서 관리
 PANEL_KEYS = ["roles", "onboarding", "nicknames", "commerce", "fishing", "profile"]
 EMBED_KEYS = [
-    # 시스템
-    "welcome_embed", "farewell_embed",
-    # 패널
-    "panel_roles", "panel_onboarding", "panel_nicknames", 
-    "panel_commerce", "panel_fishing", "panel_profile",
-    # 온보딩
-    "embed_onboarding_approval", "embed_onboarding_public_welcome",
-    # 경제/로그
-    "embed_transfer_confirmation", "log_coin_gain", "log_coin_transfer", "log_coin_admin",
-    # 상점
-    "embed_shop_buy", "embed_shop_sell"
+    "welcome_embed", "farewell_embed", "panel_roles", "panel_onboarding", "panel_nicknames", 
+    "panel_commerce", "panel_fishing", "panel_profile", "embed_onboarding_approval", 
+    "embed_onboarding_public_welcome", "embed_transfer_confirmation", "log_coin_gain", 
+    "log_coin_transfer", "log_coin_admin", "embed_shop_buy", "embed_shop_sell"
 ]
 
 DEFAULT_EMBED_DATA = { "title": "（タイトル未設定）", "description": "（説明未設定）", "color": 0x5865F2, "footer": {"text": ""}}
 
-# 임베드 수정을 위한 팝업(Modal) 클래스
 class EmbedEditModal(ui.Modal, title="埋め込みメッセージ編集"):
     modal_title = ui.TextInput(label="タイトル", style=discord.TextStyle.short, required=True, max_length=256)
     modal_description = ui.TextInput(label="説明", style=discord.TextStyle.paragraph, required=False, max_length=4000)
@@ -55,13 +46,7 @@ class EmbedEditModal(ui.Modal, title="埋め込みメッセージ編集"):
         except (ValueError, TypeError):
             await interaction.followup.send("❌ 無効な色コードです。`#RRGGBB`の形式で入力してください。", ephemeral=True); return
 
-        embed_data = {
-            "title": self.modal_title.value,
-            "description": self.modal_description.value,
-            "color": color_value,
-            "footer": {"text": self.modal_footer.value}
-        }
-
+        embed_data = { "title": self.modal_title.value, "description": self.modal_description.value, "color": color_value, "footer": {"text": self.modal_footer.value} }
         try:
             await save_embed_to_db(self.embed_key, embed_data)
             preview_embed = discord.Embed.from_dict(embed_data)
@@ -70,7 +55,6 @@ class EmbedEditModal(ui.Modal, title="埋め込みメッセージ編集"):
             logger.error(f"임베드 저장 중 오류: {e}", exc_info=True)
             await interaction.followup.send(f"❌ データベースへの保存中にエラーが発生しました。", ephemeral=True)
 
-# 버튼 수정을 위한 팝업(Modal) 클래스
 class ButtonEditModal(ui.Modal, title="ボタン編集"):
     label = ui.TextInput(label="ボタンのテキスト", style=discord.TextStyle.short, required=True, max_length=80)
     emoji = ui.TextInput(label="絵文字", style=discord.TextStyle.short, required=False, max_length=50)
@@ -96,10 +80,7 @@ class ButtonEditModal(ui.Modal, title="ボタン編集"):
         else:
             row_val = self.component_data.get('row', 0)
             
-        self.component_data['label'] = self.label.value
-        self.component_data['emoji'] = self.emoji.value or None
-        self.component_data['row'] = row_val
-
+        self.component_data['label'] = self.label.value; self.component_data['emoji'] = self.emoji.value or None; self.component_data['row'] = row_val
         try:
             await save_panel_component_to_db(self.component_data)
             await interaction.followup.send(f"✅ **`{self.component_data['component_key']}`** ボタンを保存しました。", ephemeral=True)
@@ -107,38 +88,49 @@ class ButtonEditModal(ui.Modal, title="ボタン編集"):
             logger.error(f"버튼 저장 중 오류: {e}", exc_info=True)
             await interaction.followup.send(f"❌ データベースへの保存中にエラーが発生しました。", ephemeral=True)
 
-# 설정 메뉴의 드롭다운 선택지
 class ConfigSelect(ui.Select):
     def __init__(self, options: List[discord.SelectOption], placeholder: str):
         super().__init__(placeholder=placeholder, options=options, custom_id=f"config_select_{placeholder[:20]}")
 
+    # [수정] 여기가 문제의 콜백 함수입니다.
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        # defer()를 호출하지 않고, 바로 send_modal()을 호출합니다.
+        
         selected_value = self.values[0]
         parts = selected_value.split(':')
         
-        if parts[0] == "embed":
-            embed_key = parts[1]
-            current_data = await get_embed_from_db(embed_key) or DEFAULT_EMBED_DATA
-            modal = EmbedEditModal(embed_key, current_data)
-            await interaction.followup.send_modal(modal)
-        elif parts[0] == "button":
-            panel_key, component_key = parts[1], parts[2]
-            components = await get_panel_components_from_db(panel_key)
-            target_comp = next((c for c in components if c['component_key'] == component_key), None)
-            if not target_comp:
-                await interaction.followup.send("❌ 該当のボタンが見つかりません。", ephemeral=True); return
-            modal = ButtonEditModal(target_comp)
-            await interaction.followup.send_modal(modal)
+        try:
+            if parts[0] == "embed":
+                embed_key = parts[1]
+                current_data = await get_embed_from_db(embed_key) or DEFAULT_EMBED_DATA
+                modal = EmbedEditModal(embed_key, current_data)
+                await interaction.response.send_modal(modal) # followup 이 아니라 response 로 보냅니다.
+            elif parts[0] == "button":
+                panel_key, component_key = parts[1], parts[2]
+                components = await get_panel_components_from_db(panel_key)
+                if not components:
+                     # defer를 안했으므로, 응답이 필요합니다.
+                    await interaction.response.send_message("❌ 該当のボタンデータが見つかりません。", ephemeral=True)
+                    return
 
-# 설정 메뉴의 전체 View
+                target_comp = next((c for c in components if c['component_key'] == component_key), None)
+                if not target_comp:
+                    await interaction.response.send_message("❌ 該当のボタンが見つかりません。", ephemeral=True)
+                    return
+                
+                modal = ButtonEditModal(target_comp)
+                await interaction.response.send_modal(modal) # followup 이 아니라 response 로 보냅니다.
+        except Exception as e:
+            logger.error(f"Config Select 콜백 처리 중 오류: {e}", exc_info=True)
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌処理中にエラーが発生しました。", ephemeral=True)
+
+
 class ConfigMenuView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-
     async def initialize(self):
         embed_options = [discord.SelectOption(label=f"埋め込み: {key}", value=f"embed:{key}") for key in EMBED_KEYS]
-        
         button_options = []
         for panel_key in PANEL_KEYS:
             components = await get_panel_components_from_db(panel_key)
@@ -148,37 +140,24 @@ class ConfigMenuView(ui.View):
                         button_options.append(
                             discord.SelectOption(label=f"ボタン: {panel_key} > {comp.get('label', comp.get('component_key'))}", value=f"button:{panel_key}:{comp['component_key']}")
                         )
-
         all_options = embed_options + button_options
-        
-        # [수정] 옵션이 25개를 초과하면 여러 개의 Select 메뉴로 자동 분할
         if not all_options: return
-        
-        chunk_size = 25
-        total_chunks = ceil(len(all_options) / chunk_size)
-        
+        chunk_size = 25; total_chunks = ceil(len(all_options) / chunk_size)
         for i in range(total_chunks):
-            start = i * chunk_size
-            end = start + chunk_size
-            chunk = all_options[start:end]
-            
+            start = i * chunk_size; end = start + chunk_size; chunk = all_options[start:end]
             placeholder = f"設定する項目を選択 ({i+1}/{total_chunks})"
             self.add_item(ConfigSelect(options=chunk, placeholder=placeholder))
 
-
-# 실제 Cog 클래스
 class ConfigMenu(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         logger.info("ConfigMenu Cog가 성공적으로 초기화되었습니다.")
-
     @app_commands.command(name="config", description="[管理者] ボットの埋め込みやボタンなどのUIを管理します。")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def open_config_menu(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            view = ConfigMenuView()
-            await view.initialize()
+            view = ConfigMenuView(); await view.initialize()
             await interaction.followup.send("⚙️ 봇 UI 설정 메뉴\n\n수정하고 싶은 임베드나 버튼이 포함된 메뉴를 선택하세요.", view=view, ephemeral=True)
         except Exception as e:
             logger.error(f"❌ 설정 메뉴(/config) 실행 중 오류 발생: {e}", exc_info=True)
