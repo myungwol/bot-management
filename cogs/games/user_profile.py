@@ -1,4 +1,4 @@
-# cogs/games/user_profile.py (UI 중앙 관리 시스템 연동)
+# cogs/games/user_profile.py (게임 데이터 DB 분리 적용)
 
 import discord
 from discord.ext import commands
@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 from utils.database import (
     get_wallet, get_inventory, get_aquarium, get_user_gear, set_user_gear, CURRENCY_ICON,
-    ITEM_DATABASE, ROD_HIERARCHY, save_panel_id, get_panel_id, get_id, get_embed_from_db,
-    get_panel_components_from_db
+    save_panel_id, get_panel_id, get_id, get_embed_from_db,
+    get_panel_components_from_db, get_item_database, ROD_HIERARCHY
 )
 from cogs.server.nicknames import NICKNAME_PREFIX_HIERARCHY_NAMES
 
@@ -22,7 +22,6 @@ BUTTON_STYLES_MAP = {
     "primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
     "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger,
 }
-
 CATEGORIES = ["プロフィール", "装備", "アイテム", "魚", "農業", "ペット"]
 FISH_PER_PAGE = 5
 
@@ -47,15 +46,10 @@ class InventoryView(ui.View):
         embed = self._build_embed(); self._update_view_components()
         target = interaction.followup if interaction and interaction.response.is_done() else interaction
         if not target: target = self.message
-        
         try:
-            if isinstance(target, discord.Interaction):
-                await target.response.edit_message(embed=embed, view=self)
-            elif isinstance(target, (discord.WebhookMessage, discord.Message)):
-                await target.edit(embed=embed, view=self)
-        except (discord.NotFound, discord.HTTPException) as e:
-            logger.warning(f"인벤토리 메시지 업데이트 실패: {e}")
-
+            if isinstance(target, discord.Interaction): await target.response.edit_message(embed=embed, view=self)
+            elif isinstance(target, (discord.WebhookMessage, discord.Message)): await target.edit(embed=embed, view=self)
+        except (discord.NotFound, discord.HTTPException) as e: logger.warning(f"인벤토리 메시지 업데이트 실패: {e}")
     def _build_embed(self) -> discord.Embed:
         embed = discord.Embed(title=f"📦 {self.user.display_name}様の持ち物 - 「{self.current_category}」", color=0xC8C8C8)
         if self.user.display_avatar: embed.set_thumbnail(url=self.user.display_avatar.url)
@@ -89,7 +83,7 @@ class InventoryView(ui.View):
         embed.set_footer(text="ここで装備したアイテムが釣りの際に自動で使用されます。")
     def _build_アイテム_embed(self, embed: discord.Embed):
         if not self.inventory_data: embed.description = "アイテムがありません。"; return
-        embed.description = "".join([f"{ITEM_DATABASE.get(n, {}).get('emoji', '❓')} **{n}** : `{c}`個\n" for n, c in self.inventory_data.items()])
+        embed.description = "".join([f"{get_item_database().get(n, {}).get('emoji', '❓')} **{n}** : `{c}`個\n" for n, c in self.inventory_data.items()])
     def _build_魚_embed(self, embed: discord.Embed):
         total_fishes = len(self.aquarium_data); total_pages = ceil(total_fishes / FISH_PER_PAGE) if total_fishes > 0 else 1
         if self.fish_page > total_pages: self.fish_page = total_pages
@@ -102,10 +96,10 @@ class InventoryView(ui.View):
     def _build_default_embed(self, embed: discord.Embed): embed.description = "現在、このカテゴリの情報はありません。"
     def _add_gear_selects(self):
         rod_options = [discord.SelectOption(label="古い釣竿", emoji="🎣")]
-        rod_options.extend(discord.SelectOption(label=r, emoji=ITEM_DATABASE.get(r, {}).get('emoji', '🎣')) for r in ROD_HIERARCHY if r != "古い釣竿" and self.inventory_data.get(r, 0) > 0)
+        rod_options.extend(discord.SelectOption(label=r, emoji=get_item_database().get(r, {}).get('emoji', '🎣')) for r in ROD_HIERARCHY if r != "古い釣竿" and self.inventory_data.get(r, 0) > 0)
         rod_select = ui.Select(placeholder="装備する釣竿を選択...", options=rod_options, custom_id="gear_rod_select", row=2); rod_select.callback = self.gear_select_callback; self.add_item(rod_select)
         bait_options = [discord.SelectOption(label="エサなし", value="エサなし", emoji="🚫")]
-        bait_options.extend(discord.SelectOption(label=i, emoji=ITEM_DATABASE.get(i, {}).get('emoji', '🐛')) for i in ["一般の釣りエサ", "高級釣りエサ"] if self.inventory_data.get(i, 0) > 0)
+        bait_options.extend(discord.SelectOption(label=i, emoji=get_item_database().get(i, {}).get('emoji', '🐛')) for i in ["一般の釣りエサ", "高級釣りエサ"] if self.inventory_data.get(i, 0) > 0)
         bait_select = ui.Select(placeholder="装備するエサを選択...", options=bait_options, custom_id="gear_bait_select", row=3); bait_select.callback = self.gear_select_callback; self.add_item(bait_select)
     async def gear_select_callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -161,9 +155,7 @@ class UserProfile(commands.Cog):
         self.view_instance = InventoryPanelView(self); await self.view_instance.setup_buttons()
         self.bot.add_view(self.view_instance)
     async def cog_load(self): await self.load_all_configs()
-    async def load_all_configs(self):
-        self.inventory_panel_channel_id = get_id("inventory_panel_channel_id")
-
+    async def load_all_configs(self): self.inventory_panel_channel_id = get_id("inventory_panel_channel_id")
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
