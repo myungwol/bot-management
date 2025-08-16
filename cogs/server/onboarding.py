@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (단계별 가이드 시스템 완성)
+# cogs/server/onboarding.py ('상호작용 실패' 오류 수정 완료)
 
 import discord
 from discord.ext import commands
@@ -165,57 +165,76 @@ class OnboardingGuideView(ui.View):
         super().__init__(timeout=300)
         self.onboarding_cog = cog_instance; self.steps_data = steps_data
         self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
+
     async def start(self, interaction: discord.Interaction):
-        await self.update_view(interaction)
-    async def update_view(self, interaction: discord.Interaction):
+        await self._update_view(interaction, is_initial=True)
+
+    # [수정] 여기가 핵심적인 오류 수정 부분입니다.
+    async def _update_view(self, interaction: discord.Interaction, is_initial: bool = False):
         step_info = self.steps_data[self.current_step]
         embed_data = step_info.get("embed_data", {}).get("embed_data")
-        if not embed_data:
-            embed = discord.Embed(title="エラー", description="このステップの表示データが見つかりません。", color=discord.Color.red())
-        else:
-            embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
+        embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention) if embed_data else discord.Embed(title="エラー")
+        
         self.clear_items()
         is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
+        
         prev_button = ui.Button(label="◀ 戻る", style=discord.ButtonStyle.secondary, custom_id="onboarding_prev", row=1, disabled=is_first)
         prev_button.callback = self.go_previous; self.add_item(prev_button)
+
         step_type = step_info.get("step_type")
         if step_type == "intro":
              intro_button = ui.Button(label=step_info.get("button_label", "住民登録票を作成する"), style=discord.ButtonStyle.success, custom_id="onboarding_intro")
              intro_button.callback = self.create_introduction; self.add_item(intro_button)
         elif step_type == "action":
-            action_button = ui.Button(label=step_info.get("button_label", "同意する"), style=discord.ButtonStyle.primary, custom_id="onboarding_action", disabled=is_last)
+            action_button = ui.Button(label=step_info.get("button_label", "同意する"), style=discord.ButtonStyle.primary, custom_id="onboarding_action")
             action_button.callback = self.do_action; self.add_item(action_button)
         else:
             next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next", disabled=is_last)
             next_button.callback = self.go_next; self.add_item(next_button)
-        if interaction.response.is_done():
-            if self.message: await self.message.edit(embed=embed, view=self)
-        else:
+
+        # [수정] 최초 생성과 메시지 수정을 명확하게 분리합니다.
+        if is_initial:
             await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
             self.message = await interaction.original_response()
+        else:
+            await interaction.response.edit_message(embed=embed, view=self)
+
     async def go_next(self, interaction: discord.Interaction):
         if self.current_step < len(self.steps_data) - 1: self.current_step += 1
-        await self.update_view(interaction)
+        await self._update_view(interaction)
     async def go_previous(self, interaction: discord.Interaction):
         if self.current_step > 0: self.current_step -= 1
-        await self.update_view(interaction)
+        await self._update_view(interaction)
+    
+    # [수정] 응답 순서 오류를 수정합니다.
     async def do_action(self, interaction: discord.Interaction):
-        step_info = self.steps_data[self.current_step]; role_key_to_add = step_info.get("role_key_to_add")
+        role_granted = False
+        step_info = self.steps_data[self.current_step]
+        role_key_to_add = step_info.get("role_key_to_add")
         if role_key_to_add:
             role_id = get_id(role_key_to_add)
             if role_id and (role := interaction.guild.get_role(role_id)):
                 try:
                     await interaction.user.add_roles(role, reason="オンボーディング進行")
-                    await interaction.followup.send(f"✅ 「{role.name}」の役割を付与しました。", ephemeral=True)
-                except Exception as e: await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True)
+                    role_granted = True
+                except Exception: pass
+        
+        # 1. 먼저 메인 뷰를 다음 단계로 업데이트합니다 (핵심 응답)
         await self.go_next(interaction)
+        
+        # 2. 그 다음에 추가적인 확인 메시지를 보냅니다 (후속 조치)
+        if role_granted:
+            await interaction.followup.send(f"✅ 「{role.name}」の役割を付与しました。", ephemeral=True)
+
     async def create_introduction(self, interaction: discord.Interaction):
         last_time = await get_cooldown(str(interaction.user.id), "introduction")
         if last_time and time.time() - last_time < INTRODUCTION_COOLDOWN_SECONDS:
             rem = INTRODUCTION_COOLDOWN_SECONDS - (time.time() - last_time); m, s = divmod(int(rem), 60)
             await interaction.response.send_message(f"次の申請まであと {m}分{s}秒 お待ちください。", ephemeral=True); return
+        
         await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
-        await self.message.delete(); self.stop()
+        if self.message: await self.message.delete()
+        self.stop()
 
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
@@ -252,10 +271,8 @@ class Onboarding(commands.Cog):
         self.bot.add_view(self.view_instance)
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
-        self.panel_channel_id = get_id("onboarding_panel_channel_id")
-        self.approval_channel_id = get_id("onboarding_approval_channel_id")
-        self.introduction_channel_id = get_id("introduction_channel_id")
-        self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
+        self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
+        self.introduction_channel_id = get_id("introduction_channel_id"); self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
         self.approval_role_id = get_id("role_approval")
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
