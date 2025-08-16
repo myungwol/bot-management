@@ -1,4 +1,4 @@
-# utils/database.py
+# utils/database.py (치명적 오류 수정 완료)
 
 import os
 import discord
@@ -182,9 +182,11 @@ async def add_to_aquarium(user_id_str: str, fish_data: dict):
 async def remove_fish_from_aquarium(fish_id: int):
     await supabase.table('aquariums').delete().eq('id', fish_id).execute()
 
+# [수정] 여기가 문제의 함수입니다.
 @supabase_retry_handler()
 async def get_panel_components_from_db(panel_key: str) -> list | None:
-    response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', ascending=True).execute()
+    # .order('row', ascending=True) -> .order('row', desc=False) 로 수정
+    response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).execute()
     return response.data if response and response.data else None
 
 @supabase_retry_handler()
@@ -193,7 +195,8 @@ async def save_panel_component_to_db(component_data: dict):
 
 @supabase_retry_handler()
 async def get_onboarding_steps() -> list | None:
-    response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', ascending=False).execute()
+    # .order('step_number', ascending=False) -> .order('step_number', desc=False) 로 수정
+    response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
     return response.data if response and response.data else None
 
 async def get_activity_data(user_id_str: str) -> dict:
