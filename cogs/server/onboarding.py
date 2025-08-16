@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (수정됨)
+# cogs/server/onboarding.py (거절 로그 멘션 추가)
 
 import discord
 from discord.ext import commands
@@ -154,7 +154,8 @@ class ApprovalView(ui.View):
             if (ch_id := self.onboarding_cog.rejection_log_channel_id) and (ch := guild.get_channel(ch_id)):
                 embed = self.original_embed.copy(); embed.title = "❌ 住人登録が拒否されました"; embed.color = discord.Color.red(); embed.description = f"**対象者:** {member.mention}"
                 embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False); embed.add_field(name="処理者", value=moderator.mention, inline=False)
-                await ch.send(embed=embed)
+                # [수정] 대상자를 멘션하여 알림이 가도록 content를 추가합니다.
+                await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
     async def _send_new_welcome_message(self, channel: discord.TextChannel, member: discord.Member, mention_role_id: Optional[int]):
         mention = f"<@&{mention_role_id}>" if mention_role_id else ""
         content = f"# {member.mention} さんがDico森へ里入りしました！\n## 皆さんで歓迎しましょう！ {mention}"
@@ -244,10 +245,8 @@ class Onboarding(commands.Cog):
         self.guest_role_id: Optional[int] = None; self.mention_role_id_1: Optional[int] = None
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
     
-    # [수정] 영구 View 등록을 위한 함수 추가
     def register_persistent_views(self):
         self.bot.add_view(OnboardingPanelView(self))
-        # ApprovalView는 동적으로 생성되므로 등록할 필요 없음
     
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
