@@ -1,4 +1,4 @@
-# utils/database.py (온보딩 단계 로드 함수 추가)
+# utils/database.py (패널 컴포넌트 함수 추가)
 
 import os
 import discord
@@ -181,6 +181,15 @@ async def add_to_aquarium(user_id_str: str, fish_data: dict):
 @supabase_retry_handler()
 async def remove_fish_from_aquarium(fish_id: int):
     await supabase.table('aquariums').delete().eq('id', fish_id).execute()
+
+@supabase_retry_handler()
+async def get_panel_components_from_db(panel_key: str) -> list | None:
+    response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).execute()
+    return response.data if response and response.data else None
+
+@supabase_retry_handler()
+async def save_panel_component_to_db(component_data: dict):
+    await supabase.table('panel_components').upsert(component_data, on_conflict='component_key').execute()
 
 @supabase_retry_handler()
 async def get_onboarding_steps() -> list | None:
