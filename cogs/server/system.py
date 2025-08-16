@@ -48,37 +48,58 @@ class RoleSelectView(ui.View):
             options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in chunk if (rid := get_id(info.get('role_id_key')))]
             if options: self.add_item(ui.Select(placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})", min_values=0, max_values=len(options), options=options, custom_id=f"role_select_dynamic_{i}"))
 
-    # --- [수정] 이 함수에 defer()가 추가되었습니다 ---
+    # --- [디버깅] 이 함수 전체에 로그가 추가되었습니다 ---
     @ui.button(label="役割を更新", style=discord.ButtonStyle.primary, custom_id="update_roles_button_final", emoji="✅", row=4)
     async def update_roles_callback(self, interaction: discord.Interaction, button: ui.Button):
-        # 1. defer()를 가장 먼저 호출하여 상호작용 실패를 방지합니다.
-        await interaction.response.defer(ephemeral=True)
-        
-        selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
-        current_ids = {role.id for role in self.member.roles}
-        to_add_ids = selected_ids - current_ids; to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
-        
+        logger.info("--- [디버그] '역할 갱신' 버튼 클릭됨, 콜백 시작 ---")
         try:
+            await interaction.response.defer(ephemeral=True)
+            logger.info("[디버그] 1. defer() 호출 성공")
+            
+            selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
+            logger.info(f"[디버그] 2. 유저가 선택한 역할 ID: {selected_ids}")
+            
+            current_ids = {role.id for role in self.member.roles}
+            logger.info(f"[디버그] 3. 유저의 현재 역할 ID: {current_ids}")
+            
+            to_add_ids = selected_ids - current_ids
+            logger.info(f"[디버그] 4. 추가할 역할 ID 계산됨: {to_add_ids}")
+            
+            to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
+            logger.info(f"[디버그] 5. 제거할 역할 ID 계산됨: {to_remove_ids}")
+            
             guild = interaction.guild
             if to_add_ids:
-                roles_to_add = [r for r_id in to_add_ids if (r := guild.get_role(r_id))];
+                roles_to_add = [r for r_id in to_add_ids if (r := guild.get_role(r_id))]
+                logger.info(f"[디버그] 6a. 역할 추가 시도: {[r.name for r in roles_to_add]}")
                 if roles_to_add: await self.member.add_roles(*roles_to_add, reason="自動役割選択")
+                logger.info("[디버그] 6b. 역할 추가 작업 완료")
+            else:
+                logger.info("[디버그] 6. 추가할 역할 없음, 건너뜀")
+
             if to_remove_ids:
-                roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))];
+                roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))]
+                logger.info(f"[디버그] 7a. 역할 제거 시도: {[r.name for r in roles_to_remove]}")
                 if roles_to_remove: await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
-            
+                logger.info("[디버그] 7b. 역할 제거 작업 완료")
+            else:
+                logger.info("[디버그] 7. 제거할 역할 없음, 건너뜀")
+
             button.disabled = True
             for item in self.children:
                 if isinstance(item, ui.Select): item.disabled = True
             
-            # 2. defer()를 사용했으므로, edit_original_response로 최종 응답을 보냅니다.
+            logger.info("[디버그] 8. 최종 성공 메시지 전송 시도")
             await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self)
+            logger.info("[디버그] 9. 최종 성공 메시지 전송 완료")
             self.stop()
         except Exception as e:
-            logger.error(f"역할 업데이트 콜백 중 오류: {e}", exc_info=True)
-            await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
+            logger.error(f"❌ [디버그] '역할 갱신' 콜백 함수에서 예상치 못한 오류 발생: {e}", exc_info=True)
+            if interaction.response.is_done():
+                await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
+        logger.info("--- [디버그] 콜백 종료 ---")
 
-# --- 역할 카테고리 선택 View (AutoRoleView) ---
+# ... 이하 나머지 코드는 변경 사항 없습니다 ...
 class AutoRoleView(ui.View):
     def __init__(self, panel_config: dict):
         super().__init__(timeout=None); self.panel_config = panel_config
@@ -102,8 +123,6 @@ class AutoRoleView(ui.View):
         except Exception as e:
             logger.error(f"역할 카테고리 선택 콜백 중 오류: {e}", exc_info=True)
             if interaction.response.is_done(): await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
-
-# --- ServerSystem Cog ---
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.welcome_channel_id: Optional[int] = None
