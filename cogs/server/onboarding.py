@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (거절 로그 멘션 추가)
+# cogs/server/onboarding.py (제출 속도 개선)
 
 import discord
 from discord.ext import commands
@@ -42,27 +42,54 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
     gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
     hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
-    def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+    
+    def __init__(self, cog_instance: 'Onboarding'): 
+        super().__init__()
+        self.onboarding_cog = cog_instance
+
+    # [수정] 시간이 걸리는 작업을 별도 함수로 분리합니다.
+    async def _post_submission_tasks(self, interaction: discord.Interaction, approval_channel: discord.TextChannel):
         try:
-            if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id:
-                await interaction.followup.send("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True); return
-            approval_channel = interaction.guild.get_channel(self.onboarding_cog.approval_channel_id)
-            if not approval_channel:
-                await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
+            # 백그라운드에서 쿨다운 설정 및 관리자 채널에 메시지 전송
             await set_cooldown(f"intro_{interaction.user.id}", time.time())
+            
             embed = discord.Embed(title="📝 新しい住人登録票が提出されました", description=f"**作成者:** {interaction.user.mention}", color=discord.Color.blue())
-            if interaction.user.display_avatar: embed.set_thumbnail(url=interaction.user.display_avatar.url)
-            embed.add_field(name="名前", value=self.name.value, inline=False); embed.add_field(name="年齢", value=self.age.value, inline=False)
-            embed.add_field(name="性別", value=self.gender.value, inline=False); embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
+            if interaction.user.display_avatar: 
+                embed.set_thumbnail(url=interaction.user.display_avatar.url)
+            
+            embed.add_field(name="名前", value=self.name.value, inline=False)
+            embed.add_field(name="年齢", value=self.age.value, inline=False)
+            embed.add_field(name="性別", value=self.gender.value, inline=False)
+            embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
+            
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
-            await approval_channel.send(content=f"<@&{self.onboarding_cog.approval_role_id}> 新しい住人登録票が提出されました。", embed=embed, view=view)
-            await interaction.followup.send("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
+            
+            await approval_channel.send(
+                content=f"<@&{self.onboarding_cog.approval_role_id}> 新しい住人登録票が提出されました。",
+                embed=embed, 
+                view=view
+            )
         except Exception as e:
-            logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
+            logger.error(f"자기소개서 백그라운드 처리 중 오류: {e}", exc_info=True)
+
+    # [수정] on_submit 함수는 사용자에게 즉시 응답하고, 나머지 작업은 백그라운드로 넘깁니다.
+    async def on_submit(self, interaction: discord.Interaction):
+        # 1. 필수 설정이 되어 있는지 빠르게 확인합니다.
+        if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id:
+            await interaction.response.send_message("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True)
+            return
+            
+        approval_channel = interaction.guild.get_channel(self.onboarding_cog.approval_channel_id)
+        if not approval_channel:
+            await interaction.response.send_message("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True)
+            return
+
+        # 2. 사용자에게 즉시 응답하여 빠른 피드백을 줍니다.
+        await interaction.response.send_message("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
+        
+        # 3. 시간이 걸리는 작업은 백그라운드에서 실행하도록 예약합니다.
+        asyncio.create_task(self._post_submission_tasks(interaction, approval_channel))
 
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
@@ -154,7 +181,6 @@ class ApprovalView(ui.View):
             if (ch_id := self.onboarding_cog.rejection_log_channel_id) and (ch := guild.get_channel(ch_id)):
                 embed = self.original_embed.copy(); embed.title = "❌ 住人登録が拒否されました"; embed.color = discord.Color.red(); embed.description = f"**対象者:** {member.mention}"
                 embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False); embed.add_field(name="処理者", value=moderator.mention, inline=False)
-                # [수정] 대상자를 멘션하여 알림이 가도록 content를 추가합니다.
                 await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
     async def _send_new_welcome_message(self, channel: discord.TextChannel, member: discord.Member, mention_role_id: Optional[int]):
         mention = f"<@&{mention_role_id}>" if mention_role_id else ""
