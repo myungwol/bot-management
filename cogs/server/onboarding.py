@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (쿨다운 로직 수정)
+# cogs/server/onboarding.py (임베드 DB 연동)
 
 import discord
 from discord.ext import commands
@@ -39,41 +39,27 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
     gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
     hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
-    
-    def __init__(self, cog_instance: 'Onboarding'): 
-        super().__init__()
-        self.onboarding_cog = cog_instance
-
-    async def _post_submission_tasks(self, interaction: discord.Interaction, approval_channel: discord.TextChannel):
+    def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
         try:
+            if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id:
+                await interaction.followup.send("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True); return
+            approval_channel = interaction.guild.get_channel(self.onboarding_cog.approval_channel_id)
+            if not approval_channel:
+                await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
             await set_cooldown(str(interaction.user.id), "introduction", time.time())
             embed = discord.Embed(title="📝 新しい住人登録票が提出されました", description=f"**作成者:** {interaction.user.mention}", color=discord.Color.blue())
-            if interaction.user.display_avatar: 
-                embed.set_thumbnail(url=interaction.user.display_avatar.url)
-            embed.add_field(name="名前", value=self.name.value, inline=False)
-            embed.add_field(name="年齢", value=self.age.value, inline=False)
-            embed.add_field(name="性別", value=self.gender.value, inline=False)
-            embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
+            if interaction.user.display_avatar: embed.set_thumbnail(url=interaction.user.display_avatar.url)
+            embed.add_field(name="名前", value=self.name.value, inline=False); embed.add_field(name="年齢", value=self.age.value, inline=False)
+            embed.add_field(name="性別", value=self.gender.value, inline=False); embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
-            await approval_channel.send(
-                content=f"<@&{self.onboarding_cog.approval_role_id}> 新しい住人登録票が提出されました。",
-                embed=embed, 
-                view=view
-            )
+            await approval_channel.send(content=f"<@&{self.onboarding_cog.approval_role_id}> 新しい住人登録票が提出されました。", embed=embed, view=view)
+            await interaction.followup.send("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
         except Exception as e:
-            logger.error(f"자기소개서 백그라운드 처리 중 오류: {e}", exc_info=True)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        if not self.onboarding_cog or not self.onboarding_cog.approval_channel_id:
-            await interaction.response.send_message("❌ エラー: Onboarding機能が設定されていません。", ephemeral=True)
-            return
-        approval_channel = interaction.guild.get_channel(self.onboarding_cog.approval_channel_id)
-        if not approval_channel:
-            await interaction.response.send_message("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True)
-            return
-        await interaction.response.send_message("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
-        asyncio.create_task(self._post_submission_tasks(interaction, approval_channel))
+            logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
+            await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
@@ -269,6 +255,7 @@ class Onboarding(commands.Cog):
         self.new_welcome_channel_id = get_id("new_welcome_channel_id"); self.approval_role_id = get_id("role_approval")
         self.guest_role_id = get_id("role_guest"); self.mention_role_id_1 = get_id("role_mention_role_1")
         logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
+        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -282,7 +269,13 @@ class Onboarding(commands.Cog):
                 old_message = await target_channel.fetch_message(old_id)
                 await old_message.delete()
             except (discord.NotFound, discord.Forbidden): pass
-        embed = discord.Embed(title="🏡 新米住人の方へ", description="この里へようこそ！\n下のボタンを押して、里での暮らし方を確認し、住人登録を始めましょう。", color=discord.Color.gold())
+            
+        embed_data = await get_embed_from_db("panel_onboarding")
+        if not embed_data:
+            logger.warning("DB에서 'panel_onboarding' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
+            return
+        embed = discord.Embed.from_dict(embed_data)
+        
         view = OnboardingPanelView(self)
         new_message = await target_channel.send(embed=embed, view=view)
         await save_panel_id("onboarding", new_message.id, target_channel.id)
