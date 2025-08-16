@@ -1,4 +1,4 @@
-# main.py (새로운 ConfigMenu Cog 로드)
+# main.py (UI 중앙 관리 시스템 적용)
 
 import discord
 from discord.ext import commands
@@ -25,18 +25,21 @@ class MyBot(commands.Bot):
         super().__init__(*args, **kwargs)
 
     async def setup_hook(self):
+        # 1. 모든 Cog 확장 파일을 로드합니다.
         await self.load_all_extensions()
         
+        # 2. 정적인 자동 역할 View를 등록합니다.
         for panel_key, panel_config in STATIC_AUTO_ROLE_PANELS.items():
             self.add_view(AutoRoleView(panel_config))
-        logger.info(f"✅ {len(STATIC_AUTO_ROLE_PANELS)}개의 AutoRoleView가 등록되었습니다.")
+        logger.info(f"✅ {len(STATIC_AUTO_ROLE_PANELS)}개의 정적 AutoRoleView가 등록되었습니다.")
 
-        # [수정] ConfigMenu Cog도 등록합니다.
-        cogs_to_setup_views = ["Onboarding", "Nicknames", "UserProfile", "Fishing", "Commerce", "PanelManager"]
-        for cog_name in cogs_to_setup_views:
+        # 3. [수정] 각 기능 패널의 영구 View를 동적으로 등록합니다.
+        # ConfigMenu는 이 방식이 아니므로 목록에서 제외합니다.
+        cogs_with_persistent_views = ["Onboarding", "Nicknames", "UserProfile", "Fishing", "Commerce"]
+        for cog_name in cogs_with_persistent_views:
             cog = self.get_cog(cog_name)
             if cog and hasattr(cog, 'register_persistent_views'):
-                cog.register_persistent_views()
+                await cog.register_persistent_views()
                 logger.info(f"✅ '{cog_name}' Cog의 영구 View가 등록되었습니다.")
 
     async def load_all_extensions(self):
@@ -45,7 +48,8 @@ class MyBot(commands.Bot):
         if not os.path.exists(cogs_dir):
             logger.error(f"Cogs 디렉토리를 찾을 수 없습니다: {cogs_dir}")
             return
-        for folder in os.listdir(cogs_dir):
+        # [수정] 로드 순서를 정하기 위해 폴더 목록을 정렬합니다. (admin -> economy -> games -> server)
+        for folder in sorted(os.listdir(cogs_dir)):
             folder_path = os.path.join(cogs_dir, folder)
             if os.path.isdir(folder_path):
                 for filename in os.listdir(folder_path):
@@ -62,25 +66,32 @@ bot = MyBot(command_prefix="/", intents=intents)
 
 async def regenerate_all_panels():
     logger.info("------ [ 모든 패널 자동 재생성 시작 ] ------")
-    panel_tasks = [cog.regenerate_panel() for cog_name, cog in bot.cogs.items() if hasattr(cog, 'regenerate_panel')]
-    if panel_tasks:
-        results = await asyncio.gather(*panel_tasks, return_exceptions=True)
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"❌ 패널 재생성 작업 중 오류 발생: {result}", exc_info=True)
+    # [수정] 패널 재생성 순서를 제어하기 위해 Cog 목록을 가져와서 처리합니다.
+    panel_cogs = ["ServerSystem", "Onboarding", "Nicknames", "Commerce", "Fishing", "UserProfile"]
+    for cog_name in panel_cogs:
+        cog = bot.get_cog(cog_name)
+        if cog and hasattr(cog, 'regenerate_panel'):
+            try:
+                await cog.regenerate_panel()
+            except Exception as e:
+                logger.error(f"❌ '{cog_name}' 패널 재생성 작업 중 오류 발생: {e}", exc_info=True)
     logger.info("------ [ 모든 패널 자동 재생성 완료 ] ------")
 
 @bot.event
 async def on_ready():
     logger.info(f'✅ {bot.user.name}(이)가 성공적으로 로그인했습니다.')
+    
+    # 1. DB에서 모든 채널/역할 ID를 캐시로 불러옵니다.
     await load_all_configs_from_db()
     
+    # 2. 각 Cog가 캐시된 ID를 자신의 설정으로 불러옵니다.
     logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
     for cog_name, cog in bot.cogs.items():
         if hasattr(cog, 'load_all_configs'):
             await cog.load_all_configs()
     logger.info("------ [ 모든 Cog 설정 새로고침 완료 ] ------")
 
+    # 3. 슬래시 커맨드를 동기화합니다.
     try:
         if TEST_GUILD_ID:
             guild = discord.Object(id=int(TEST_GUILD_ID))
@@ -92,6 +103,7 @@ async def on_ready():
     except Exception as e:
         logger.error(f'❌ 명령어 동기화 중 오류가 발생했습니다: {e}')
     
+    # 4. 모든 패널을 재생성합니다.
     await regenerate_all_panels()
 
 async def main():
