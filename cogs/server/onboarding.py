@@ -125,22 +125,14 @@ class ApprovalView(ui.View):
     # --- [수정] 승인 로그 함수 ---
     async def _send_public_welcome(self, moderator: discord.Member, member: discord.Member) -> None:
         if (ch_id := self.onboarding_cog.introduction_channel_id) and (ch := member.guild.get_channel(ch_id)):
-            # [수정] 템플릿을 사용하지 않고 직접 임베드를 생성합니다.
-            embed = discord.Embed(
-                title="📝 自己紹介",
-                color=discord.Color.green() # 초록색
-            )
-            
+            embed = discord.Embed(title="📝 自己紹介", color=discord.Color.green())
             embed.add_field(name="住民", value=member.mention, inline=False)
             
-            intro_content_parts = []
+            # 자기소개서의 필드를 그대로 추가합니다.
             for field in self.original_embed.fields:
-                intro_content_parts.append(f"**{field.name}**\n{field.value}")
-            intro_content = "\n\n".join(intro_content_parts)
+                embed.add_field(name=field.name, value=field.value, inline=True)
             
-            embed.add_field(name="自己紹介", value=intro_content, inline=False)
             embed.add_field(name="担当者", value=moderator.mention, inline=False)
-            
             if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
             
             content = f"||{member.mention}||"
@@ -157,19 +149,12 @@ class ApprovalView(ui.View):
             except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다.")
             
             if (ch_id := self.onboarding_cog.rejection_log_channel_id) and (ch := guild.get_channel(ch_id)):
-                # [수정] 템플릿을 사용하지 않고 직접 임베드를 생성합니다.
-                embed = discord.Embed(
-                    title="❌ 住人登録が拒否されました",
-                    color=discord.Color.red() # 빨간색
-                )
-                
+                embed = discord.Embed(title="❌ 住人登録が拒否されました", color=discord.Color.red())
                 embed.add_field(name="住民", value=member.mention, inline=False)
                 
-                intro_content_parts = []
+                # 자기소개서 필드를 그대로 추가합니다.
                 for field in self.original_embed.fields:
-                    intro_content_parts.append(f"**{field.name}**\n{field.value}")
-                intro_content = "\n\n".join(intro_content_parts)
-                embed.add_field(name="提出内容", value=intro_content, inline=False)
+                    embed.add_field(name=field.name, value=field.value, inline=True)
                 
                 embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False)
                 embed.add_field(name="担当者", value=moderator.mention, inline=False)
