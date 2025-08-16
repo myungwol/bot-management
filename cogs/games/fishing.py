@@ -1,4 +1,4 @@
-# cogs/games/fishing.py (버튼 DB 연동)
+# cogs/games/fishing.py (UI 중앙 관리 시스템 연동)
 
 import discord
 from discord.ext import commands
@@ -16,7 +16,11 @@ from utils.database import (
     get_user_gear, set_user_gear, FISHING_LOOT, ITEM_DATABASE,
     save_panel_id, get_panel_id, get_id, get_embed_from_db, get_panel_components_from_db
 )
-from cogs.admin.panel_manager import BUTTON_STYLES_MAP
+
+BUTTON_STYLES_MAP = {
+    "primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
+    "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger,
+}
 
 BIG_CATCH_THRESHOLD = 70.0
 BITE_REACTION_TIME = 3.0
@@ -41,7 +45,7 @@ class FishingGameView(ui.View):
             if self.is_finished(): return
             self.game_state = "biting"
             if self.children and isinstance(catch_button := self.children[0], ui.Button):
-                catch_button.style = discord.ButtonStyle.danger; catch_button.label = "釣り上げる！"
+                catch_button.style = discord.ButtonStyle.success; catch_button.label = "釣り上げる！" # [수정] 버튼 스타일 변경
             embed = discord.Embed(title="❗ アタリが来た！", description="今だ！ボタンを押して釣り上げよう！", color=discord.Color.red())
             if self.message: await self.message.edit(embed=embed, view=self)
             await asyncio.sleep(BITE_REACTION_TIME)
@@ -79,14 +83,16 @@ class FishingGameView(ui.View):
     
     @ui.button(label="待機中...", style=discord.ButtonStyle.secondary, custom_id="catch_fish_button", emoji="🎣")
     async def catch_button(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.defer()
         if self.game_task: self.game_task.cancel()
         result_embed, log_publicly, is_big_catch = None, False, False
         if self.game_state == "waiting":
+            await interaction.response.defer()
             result_embed = discord.Embed(title="❌ 早すぎ！", description=f"{interaction.user.mention}さんは焦ってしまい、魚に気づかれてしまいました…", color=discord.Color.dark_grey())
         elif self.game_state == "biting":
+            await interaction.response.defer()
             self.game_state = "finished"
             result_embed, log_publicly, is_big_catch = await self._handle_catch_logic()
+        
         if result_embed:
             if self.player.display_avatar: result_embed.set_thumbnail(url=self.player.display_avatar.url)
             await self._send_result(result_embed, log_publicly, is_big_catch)
@@ -104,13 +110,14 @@ class FishingGameView(ui.View):
         embed.set_footer(text=f"{footer_public}\n{footer_private}")
         if self.message:
             try: await self.message.edit(embed=embed, view=None)
-            except (discord.NotFound, AttributeError): pass
+            except (discord.NotFound, AttributeError, discord.HTTPException): pass
 
     async def on_timeout(self):
         if self.game_state != "finished":
             embed = discord.Embed(title="⏱️ 時間切れ", description=f"{self.player.mention}さんは時間内に反応がありませんでした。", color=discord.Color.darker_grey())
             await self._send_result(embed)
         self.stop()
+
     def stop(self):
         if self.game_task and not self.game_task.done(): self.game_task.cancel()
         self.active_fishers_set.discard(self.player.id); super().stop()
@@ -124,41 +131,42 @@ class FishingPanelView(ui.View):
     async def setup_buttons(self):
         components_data = await get_panel_components_from_db('fishing')
         if not components_data:
-            logger.warning("'fishing' 패널에 대한 컴포넌트 데이터가 DB에 없습니다.")
-            self.add_item(ui.Button(label="낚시하기", custom_id="start_fishing"))
-            return
+            default_button = ui.Button(label="낚시하기", custom_id="start_fishing"); default_button.callback = self.start_fishing
+            self.add_item(default_button); return
+        
         for comp in components_data:
-            button = ui.Button(
-                label=comp.get('label'), style=BUTTON_STYLES_MAP.get(comp.get('style', 'secondary')),
-                emoji=comp.get('emoji'), row=comp.get('row'), custom_id=comp.get('component_key')
-            )
-            if comp.get('component_key') == 'start_fishing':
-                button.callback = self.start_fishing
-            self.add_item(button)
+            if comp.get('component_type') == 'button' and comp.get('component_key'):
+                button = ui.Button(label=comp.get('label'), style=BUTTON_STYLES_MAP.get(comp.get('style', 'secondary')), emoji=comp.get('emoji'), row=comp.get('row'), custom_id=comp.get('component_key'))
+                if comp.get('component_key') == 'start_fishing': button.callback = self.start_fishing
+                self.add_item(button)
 
     async def start_fishing(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         lock = self.user_locks.setdefault(user_id, asyncio.Lock())
         if lock.locked():
             await interaction.response.send_message("現在、以前のリクエストを処理中です。しばらくお待ちください。", ephemeral=True); return
+        
         async with lock:
             if user_id in self.fishing_cog.active_fishing_sessions_by_user:
                 await interaction.response.send_message("すでに釣りを開始しています。", ephemeral=True); return
+            
             await interaction.response.defer(ephemeral=True)
             self.fishing_cog.active_fishing_sessions_by_user.add(user_id)
             try:
                 uid_str = str(user_id)
                 gear, inventory = await asyncio.gather(get_user_gear(uid_str), get_inventory(uid_str))
                 rod = gear.get('rod', '素手')
-                if rod == "素手" or ITEM_DATABASE.get(rod) is None: raise ValueError("「古い釣竿」以上の釣竿を装備してください。")
+                if rod == "素手" or ITEM_DATABASE.get(rod) is None: raise ValueError("「古い釣竿」以上の釣竿を商店で購入し、装備してください。")
+                
                 bait = gear.get('bait', 'エサなし')
                 if bait != "エサなし":
                     if inventory.get(bait, 0) > 0:
                         await update_inventory(uid_str, bait, -1); inventory[bait] = inventory.get(bait, 0) - 1
                     else: bait = "エサなし"; await set_user_gear(uid_str, bait="エサなし")
+
                 rod_bonus = int(ITEM_DATABASE.get(rod, {}).get("good_fish_bonus", 0.0) * 100)
                 min_b, max_b = ITEM_DATABASE.get(bait, {}).get("bite_time_range", (8.0, 15.0))
-                desc = f"### ウキを投げました。\n**🎣 使用中の釣竿:** `{rod}` (`+{rod_bonus}%`)\n**🐛 使用中のエサ:** `{bait}` (`{min_b}～{max_b}秒`)"
+                desc = f"### ウキを投げました。\n**🎣 使用中の釣竿:** `{rod}` (`珍しい魚の確率 +{rod_bonus}%`)\n**🐛 使用中のエサ:** `{bait}` (`アタリ待機時間: {min_b}～{max_b}秒`)"
                 embed = discord.Embed(title="🎣 釣りを開始しました！", description=desc, color=discord.Color.light_grey())
                 view = FishingGameView(self.bot, interaction.user, rod, bait, inventory, self.fishing_cog.active_fishing_sessions_by_user)
                 await view.start_game(interaction, embed)
@@ -183,7 +191,6 @@ class Fishing(commands.Cog):
     async def load_all_configs(self):
         self.fishing_panel_channel_id = get_id("fishing_panel_channel_id")
         self.fishing_log_channel_id = get_id("fishing_log_channel_id")
-        logger.info(f"[Fishing Cog] 낚시 패널/로그 채널 ID 로드 완료.")
 
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
@@ -195,20 +202,15 @@ class Fishing(commands.Cog):
         
         panel_info = get_panel_id("fishing")
         if panel_info and (old_id := panel_info.get('message_id')):
-            try:
-                old_message = await target_channel.fetch_message(old_id)
-                await old_message.delete()
+            try: await (await target_channel.fetch_message(old_id)).delete()
             except (discord.NotFound, discord.Forbidden): pass
             
         embed_data = await get_embed_from_db("panel_fishing")
         if not embed_data:
-            logger.warning("DB에서 'panel_fishing' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
-            return
+            logger.warning("DB에서 'panel_fishing' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다."); return
         embed = discord.Embed.from_dict(embed_data)
         
-        self.view_instance = FishingPanelView(self.bot, self)
-        await self.view_instance.setup_buttons()
-        
+        self.view_instance = FishingPanelView(self.bot, self); await self.view_instance.setup_buttons()
         new_message = await target_channel.send(embed=embed, view=self.view_instance)
         await save_panel_id("fishing", new_message.id, target_channel.id)
         logger.info(f"✅ 낚시 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
