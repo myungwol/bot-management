@@ -8,9 +8,12 @@ import asyncio
 from typing import Dict, Callable, Any, List
 from functools import wraps
 
+# [신규] UI 기본값 데이터를 임포트합니다.
+from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS
+
 logger = logging.getLogger(__name__)
 
-# --- [추가] 새로운 캐시 영역 ---
+# --- 캐시 영역 ---
 _bot_configs_cache: Dict[str, Any] = {}
 _channel_id_cache: Dict[str, int] = {}
 _item_database_cache: Dict[str, Dict[str, Any]] = {}
@@ -28,14 +31,13 @@ try:
 except Exception as e:
     logger.critical(f"❌ Supabase 클라이언트 생성 실패: {e}", exc_info=True)
 
-# --- [수정] 범용 재시도 핸들러 ---
+# --- 범용 재시도 핸들러 ---
 def supabase_retry_handler(retries: int = 3, delay: int = 5):
     def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             if not supabase:
                 logger.error(f"❌ Supabase 클라이언트가 없어 '{func.__name__}' 함수를 실행할 수 없습니다.")
-                # [수정] 반환 타입 힌트에 따라 기본값 반환
                 return_type = func.__annotations__.get("return")
                 if return_type:
                     if "dict" in str(return_type).lower(): return {}
@@ -51,7 +53,6 @@ def supabase_retry_handler(retries: int = 3, delay: int = 5):
                         await asyncio.sleep(delay)
                     else:
                         logger.error(f"❌ '{func.__name__}' 함수가 모든 재시도({retries}번)에 실패했습니다.", exc_info=True)
-                        # [수정] 실패 시에도 기본값 반환
                         return_type = func.__annotations__.get("return")
                         if return_type:
                             if "dict" in str(return_type).lower(): return {}
@@ -60,9 +61,28 @@ def supabase_retry_handler(retries: int = 3, delay: int = 5):
         return wrapper
     return decorator
 
-# --- [신규] 모든 데이터 로더 통합 ---
+# --- [신규] UI 기본값을 DB에 동기화하는 함수 ---
+async def sync_ui_defaults_to_db():
+    """ui_defaults.py 파일의 내용을 DB에 덮어씁니다."""
+    logger.info("------ [ UI 기본값 DB 동기화 시작 ] ------")
+    try:
+        # 임베드 동기화
+        for key, data in UI_EMBEDS.items():
+            await save_embed_to_db(key, data)
+        logger.info(f"✅ {len(UI_EMBEDS)}개의 임베드 기본값을 DB에 동기화했습니다.")
+
+        # 패널 컴포넌트 동기화
+        for component_data in UI_PANEL_COMPONENTS:
+            await save_panel_component_to_db(component_data)
+        logger.info(f"✅ {len(UI_PANEL_COMPONENTS)}개의 패널 컴포넌트 기본값을 DB에 동기화했습니다.")
+
+    except Exception as e:
+        logger.error(f"❌ UI 기본값 DB 동기화 중 오류 발생: {e}", exc_info=True)
+    logger.info("------ [ UI 기본값 DB 동기화 완료 ] ------")
+
+
+# --- 모든 데이터 로더 통합 ---
 async def load_all_data_from_db():
-    """봇 시작 시 모든 필수 데이터를 DB에서 불러와 캐시에 저장합니다."""
     logger.info("------ [ 모든 DB 데이터 로드 시작 ] ------")
     await asyncio.gather(
         load_bot_configs_from_db(),
@@ -71,46 +91,41 @@ async def load_all_data_from_db():
     )
     logger.info("------ [ 모든 DB 데이터 로드 완료 ] ------")
 
-# --- [신규] 봇 설정 로더 및 Getter ---
+# --- 봇 설정 로더 및 Getter ---
 @supabase_retry_handler()
 async def load_bot_configs_from_db():
-    """'bot_configs' 테이블에서 모든 설정값을 불러와 캐시합니다."""
     global _bot_configs_cache
     response = await supabase.table('bot_configs').select('config_key, config_value').execute()
     if response.data:
         _bot_configs_cache = {item['config_key']: item['config_value'] for item in response.data}
-        logger.info(f"✅ {_len(_bot_configs_cache)}개의 봇 설정을 DB에서 로드했습니다.")
+        logger.info(f"✅ {len(_bot_configs_cache)}개의 봇 설정을 DB에서 로드했습니다.")
     else:
         logger.warning("DB 'bot_configs' 테이블에서 설정 정보를 찾을 수 없습니다.")
 
 def get_config(key: str, default: Any = None) -> Any:
-    """캐시에서 봇 설정값을 가져옵니다. 없으면 기본값을 반환합니다."""
     value = _bot_configs_cache.get(key)
     if value is None:
         logger.warning(f"[Config Cache Miss] '{key}'에 해당하는 설정을 캐시에서 찾을 수 없습니다. 기본값을 사용합니다.")
         return default
     return value
 
-# --- [수정] 게임 데이터 로더 및 Getter ---
+# --- 게임 데이터 로더 및 Getter ---
 @supabase_retry_handler()
 async def load_game_data_from_db():
-    """'items'와 'fishing_loots' 테이블에서 게임 데이터를 불러와 캐시합니다."""
     global _item_database_cache, _fishing_loot_cache
     
-    # 아이템 데이터 로드
     item_response = await supabase.table('items').select('*').execute()
     if item_response.data:
         temp_item_db = {item.pop('name'): item for item in item_response.data}
         _item_database_cache = temp_item_db
-        logger.info(f"✅ {_len(_item_database_cache)}개의 아이템 정보를 DB에서 로드했습니다.")
+        logger.info(f"✅ {len(_item_database_cache)}개의 아이템 정보를 DB에서 로드했습니다.")
     else:
         logger.warning("DB 'items' 테이블에서 아이템 정보를 찾을 수 없습니다.")
         
-    # 낚시 결과물 데이터 로드
     loot_response = await supabase.table('fishing_loots').select('*').execute()
     if loot_response.data:
         _fishing_loot_cache = loot_response.data
-        logger.info(f"✅ {_len(_fishing_loot_cache)}개의 낚시 결과물 정보를 DB에서 로드했습니다.")
+        logger.info(f"✅ {len(_fishing_loot_cache)}개의 낚시 결과물 정보를 DB에서 로드했습니다.")
     else:
         logger.warning("DB 'fishing_loots' 테이블에서 낚시 결과물 정보를 찾을 수 없습니다.")
 
@@ -120,20 +135,18 @@ def get_item_database() -> Dict[str, Dict[str, Any]]:
 def get_fishing_loot() -> List[Dict[str, Any]]:
     return _fishing_loot_cache
     
-# --- [수정] 채널/역할 ID 로더 및 Getter ---
+# --- 채널/역할 ID 로더 및 Getter ---
 @supabase_retry_handler()
 async def load_channel_ids_from_db():
-    """'channel_configs' 테이블에서 모든 ID 설정을 불러와 캐시합니다."""
     global _channel_id_cache
     response = await supabase.table('channel_configs').select('channel_key, channel_id').execute()
     if response.data:
         _channel_id_cache = {item['channel_key']: int(item['channel_id']) for item in response.data}
-        logger.info(f"✅ {_len(_channel_id_cache)}개의 채널/역할 ID를 DB에서 로드했습니다.")
+        logger.info(f"✅ {len(_channel_id_cache)}개의 채널/역할 ID를 DB에서 로드했습니다.")
     else:
         logger.warning("DB 'channel_configs' 테이블에서 ID 정보를 찾을 수 없습니다.")
 
 def get_id(key: str) -> int | None:
-    """캐시에서 채널/역할/메시지 ID를 가져옵니다."""
     config_id = _channel_id_cache.get(key)
     if config_id is None:
         logger.warning(f"[ID Cache Miss] '{key}'에 해당하는 ID를 캐시에서 찾을 수 없습니다.")
@@ -141,7 +154,6 @@ def get_id(key: str) -> int | None:
 
 @supabase_retry_handler()
 async def save_id_to_db(key: str, object_id: int):
-    """채널/역할/메시지 ID를 DB와 캐시에 저장(업데이트)합니다."""
     global _channel_id_cache
     await supabase.table('channel_configs').upsert(
         {"channel_key": key, "channel_id": str(object_id)}, 
@@ -186,17 +198,16 @@ async def save_panel_component_to_db(component_data: dict):
         on_conflict='component_key'
     ).execute()
     
+# ... (이하 나머지 함수들은 변경 없음) ...
 # --- 온보딩 관리 함수 ---
 @supabase_retry_handler()
 async def get_onboarding_steps() -> list:
-    # [수정] 외부 키 참조 대신 join을 사용하여 더 안정적으로 데이터를 가져옵니다.
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
     return response.data if response.data else []
 
 # --- 유저 데이터 공용 함수 ---
 @supabase_retry_handler()
 async def get_or_create_user(table_name: str, user_id_str: str, default_data: dict) -> dict:
-    """특정 테이블에서 유저 데이터를 가져오거나, 없으면 기본값으로 생성합니다."""
     try:
         response = await supabase.table(table_name).select("*").eq("user_id", user_id_str).limit(1).execute()
         if response.data:
@@ -233,7 +244,7 @@ async def update_inventory(user_id_str: str, item_name: str, quantity: int):
 # --- 장비(Gear) 관련 함수 ---
 async def get_user_gear(user_id_str: str) -> dict:
     default_rod = get_config("DEFAULT_ROD", "古い釣竿")
-    default_bait = get_config("DEFAULT_BAIT", "エサなし")
+    default_bait = "エサなし"
     default_gear = {"rod": default_rod, "bait": default_bait}
     
     gear = await get_or_create_user('gear_setups', user_id_str, default_gear)
@@ -254,7 +265,7 @@ async def get_user_gear(user_id_str: str) -> dict:
 @supabase_retry_handler()
 async def set_user_gear(user_id_str: str, rod: str = None, bait: str = None):
     default_rod = get_config("DEFAULT_ROD", "古い釣竿")
-    default_bait = get_config("DEFAULT_BAIT", "エサなし")
+    default_bait = "エサなし"
     await get_or_create_user('gear_setups', user_id_str, {"rod": default_rod, "bait": default_bait})
     
     data_to_update = {}
@@ -292,8 +303,3 @@ async def set_cooldown(user_id_str: str, cooldown_key: str, timestamp: float):
     await supabase.table('cooldowns').upsert(
         {"user_id": user_id_str, "cooldown_key": cooldown_key, "last_cooldown_timestamp": timestamp}
     ).execute()
-    
-# --- 헬퍼 함수 ---
-def _len(data) -> int:
-    """None을 확인하고 길이를 반환하는 안전한 길이 함수"""
-    return len(data) if data else 0
