@@ -1,4 +1,4 @@
-# main.py (최종 클린 버전)
+# main.py (새로운 ConfigMenu Cog 로드)
 
 import discord
 from discord.ext import commands
@@ -31,7 +31,8 @@ class MyBot(commands.Bot):
             self.add_view(AutoRoleView(panel_config))
         logger.info(f"✅ {len(STATIC_AUTO_ROLE_PANELS)}개의 AutoRoleView가 등록되었습니다.")
 
-        cogs_to_setup_views = ["Onboarding", "Nicknames", "UserProfile", "Fishing", "Commerce"]
+        # [수정] ConfigMenu Cog도 등록합니다.
+        cogs_to_setup_views = ["Onboarding", "Nicknames", "UserProfile", "Fishing", "Commerce", "PanelManager"]
         for cog_name in cogs_to_setup_views:
             cog = self.get_cog(cog_name)
             if cog and hasattr(cog, 'register_persistent_views'):
@@ -66,7 +67,7 @@ async def regenerate_all_panels():
         results = await asyncio.gather(*panel_tasks, return_exceptions=True)
         for result in results:
             if isinstance(result, Exception):
-                logger.error(f"❌ 패널 재생성 작업 중 오류 발생: {result}", exc_info=result)
+                logger.error(f"❌ 패널 재생성 작업 중 오류 발생: {result}", exc_info=True)
     logger.info("------ [ 모든 패널 자동 재생성 완료 ] ------")
 
 @bot.event
