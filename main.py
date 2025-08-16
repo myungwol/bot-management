@@ -5,33 +5,23 @@ from discord.ext import commands
 import os
 import asyncio
 import logging
-import logging.handlers  # [신규] 로깅 핸들러 임포트
+import logging.handlers
 
-from utils.database import load_all_data_from_db
+# [수정] sync_ui_defaults_to_db 함수를 임포트합니다.
+from utils.database import load_all_data_from_db, sync_ui_defaults_to_db
 
-# --- [신규] 중앙 로깅 설정 ---
-# 1. 로그 포맷터 생성: 로그가 어떤 형식으로 보일지 결정합니다.
+# --- 중앙 로깅 설정 ---
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s')
-
-# 2. 로그 핸들러 생성: 로그를 어디로 보낼지 결정합니다. (StreamHandler -> 콘솔 화면)
 log_handler = logging.StreamHandler()
 log_handler.setFormatter(log_formatter)
-
-# 3. 루트 로거 가져오기: 봇의 모든 로거들의 최상위 로거입니다.
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)  # 봇 전체의 기본 로그 레벨을 INFO로 설정
-
-# 4. 기존 핸들러 제거 및 새 핸들러 추가: 중복 로깅을 방지합니다.
+root_logger.setLevel(logging.INFO)
 if root_logger.hasHandlers():
     root_logger.handlers.clear()
 root_logger.addHandler(log_handler)
-
-# 5. 라이브러리 로거 레벨 조정: 너무 많은 로그를 남기는 라이브러리를 조용하게 만듭니다.
 logging.getLogger('discord').setLevel(logging.WARNING)
 logging.getLogger('discord.http').setLevel(logging.WARNING)
 logging.getLogger('websockets').setLevel(logging.WARNING)
-
-# 6. 이 파일에서 사용할 로거 생성
 logger = logging.getLogger(__name__)
 
 # --- 환경 변수 로드 ---
@@ -90,7 +80,6 @@ class MyBot(commands.Bot):
                             logger.error(f'❌ Cog 로드 실패: {extension_path} | {e}', exc_info=True)
         logger.info("------ [ Cog 로드 완료 ] ------")
 
-# --- 봇 인스턴스 생성 ---
 bot = MyBot(command_prefix="/", intents=intents)
 
 async def regenerate_all_panels():
@@ -111,6 +100,11 @@ async def regenerate_all_panels():
 async def on_ready():
     logger.info(f'✅ {bot.user.name}(이)가 성공적으로 로그인했습니다.')
     
+    # [수정] 봇 시작 시 실행 순서 변경
+    # 1. 코드에 있는 UI 기본값을 DB에 먼저 기록합니다.
+    await sync_ui_defaults_to_db()
+    
+    # 2. DB에 있는 모든 데이터(방금 기록한 UI 포함)를 봇의 캐시로 불러옵니다.
     await load_all_data_from_db()
     
     logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
