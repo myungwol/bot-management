@@ -152,12 +152,12 @@ UI_ROLE_KEY_MAP = {
         "name": "通話",
         "is_prefix": False,
         "priority": 0
-    },  # [수정]
+    },
     "role_notify_friends": {
         "name": "友達",
         "is_prefix": False,
         "priority": 0
-    },  # [수정]
+    },
     "role_notify_disboard": {
         "name": "Disboard",
         "is_prefix": False,
