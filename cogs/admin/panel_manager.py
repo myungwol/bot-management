@@ -16,11 +16,13 @@ logger = logging.getLogger(__name__)
 PANEL_KEYS = ["onboarding", "roles", "nicknames", "commerce", "fishing", "profile"]
 EMBED_KEYS = [
     "welcome_embed", "farewell_embed", 
-    "panel_onboarding", "panel_roles", "panel_nicknames", 
+    "panel_roles", "panel_onboarding", "panel_nicknames", 
     "panel_commerce", "panel_fishing", "panel_profile",
     "onboarding_step_0", "onboarding_step_1", "onboarding_step_2",
-    "onboarding_step_3", "onboarding_step_4", "onboarding_step_5"
+    "onboarding_step_3", "onboarding_step_4", "onboarding_step_5",
+    "log_coin_gain", "log_coin_transfer", "log_coin_admin"
 ]
+
 BUTTON_STYLES_MAP = {
     "primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
     "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger,
