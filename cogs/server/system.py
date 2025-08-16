@@ -22,13 +22,10 @@ def format_embed_from_db(embed_data: dict, **kwargs) -> discord.Embed:
         def __missing__(self, key): return f'{{{key}}}'
     safe_kwargs = SafeFormatter(**kwargs)
     try:
-        if 'title' in formatted_data and isinstance(formatted_data.get('title'), str):
-            formatted_data['title'] = formatted_data['title'].format_map(safe_kwargs)
-        if 'description' in formatted_data and isinstance(formatted_data.get('description'), str):
-            formatted_data['description'] = formatted_data['description'].format_map(safe_kwargs)
+        if 'title' in formatted_data and isinstance(formatted_data.get('title'), str): formatted_data['title'] = formatted_data['title'].format_map(safe_kwargs)
+        if 'description' in formatted_data and isinstance(formatted_data.get('description'), str): formatted_data['description'] = formatted_data['description'].format_map(safe_kwargs)
         if 'footer' in formatted_data and isinstance(formatted_data.get('footer'), dict):
-            if 'text' in formatted_data['footer'] and isinstance(formatted_data['footer'].get('text'), str):
-                formatted_data['footer']['text'] = formatted_data['footer']['text'].format_map(safe_kwargs)
+            if 'text' in formatted_data['footer'] and isinstance(formatted_data['footer'].get('text'), str): formatted_data['footer']['text'] = formatted_data['footer']['text'].format_map(safe_kwargs)
         if 'fields' in formatted_data and isinstance(formatted_data.get('fields'), list):
             for field in formatted_data['fields']:
                 if isinstance(field, dict):
@@ -41,24 +38,26 @@ def format_embed_from_db(embed_data: dict, **kwargs) -> discord.Embed:
 
 # --- 역할 선택 View (RoleSelectView) ---
 class RoleSelectView(ui.View):
-    # 이 클래스는 변경점 없음
     def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
-        super().__init__(timeout=300)
-        self.member = member
+        super().__init__(timeout=300); self.member = member
         self.all_category_role_ids = {rid for role in category_roles if (rid := get_id(role.get('role_id_key')))}
         current_user_role_ids = {r.id for r in self.member.roles}
         role_chunks = [category_roles[i:i + 25] for i in range(0, len(category_roles), 25)]
-        if not role_chunks or not self.all_category_role_ids:
-            self.add_item(ui.Button(label="設定された役割がありません", disabled=True)); return
+        if not role_chunks or not self.all_category_role_ids: self.add_item(ui.Button(label="設定された役割がありません", disabled=True)); return
         for i, chunk in enumerate(role_chunks):
             options = [discord.SelectOption(label=info['label'], value=str(rid), description=info.get('description'), default=(rid in current_user_role_ids)) for info in chunk if (rid := get_id(info.get('role_id_key')))]
             if options: self.add_item(ui.Select(placeholder=f"{category_name} 役割選択 ({i+1}/{len(role_chunks)})", min_values=0, max_values=len(options), options=options, custom_id=f"role_select_dynamic_{i}"))
+
+    # --- [수정] 이 함수에 defer()가 추가되었습니다 ---
     @ui.button(label="役割を更新", style=discord.ButtonStyle.primary, custom_id="update_roles_button_final", emoji="✅", row=4)
     async def update_roles_callback(self, interaction: discord.Interaction, button: ui.Button):
+        # 1. defer()를 가장 먼저 호출하여 상호작용 실패를 방지합니다.
         await interaction.response.defer(ephemeral=True)
+        
         selected_ids = {int(value) for item in self.children if isinstance(item, ui.Select) for value in item.values}
         current_ids = {role.id for role in self.member.roles}
         to_add_ids = selected_ids - current_ids; to_remove_ids = (self.all_category_role_ids - selected_ids) & current_ids
+        
         try:
             guild = interaction.guild
             if to_add_ids:
@@ -67,10 +66,14 @@ class RoleSelectView(ui.View):
             if to_remove_ids:
                 roles_to_remove = [r for r_id in to_remove_ids if (r := guild.get_role(r_id))];
                 if roles_to_remove: await self.member.remove_roles(*roles_to_remove, reason="自動役割選択")
+            
             button.disabled = True
             for item in self.children:
                 if isinstance(item, ui.Select): item.disabled = True
-            await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self); self.stop()
+            
+            # 2. defer()를 사용했으므로, edit_original_response로 최종 응답을 보냅니다.
+            await interaction.edit_original_response(content="✅ 役割が正常に更新されました。", view=self)
+            self.stop()
         except Exception as e:
             logger.error(f"역할 업데이트 콜백 중 오류: {e}", exc_info=True)
             await interaction.edit_original_response(content="❌ 処理中にエラーが発生しました。", view=None)
@@ -83,43 +86,25 @@ class AutoRoleView(ui.View):
         if options:
             select = ui.Select(placeholder="役割のカテゴリーを選択してください...", options=options, custom_id=f"autorole_category_select:{panel_config.get('channel_key', 'default')}")
             select.callback = self.category_select_callback; self.add_item(select)
-
-    # [수정] category_select_callback 전체 수정
     async def category_select_callback(self, interaction: discord.Interaction):
-        # 1. 3초 룰을 지키기 위해 defer()를 가장 먼저 호출합니다.
         await interaction.response.defer(ephemeral=True, thinking=True)
-        
         try:
-            # 2. 선택된 값을 안전하게 가져옵니다.
-            values = interaction.data.get("values", [])
-            if not values:
-                await interaction.followup.send("❌ 選択が無効です。", ephemeral=True); return
-            
+            values = interaction.data.get("values", []);
+            if not values: await interaction.followup.send("❌ 選択が無効です。", ephemeral=True); return
             category_id = values[0]
-            
-            # 3. 나머지 로직을 실행합니다.
             category_info = next((c for c in self.panel_config.get("categories", []) if c['id'] == category_id), None)
             category_name = category_info['label'] if category_info else category_id.capitalize()
             category_roles = self.panel_config.get("roles", {}).get(category_id, [])
-            
-            if not category_roles:
-                await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True); return
-                
-            embed = discord.Embed(
-                title=f"「{category_name}」役割選択",
-                description="下のドロップダウンメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。",
-                color=discord.Color.blue()
-            )
+            if not category_roles: await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True); return
+            embed = discord.Embed(title=f"「{category_name}」役割選択", description="下のドロップダウンメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。", color=discord.Color.blue())
             view = RoleSelectView(interaction.user, category_roles, category_name)
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
         except Exception as e:
             logger.error(f"역할 카테고리 선택 콜백 중 오류: {e}", exc_info=True)
-            if interaction.response.is_done():
-                await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
+            if interaction.response.is_done(): await interaction.followup.send("❌ 処理中にエラーが発生しました。", ephemeral=True)
 
 # --- ServerSystem Cog ---
 class ServerSystem(commands.Cog):
-    # 이 클래스의 나머지 부분은 변경점 없음
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.welcome_channel_id: Optional[int] = None
         self.farewell_channel_id: Optional[int] = None; self.guest_role_id: Optional[int] = None
