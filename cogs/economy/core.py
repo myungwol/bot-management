@@ -1,4 +1,4 @@
-# cogs/economy/core.py (임베드 DB 연동 최종)
+# cogs/economy/core.py (UI 중앙 관리 시스템 연동)
 
 import discord
 from discord.ext import commands, tasks
@@ -17,6 +17,8 @@ from utils.database import (
     get_wallet, update_wallet,
     CURRENCY_ICON, get_id, supabase, get_embed_from_db
 )
+# [수정] system.py에서 만든 헬퍼 함수를 가져옵니다.
+from cogs.server.system import format_embed_from_db
 
 CHAT_MESSAGE_REQUIREMENT = 10
 CHAT_REWARD_RANGE = (5, 10)
@@ -28,7 +30,6 @@ class TransferConfirmView(ui.View):
         super().__init__(timeout=60)
         self.sender = sender; self.recipient = recipient; self.amount = amount
         self.economy_cog = cog_instance; self.result_message: Optional[str] = None
-        self.error: Optional[Exception] = None
     @ui.button(label="はい", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: ui.Button):
         if interaction.user.id != self.sender.id:
@@ -37,12 +38,13 @@ class TransferConfirmView(ui.View):
         try:
             params = {'sender_id_param': str(self.sender.id), 'recipient_id_param': str(self.recipient.id), 'amount_param': self.amount}
             response = await supabase.rpc('transfer_coins', params).execute()
-            if not response.data or (hasattr(response.data, 'error') and response.data['error']):
-                 raise Exception("Supabase RPC call failed or returned an error.")
+            # [수정] Supabase RPC 응답에 대한 더 안정적인 오류 확인
+            if response.data is None or (isinstance(response.data, list) and not response.data):
+                 raise Exception(f"송금 실패: 잔액 부족 또는 DB 오류. {response.error}")
             await self.economy_cog.log_coin_transfer(self.sender, self.recipient, self.amount)
             self.result_message = f"✅ {self.recipient.mention}さんへ `{self.amount:,}`{CURRENCY_ICON}を正常に送金しました。"
         except Exception as e:
-            self.error = e; logger.error(f"송금 RPC 실행 중 오류: {e}", exc_info=True)
+            logger.error(f"송금 RPC 실행 중 오류: {e}", exc_info=True)
             self.result_message = f"❌ 送金に失敗しました。残高が不足しているか、予期せぬエラーが発生しました。"
         self.stop()
     @ui.button(label="いいえ", style=discord.ButtonStyle.danger)
@@ -51,11 +53,6 @@ class TransferConfirmView(ui.View):
             await interaction.response.send_message("本人確認が必要です。", ephemeral=True); return
         self.result_message = "❌ 送金がキャンセルされました。"; self.stop()
         await interaction.response.edit_message(content=self.result_message, view=None)
-
-def format_embed_data(data: dict, **kwargs) -> dict:
-    json_str = json.dumps(data)
-    formatted_str = json_str.format(**kwargs)
-    return json.loads(formatted_str)
 
 class EconomyCore(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -78,13 +75,10 @@ class EconomyCore(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot or message.guild is None or message.content.startswith('/'): return
-        user = message.author
-        self.user_chat_progress[user.id] += 1
+        user = message.author; self.user_chat_progress[user.id] += 1
         if self.user_chat_progress[user.id] >= CHAT_MESSAGE_REQUIREMENT:
-            self.user_chat_progress[user.id] = 0
-            reward = random.randint(*CHAT_REWARD_RANGE)
-            await update_wallet(user, reward)
-            await self.log_coin_activity(user, reward, "チャット活動報酬")
+            self.user_chat_progress[user.id] = 0; reward = random.randint(*CHAT_REWARD_RANGE)
+            await update_wallet(user, reward); await self.log_coin_activity(user, reward, "チャット活動報酬")
             
     @tasks.loop(minutes=1)
     async def voice_reward_loop(self):
@@ -97,10 +91,8 @@ class EconomyCore(commands.Cog):
                         if not member.bot and member.voice and not member.voice.self_deaf and not member.voice.self_mute:
                             self.user_voice_progress[member.id] += 1
                             if self.user_voice_progress[member.id] >= VOICE_TIME_REQUIREMENT_MINUTES:
-                                self.user_voice_progress[member.id] = 0
-                                reward = random.randint(*VOICE_REWARD_RANGE)
-                                await update_wallet(member, reward)
-                                await self.log_coin_activity(member, reward, "ボイスチャット活動報酬")
+                                self.user_voice_progress[member.id] = 0; reward = random.randint(*VOICE_REWARD_RANGE)
+                                await update_wallet(member, reward); await self.log_coin_activity(member, reward, "ボイスチャット活動報酬")
         except Exception as e: logger.error(f"음성 보상 루프 중 오류: {e}", exc_info=True)
         
     @voice_reward_loop.before_loop
@@ -108,42 +100,27 @@ class EconomyCore(commands.Cog):
     
     async def log_coin_activity(self, user: discord.Member, amount: int, reason: str):
         if not self.coin_log_channel_id or not (log_channel := self.bot.get_channel(self.coin_log_channel_id)): return
-        embed_data = await get_embed_from_db("log_coin_gain")
-        if not embed_data: return
-        formatted_data = format_embed_data(
-            embed_data, reason=reason, user_mention=user.mention,
-            amount=f"{amount:,}", currency_icon=CURRENCY_ICON
-        )
-        embed = discord.Embed.from_dict(formatted_data)
-        try: await log_channel.send(embed=embed)
-        except Exception as e: logger.error(f"코인 활동 로그 전송 실패: {e}", exc_info=True)
+        if embed_data := await get_embed_from_db("log_coin_gain"):
+            embed = format_embed_from_db(embed_data, reason=reason, user_mention=user.mention, amount=f"{amount:,}", currency_icon=CURRENCY_ICON)
+            try: await log_channel.send(embed=embed)
+            except Exception as e: logger.error(f"코인 활동 로그 전송 실패: {e}", exc_info=True)
         
     async def log_coin_transfer(self, sender: discord.Member, recipient: discord.Member, amount: int):
         if not self.coin_log_channel_id or not (log_channel := self.bot.get_channel(self.coin_log_channel_id)): return
-        embed_data = await get_embed_from_db("log_coin_transfer")
-        if not embed_data: return
-        formatted_data = format_embed_data(
-            embed_data, sender_mention=sender.mention, recipient_mention=recipient.mention,
-            amount=f"{amount:,}", currency_icon=CURRENCY_ICON
-        )
-        embed = discord.Embed.from_dict(formatted_data)
-        try: await log_channel.send(embed=embed)
-        except Exception as e: logger.error(f"코인 송금 로그 전송 실패: {e}", exc_info=True)
+        if embed_data := await get_embed_from_db("log_coin_transfer"):
+            embed = format_embed_from_db(embed_data, sender_mention=sender.mention, recipient_mention=recipient.mention, amount=f"{amount:,}", currency_icon=CURRENCY_ICON)
+            try: await log_channel.send(embed=embed)
+            except Exception as e: logger.error(f"코인 송금 로그 전송 실패: {e}", exc_info=True)
         
     async def log_admin_action(self, admin: discord.Member, target: discord.Member, amount: int, action: str):
         if not self.coin_log_channel_id or not (log_channel := self.bot.get_channel(self.coin_log_channel_id)): return
-        embed_data = await get_embed_from_db("log_coin_admin")
-        if not embed_data: return
-        color = 0x3498DB if amount > 0 else 0xE74C3C
-        amount_str = f"+{amount:,}" if amount > 0 else f"{amount:,}"
-        formatted_data = format_embed_data(
-            embed_data, action=action, target_mention=target.mention,
-            amount=amount_str, currency_icon=CURRENCY_ICON, admin_mention=admin.mention
-        )
-        formatted_data['color'] = color
-        embed = discord.Embed.from_dict(formatted_data)
-        try: await log_channel.send(embed=embed)
-        except Exception as e: logger.error(f"관리자 코인 조작 로그 전송 실패: {e}", exc_info=True)
+        if embed_data := await get_embed_from_db("log_coin_admin"):
+            action_color = 0x3498DB if amount > 0 else 0xE74C3C
+            amount_str = f"+{amount:,}" if amount > 0 else f"{amount:,}"
+            embed = format_embed_from_db(embed_data, action=action, target_mention=target.mention, amount=amount_str, currency_icon=CURRENCY_ICON, admin_mention=admin.mention)
+            embed.color = discord.Color(action_color) # 색상은 동적으로 변경
+            try: await log_channel.send(embed=embed)
+            except Exception as e: logger.error(f"관리자 코인 조작 로그 전송 실패: {e}", exc_info=True)
         
     @app_commands.command(name="送金", description="他のユーザーにコインを送ります。")
     @app_commands.describe(recipient="コインを受け取るユーザー", amount="送る金額")
@@ -154,8 +131,15 @@ class EconomyCore(commands.Cog):
         sender_wallet = await get_wallet(sender.id)
         if sender_wallet.get('balance', 0) < amount:
             return await interaction.response.send_message(f"残高が不足しています。 現在の残高: `{sender_wallet.get('balance', 0):,}`{CURRENCY_ICON}", ephemeral=True)
+        
+        # [수정] 송금 확인 임베드를 DB에서 불러옵니다.
+        embed_data = await get_embed_from_db("embed_transfer_confirmation")
+        if not embed_data: # DB에 데이터가 없을 경우를 대비한 기본값
+            embed = discord.Embed(title="💸 送金確認", description=f"本当に {recipient.mention}さんへ `{amount:,}`{CURRENCY_ICON} を送金しますか？", color=0xE67E22)
+        else:
+            embed = format_embed_from_db(embed_data, recipient_mention=recipient.mention, amount=f"{amount:,}", currency_icon=CURRENCY_ICON)
+
         view = TransferConfirmView(sender, recipient, amount, self)
-        embed = discord.Embed(title="💸 送金確認", description=f"本当に {recipient.mention}さんへ `{amount:,}`{CURRENCY_ICON} を送金しますか？", color=0xE67E22)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         await view.wait()
         await interaction.edit_original_response(content=view.result_message, view=None)
@@ -166,9 +150,8 @@ class EconomyCore(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         result = await update_wallet(user, amount)
         if result:
-            await self.log_admin_action(interaction.user, user, amount, "付与")
-            await interaction.followup.send(f"✅ {user.mention}さんへ `{amount:,}`{CURRENCY_ICON}を付与しました。", ephemeral=True)
-        else: await interaction.followup.send("❌ コイン付与中にエラーが発生しました。", ephemeral=True)
+            await self.log_admin_action(interaction.user, user, amount, "付与"); await interaction.followup.send(f"✅ {user.mention}さんへ `{amount:,}`{CURRENCY_ICON}を付与しました。")
+        else: await interaction.followup.send("❌ コイン付与中にエラーが発生しました。")
         
     @app_commands.command(name="コイン削減", description="[管理者専用] 特定のユーザーのコインを削減します。")
     @app_commands.checks.has_permissions(administrator=True)
@@ -176,9 +159,8 @@ class EconomyCore(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         result = await update_wallet(user, -amount)
         if result:
-            await self.log_admin_action(interaction.user, user, -amount, "削減")
-            await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{CURRENCY_ICON}を削減しました。", ephemeral=True)
-        else: await interaction.followup.send("❌ コイン削減中にエラーが発生しました。", ephemeral=True)
+            await self.log_admin_action(interaction.user, user, -amount, "削減"); await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{CURRENCY_ICON}を削減しました。")
+        else: await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(EconomyCore(bot))
