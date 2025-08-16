@@ -121,24 +121,14 @@ class ApprovalView(ui.View):
     async def _update_nickname(self, member: discord.Member) -> None:
         if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := self._get_field_value(self.original_embed, "名前")):
             await nick_cog.update_nickname(member, base_name_override=name_field)
-    
-    # --- [수정] 승인 로그 함수 ---
     async def _send_public_welcome(self, moderator: discord.Member, member: discord.Member) -> None:
         if (ch_id := self.onboarding_cog.introduction_channel_id) and (ch := member.guild.get_channel(ch_id)):
             embed = discord.Embed(title="📝 自己紹介", color=discord.Color.green())
             embed.add_field(name="住民", value=member.mention, inline=False)
-            
-            # 모든 필드를 한 줄씩(inline=False) 추가합니다.
-            for field in self.original_embed.fields:
-                embed.add_field(name=field.name, value=field.value, inline=False)
-            
+            for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
             embed.add_field(name="担当者", value=moderator.mention, inline=False)
             if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-            
-            content = f"||{member.mention}||"
-            await ch.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
-
-    # --- [수정] 알림 및 거절 로그 함수 ---
+            content = f"||{member.mention}||"; await ch.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
     async def _send_notifications(self, moderator: discord.Member, member: discord.Member, is_approved: bool) -> None:
         guild = member.guild
         if is_approved:
@@ -147,33 +137,23 @@ class ApprovalView(ui.View):
         else:
             try: await member.send(f"❌ お知らせ：「{guild.name}」での住人登録が拒否されました。\n理由: 「{self.rejection_reason}」\n<#{self.onboarding_cog.panel_channel_id}> からやり直してください。")
             except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다.")
-            
             if (ch_id := self.onboarding_cog.rejection_log_channel_id) and (ch := guild.get_channel(ch_id)):
                 embed = discord.Embed(title="❌ 住人登録が拒否されました", color=discord.Color.red())
                 embed.add_field(name="住民", value=member.mention, inline=False)
-                
-                # 모든 필드를 한 줄씩(inline=False) 추가합니다.
-                for field in self.original_embed.fields:
-                    embed.add_field(name=field.name, value=field.value, inline=False)
-                
-                embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False)
-                embed.add_field(name="担当者", value=moderator.mention, inline=False)
-                
+                for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
+                embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False); embed.add_field(name="担当者", value=moderator.mention, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-                
-                content = f"||{member.mention}||"
-                await ch.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
-
+                content = f"||{member.mention}||"; await ch.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
     @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
-# ... 이하 나머지 코드는 변경 사항 없습니다 ...
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
         self.user = user; self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
+        self.user_lock = asyncio.Lock()
     def _update_components(self):
         self.clear_items(); step_info = self.steps_data[self.current_step]
         is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
@@ -195,6 +175,7 @@ class OnboardingGuideView(ui.View):
         else: embed = format_embed_from_db(embed_data, member_mention=self.user.mention)
         self._update_components()
         if self.message: await self.message.edit(embed=embed, view=self)
+    
     async def go_next(self, interaction: discord.Interaction):
         await interaction.response.defer()
         if self.current_step < len(self.steps_data) - 1: self.current_step += 1
@@ -203,28 +184,55 @@ class OnboardingGuideView(ui.View):
         await interaction.response.defer()
         if self.current_step > 0: self.current_step -= 1
         await self._update_message()
+
+    # --- [수정] 역할 부여 순서 변경 ---
     async def do_action(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        step_info = self.steps_data[self.current_step]; role_key_to_add = step_info.get("role_key_to_add")
+        step_info = self.steps_data[self.current_step]
+        role_key_to_add = step_info.get("role_key_to_add")
+        
+        # 1. 역할 부여를 먼저 실행하고 기다립니다.
         if role_key_to_add:
             role_id = get_id(role_key_to_add)
             if role_id and isinstance(interaction.user, discord.Member) and (role := interaction.guild.get_role(role_id)):
-                try: await interaction.user.add_roles(role, reason="オンボーディング進行")
-                except Exception as e: await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True)
-        if self.current_step < len(self.steps_data) - 1: self.current_step += 1
+                try:
+                    await interaction.user.add_roles(role, reason="オンボーディング進行")
+                except Exception as e:
+                    # 역할 부여 실패 시 followup으로 알리고 함수를 종료합니다.
+                    await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True)
+                    return
+        
+        # 2. 역할 부여가 성공적으로 끝나면, 다음 단계로 넘어갑니다.
+        if self.current_step < len(self.steps_data) - 1:
+            self.current_step += 1
+        
+        # 3. 마지막으로 화면을 업데이트합니다.
         await self._update_message()
+
+    # --- [수정] 쿨타임 로직 복구 ---
     async def create_introduction(self, interaction: discord.Interaction):
-        cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 600)
-        last_time = await get_cooldown(str(interaction.user.id), "introduction")
-        if last_time and time.time() - last_time < cooldown_seconds:
-            rem = cooldown_seconds - (time.time() - last_time); m, s = divmod(int(rem), 60)
-            await interaction.response.send_message(f"次の申請まであと {m}分{s}秒 お待ちください。", ephemeral=True); return
-        await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
-        if self.message: await self.message.delete()
+        async with self.user_lock:
+            cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300) # 기본값 5분
+            last_time = await get_cooldown(str(interaction.user.id), "introduction")
+            
+            if last_time and (time.time() - last_time) < cooldown_seconds:
+                rem = cooldown_seconds - (time.time() - last_time)
+                m, s = divmod(int(rem), 60)
+                await interaction.response.send_message(f"次の申請まであと {m}分{s}秒 お待ちください。", ephemeral=True)
+                return
+            
+            # 쿨타임이 아니면 모달을 보냅니다. (이후 로직은 on_submit에서 처리)
+            await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
+        
+        # 모달이 닫힌 후 View를 정지하고 메시지를 삭제합니다.
+        if self.message:
+            await self.message.delete()
         self.stop()
 
 class OnboardingPanelView(ui.View):
-    def __init__(self, cog_instance: 'Onboarding'): super().__init__(timeout=None); self.onboarding_cog = cog_instance
+    def __init__(self, cog_instance: 'Onboarding'):
+        super().__init__(timeout=None); self.onboarding_cog = cog_instance
+        self.user_locks: Dict[int, asyncio.Lock] = {}
     async def setup_buttons(self):
         button_styles = get_config("DISCORD_BUTTON_STYLES_MAP", {})
         components_data = await get_panel_components_from_db('onboarding')
@@ -238,16 +246,19 @@ class OnboardingPanelView(ui.View):
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
     async def start_guide_callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        steps = await get_onboarding_steps()
-        if not steps: await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True); return
-        guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user); first_step_info = steps[0]
-        embed_data = first_step_info.get("embed_data", {}).get("embed_data")
-        if not embed_data: embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
-        else: embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
-        guide_view._update_components()
-        message = await interaction.followup.send(embed=embed, view=guide_view, ephemeral=True)
-        guide_view.message = message
+        lock = self.user_locks.setdefault(interaction.user.id, asyncio.Lock())
+        if lock.locked(): return await interaction.response.send_message("以前のリクエストを処理中です。", ephemeral=True)
+        async with lock:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            steps = await get_onboarding_steps()
+            if not steps: await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True); return
+            guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user); first_step_info = steps[0]
+            embed_data = first_step_info.get("embed_data", {}).get("embed_data")
+            if not embed_data: embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
+            else: embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
+            guide_view._update_components()
+            message = await interaction.followup.send(embed=embed, view=guide_view, ephemeral=True)
+            guide_view.message = message
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
