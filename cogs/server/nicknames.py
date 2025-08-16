@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (쿨다운 로직 수정)
+# cogs/server/nicknames.py (임베드 DB 연동)
 
 import discord
 from discord.ext import commands
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 from utils.database import (
     get_panel_id, save_panel_id, get_cooldown, set_cooldown, 
-    get_id
+    get_id, get_embed_from_db
 )
 
 ALLOWED_NICKNAME_PATTERN = re.compile(r"^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4e00-\u9faf]+$")
@@ -127,10 +127,8 @@ class Nicknames(commands.Cog):
         self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None; self.nickname_log_channel_id: Optional[int] = None
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
-
     def register_persistent_views(self):
         self.bot.add_view(NicknameChangerPanelView(self))
-    
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.panel_channel_id = get_id("nickname_panel_channel_id")
@@ -138,7 +136,6 @@ class Nicknames(commands.Cog):
         self.nickname_log_channel_id = get_id("nickname_log_channel_id")
         self.approval_role_id = get_id("role_approval")
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
-    
     async def get_final_nickname(self, member: discord.Member, base_name: str) -> str:
         prefix = None
         base = base_name.strip() or member.name
@@ -147,7 +144,6 @@ class Nicknames(commands.Cog):
             prefix_len = len(prefix) if prefix else 0
             base = base[:32 - prefix_len]; nick = f"{prefix}{base}" if prefix else base
         return nick
-    
     async def update_nickname(self, member: discord.Member, base_name_override: str):
         try:
             final_name = await self.get_final_nickname(member, base_name=base_name_override)
@@ -158,7 +154,6 @@ class Nicknames(commands.Cog):
         except Exception as e:
             logger.error(f"Onboarding: {member.display_name}의 닉네임 업데이트 실패: {e}", exc_info=True)
             raise
-            
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if after.bot or before.roles == after.roles: return
@@ -168,7 +163,6 @@ class Nicknames(commands.Cog):
         if after.nick != new_nick:
             try: await after.edit(nick=new_nick, reason="역할 변경으로 인한 칭호 업데이트")
             except discord.Forbidden: pass
-            
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -182,7 +176,13 @@ class Nicknames(commands.Cog):
                 old_message = await target_channel.fetch_message(old_id)
                 await old_message.delete()
             except (discord.NotFound, discord.Forbidden): pass
-        embed = discord.Embed(title="📝 名前変更案内", description="サーバーで使用する名前を変更したい場合は、下のボタンを押して申請してください。", color=discord.Color.blurple())
+            
+        embed_data = await get_embed_from_db("panel_nicknames")
+        if not embed_data:
+            logger.warning("DB에서 'panel_nicknames' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
+            return
+        embed = discord.Embed.from_dict(embed_data)
+        
         view = NicknameChangerPanelView(self)
         new_message = await target_channel.send(embed=embed, view=view)
         await save_panel_id("nickname_changer", new_message.id, target_channel.id)
