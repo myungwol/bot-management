@@ -15,7 +15,6 @@ from utils.database import (
     get_panel_components_from_db, get_item_database, get_config
 )
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- [삭제] 하드코딩된 변수들 ---
