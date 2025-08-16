@@ -1,4 +1,4 @@
-# cogs/economy/commerce.py (임베드 DB 연동)
+# cogs/economy/commerce.py (버튼 DB 연동)
 
 import discord
 from discord.ext import commands
@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 from utils.database import (
     ITEM_DATABASE, FISHING_LOOT, CURRENCY_ICON, ROD_HIERARCHY,
     get_inventory, get_wallet, get_aquarium, update_wallet,
-    save_panel_id, get_panel_id, get_id, supabase, get_embed_from_db
+    save_panel_id, get_panel_id, get_id, supabase, get_embed_from_db, get_panel_components_from_db
 )
+from cogs.admin.panel_manager import BUTTON_STYLES_MAP
 
 SELL_CATEGORIES = ["魚", "アイテム"]
 BUY_CATEGORIES = ["里の役職", "釣り", "農業", "牧場"]
@@ -187,15 +188,33 @@ class BuyItemView(ShopViewBase):
 
 class CommercePanelView(ui.View):
     def __init__(self, cog_instance: 'Commerce'):
-        super().__init__(timeout=None); self.commerce_cog = cog_instance
-    @ui.button(label="🏪 商店に入る", style=discord.ButtonStyle.success, custom_id="open_shop_view_v3")
-    async def open_shop(self, i: discord.Interaction, b: ui.Button):
+        super().__init__(timeout=None)
+        self.commerce_cog = cog_instance
+
+    async def setup_buttons(self):
+        components_data = await get_panel_components_from_db('commerce')
+        if not components_data:
+            logger.warning("'commerce' 패널에 대한 컴포넌트 데이터가 DB에 없습니다.")
+            return
+
+        for comp in components_data:
+            button = ui.Button(
+                label=comp.get('label'), style=BUTTON_STYLES_MAP.get(comp.get('style', 'secondary')),
+                emoji=comp.get('emoji'), row=comp.get('row'), custom_id=comp.get('component_key')
+            )
+            if comp.get('component_key') == 'open_shop':
+                button.callback = self.open_shop
+            elif comp.get('component_key') == 'open_market':
+                button.callback = self.open_market
+            self.add_item(button)
+
+    async def open_shop(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True, thinking=True)
         view = BuyItemView(i.user); await view.fetch_data()
         embed = view._build_embed(); view._build_components()
         view.message = await i.followup.send(embed=embed, view=view, ephemeral=True)
-    @ui.button(label="📦 販売所に入る", style=discord.ButtonStyle.danger, custom_id="open_market_view_v3")
-    async def open_market(self, i: discord.Interaction, b: ui.Button):
+
+    async def open_market(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True, thinking=True)
         view = SellItemView(i.user); await view.fetch_data()
         embed = view._build_embed(); view._build_components()
@@ -205,13 +224,19 @@ class Commerce(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.commerce_panel_channel_id: Optional[int] = None
+        self.view_instance = None
         logger.info("Commerce Cog가 성공적으로 초기화되었습니다.")
-    def register_persistent_views(self):
-        self.bot.add_view(CommercePanelView(self))
+
+    async def register_persistent_views(self):
+        self.view_instance = CommercePanelView(self)
+        await self.view_instance.setup_buttons()
+        self.bot.add_view(self.view_instance)
+
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.commerce_panel_channel_id = get_id("commerce_panel_channel_id")
         logger.info(f"[Commerce Cog] 상점 패널 채널 ID 로드: {self.commerce_panel_channel_id}")
+        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -219,6 +244,7 @@ class Commerce(commands.Cog):
             if channel_id: target_channel = self.bot.get_channel(channel_id)
             else: logger.info("ℹ️ 상점 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
         if not target_channel: logger.warning("❌ Commerce panel channel could not be found."); return
+        
         panel_info = get_panel_id("commerce")
         if panel_info and (old_id := panel_info.get('message_id')):
             try:
@@ -232,8 +258,10 @@ class Commerce(commands.Cog):
             return
         embed = discord.Embed.from_dict(embed_data)
         
-        view = CommercePanelView(self)
-        new_message = await target_channel.send(embed=embed, view=view)
+        self.view_instance = CommercePanelView(self)
+        await self.view_instance.setup_buttons()
+        
+        new_message = await target_channel.send(embed=embed, view=self.view_instance)
         await save_panel_id("commerce", new_message.id, target_channel.id)
         logger.info(f"✅ 상점 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
 
