@@ -1,4 +1,4 @@
-# cogs/games/fishing.py (UI 중앙 관리 시스템 연동)
+# cogs/games/fishing.py (게임 데이터 DB 분리 적용)
 
 import discord
 from discord.ext import commands
@@ -13,17 +13,16 @@ logger = logging.getLogger(__name__)
 
 from utils.database import (
     update_wallet, get_inventory, update_inventory, add_to_aquarium,
-    get_user_gear, set_user_gear, FISHING_LOOT, ITEM_DATABASE,
-    save_panel_id, get_panel_id, get_id, get_embed_from_db, get_panel_components_from_db
+    get_user_gear, set_user_gear, save_panel_id, get_panel_id, get_id, 
+    get_embed_from_db, get_panel_components_from_db,
+    get_item_database, get_fishing_loot
 )
 
 BUTTON_STYLES_MAP = {
     "primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
     "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger,
 }
-
-BIG_CATCH_THRESHOLD = 70.0
-BITE_REACTION_TIME = 3.0
+BIG_CATCH_THRESHOLD = 70.0; BITE_REACTION_TIME = 3.0
 
 class FishingGameView(ui.View):
     def __init__(self, bot: commands.Bot, user: discord.Member, used_rod: str, used_bait: str, remaining_baits: Dict[str, int], active_fishers_set: Set[int]):
@@ -32,8 +31,8 @@ class FishingGameView(ui.View):
         self.game_state = "waiting"; self.game_task: Optional[asyncio.Task] = None
         self.used_rod = used_rod; self.used_bait = used_bait; self.remaining_baits = remaining_baits
         self.active_fishers_set = active_fishers_set
-        self.rod_bonus = ITEM_DATABASE.get(self.used_rod, {}).get("good_fish_bonus", 0.0)
-        self.bite_range = ITEM_DATABASE.get(self.used_bait, {}).get("bite_time_range", (8.0, 15.0))
+        self.rod_bonus = get_item_database().get(self.used_rod, {}).get("good_fish_bonus", 0.0)
+        self.bite_range = get_item_database().get(self.used_bait, {}).get("bite_time_range", (8.0, 15.0))
 
     async def start_game(self, interaction: discord.Interaction, embed: discord.Embed):
         self.message = await interaction.followup.send(embed=embed, view=self, ephemeral=True)
@@ -45,7 +44,7 @@ class FishingGameView(ui.View):
             if self.is_finished(): return
             self.game_state = "biting"
             if self.children and isinstance(catch_button := self.children[0], ui.Button):
-                catch_button.style = discord.ButtonStyle.success; catch_button.label = "釣り上げる！" # [수정] 버튼 스타일 변경
+                catch_button.style = discord.ButtonStyle.success; catch_button.label = "釣り上げる！"
             embed = discord.Embed(title="❗ アタリが来た！", description="今だ！ボタンを押して釣り上げよう！", color=discord.Color.red())
             if self.message: await self.message.edit(embed=embed, view=self)
             await asyncio.sleep(BITE_REACTION_TIME)
@@ -60,10 +59,11 @@ class FishingGameView(ui.View):
                 await self._send_result(error_embed); self.stop()
 
     async def _handle_catch_logic(self) -> tuple[discord.Embed, bool, bool]:
-        weights = [item['weight'] * (1 + self.rod_bonus if 'base_value' in item else 1) for item in FISHING_LOOT]
-        catch_proto = random.choices(FISHING_LOOT, weights=weights, k=1)[0]
+        fishing_loot = get_fishing_loot()
+        weights = [item['weight'] * (1 + self.rod_bonus if item.get('base_value') is not None else 1) for item in fishing_loot]
+        catch_proto = random.choices(fishing_loot, weights=weights, k=1)[0]
         user_mention = self.player.mention; is_big_catch = log_publicly = False
-        if "min_size" in catch_proto:
+        if catch_proto.get("min_size") is not None:
             log_publicly = True
             size = round(random.uniform(catch_proto["min_size"], catch_proto["max_size"]), 1)
             await add_to_aquarium(str(self.player.id), {"name": catch_proto['name'], "size": size, "emoji": catch_proto['emoji']})
@@ -156,16 +156,14 @@ class FishingPanelView(ui.View):
                 uid_str = str(user_id)
                 gear, inventory = await asyncio.gather(get_user_gear(uid_str), get_inventory(uid_str))
                 rod = gear.get('rod', '素手')
-                if rod == "素手" or ITEM_DATABASE.get(rod) is None: raise ValueError("「古い釣竿」以上の釣竿を商店で購入し、装備してください。")
-                
+                if rod == "素手" or get_item_database().get(rod) is None: raise ValueError("「古い釣竿」以上の釣竿を商店で購入し、装備してください。")
                 bait = gear.get('bait', 'エサなし')
                 if bait != "エサなし":
                     if inventory.get(bait, 0) > 0:
                         await update_inventory(uid_str, bait, -1); inventory[bait] = inventory.get(bait, 0) - 1
                     else: bait = "エサなし"; await set_user_gear(uid_str, bait="エサなし")
-
-                rod_bonus = int(ITEM_DATABASE.get(rod, {}).get("good_fish_bonus", 0.0) * 100)
-                min_b, max_b = ITEM_DATABASE.get(bait, {}).get("bite_time_range", (8.0, 15.0))
+                rod_bonus = int(get_item_database().get(rod, {}).get("good_fish_bonus", 0.0) * 100)
+                min_b, max_b = get_item_database().get(bait, {}).get("bite_time_range", (8.0, 15.0))
                 desc = f"### ウキを投げました。\n**🎣 使用中の釣竿:** `{rod}` (`珍しい魚の確率 +{rod_bonus}%`)\n**🐛 使用中のエサ:** `{bait}` (`アタリ待機時間: {min_b}～{max_b}秒`)"
                 embed = discord.Embed(title="🎣 釣りを開始しました！", description=desc, color=discord.Color.light_grey())
                 view = FishingGameView(self.bot, interaction.user, rod, bait, inventory, self.fishing_cog.active_fishing_sessions_by_user)
