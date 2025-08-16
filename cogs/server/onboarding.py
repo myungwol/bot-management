@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (DB 기반 온보딩으로 전면 수정)
+# cogs/server/onboarding.py (패널 버튼 DB 연동 최종)
 
 import discord
 from discord.ext import commands
@@ -15,8 +15,10 @@ logger = logging.getLogger(__name__)
 
 from utils.database import (
     get_id, save_panel_id, get_panel_id, get_auto_role_mappings, 
-    get_cooldown, set_cooldown, get_embed_from_db, get_onboarding_steps
+    get_cooldown, set_cooldown, get_embed_from_db, get_onboarding_steps,
+    get_panel_components_from_db
 )
+from cogs.admin.panel_manager import BUTTON_STYLES_MAP # 버튼 스타일 맵 임포트
 
 INTRODUCTION_COOLDOWN_SECONDS = 10 * 60
 AGE_ROLE_MAPPING = [{"key": "role_info_age_70s", "range": range(1970, 1980)}, {"key": "role_info_age_80s", "range": range(1980, 1990)}, {"key": "role_info_age_90s", "range": range(1990, 2000)}, {"key": "role_info_age_00s", "range": range(2000, 2010)}]
@@ -27,9 +29,9 @@ class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
 
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
-    age = ui.TextInput(label="年齢", placeholder="例：20代、90年生、30歳、非公開", required=True, max_length=20)
+    age = ui.TextInput(label="年齢", placeholder="例：20代、90年生まれ、30歳、非公開", required=True, max_length=20)
     gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
-    hobby = ui.TextInput(label="趣味", placeholder="趣味を自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
+    hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
     async def on_submit(self, interaction: discord.Interaction):
@@ -99,7 +101,7 @@ class ApprovalView(ui.View):
         results = await asyncio.gather(*tasks, return_exceptions=True)
         failed_tasks = [res for res in results if isinstance(res, Exception)]
         if failed_tasks:
-            error_report = f"❌ **{status_text} 처리 중 일부 작업에 실패했습니다:**\n" + "".join(f"- `{type(e).__name__}: {e}`\n" for e in failed_tasks)
+            error_report = f"❌ **{status_text} 処理中の一部作業に失敗しました:**\n" + "".join(f"- `{type(e).__name__}: {e}`\n" for e in failed_tasks)
             await interaction.followup.send(error_report, ephemeral=True)
         else: await interaction.followup.send(f"✅ {status_text}処理が正常に完了しました。", ephemeral=True)
         try: await interaction.message.delete()
@@ -243,8 +245,28 @@ class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
         self.onboarding_cog = cog_instance
-    @ui.button(label="里の案内・住人登録を始める", style=discord.ButtonStyle.success, custom_id="start_onboarding_button_final")
-    async def start_onboarding(self, interaction: discord.Interaction, button: ui.Button):
+        # [수정] 버튼 설정을 위한 async 함수를 호출합니다.
+        
+    async def setup_buttons(self):
+        components_data = await get_panel_components_from_db('onboarding')
+        if not components_data:
+            logger.warning("'onboarding' 패널에 대한 컴포넌트 데이터가 DB에 없습니다.")
+            self.add_item(ui.Button(label="里の案内・住人登録を始める", style=discord.ButtonStyle.success, custom_id="start_onboarding_button_default"))
+            return
+        for comp in components_data:
+            if comp.get('component_type') == 'button':
+                button = ui.Button(
+                    label=comp.get('label'),
+                    style=BUTTON_STYLES_MAP.get(comp.get('style', 'secondary')),
+                    emoji=comp.get('emoji'),
+                    row=comp.get('row'),
+                    custom_id=comp.get('component_key')
+                )
+                if comp.get('component_key') == 'start_onboarding':
+                    button.callback = self.start_onboarding
+                self.add_item(button)
+
+    async def start_onboarding(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             steps_data = await get_onboarding_steps()
@@ -269,9 +291,14 @@ class Onboarding(commands.Cog):
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.new_welcome_channel_id: Optional[int] = None; self.approval_role_id: Optional[int] = None
         self.guest_role_id: Optional[int] = None; self.mention_role_id_1: Optional[int] = None
+        self.view_instance = None # View 인스턴스를 저장할 변수
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-    def register_persistent_views(self):
-        self.bot.add_view(OnboardingPanelView(self))
+    
+    async def register_persistent_views(self):
+        self.view_instance = OnboardingPanelView(self)
+        await self.view_instance.setup_buttons() # 비동기적으로 버튼을 설정합니다.
+        self.bot.add_view(self.view_instance)
+    
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
@@ -279,6 +306,7 @@ class Onboarding(commands.Cog):
         self.new_welcome_channel_id = get_id("new_welcome_channel_id"); self.approval_role_id = get_id("role_approval")
         self.guest_role_id = get_id("role_guest"); self.mention_role_id_1 = get_id("role_mention_role_1")
         logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
+        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -292,13 +320,18 @@ class Onboarding(commands.Cog):
                 old_message = await target_channel.fetch_message(old_id)
                 await old_message.delete()
             except (discord.NotFound, discord.Forbidden): pass
+            
         embed_data = await get_embed_from_db("panel_onboarding")
         if not embed_data:
             logger.warning("DB에서 'panel_onboarding' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
             return
         embed = discord.Embed.from_dict(embed_data)
-        view = OnboardingPanelView(self)
-        new_message = await target_channel.send(embed=embed, view=view)
+        
+        # View 인스턴스를 재생성하고 버튼을 다시 설정합니다.
+        self.view_instance = OnboardingPanelView(self)
+        await self.view_instance.setup_buttons()
+        
+        new_message = await target_channel.send(embed=embed, view=self.view_instance)
         await save_panel_id("onboarding", new_message.id, target_channel.id)
         logger.info(f"✅ 온보딩 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
 
