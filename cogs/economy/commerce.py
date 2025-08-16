@@ -15,7 +15,6 @@ from utils.database import (
 )
 from cogs.server.system import format_embed_from_db
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- [삭제] 하드코딩된 변수들 ---
