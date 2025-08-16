@@ -1,11 +1,255 @@
 # utils/ui_defaults.py
 """
-봇이 사용하는 모든 UI 요소(임베드, 패널 버튼)의 기본값을 정의하는 파일입니다.
+봇이 사용하는 모든 UI 요소 및 핵심 매핑 데이터의 기본값을 정의하는 파일입니다.
 봇이 시작될 때 이 파일의 데이터가 Supabase 데이터베이스에 동기화됩니다.
 """
 
 # ==============================================================================
-# 1. 임베드(Embed) 기본값
+# 1. 역할 키 맵 (Role Key Map) - [신규]
+# ==============================================================================
+# is_prefix: 닉네임 앞에 [칭호]로 붙일지 여부
+# priority: is_prefix가 True일 때, 칭호 우선순위 (높은 숫자가 우선)
+UI_ROLE_KEY_MAP = {
+    # --- 스태프 역할 (닉네임 접두사 O) ---
+    "role_admin_total": {
+        "name": "森の妖精",
+        "is_prefix": True,
+        "priority": 100
+    },
+    "role_staff_village_chief": {
+        "name": "村長",
+        "is_prefix": True,
+        "priority": 90
+    },
+    "role_staff_deputy_chief": {
+        "name": "副村長",
+        "is_prefix": True,
+        "priority": 85
+    },
+    "role_staff_police": {
+        "name": "交番さん",
+        "is_prefix": True,
+        "priority": 80
+    },
+    "role_staff_festival": {
+        "name": "お祭り係",
+        "is_prefix": True,
+        "priority": 70
+    },
+    "role_staff_pr": {
+        "name": "ビラ配りさん",
+        "is_prefix": True,
+        "priority": 70
+    },
+    "role_staff_design": {
+        "name": "村の絵描きさん",
+        "is_prefix": True,
+        "priority": 70
+    },
+    "role_staff_secretary": {
+        "name": "書記",
+        "is_prefix": True,
+        "priority": 70
+    },
+    "role_staff_newbie_helper": {
+        "name": "お世話係",
+        "is_prefix": True,
+        "priority": 70
+    },
+    "role_approval": {
+        "name": "役場の職員",
+        "is_prefix": True,
+        "priority": 60
+    },
+
+    # --- 주민 등급 역할 (닉네임 접두사 O) ---
+    "role_resident_elder": {
+        "name": "長老",
+        "is_prefix": True,
+        "priority": 50
+    },
+    "role_resident_veteran": {
+        "name": "ベテラン住民",
+        "is_prefix": True,
+        "priority": 40
+    },
+    "role_resident_regular": {
+        "name": "おなじみ住民",
+        "is_prefix": True,
+        "priority": 30
+    },
+    "role_resident_rookie": {
+        "name": "かけだし住民",
+        "is_prefix": True,
+        "priority": 20
+    },
+    "role_resident": {
+        "name": "住民",
+        "is_prefix": True,
+        "priority": 10
+    },  # 자기소개서 통과 시 받는 역할
+    "role_guest": {
+        "name": "旅の人",
+        "is_prefix": True,
+        "priority": 5
+    },  # 서버에 막 들어온 역할
+
+    # --- 온보딩 진행 역할 (구분선, 닉네임 접두사 X) ---
+    "role_onboarding_step_1": {
+        "name": "━━━━━━ ゲーム ━━━━━━",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_onboarding_step_2": {
+        "name": "━━━━━━ 通知 ━━━━━━",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_onboarding_step_3": {
+        "name": "━━━━━━ 情報 ━━━━━━",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_onboarding_step_4": {
+        "name": "━━━━━━ 住民 ━━━━━━",
+        "is_prefix": False,
+        "priority": 0
+    },
+
+    # --- 정보 역할 (닉네임 접두사 X) ---
+    "role_info_male": {
+        "name": "男性",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_info_female": {
+        "name": "女性",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_info_age_70s": {
+        "name": "70年代生",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_info_age_80s": {
+        "name": "80年代生",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_info_age_90s": {
+        "name": "90年代生",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_info_age_00s": {
+        "name": "00年代生",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_info_age_private": {
+        "name": "非公開",
+        "is_prefix": False,
+        "priority": 0
+    },
+
+    # --- 알림 역할 (닉네임 접두사 X) ---
+    "role_notify_voice": {
+        "name": "通話のおさそい",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_notify_friends": {
+        "name": "お友達ぼしゅう",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_notify_disboard": {
+        "name": "Disboard",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_notify_up": {
+        "name": "Up",
+        "is_prefix": False,
+        "priority": 0
+    },
+
+    # --- 게임 역할 (닉네임 접두사 X) ---
+    "role_game_minecraft": {
+        "name": "マインクラフト",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_valorant": {
+        "name": "ヴァロラント",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_overwatch": {
+        "name": "オーバーウォッチ",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_lol": {
+        "name": "リーグ・オブ・レジェンド",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_mahjong": {
+        "name": "麻雀",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_amongus": {
+        "name": "アモングアス",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_mh": {
+        "name": "モンスターハンター",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_genshin": {
+        "name": "原神",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_apex": {
+        "name": "エーペックスレジェンズ",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_splatoon": {
+        "name": "スプラトゥーン",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_game_gf": {
+        "name": "ゴッドフィールド",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_platform_steam": {
+        "name": "スチーム",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_platform_smartphone": {
+        "name": "スマートフォン",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_platform_switch": {
+        "name": "スイッチ",
+        "is_prefix": False,
+        "priority": 0
+    },
+}
+
+# ==============================================================================
+# 2. 임베드(Embed) 기본값
 # ==============================================================================
 UI_EMBEDS = {
     "welcome_embed": {
@@ -24,7 +268,6 @@ UI_EMBEDS = {
         "description": "下のメニューからカテゴリーを選択して、自分に必要な役割を受け取ってください。",
         "color": 0x5865F2
     },
-    # [추가] 온보딩 정보 역할 안내 임베드
     "embed_onboarding_info_roles": {
         "title": "📖 役割付与 (情報)",
         "description":
@@ -107,7 +350,7 @@ UI_EMBEDS = {
 }
 
 # ==============================================================================
-# 2. 패널 버튼(Panel Components) 기본값
+# 3. 패널 버튼(Panel Components) 기본값
 # ==============================================================================
 UI_PANEL_COMPONENTS = [
     {
