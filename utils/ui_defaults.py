@@ -5,10 +5,8 @@
 """
 
 # ==============================================================================
-# 1. 역할 키 맵 (Role Key Map) - [신규]
+# 1. 역할 키 맵 (Role Key Map)
 # ==============================================================================
-# is_prefix: 닉네임 앞에 [칭호]로 붙일지 여부
-# priority: is_prefix가 True일 때, 칭호 우선순위 (높은 숫자가 우선)
 UI_ROLE_KEY_MAP = {
     # --- 스태프 역할 (닉네임 접두사 O) ---
     "role_admin_total": {
@@ -61,7 +59,6 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": True,
         "priority": 60
     },
-
     # --- 주민 등급 역할 (닉네임 접두사 O) ---
     "role_resident_elder": {
         "name": "長老",
@@ -87,35 +84,33 @@ UI_ROLE_KEY_MAP = {
         "name": "住民",
         "is_prefix": True,
         "priority": 10
-    },  # 자기소개서 통과 시 받는 역할
+    },
     "role_guest": {
         "name": "旅の人",
         "is_prefix": True,
         "priority": 5
-    },  # 서버에 막 들어온 역할
-
+    },
     # --- 온보딩 진행 역할 (구분선, 닉네임 접두사 X) ---
     "role_onboarding_step_1": {
-        "name": "════════════ゲーム══════════",
+        "name": "━━━━━━ ゲーム ━━━━━━",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_2": {
-        "name": "═════════════通知═══════════",
+        "name": "━━━━━━ 通知 ━━━━━━",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_3": {
-        "name": "═════════════情報═══════════",
+        "name": "━━━━━━ 情報 ━━━━━━",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_4": {
-        "name": "═════════════住人═══════════",
+        "name": "━━━━━━ 住民 ━━━━━━",
         "is_prefix": False,
         "priority": 0
     },
-
     # --- 정보 역할 (닉네임 접두사 X) ---
     "role_info_male": {
         "name": "男性",
@@ -152,18 +147,17 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": False,
         "priority": 0
     },
-
     # --- 알림 역할 (닉네임 접두사 X) ---
     "role_notify_voice": {
         "name": "通話",
         "is_prefix": False,
         "priority": 0
-    },
+    },  # [수정]
     "role_notify_friends": {
         "name": "友達",
         "is_prefix": False,
         "priority": 0
-    },
+    },  # [수정]
     "role_notify_disboard": {
         "name": "Disboard",
         "is_prefix": False,
@@ -174,7 +168,6 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": False,
         "priority": 0
     },
-
     # --- 게임 역할 (닉네임 접두사 X) ---
     "role_game_minecraft": {
         "name": "マインクラフト",
@@ -253,11 +246,12 @@ UI_ROLE_KEY_MAP = {
 # ==============================================================================
 UI_EMBEDS = {
     "welcome_embed": {
-        "title": "🎉 {guild_name}へようこそ！",
-        "description":
-            "{member_mention}さん、はじめまして！\n\n"
-            "まずは、サーバーの案内を読んで、自己紹介の作成をお願いします。",
-        "color": 0x3498DB
+        "title":
+        "🎉 {guild_name}へようこそ！",
+        "description": ("{member_mention}さん、はじめまして！\n\n"
+                        "まずは、サーバーの案内を読んで、自己紹介の作成をお願いします。"),
+        "color":
+        0x3498DB
     },
     "farewell_embed": {
         "title": "👋 また会いましょう",
@@ -270,21 +264,23 @@ UI_EMBEDS = {
         "color": 0x5865F2
     },
     "embed_onboarding_info_roles": {
-        "title": "📖 役割付与 (情報)",
-        "description":
-            "次に、ご自身の情報を表す役割を選択してください。\n\n"
-            "この情報は、他の住民があなたをよりよく知るのに役立ちます。（非公開も可能です）",
-        "color": 0x5865F2
+        "title":
+        "📖 役割付与 (情報)",
+        "description": ("次に、ご自身の情報を表す役割を選択してください。\n\n"
+                        "この情報は、他の住民があなたをよりよく知るのに役立ちます。（非公開も可能です）"),
+        "color":
+        0x5865F2
     },
     "embed_onboarding_final_rules": {
-        "title": "📝 最終確認",
-        "description":
-            "ありがとうございます！\n\n"
-            "最後に、村のルールをもう一度確認してください。\n\n"
-            "- 他の住民を尊重し、迷惑をかけないこと。\n"
-            "- 問題が発生した場合は、すぐに村役場（管理者）に報告すること。\n\n"
-            "下のボタンを押すと、住民登録票の作成に進みます。",
-        "color": 0x3498DB
+        "title":
+        "📝 最終確認",
+        "description": ("ありがとうございます！\n\n"
+                        "最後に、村のルールをもう一度確認してください。\n\n"
+                        "- 他の住民を尊重し、迷惑をかけないこと。\n"
+                        "- 問題が発生した場合は、すぐに村役場（管理者）に報告すること。\n\n"
+                        "下のボタンを押すと、住民登録票の作成に進みます。"),
+        "color":
+        0x3498DB
     },
     "panel_onboarding": {
         "title": "📝 村役場・案内所",
@@ -303,9 +299,8 @@ UI_EMBEDS = {
     },
     "panel_fishing": {
         "title": "🎣 釣り場",
-        "description":
-            "のんびり釣りを楽しみましょう。\n"
-            "「釣りをする」ボタンで釣りを開始します。",
+        "description": ("のんびり釣りを楽しみましょう。\n"
+                        "「釣りをする」ボタンで釣りを開始します。"),
         "color": 0x5865F2
     },
     "panel_profile": {
@@ -318,26 +313,34 @@ UI_EMBEDS = {
         "description": "{member_mention}さんが住民登録票を提出しました。",
         "color": 0xE67E22
     },
+    "embed_main_chat_welcome": {
+        "description": "🎉 {member_mention}さんが新しい住民になりました！これからよろしくお願いします！",
+        "color": 0x2ECC71
+    },
     "embed_introduction_log": {
         "title": "📝 自己紹介",
-        "description": " ",
+        "description": "新しい住民がやってきました！みんなで歓迎しましょう！",
         "color": 0x2ECC71
     },
     "embed_transfer_confirmation": {
         "title": "💸 送金確認",
-        "description": "本当に {recipient_mention}さんへ `{amount}`{currency_icon} を送金しますか？",
+        "description":
+        "本当に {recipient_mention}さんへ `{amount}`{currency_icon} を送金しますか？",
         "color": 0xE67E22
     },
     "log_coin_gain": {
-        "description": "{user_mention}さんが**{reason}**で`{amount}`{currency_icon}を獲得しました。",
+        "description":
+        "{user_mention}さんが**{reason}**で`{amount}`{currency_icon}を獲得しました。",
         "color": 0x2ECC71
     },
     "log_coin_transfer": {
-        "description": "💸 {sender_mention}さんが{recipient_mention}さんへ`{amount}`{currency_icon}を送金しました。",
+        "description":
+        "💸 {sender_mention}さんが{recipient_mention}さんへ`{amount}`{currency_icon}を送金しました。",
         "color": 0x3498DB
     },
     "log_coin_admin": {
-        "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。",
+        "description":
+        "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。",
         "color": 0x3498DB
     },
     "embed_shop_buy": {
