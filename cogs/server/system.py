@@ -1,15 +1,30 @@
-# cogs/server/system.py (임베드 DB 연동 최종)
+# cogs/server/system.py (UI 중앙 관리 시스템 연동)
 
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
 import logging
+import json
 from typing import Optional, List, Dict, Any
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db
+from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, save_id_to_db
+
+# [추가] DB에서 가져온 Embed 데이터에 변수를 안전하게 적용하는 헬퍼 함수
+def format_embed_from_db(embed_data: dict, **kwargs) -> discord.Embed:
+    """DB에서 가져온 Embed 데이터(dict)에 format을 적용하고 discord.Embed 객체로 변환합니다."""
+    try:
+        # JSON 문자열로 변환 후 format 적용, 다시 dict로 변환
+        json_str = json.dumps(embed_data)
+        formatted_str = json_str.format(**kwargs)
+        formatted_data = json.loads(formatted_str)
+        return discord.Embed.from_dict(formatted_data)
+    except (KeyError, json.JSONDecodeError, Exception) as e:
+        logger.error(f"임베드 포매팅 중 오류 발생: {e}", exc_info=True)
+        # 포매팅 실패 시, 원본 데이터를 기반으로 최대한 생성 시도
+        return discord.Embed.from_dict(embed_data)
 
 STATIC_AUTO_ROLE_PANELS = {
     "main_roles": {
@@ -78,8 +93,7 @@ class AutoRoleView(ui.View):
         category_name = category_info['label'] if category_info else category_id.capitalize()
         category_roles = self.panel_config.get("roles", {}).get(category_id, [])
         if not category_roles:
-            await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True)
-            return
+            await interaction.followup.send("このカテゴリーには設定された役割がありません。", ephemeral=True); return
         embed = discord.Embed(
             title=f"「{category_name}」役割選択",
             description="下のドロップダウンメニューで希望する役割をすべて選択し、最後に「役割を更新」ボタンを押してください。",
@@ -91,8 +105,7 @@ class AutoRoleView(ui.View):
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.welcome_channel_id: Optional[int] = None
-        self.farewell_channel_id: Optional[int] = None
+        self.welcome_channel_id: Optional[int] = None; self.farewell_channel_id: Optional[int] = None
         self.guest_role_id: Optional[int] = None
         logger.info("ServerSystem Cog가 성공적으로 초기화되었습니다.")
 
@@ -110,19 +123,16 @@ class ServerSystem(commands.Cog):
                 if target_channel is None:
                     channel_id = get_id(panel_config['channel_key'])
                     if not channel_id or not (target_channel := self.bot.get_channel(channel_id)):
-                        logger.info(f"ℹ️ '{panel_key}' 패널 채널이 DB에 설정되지 않아 생성을 건너뜁니다.")
-                        continue
+                        logger.info(f"ℹ️ '{panel_key}' 패널 채널이 DB에 설정되지 않아 생성을 건너뜁니다."); continue
+                
                 panel_info = get_panel_id(panel_key)
                 if panel_info and (old_id := panel_info.get('message_id')):
-                    try:
-                        old_message = await target_channel.fetch_message(old_id)
-                        await old_message.delete()
+                    try: await (await target_channel.fetch_message(old_id)).delete()
                     except (discord.NotFound, discord.Forbidden): pass
                 
                 embed_data = await get_embed_from_db(panel_config['embed_key'])
                 if not embed_data:
-                    logger.warning(f"DB에서 '{panel_config['embed_key']}' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
-                    continue
+                    logger.warning(f"DB에서 '{panel_config['embed_key']}' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다."); continue
                 embed = discord.Embed.from_dict(embed_data)
 
                 view = AutoRoleView(panel_config)
@@ -137,21 +147,22 @@ class ServerSystem(commands.Cog):
         if member.bot: return
         if self.guest_role_id and (role := member.guild.get_role(self.guest_role_id)):
             try: await member.add_roles(role, reason="サーバー参加時の初期役割")
-            except Exception as e: logger.error(f"'外部の人' 역할 부여에 실패했습니다: {e}")
+            except Exception as e: logger.error(f"'{self.guest_role_id}' 역할 부여에 실패했습니다: {e}")
+        
         if self.welcome_channel_id and (ch := self.bot.get_channel(self.welcome_channel_id)):
             if embed_data := await get_embed_from_db('welcome_embed'):
-                desc = embed_data.get('description', '').format(member_mention=member.mention, member_name=member.display_name, guild_name=member.guild.name)
-                embed = discord.Embed.from_dict({**embed_data, 'description': desc})
+                # [수정] 헬퍼 함수를 사용하여 안전하게 포매팅
+                embed = format_embed_from_db(embed_data, member_mention=member.mention, member_name=member.display_name, guild_name=member.guild.name)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-                try: await ch.send(f"@everyone, {member.mention}", embed=embed, allowed_mentions=discord.AllowedMentions(everyone=True, users=True))
+                try: await ch.send(f"ようこそ、{member.mention}さん！", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
                 except Exception as e: logger.error(f"환영 메시지 전송에 실패했습니다: {e}")
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
         if self.farewell_channel_id and (ch := self.bot.get_channel(self.farewell_channel_id)):
             if embed_data := await get_embed_from_db('farewell_embed'):
-                desc = embed_data.get('description', '').format(member_name=member.display_name)
-                embed = discord.Embed.from_dict({**embed_data, 'description': desc})
+                # [수정] 헬퍼 함수를 사용하여 안전하게 포매팅
+                embed = format_embed_from_db(embed_data, member_name=member.display_name)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 try: await ch.send(embed=embed)
                 except Exception as e: logger.error(f"작별 메시지 전송에 실패했습니다: {e}")
@@ -191,7 +202,6 @@ class ServerSystem(commands.Cog):
         try:
             db_key, friendly_name = config['key'], config['friendly_name']
             await save_id_to_db(db_key, channel.id)
-            logger.info(f"'{db_key}' 설정을 DB에 저장했습니다: {channel.id}")
             if config["type"] == "panel":
                 cog_to_run = self.bot.get_cog(config["cog"])
                 if not cog_to_run or not hasattr(cog_to_run, 'regenerate_panel'): await interaction.followup.send(f"❌ '{config['cog']}' Cogが見つからないか、'regenerate_panel' 関数がありません。", ephemeral=True); return
@@ -199,9 +209,7 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send(f"✅ `{channel.mention}` に **{friendly_name}** を設置しました。", ephemeral=True)
             elif config["type"] == "channel":
                 target_cog = self.bot.get_cog(config["cog_name"])
-                if target_cog and hasattr(target_cog, 'load_all_configs'):
-                    await target_cog.load_all_configs()
-                    logger.info(f"✅ '{config['cog_name']}' Cog의 설정을 실시간으로 새로고침했습니다.")
+                if target_cog and hasattr(target_cog, 'load_all_configs'): await target_cog.load_all_configs()
                 await interaction.followup.send(f"✅ `{channel.mention}`を**{friendly_name}**として設定しました。", ephemeral=True)
         except Exception as e:
             logger.error(f"통합 설정 명령어({setting_type}) 처리 중 오류 발생: {e}", exc_info=True)
