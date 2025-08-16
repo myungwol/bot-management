@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (수정됨)
+# cogs/server/nicknames.py (쿨다운 로직 수정)
 
 import discord
 from discord.ext import commands
@@ -9,17 +9,14 @@ import time
 import logging
 from typing import Optional
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# 유틸리티 함수 임포트
 from utils.database import (
     get_panel_id, save_panel_id, get_cooldown, set_cooldown, 
     get_id
 )
 
-# --- 설정 상수 ---
 ALLOWED_NICKNAME_PATTERN = re.compile(r"^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4e00-\u9faf]+$")
 COOLDOWN_SECONDS = 4 * 3600
 
@@ -102,16 +99,11 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
     async def on_submit(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True)
         name = self.new_name.value
-        if not ALLOWED_NICKNAME_PATTERN.match(name):
-            return await i.followup.send("❌ エラー: 名前に絵文字や特殊文字は使用できません。", ephemeral=True)
-        if (length := calculate_weighted_length(name)) > 8:
-            return await i.followup.send(f"❌ エラー: 名前の長さがルールを超えています。(現在: **{length}/8**)", ephemeral=True)
-        # [오류 원인 지점] 아래의 self.nicknames_cog.approval_channel_id 등이 None이어서 문제가 발생했음.
-        if not self.nicknames_cog.approval_channel_id or not self.nicknames_cog.approval_role_id:
-            return await i.followup.send("エラー: ニックネーム機能が正しく設定されていません。", ephemeral=True)
-        if not (ch := i.guild.get_channel(self.nicknames_cog.approval_channel_id)):
-            return await i.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
-        await set_cooldown(f"nickname_{i.user.id}", time.time())
+        if not ALLOWED_NICKNAME_PATTERN.match(name): return await i.followup.send("❌ エラー: 名前に絵文字や特殊文字は使用できません。", ephemeral=True)
+        if (length := calculate_weighted_length(name)) > 8: return await i.followup.send(f"❌ エラー: 名前の長さがルールを超えています。(現在: **{length}/8**)", ephemeral=True)
+        if not self.nicknames_cog.approval_channel_id or not self.nicknames_cog.approval_role_id: return await i.followup.send("エラー: ニックネーム機能が正しく設定されていません。", ephemeral=True)
+        if not (ch := i.guild.get_channel(self.nicknames_cog.approval_channel_id)): return await i.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
+        await set_cooldown(str(i.user.id), "nickname_change", time.time())
         embed = discord.Embed(title="📝 名前変更申請", color=discord.Color.blue())
         embed.add_field(name="申請者", value=i.user.mention, inline=False).add_field(name="現在の名前", value=i.user.display_name, inline=False).add_field(name="希望の名前", value=name, inline=False)
         view = NicknameApprovalView(i.user, name, self.nicknames_cog)
@@ -122,7 +114,7 @@ class NicknameChangerPanelView(ui.View):
     def __init__(self, cog_instance: 'Nicknames'): super().__init__(timeout=None); self.nicknames_cog = cog_instance
     @ui.button(label="名前変更申請", style=discord.ButtonStyle.primary, custom_id="nickname_change_button_v8")
     async def request_change(self, i: discord.Interaction, b: ui.Button):
-        last_time = await get_cooldown(f"nickname_{i.user.id}")
+        last_time = await get_cooldown(str(i.user.id), "nickname_change")
         if last_time and time.time() - last_time < COOLDOWN_SECONDS:
             rem = COOLDOWN_SECONDS - (time.time() - last_time)
             h, r = divmod(int(rem), 3600); m, _ = divmod(r, 60)
@@ -136,7 +128,6 @@ class Nicknames(commands.Cog):
         self.approval_role_id: Optional[int] = None; self.nickname_log_channel_id: Optional[int] = None
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
 
-    # [수정] 영구 View 등록을 위한 함수 추가
     def register_persistent_views(self):
         self.bot.add_view(NicknameChangerPanelView(self))
     
@@ -147,16 +138,9 @@ class Nicknames(commands.Cog):
         self.nickname_log_channel_id = get_id("nickname_log_channel_id")
         self.approval_role_id = get_id("role_approval")
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
-
+    
     async def get_final_nickname(self, member: discord.Member, base_name: str) -> str:
         prefix = None
-        # 역할 기반 칭호를 DB에서 가져오는 로직 (이 부분은 없어서 임시로 주석처리 또는 수정 필요)
-        # for role_name in NICKNAME_PREFIX_HIERARCHY_NAMES:
-        #     if discord.utils.get(member.roles, name=role_name):
-        #         # 예: db_prefix = get_id(f"role_prefix_{role_name}")
-        #         # 이 예제에서는 칭호가 DB에 저장되어있다고 가정하지 않으므로, 역할 이름 자체를 칭호로 사용
-        #         prefix = f"【{role_name}】"
-        #         break
         base = base_name.strip() or member.name
         nick = f"{prefix}{base}" if prefix else base
         if len(nick) > 32:
@@ -180,14 +164,6 @@ class Nicknames(commands.Cog):
         if after.bot or before.roles == after.roles: return
         current_nick = after.nick or after.name
         base_name = current_nick
-        
-        # 칭호 제거 로직 (칭호가 DB에 저장되어 있다고 가정하지 않음)
-        # for role_name in NICKNAME_PREFIX_HIERARCHY_NAMES:
-        #     prefix_candidate = f"【{role_name}】"
-        #     if current_nick.startswith(prefix_candidate):
-        #         base_name = current_nick[len(prefix_candidate):]
-        #         break
-                
         new_nick = await self.get_final_nickname(after, base_name=base_name)
         if after.nick != new_nick:
             try: await after.edit(nick=new_nick, reason="역할 변경으로 인한 칭호 업데이트")
