@@ -1,4 +1,4 @@
-# cogs/games/fishing.py (임베드 DB 연동)
+# cogs/games/fishing.py (버튼 DB 연동)
 
 import discord
 from discord.ext import commands
@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 from utils.database import (
     update_wallet, get_inventory, update_inventory, add_to_aquarium,
     get_user_gear, set_user_gear, FISHING_LOOT, ITEM_DATABASE,
-    CURRENCY_ICON, save_panel_id, get_panel_id, get_id, get_embed_from_db
+    save_panel_id, get_panel_id, get_id, get_embed_from_db, get_panel_components_from_db
 )
+from cogs.admin.panel_manager import BUTTON_STYLES_MAP
 
 BIG_CATCH_THRESHOLD = 70.0
 BITE_REACTION_TIME = 3.0
@@ -76,7 +77,7 @@ class FishingGameView(ui.View):
             embed = discord.Embed(title=catch_proto['title'], description=catch_proto['description'].format(user_mention=user_mention, value=value), color=discord.Color(catch_proto['color']))
         return embed, log_publicly, is_big_catch
     
-    @ui.button(label="待機中...", style=discord.ButtonStyle.secondary, custom_id="catch_fish_button_v4", emoji="🎣")
+    @ui.button(label="待機中...", style=discord.ButtonStyle.secondary, custom_id="catch_fish_button", emoji="🎣")
     async def catch_button(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer()
         if self.game_task: self.game_task.cancel()
@@ -120,8 +121,22 @@ class FishingPanelView(ui.View):
         self.bot = bot; self.fishing_cog = cog_instance
         self.user_locks: Dict[int, asyncio.Lock] = {}
 
-    @ui.button(label="釣りをする", style=discord.ButtonStyle.blurple, custom_id="start_fishing_button_v4", emoji="🎣")
-    async def start_fishing(self, interaction: discord.Interaction, button: ui.Button):
+    async def setup_buttons(self):
+        components_data = await get_panel_components_from_db('fishing')
+        if not components_data:
+            logger.warning("'fishing' 패널에 대한 컴포넌트 데이터가 DB에 없습니다.")
+            self.add_item(ui.Button(label="낚시하기", custom_id="start_fishing"))
+            return
+        for comp in components_data:
+            button = ui.Button(
+                label=comp.get('label'), style=BUTTON_STYLES_MAP.get(comp.get('style', 'secondary')),
+                emoji=comp.get('emoji'), row=comp.get('row'), custom_id=comp.get('component_key')
+            )
+            if comp.get('component_key') == 'start_fishing':
+                button.callback = self.start_fishing
+            self.add_item(button)
+
+    async def start_fishing(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         lock = self.user_locks.setdefault(user_id, asyncio.Lock())
         if lock.locked():
@@ -156,14 +171,20 @@ class Fishing(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.active_fishing_sessions_by_user: Set[int] = set()
         self.fishing_panel_channel_id: Optional[int] = None; self.fishing_log_channel_id: Optional[int] = None
+        self.view_instance = None
         logger.info("Fishing Cog가 성공적으로 초기화되었습니다.")
-    def register_persistent_views(self):
-        self.bot.add_view(FishingPanelView(self.bot, self))
+
+    async def register_persistent_views(self):
+        self.view_instance = FishingPanelView(self.bot, self)
+        await self.view_instance.setup_buttons()
+        self.bot.add_view(self.view_instance)
+
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.fishing_panel_channel_id = get_id("fishing_panel_channel_id")
         self.fishing_log_channel_id = get_id("fishing_log_channel_id")
         logger.info(f"[Fishing Cog] 낚시 패널/로그 채널 ID 로드 완료.")
+
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -171,6 +192,7 @@ class Fishing(commands.Cog):
             if channel_id: target_channel = self.bot.get_channel(channel_id)
             else: logger.info("ℹ️ 낚시 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
         if not target_channel: logger.warning("❌ Fishing panel channel could not be found."); return
+        
         panel_info = get_panel_id("fishing")
         if panel_info and (old_id := panel_info.get('message_id')):
             try:
@@ -184,8 +206,10 @@ class Fishing(commands.Cog):
             return
         embed = discord.Embed.from_dict(embed_data)
         
-        view = FishingPanelView(self.bot, self)
-        new_message = await target_channel.send(embed=embed, view=view)
+        self.view_instance = FishingPanelView(self.bot, self)
+        await self.view_instance.setup_buttons()
+        
+        new_message = await target_channel.send(embed=embed, view=self.view_instance)
         await save_panel_id("fishing", new_message.id, target_channel.id)
         logger.info(f"✅ 낚시 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
 
