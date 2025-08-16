@@ -1,4 +1,4 @@
-# cogs/games/user_profile.py (임베드 DB 연동)
+# cogs/games/user_profile.py (칭호 시스템 표시 기능 연동)
 
 import discord
 from discord.ext import commands
@@ -15,9 +15,11 @@ from utils.database import (
     get_wallet, get_inventory, get_aquarium,
     get_user_gear, set_user_gear, CURRENCY_ICON,
     ITEM_DATABASE, ROD_HIERARCHY,
-    save_panel_id, get_panel_id, get_id, get_embed_from_db
+    save_panel_id, get_panel_id, get_id, get_embed_from_db,
+    get_panel_components_from_db # [추가] 패널 컴포넌트 DB 함수 임포트
 )
 from cogs.server.nicknames import NICKNAME_PREFIX_HIERARCHY_NAMES
+from cogs.admin.panel_manager import BUTTON_STYLES_MAP # [추가] 버튼 스타일 맵 임포트
 
 CATEGORIES = ["プロフィール", "装備", "アイテム", "魚", "農業", "ペット"]
 FISH_PER_PAGE = 5
@@ -53,20 +55,32 @@ class InventoryView(ui.View):
     def _update_view_components(self):
         self.clear_items()
         for i, cat_name in enumerate(CATEGORIES):
-            btn = ui.Button(label=cat_name, style=discord.ButtonStyle.success if self.current_category == cat_name else discord.ButtonStyle.secondary, custom_id=f"inv_cat_{cat_name}")
+            btn = ui.Button(label=cat_name, style=discord.ButtonStyle.success if self.current_category == cat_name else discord.ButtonStyle.secondary, custom_id=f"inv_cat_{cat_name}", row=0)
             btn.callback = self.category_button_callback; self.add_item(btn)
         if self.current_category == "装備": self._add_gear_selects()
         if self.current_category == "魚":
             total_pages = ceil(len(self.aquarium_data) / FISH_PER_PAGE) if self.aquarium_data else 1
-            prev_btn = ui.Button(label="◀", style=discord.ButtonStyle.grey, disabled=(self.fish_page <= 1))
-            next_btn = ui.Button(label="▶", style=discord.ButtonStyle.grey, disabled=(self.fish_page >= total_pages))
+            prev_btn = ui.Button(label="◀", style=discord.ButtonStyle.grey, disabled=(self.fish_page <= 1), row=1)
+            next_btn = ui.Button(label="▶", style=discord.ButtonStyle.grey, disabled=(self.fish_page >= total_pages), row=1)
             prev_btn.callback = self.prev_fish_page; next_btn.callback = self.next_fish_page
             self.add_item(prev_btn); self.add_item(next_btn)
+    
+    # [수정] 프로필 탭에 칭호 시스템을 연동합니다.
     def _build_プロフィール_embed(self, embed: discord.Embed):
         balance = self.wallet_data.get('balance', 0)
         embed.add_field(name="💰 所持金", value=f"`{balance:,}` {CURRENCY_ICON}", inline=False)
-        prefix = "役職なし"
-        embed.add_field(name="📜 等級", value=f"`{prefix}` (칭호 시스템 점검 중)", inline=False)
+        
+        # 사용자의 역할 목록을 확인하여 가장 높은 등급의 칭호를 찾습니다.
+        prefix = "役職なし" # 기본값
+        member_role_names = {role.name for role in self.user.roles}
+        for prefix_name in NICKNAME_PREFIX_HIERARCHY_NAMES:
+            if prefix_name in member_role_names:
+                prefix = prefix_name
+                break # 가장 높은 등급을 찾으면 중단
+        
+        # '점검 중' 문구를 제거하고 찾은 칭호를 표시합니다.
+        embed.add_field(name="📜 等級", value=f"`{prefix}`", inline=False)
+
     def _build_装備_embed(self, embed: discord.Embed):
         rod = self.gear_data.get('rod', '素手')
         rod_count = self.inventory_data.get(rod, 1) if rod in ["素手", "古い釣竿"] else self.inventory_data.get(rod, 0)
@@ -90,10 +104,10 @@ class InventoryView(ui.View):
     def _add_gear_selects(self):
         rod_options = [discord.SelectOption(label="古い釣竿", emoji="🎣")]
         rod_options.extend(discord.SelectOption(label=r, emoji=ITEM_DATABASE.get(r, {}).get('emoji', '🎣')) for r in ROD_HIERARCHY if r != "古い釣竿" and self.inventory_data.get(r, 0) > 0)
-        rod_select = ui.Select(placeholder="装備する釣竿を選択...", options=rod_options, custom_id="gear_rod_select"); rod_select.callback = self.gear_select_callback; self.add_item(rod_select)
+        rod_select = ui.Select(placeholder="装備する釣竿を選択...", options=rod_options, custom_id="gear_rod_select", row=1); rod_select.callback = self.gear_select_callback; self.add_item(rod_select)
         bait_options = [discord.SelectOption(label=i, emoji=ITEM_DATABASE.get(i, {}).get('emoji', '🐛')) for i in ["一般の釣りエサ", "高級釣りエサ"] if self.inventory_data.get(i, 0) > 0]
-        bait_options.append(discord.SelectOption(label="エサなし", value="エサなし", emoji="🚫"))
-        bait_select = ui.Select(placeholder="装備するエサを選択...", options=bait_options, custom_id="gear_bait_select"); bait_select.callback = self.gear_select_callback; self.add_item(bait_select)
+        bait_options.insert(0, discord.SelectOption(label="エサなし", value="エサなし", emoji="🚫"))
+        bait_select = ui.Select(placeholder="装備するエサを選択...", options=bait_options, custom_id="gear_bait_select", row=2); bait_select.callback = self.gear_select_callback; self.add_item(bait_select)
     async def gear_select_callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
         gear_type = "rod" if "rod" in interaction.data["custom_id"] else "bait"
@@ -122,15 +136,15 @@ class InventoryPanelView(ui.View):
     def __init__(self, cog_instance: 'UserProfile'):
         super().__init__(timeout=None)
         self.user_profile_cog = cog_instance
-        # [수정] DB에서 버튼 정보를 불러와 동적으로 추가합니다.
-        # 이 작업은 비동기로 이루어져야 하므로, 별도의 async 함수에서 처리합니다.
         
     async def setup_buttons(self):
+        self.clear_items()
         components_data = await get_panel_components_from_db('profile')
         if not components_data:
-            logger.warning("'profile' 패널에 대한 컴포넌트 데이터가 DB에 없습니다.")
-            # DB에 데이터가 없을 경우, 기본 버튼을 추가할 수 있습니다.
-            self.add_item(ui.Button(label="📦 持ち物を開く", custom_id="open_inventory"))
+            logger.warning("'profile' 패널에 대한 컴포넌트 데이터가 DB에 없습니다. 기본 버튼을 생성합니다.")
+            default_button = ui.Button(label="📦 持ち物を開く", custom_id="open_inventory", style=discord.ButtonStyle.primary)
+            default_button.callback = self.open_inventory
+            self.add_item(default_button)
             return
 
         for comp in components_data:
@@ -142,7 +156,6 @@ class InventoryPanelView(ui.View):
                     row=comp.get('row'),
                     custom_id=comp.get('component_key')
                 )
-                # component_key를 기반으로 적절한 콜백 함수를 연결합니다.
                 if comp.get('component_key') == 'open_inventory':
                     button.callback = self.open_inventory
                 
@@ -163,12 +176,12 @@ class UserProfile(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.inventory_panel_channel_id: Optional[int] = None
-        self.view_instance = None # View 인스턴스를 저장할 변수
+        self.view_instance = None
         logger.info("UserProfile Cog가 성공적으로 초기화되었습니다.")
 
     async def register_persistent_views(self):
         self.view_instance = InventoryPanelView(self)
-        await self.view_instance.setup_buttons() # 비동기적으로 버튼을 설정합니다.
+        await self.view_instance.setup_buttons()
         self.bot.add_view(self.view_instance)
         
     async def cog_load(self): await self.load_all_configs()
@@ -197,7 +210,6 @@ class UserProfile(commands.Cog):
             return
         embed = discord.Embed.from_dict(embed_data)
         
-        # View 인스턴스를 재생성하고 버튼을 다시 설정합니다.
         self.view_instance = InventoryPanelView(self)
         await self.view_instance.setup_buttons()
         
