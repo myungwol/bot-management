@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (상호작용 실패 오류 해결)
+# cogs/server/onboarding.py (상호작용 실패 오류 수정)
 
 import discord
 from discord.ext import commands
@@ -165,106 +165,56 @@ class OnboardingGuideView(ui.View):
         super().__init__(timeout=300)
         self.onboarding_cog = cog_instance; self.steps_data = steps_data
         self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
-
-    async def start(self, interaction: discord.Interaction):
-        # [수정] 최초 호출 시, ephemeral 메시지를 보냅니다.
-        # 이 start 함수는 OnboardingPanelView에서 처음 호출되므로, 여기서 ephemeral 메시지를 보냅니다.
-        step_info = self.steps_data[self.current_step]
-        embed_data = step_info.get("embed_data", {}).get("embed_data")
-        embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention) if embed_data else discord.Embed(title="エラー", description="このステップの表示データが見つかりません。", color=discord.Color.red())
-        
-        self.clear_items() # 기존 아이템 정리
-        self._add_navigation_buttons(self.current_step, len(self.steps_data), step_info.get("step_type"))
-
-        await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
-        self.message = await interaction.original_response() # 보낸 메시지를 저장하여 이후 편집에 사용
-
+    async def start(self, interaction: discord.Interaction): await self.update_view(interaction)
     async def update_view(self, interaction: discord.Interaction):
-        # [수정] 버튼 클릭으로 인한 업데이트는 interaction.response.edit_message 사용
         step_info = self.steps_data[self.current_step]
         embed_data = step_info.get("embed_data", {}).get("embed_data")
-        embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention) if embed_data else discord.Embed(title="エラー", description="このステップの表示データが見つかりません。", color=discord.Color.red())
-        
+        if not embed_data:
+            embed = discord.Embed(title="エラー", description="このステップの表示データが見つかりません。", color=discord.Color.red())
+        else:
+            embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
         self.clear_items()
-        self._add_navigation_buttons(self.current_step, len(self.steps_data), step_info.get("step_type"))
-        
-        # defer 후 edit_original_response, 혹은 최초 응답에서 edit_message
-        # 여기서는 항상 버튼 클릭 후 defer()를 했으므로 followup.edit_message를 사용합니다.
-        await interaction.followup.edit_message(message_id=self.message.id, embed=embed, view=self)
-
-    def _add_navigation_buttons(self, current_step: int, total_steps: int, step_type: str):
-        is_first = current_step == 0
-        is_last = current_step == total_steps - 1
-        
+        is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
         prev_button = ui.Button(label="◀ 戻る", style=discord.ButtonStyle.secondary, custom_id="onboarding_prev", row=1, disabled=is_first)
-        prev_button.callback = self.go_previous
-        self.add_item(prev_button)
-
+        prev_button.callback = self.go_previous; self.add_item(prev_button)
+        step_type = step_info.get("step_type")
         if step_type == "intro":
-             intro_button = ui.Button(label=self.steps_data[current_step].get("button_label", "住民登録票を作成する"), style=discord.ButtonStyle.success, custom_id="onboarding_intro")
-             intro_button.callback = self.create_introduction
-             self.add_item(intro_button)
+             intro_button = ui.Button(label=step_info.get("button_label", "住民登録票を作成する"), style=discord.ButtonStyle.success, custom_id="onboarding_intro")
+             intro_button.callback = self.create_introduction; self.add_item(intro_button)
         elif step_type == "action":
-            action_button = ui.Button(label=self.steps_data[current_step].get("button_label", "同意する"), style=discord.ButtonStyle.primary, custom_id="onboarding_action")
-            action_button.callback = self.do_action
-            self.add_item(action_button)
+            action_button = ui.Button(label=step_info.get("button_label", "同意する"), style=discord.ButtonStyle.primary, custom_id="onboarding_action", disabled=is_last)
+            action_button.callback = self.do_action; self.add_item(action_button)
         else:
             next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next", disabled=is_last)
-            next_button.callback = self.go_next
-            self.add_item(next_button)
-
+            next_button.callback = self.go_next; self.add_item(next_button)
+        if interaction.response.is_done():
+            if self.message: await self.message.edit(embed=embed, view=self)
+        else:
+            await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
+            self.message = await interaction.original_response()
     async def go_next(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True) # defer 먼저
-        if self.current_step < len(self.steps_data) - 1:
-            self.current_step += 1
+        if self.current_step < len(self.steps_data) - 1: self.current_step += 1
         await self.update_view(interaction)
-
     async def go_previous(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True) # defer 먼저
-        if self.current_step > 0:
-            self.current_step -= 1
+        if self.current_step > 0: self.current_step -= 1
         await self.update_view(interaction)
-    
     async def do_action(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True) # defer 먼저
-        step_info = self.steps_data[self.current_step]
-        role_key_to_add = step_info.get("role_key_to_add")
+        step_info = self.steps_data[self.current_step]; role_key_to_add = step_info.get("role_key_to_add")
         if role_key_to_add:
             role_id = get_id(role_key_to_add)
             if role_id and (role := interaction.guild.get_role(role_id)):
                 try:
                     await interaction.user.add_roles(role, reason="オンボーディング進行")
                     await interaction.followup.send(f"✅ 「{role.name}」の役割を付与しました。", ephemeral=True)
-                except Exception as e:
-                    await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True)
+                except Exception as e: await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True)
         await self.go_next(interaction)
-
     async def create_introduction(self, interaction: discord.Interaction):
-        # 모달을 띄우는 것이므로 defer를 먼저 하지 않습니다.
         last_time = await get_cooldown(str(interaction.user.id), "introduction")
         if last_time and time.time() - last_time < INTRODUCTION_COOLDOWN_SECONDS:
             rem = INTRODUCTION_COOLDOWN_SECONDS - (time.time() - last_time); m, s = divmod(int(rem), 60)
             await interaction.response.send_message(f"次の申請まであと {m}分{s}秒 お待ちください。", ephemeral=True); return
-        
         await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
-        # 모달이 닫힌 후, 원래 가이드 메시지를 삭제해야 합니다.
-        # 모달 응답 후에는 interaction.followup을 사용해야 합니다.
-        if self.message:
-            try:
-                # interaction.original_response().delete() 는 모달 이후 사용 불가
-                # interaction.followup을 통해 직접 메시지를 찾아 삭제해야 함
-                # 하지만, interaction.followup.delete_message는 interaction.response.defer() 후 호출 가능
-                # 모달은 defer를 하지 않으므로 다른 방법 필요
-                # 가장 간단한 방법은, 모달이 뜨고 나서 사용자가 모달을 닫았을 때,
-                # on_submit 또는 on_error 에서 해당 메시지를 찾아서 삭제하는 것
-                # 또는 모달 닫기 전에 defer 후 메시지 삭제.
-                # 현재는 모달 닫기 후 메시지 삭제가 좀 복잡하므로, 일단 모달만 띄우고, 가이드 메시지는 그냥 남겨둡니다.
-                # 만약 깔끔하게 지우고 싶다면, ApprovalView처럼 __init__에 original_message를 넘겨줘서
-                # 모달 on_submit 후에 그 메시지를 삭제하도록 해야 합니다.
-                pass # self.message.delete()
-            except Exception as e:
-                logger.warning(f"온보딩 가이드 메시지 삭제 실패: {e}")
-        self.stop() # 가이드 뷰 종료
+        await self.message.delete(); self.stop()
 
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
@@ -280,16 +230,11 @@ class OnboardingPanelView(ui.View):
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
     async def start_guide_callback(self, interaction: discord.Interaction):
-        # 이 부분에서는 defer()가 있어야 interaction timeout을 방지합니다.
         await interaction.response.defer(ephemeral=True, thinking=True)
-
         steps = await get_onboarding_steps()
         if not steps:
             await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True); return
-        
-        guide_view = OnboardingGuideView(self.onboarding_cog, steps)
-        # start() 내부에서 최초 메시지를 ephemeral로 보내고 original_response를 저장합니다.
-        await guide_view.start(interaction) 
+        guide_view = OnboardingGuideView(self.onboarding_cog, steps); await guide_view.start(interaction)
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -312,7 +257,6 @@ class Onboarding(commands.Cog):
         self.introduction_channel_id = get_id("introduction_channel_id")
         self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
         self.approval_role_id = get_id("role_approval")
-            
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
