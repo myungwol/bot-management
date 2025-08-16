@@ -45,7 +45,6 @@ class RoleSelectDirectApply(ui.Select):
             for info in category_roles if (rid := get_id(info.get('role_id_key')))
         ]
         self.managed_role_ids = {int(opt.value) for opt in options}
-        # [수정] 한국어 제거
         super().__init__(placeholder=f"{category_name}の役割を選択 (選択するとすぐに適用されます)", min_values=0, max_values=len(options), options=options)
 
     async def callback(self, interaction: discord.Interaction):
@@ -147,6 +146,8 @@ class ServerSystem(commands.Cog):
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 try: await ch.send(embed=embed)
                 except Exception as e: logger.error(f"작별 메시지 전송에 실패했습니다: {e}")
+
+    # --- [수정] 이 명령어의 선택지와 설명서가 모두 포함되었습니다 ---
     @app_commands.command(name="setup", description="[管理者] ボットの各種チャンネルを設定またはパネルを設置します。")
     @app_commands.describe(setting_type="設定したい項目を選択してください。", channel="設定対象のチャンネルを指定してください。")
     @app_commands.choices(setting_type=[
@@ -158,9 +159,9 @@ class ServerSystem(commands.Cog):
         app_commands.Choice(name="[パネル] 持ち物パネル", value="panel_profile"),
         app_commands.Choice(name="[チャンネル] 自己紹介承認チャンネル", value="channel_onboarding_approval"), 
         app_commands.Choice(name="[チャンネル] 名前変更承認チャンネル", value="channel_nickname_approval"),
-        app_commands.Choice(name="[チャンネル] 新規参加者歓迎チャンネル", value="channel_new_welcome"), 
+        app_commands.Choice(name="[チャンネル] 新規参加者歓迎チャンネル (입장 메시지)", value="channel_new_welcome"), 
         app_commands.Choice(name="[チャンネル] 退場メッセージチャンネル", value="channel_farewell"), 
-        app_commands.Choice(name="[チャンネル] メインチャットチャンネル", value="channel_main_chat"),
+        app_commands.Choice(name="[チャンネル] メインチャットチャンネル (자기소개 승인 후)", value="channel_main_chat"),
         app_commands.Choice(name="[ログ] 名前変更ログ", value="log_nickname"), 
         app_commands.Choice(name="[ログ] 釣りログ", value="log_fishing"), 
         app_commands.Choice(name="[ログ] コインログ", value="log_coin"),
