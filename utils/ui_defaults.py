@@ -318,11 +318,9 @@ UI_EMBEDS = {
         "description": "{member_mention}さんが住民登録票を提出しました。",
         "color": 0xE67E22
     },
-    "embed_onboarding_public_welcome": {
-        "title": "🎊 新しい住民がやってきました！",
-        "description":
-            "{moderator_mention}さんの承認を経て、{member_mention}さんが新しい住民になりました！\n"
-            "みんなで歓迎しましょう！",
+    "embed_introduction_log": {
+        "title": "📝 自己紹介",
+        "description": " ",
         "color": 0x2ECC71
     },
     "embed_transfer_confirmation": {
