@@ -255,7 +255,8 @@ UI_EMBEDS = {
     "welcome_embed": {
         "title": "🎉 {guild_name}へようこそ！",
         "description":
-        "{member_mention}さん、はじめまして！\n\nまずは、サーバーの案内を読んで、自己紹介の作成をお願いします。",
+            "{member_mention}さん、はじめまして！\n\n"
+            "まずは、サーバーの案内を読んで、自己紹介の作成をお願いします。",
         "color": 0x3498DB
     },
     "farewell_embed": {
@@ -271,13 +272,18 @@ UI_EMBEDS = {
     "embed_onboarding_info_roles": {
         "title": "📖 役割付与 (情報)",
         "description":
-        "次に、ご自身の情報を表す役割を選択してください。\n\nこの情報は、他の住民があなたをよりよく知るのに役立ちます。（非公開も可能です）",
+            "次に、ご自身の情報を表す役割を選択してください。\n\n"
+            "この情報は、他の住民があなたをよりよく知るのに役立ちます。（非公開も可能です）",
         "color": 0x5865F2
     },
     "embed_onboarding_final_rules": {
         "title": "📝 最終確認",
         "description":
-        "ありがとうございます！\n\n最後に、村のルールをもう一度確認してください。\n\n- 他の住民を尊重し、迷惑をかけないこと。\n- 問題が発生した場合は、すぐに村役場（管理者）に報告すること。\n\n下のボタンを押すと、住民登録票の作成に進みます。",
+            "ありがとうございます！\n\n"
+            "最後に、村のルールをもう一度確認してください。\n\n"
+            "- 他の住民を尊重し、迷惑をかけないこと。\n"
+            "- 問題が発生した場合は、すぐに村役場（管理者）に報告すること。\n\n"
+            "下のボタンを押すと、住民登録票の作成に進みます。",
         "color": 0x3498DB
     },
     "panel_onboarding": {
@@ -297,7 +303,9 @@ UI_EMBEDS = {
     },
     "panel_fishing": {
         "title": "🎣 釣り場",
-        "description": "のんびり釣りを楽しみましょう。\n「釣りをする」ボタンで釣りを開始します。",
+        "description":
+            "のんびり釣りを楽しみましょう。\n"
+            "「釣りをする」ボタンで釣りを開始します。",
         "color": 0x5865F2
     },
     "panel_profile": {
@@ -313,28 +321,25 @@ UI_EMBEDS = {
     "embed_onboarding_public_welcome": {
         "title": "🎊 新しい住民がやってきました！",
         "description":
-        "{moderator_mention}さんの承認を経て、{member_mention}さんが新しい住民になりました！\nみんなで歓迎しましょう！",
+            "{moderator_mention}さんの承認を経て、{member_mention}さんが新しい住民になりました！\n"
+            "みんなで歓迎しましょう！",
         "color": 0x2ECC71
     },
     "embed_transfer_confirmation": {
         "title": "💸 送金確認",
-        "description":
-        "本当に {recipient_mention}さんへ `{amount}`{currency_icon} を送金しますか？",
+        "description": "本当に {recipient_mention}さんへ `{amount}`{currency_icon} を送金しますか？",
         "color": 0xE67E22
     },
     "log_coin_gain": {
-        "description":
-        "{user_mention}さんが**{reason}**で`{amount}`{currency_icon}を獲得しました。",
+        "description": "{user_mention}さんが**{reason}**で`{amount}`{currency_icon}を獲得しました。",
         "color": 0x2ECC71
     },
     "log_coin_transfer": {
-        "description":
-        "💸 {sender_mention}さんが{recipient_mention}さんへ`{amount}`{currency_icon}を送金しました。",
+        "description": "💸 {sender_mention}さんが{recipient_mention}さんへ`{amount}`{currency_icon}を送金しました。",
         "color": 0x3498DB
     },
     "log_coin_admin": {
-        "description":
-        "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。",
+        "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。",
         "color": 0x3498DB
     },
     "embed_shop_buy": {
