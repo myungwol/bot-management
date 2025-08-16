@@ -1,4 +1,4 @@
-# utils/database.py (쿨다운 로직 수정)
+# utils/database.py (온보딩 단계 로드 함수 추가)
 
 import os
 import discord
@@ -8,15 +8,11 @@ import asyncio
 from typing import Dict, Callable, Any
 from functools import wraps
 
-
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- ⬇️ 역할 ID 관리 ⬇️ ---
 _cached_ids: Dict[str, int] = {}
 
-# --- ⬇️ 자기소개 기반 자동 역할 부여 규칙 (성별) ⬇️ ---
 AUTO_ROLE_MAPPING = [
     {"field_name": "性別", "keywords": ["男", "男性", "おとこ", "オトコ", "man", "male"], "role_id_key": "role_info_male"},
     {"field_name": "性別", "keywords": ["女", "女性", "おんな", "オンナ", "woman", "female"], "role_id_key": "role_info_female"},
@@ -41,7 +37,6 @@ FISHING_LOOT = [
     {"name": "小魚", "emoji": "🐟", "weight": 250, "min_size": 10, "max_size": 30, "base_value": 8, "size_multiplier": 0.8},
 ]
 
-# --- Supabase 클라이언트 초기화 ---
 supabase: AsyncClient = None
 try:
     url: str = os.environ.get("SUPABASE_URL")
@@ -125,7 +120,6 @@ async def get_or_create_user(table_name: str, user_id_str: str, default_data: di
         response = await supabase.table(table_name).select("*").eq("user_id", user_id_str).limit(1).execute()
         if response and response.data:
             return response.data[0]
-        
         insert_data = {"user_id": user_id_str, **default_data}
         response = await supabase.table(table_name).insert(insert_data, returning="representation").execute()
         return response.data[0] if response and response.data else default_data
@@ -188,6 +182,11 @@ async def add_to_aquarium(user_id_str: str, fish_data: dict):
 async def remove_fish_from_aquarium(fish_id: int):
     await supabase.table('aquariums').delete().eq('id', fish_id).execute()
 
+@supabase_retry_handler()
+async def get_onboarding_steps() -> list | None:
+    response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
+    return response.data if response and response.data else None
+
 async def get_activity_data(user_id_str: str) -> dict:
     return await get_or_create_user('activity_data', user_id_str, {"chat_counts":0, "voice_minutes":0})
 
@@ -196,7 +195,6 @@ async def update_activity_data(user_id_str: str, chat_increment=0, voice_increme
     params = {'user_id_param': user_id_str, 'chat_increment_param': chat_increment, 'voice_increment_param': voice_increment, 'reset_chat_param': reset_chat, 'reset_voice_param': reset_voice}
     await supabase.rpc('increment_activity_data', params).execute()
 
-# [수정] get_cooldown 함수가 cooldown_key를 받도록 변경
 @supabase_retry_handler()
 async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
     response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
@@ -204,7 +202,6 @@ async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
         return float(response.data[0]['last_cooldown_timestamp'])
     return 0.0
 
-# [수정] set_cooldown 함수가 cooldown_key를 받도록 변경
 @supabase_retry_handler()
 async def set_cooldown(user_id_str: str, cooldown_key: str, timestamp: float):
     await supabase.table('cooldowns').upsert(
