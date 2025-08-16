@@ -1,4 +1,5 @@
-# utils/database.py (수정 없음, 기존 코드 유지)
+# utils/database.py (쿨다운 로직 수정)
+
 import os
 import discord
 from supabase import create_client, AsyncClient
@@ -52,7 +53,6 @@ try:
 except Exception as e:
     logger.critical(f"❌ Supabase 클라이언트 생성 실패: {e}", exc_info=True)
     
-# --- DB 자동 재시도 데코레이터 ---
 def supabase_retry_handler(retries: int = 3, delay: int = 5):
     def decorator(func: Callable):
         @wraps(func)
@@ -75,7 +75,6 @@ def supabase_retry_handler(retries: int = 3, delay: int = 5):
         return wrapper
     return decorator
 
-# --- 설정 (ID) 관리 ---
 @supabase_retry_handler()
 async def load_all_configs_from_db():
     global _cached_ids
@@ -102,7 +101,6 @@ async def save_id_to_db(key: str, object_id: int):
     _cached_ids[key] = object_id
     logger.info(f"✅ '{key}' ID({object_id})를 DB와 캐시에 저장했습니다.")
 
-# --- 임베드 및 패널 관리 ---
 @supabase_retry_handler()
 async def save_embed_to_db(embed_key: str, embed_data: dict):
     await supabase.table('embeds').upsert({'embed_key': embed_key, 'embed_data': embed_data}).execute()
@@ -121,7 +119,6 @@ def get_panel_id(panel_name: str) -> dict | None:
     channel_id = get_id(f"panel_{panel_name}_channel_id")
     return {"message_id": message_id, "channel_id": channel_id} if message_id and channel_id else None
 
-# --- 사용자 데이터 관리 (범용) ---
 @supabase_retry_handler()
 async def get_or_create_user(table_name: str, user_id_str: str, default_data: dict) -> dict:
     try:
@@ -136,7 +133,6 @@ async def get_or_create_user(table_name: str, user_id_str: str, default_data: di
         logger.error(f"'{table_name}' 테이블에서 유저 데이터 조회/생성 실패. 기본 데이터를 반환합니다.")
         return default_data
 
-# --- 지갑 (Wallets) ---
 async def get_wallet(user_id: int) -> dict:
     return await get_or_create_user('wallets', str(user_id), {"balance": 0})
 
@@ -146,7 +142,6 @@ async def update_wallet(user: discord.User, amount: int):
     response = await supabase.rpc('increment_wallet_balance', params).execute()
     return response.data[0] if response and response.data else None
 
-# --- 인벤토리 (Inventories) & 장비 (Gear) ---
 @supabase_retry_handler()
 async def get_inventory(user_id_str: str) -> dict:
     response = await supabase.table('inventories').select('item_name, quantity').eq('user_id', user_id_str).gt('quantity', 0).execute()
@@ -179,7 +174,6 @@ async def set_user_gear(user_id_str: str, rod: str = None, bait: str = None):
     if data_to_update:
         await supabase.table('gear_setups').update(data_to_update).eq('user_id', user_id_str).execute()
 
-# --- 수족관 (Aquariums) ---
 @supabase_retry_handler()
 async def get_aquarium(user_id_str: str) -> list:
     response = await supabase.table('aquariums').select('id, name, size, emoji').eq('user_id', user_id_str).execute()
@@ -194,7 +188,6 @@ async def add_to_aquarium(user_id_str: str, fish_data: dict):
 async def remove_fish_from_aquarium(fish_id: int):
     await supabase.table('aquariums').delete().eq('id', fish_id).execute()
 
-# --- 활동량 (Activity) & 쿨다운 (Cooldown) ---
 async def get_activity_data(user_id_str: str) -> dict:
     return await get_or_create_user('activity_data', user_id_str, {"chat_counts":0, "voice_minutes":0})
 
@@ -203,17 +196,20 @@ async def update_activity_data(user_id_str: str, chat_increment=0, voice_increme
     params = {'user_id_param': user_id_str, 'chat_increment_param': chat_increment, 'voice_increment_param': voice_increment, 'reset_chat_param': reset_chat, 'reset_voice_param': reset_voice}
     await supabase.rpc('increment_activity_data', params).execute()
 
+# [수정] get_cooldown 함수가 cooldown_key를 받도록 변경
 @supabase_retry_handler()
-async def get_cooldown(user_id_str: str) -> float:
-    response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).limit(1).execute()
+async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
+    response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
     if response and response.data and response.data[0].get('last_cooldown_timestamp') is not None:
         return float(response.data[0]['last_cooldown_timestamp'])
     return 0.0
 
+# [수정] set_cooldown 함수가 cooldown_key를 받도록 변경
 @supabase_retry_handler()
-async def set_cooldown(user_id_str: str, timestamp: float):
-    await supabase.table('cooldowns').upsert({"user_id": user_id_str, "last_cooldown_timestamp": timestamp}, on_conflict="user_id").execute()
+async def set_cooldown(user_id_str: str, cooldown_key: str, timestamp: float):
+    await supabase.table('cooldowns').upsert(
+        {"user_id": user_id_str, "cooldown_key": cooldown_key, "last_cooldown_timestamp": timestamp}
+    ).execute()
 
-# --- 고정 데이터 제공 함수 (DB 접근 X) ---
 def get_auto_role_mappings() -> list:
     return AUTO_ROLE_MAPPING
