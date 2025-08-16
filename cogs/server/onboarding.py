@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (패널 버튼 DB 연동 최종)
+# cogs/server/onboarding.py (임베드 DB 연동, 2차 수정)
 
 import discord
 from discord.ext import commands
@@ -18,7 +18,7 @@ from utils.database import (
     get_cooldown, set_cooldown, get_embed_from_db, get_onboarding_steps,
     get_panel_components_from_db
 )
-from cogs.admin.panel_manager import BUTTON_STYLES_MAP # 버튼 스타일 맵 임포트
+from cogs.admin.panel_manager import BUTTON_STYLES_MAP
 
 INTRODUCTION_COOLDOWN_SECONDS = 10 * 60
 AGE_ROLE_MAPPING = [{"key": "role_info_age_70s", "range": range(1970, 1980)}, {"key": "role_info_age_80s", "range": range(1980, 1990)}, {"key": "role_info_age_90s", "range": range(1990, 2000)}, {"key": "role_info_age_00s", "range": range(2000, 2010)}]
@@ -61,9 +61,7 @@ class ApprovalView(ui.View):
         self.onboarding_cog = cog_instance; self.rejection_reason: Optional[str] = None
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
-        if not approval_role_id:
-            await interaction.response.send_message("❌ エラー: 承認役割IDが設定されていません。", ephemeral=True); return False
-        if not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
+        if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
             await interaction.response.send_message("❌ このボタンを押す権限がありません。", ephemeral=True); return False
         return True
     def _parse_birth_year(self, text: str) -> Optional[int]:
@@ -101,7 +99,7 @@ class ApprovalView(ui.View):
         results = await asyncio.gather(*tasks, return_exceptions=True)
         failed_tasks = [res for res in results if isinstance(res, Exception)]
         if failed_tasks:
-            error_report = f"❌ **{status_text} 処理中の一部作業に失敗しました:**\n" + "".join(f"- `{type(e).__name__}: {e}`\n" for e in failed_tasks)
+            error_report = f"❌ **{status_text} 처리 중 일부 작업에 실패했습니다:**\n" + "".join(f"- `{type(e).__name__}: {e}`\n" for e in failed_tasks)
             await interaction.followup.send(error_report, ephemeral=True)
         else: await interaction.followup.send(f"✅ {status_text}処理が正常に完了しました。", ephemeral=True)
         try: await interaction.message.delete()
@@ -158,26 +156,23 @@ class ApprovalView(ui.View):
         embed = discord.Embed(description=desc, color=0xFFFFE0)
         try: await channel.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
         except Exception as e: logger.error(f"Error sending new welcome message: {e}", exc_info=True)
-    @ui.button(label='承認', style=discord.ButtonStyle.success, custom_id='approve_button_final')
-    async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
-    @ui.button(label='拒否', style=discord.ButtonStyle.danger, custom_id='reject_button_final')
-    async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
 class OnboardingView(ui.View):
-    def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], current_step: int = 0):
+    def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]]):
         super().__init__(timeout=300)
         self.onboarding_cog = cog_instance
         self.steps_data = steps_data
-        self.current_step = current_step
         self.update_view()
 
     def update_view(self):
         self.clear_items()
         page = self.steps_data[self.current_step]
+        
         if self.current_step > 0:
             prev_button = ui.Button(label="◀ 前へ", style=discord.ButtonStyle.secondary, custom_id="onboarding_prev", row=1)
             prev_button.callback = self.go_previous
             self.add_item(prev_button)
+
         page_type = page.get("step_type")
         if page_type == "info":
             next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next")
@@ -190,150 +185,4 @@ class OnboardingView(ui.View):
         elif page_type == "intro":
             intro_button = ui.Button(label="住人登録票を作成する", style=discord.ButtonStyle.success, custom_id="onboarding_intro")
             intro_button.callback = self.create_introduction
-            self.add_item(intro_button)
-
-    async def _update_message(self, interaction: discord.Interaction):
-        page = self.steps_data[self.current_step]
-        embed_data = page.get("embed_data", {}).get("embed_data")
-        if not embed_data:
-            await interaction.edit_original_response(content="❌ エラー: 次のページのデータを読み込めませんでした。", embed=None, view=None)
-            return
-        embed = discord.Embed.from_dict(embed_data)
-        self.update_view()
-        await interaction.edit_original_response(embed=embed, view=self)
-
-    async def go_previous(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        if self.current_step > 0:
-            self.current_step -= 1
-        await self._update_message(interaction)
-
-    async def go_next(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        if self.current_step < len(self.steps_data) - 1:
-            self.current_step += 1
-        await self._update_message(interaction)
-
-    async def do_action(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        try:
-            page_data = self.steps_data[self.current_step]
-            role_key = page_data.get("role_key")
-            if not role_key:
-                await interaction.followup.send("エラー: このステップに割り当てられた役割がありません。", ephemeral=True); return
-            role_id = get_id(role_key)
-            if not role_id or not (role := interaction.guild.get_role(role_id)):
-                await interaction.followup.send("エラー: 役職が見つかりません。管理者が設定を確認してください。", ephemeral=True); return
-            if role not in interaction.user.roles:
-                await interaction.user.add_roles(role)
-            if self.current_step < len(self.steps_data) - 1:
-                self.current_step += 1
-            await self._update_message(interaction)
-        except Exception as e:
-            logger.error(f"온보딩 액션 처리 중 오류: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ エラーが発生しました。", ephemeral=True)
-
-    async def create_introduction(self, interaction: discord.Interaction):
-        key = str(interaction.user.id)
-        last_time = await get_cooldown(key, "introduction")
-        if last_time and time.time() - last_time < INTRODUCTION_COOLDOWN_SECONDS:
-            rem = INTRODUCTION_COOLDOWN_SECONDS - (time.time() - last_time)
-            await interaction.response.send_message(f"次の申請まであと {int(rem/60)}分 お待ちください。", ephemeral=True); return
-        await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
-
-class OnboardingPanelView(ui.View):
-    def __init__(self, cog_instance: 'Onboarding'):
-        super().__init__(timeout=None)
-        self.onboarding_cog = cog_instance
-        # [수정] 버튼 설정을 위한 async 함수를 호출합니다.
-        
-    async def setup_buttons(self):
-        components_data = await get_panel_components_from_db('onboarding')
-        if not components_data:
-            logger.warning("'onboarding' 패널에 대한 컴포넌트 데이터가 DB에 없습니다.")
-            self.add_item(ui.Button(label="里の案内・住人登録を始める", style=discord.ButtonStyle.success, custom_id="start_onboarding_button_default"))
-            return
-        for comp in components_data:
-            if comp.get('component_type') == 'button':
-                button = ui.Button(
-                    label=comp.get('label'),
-                    style=BUTTON_STYLES_MAP.get(comp.get('style', 'secondary')),
-                    emoji=comp.get('emoji'),
-                    row=comp.get('row'),
-                    custom_id=comp.get('component_key')
-                )
-                if comp.get('component_key') == 'start_onboarding':
-                    button.callback = self.start_onboarding
-                self.add_item(button)
-
-    async def start_onboarding(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            steps_data = await get_onboarding_steps()
-            if not steps_data:
-                await interaction.followup.send("❌ エラー: オンボーディングのステップ情報が見つかりません。", ephemeral=True)
-                return
-            first_step_embed_data = steps_data[0].get("embed_data", {}).get("embed_data")
-            if not first_step_embed_data:
-                 await interaction.followup.send("❌ エラー: オンボーディングの最初のページのデータを読み込めませんでした。", ephemeral=True)
-                 return
-            embed = discord.Embed.from_dict(first_step_embed_data)
-            await interaction.followup.send(embed=embed, view=OnboardingView(self.onboarding_cog, steps_data), ephemeral=True)
-        except Exception as e:
-            logger.error(f"온보딩 시작 중 오류: {e}", exc_info=True)
-            if not interaction.response.is_done():
-                await interaction.followup.send("エラーが発生しました。", ephemeral=True)
-
-class Onboarding(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
-        self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
-        self.new_welcome_channel_id: Optional[int] = None; self.approval_role_id: Optional[int] = None
-        self.guest_role_id: Optional[int] = None; self.mention_role_id_1: Optional[int] = None
-        self.view_instance = None # View 인스턴스를 저장할 변수
-        logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-    
-    async def register_persistent_views(self):
-        self.view_instance = OnboardingPanelView(self)
-        await self.view_instance.setup_buttons() # 비동기적으로 버튼을 설정합니다.
-        self.bot.add_view(self.view_instance)
-    
-    async def cog_load(self): await self.load_all_configs()
-    async def load_all_configs(self):
-        self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
-        self.introduction_channel_id = get_id("introduction_channel_id"); self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
-        self.new_welcome_channel_id = get_id("new_welcome_channel_id"); self.approval_role_id = get_id("role_approval")
-        self.guest_role_id = get_id("role_guest"); self.mention_role_id_1 = get_id("role_mention_role_1")
-        logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
-        
-    async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
-        target_channel = channel
-        if target_channel is None:
-            channel_id = get_id("onboarding_panel_channel_id")
-            if channel_id: target_channel = self.bot.get_channel(channel_id)
-            else: logger.info("ℹ️ 온보딩 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
-        if not target_channel: logger.warning("❌ Onboarding panel channel could not be found."); return
-        panel_info = get_panel_id("onboarding")
-        if panel_info and (old_id := panel_info.get('message_id')):
-            try:
-                old_message = await target_channel.fetch_message(old_id)
-                await old_message.delete()
-            except (discord.NotFound, discord.Forbidden): pass
-            
-        embed_data = await get_embed_from_db("panel_onboarding")
-        if not embed_data:
-            logger.warning("DB에서 'panel_onboarding' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
-            return
-        embed = discord.Embed.from_dict(embed_data)
-        
-        # View 인스턴스를 재생성하고 버튼을 다시 설정합니다.
-        self.view_instance = OnboardingPanelView(self)
-        await self.view_instance.setup_buttons()
-        
-        new_message = await target_channel.send(embed=embed, view=self.view_instance)
-        await save_panel_id("onboarding", new_message.id, target_channel.id)
-        logger.info(f"✅ 온보딩 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(Onboarding(bot))
+            self.add_item(
