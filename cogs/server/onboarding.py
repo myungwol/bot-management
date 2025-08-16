@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (임베드 DB 연동)
+# cogs/server/onboarding.py (DB 기반 온보딩으로 전면 수정)
 
 import discord
 from discord.ext import commands
@@ -14,20 +14,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%
 logger = logging.getLogger(__name__)
 
 from utils.database import (
-    get_id, save_panel_id, get_panel_id, get_auto_role_mappings, get_cooldown, set_cooldown, get_embed_from_db
+    get_id, save_panel_id, get_panel_id, get_auto_role_mappings, 
+    get_cooldown, set_cooldown, get_embed_from_db, get_onboarding_steps
 )
 
-GUIDE_GIF_URL = None
 INTRODUCTION_COOLDOWN_SECONDS = 10 * 60
 AGE_ROLE_MAPPING = [{"key": "role_info_age_70s", "range": range(1970, 1980)}, {"key": "role_info_age_80s", "range": range(1980, 1990)}, {"key": "role_info_age_90s", "range": range(1990, 2000)}, {"key": "role_info_age_00s", "range": range(2000, 2010)}]
-GUIDE_PAGES = [
-    {"type": "info", "title": "🏡 Dico森へようこそ！ ✨", "description": "➡️ 次に進むには、下の「次へ」ボタンを押してください 📩"},
-    {"type": "action", "title": "ボット紹介", "description": "**下のボタンを押すと、次の段階である「里の掟」チャンネルを閲覧する権限が付与されます。**", "button_label": "ボットの紹介を確認しました", "role_key": "role_onboarding_step_1"},
-    {"type": "action", "title": "里の掟", "description": "「里の掟」チャンネルが閲覧可能になりました。\n\n## <#1404410157504397322>\n\n上記のチャンネルに移動し、すべての掟をよく確認してください。", "button_label": "掟を確認しました", "role_key": "role_onboarding_step_2"},
-    {"type": "action", "title": "里の地図", "description": "次は、里のチャンネルについての案内です。\n\n## <#1404410171689664552>\n\nですべてのチャンネルの役割を確認してください。", "button_label": "地図を確認しました", "role_key": "role_onboarding_step_3"},
-    {"type": "action", "title": "依頼掲示板", "description": "次は依頼掲示板の確認です。\n\n## <#1404410186562666546>", "button_label": "依頼掲示板を確認しました", "role_key": "role_onboarding_step_4"},
-    {"type": "intro", "title": "住人登録票 (最終段階)", "description": "すべての案内を確認しました！いよいよ最終段階です。\n\n**下のボタンを押して、住人登録票を作成してください。**\n登録票が公務員によって承認されると、正式にすべての場所が利用可能になります。", "rules": "・性別の記載は必須です\n・年齢を非公開にしたい場合は、公務員に個別にご連絡ください\n・名前に特殊文字は使用できません\n・漢字は4文字まで、ひらがな・カタカナ・英数字は合わせて8文字まで可能です\n・不適切な名前は拒否される場合があります\n・未記入の項目がある場合、拒否されることがあります\n・参加経路も必ずご記入ください。（例：Disboard、〇〇からの招待など）"}
-]
 
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
@@ -170,49 +162,75 @@ class ApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
 class OnboardingView(ui.View):
-    def __init__(self, cog_instance: 'Onboarding', current_step: int = 0):
-        super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.current_step = current_step; self.update_view()
+    def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], current_step: int = 0):
+        super().__init__(timeout=300)
+        self.onboarding_cog = cog_instance
+        self.steps_data = steps_data
+        self.current_step = current_step
+        self.update_view()
+
     def update_view(self):
-        self.clear_items(); page = GUIDE_PAGES[self.current_step]
+        self.clear_items()
+        page = self.steps_data[self.current_step]
         if self.current_step > 0:
             prev_button = ui.Button(label="◀ 前へ", style=discord.ButtonStyle.secondary, custom_id="onboarding_prev", row=1)
-            prev_button.callback = self.go_previous; self.add_item(prev_button)
-        if page["type"] == "info":
+            prev_button.callback = self.go_previous
+            self.add_item(prev_button)
+        page_type = page.get("step_type")
+        if page_type == "info":
             next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next")
-            next_button.callback = self.go_next; self.add_item(next_button)
-        elif page["type"] == "action":
+            next_button.callback = self.go_next
+            self.add_item(next_button)
+        elif page_type == "action":
             action_button = ui.Button(label=page.get("button_label", "確認"), style=discord.ButtonStyle.success, custom_id="onboarding_action")
-            action_button.callback = self.do_action; self.add_item(action_button)
-        elif page["type"] == "intro":
+            action_button.callback = self.do_action
+            self.add_item(action_button)
+        elif page_type == "intro":
             intro_button = ui.Button(label="住人登録票を作成する", style=discord.ButtonStyle.success, custom_id="onboarding_intro")
-            intro_button.callback = self.create_introduction; self.add_item(intro_button)
+            intro_button.callback = self.create_introduction
+            self.add_item(intro_button)
+
     async def _update_message(self, interaction: discord.Interaction):
-        page = GUIDE_PAGES[self.current_step]
-        embed = discord.Embed(title=page["title"], description=page["description"], color=discord.Color.purple())
-        if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
-        if page.get("rules"): embed.add_field(name="⚠️ ルール", value=page["rules"], inline=False)
+        page = self.steps_data[self.current_step]
+        embed_data = page.get("embed_data", {}).get("embed_data")
+        if not embed_data:
+            await interaction.edit_original_response(content="❌ エラー: 次のページのデータを読み込めませんでした。", embed=None, view=None)
+            return
+        embed = discord.Embed.from_dict(embed_data)
         self.update_view()
-        if interaction.response.is_done():
-            await interaction.edit_original_response(embed=embed, view=self)
+        await interaction.edit_original_response(embed=embed, view=self)
+
     async def go_previous(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        if self.current_step > 0: self.current_step -= 1
+        if self.current_step > 0:
+            self.current_step -= 1
         await self._update_message(interaction)
+
     async def go_next(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        if self.current_step < len(GUIDE_PAGES) - 1: self.current_step += 1
+        if self.current_step < len(self.steps_data) - 1:
+            self.current_step += 1
         await self._update_message(interaction)
+
     async def do_action(self, interaction: discord.Interaction):
         await interaction.response.defer()
         try:
-            page_data = GUIDE_PAGES[self.current_step]
-            role_id = get_id(page_data.get("role_key"))
+            page_data = self.steps_data[self.current_step]
+            role_key = page_data.get("role_key")
+            if not role_key:
+                await interaction.followup.send("エラー: このステップに割り当てられた役割がありません。", ephemeral=True); return
+            role_id = get_id(role_key)
             if not role_id or not (role := interaction.guild.get_role(role_id)):
-                await interaction.followup.send("エラー: 役職が見つかりません。", ephemeral=True); return
-            if role not in interaction.user.roles: await interaction.user.add_roles(role)
-            if self.current_step < len(GUIDE_PAGES) - 1: self.current_step += 1
+                await interaction.followup.send("エラー: 役職が見つかりません。管理者が設定を確認してください。", ephemeral=True); return
+            if role not in interaction.user.roles:
+                await interaction.user.add_roles(role)
+            if self.current_step < len(self.steps_data) - 1:
+                self.current_step += 1
             await self._update_message(interaction)
-        except Exception as e: await interaction.followup.send(f"❌ エラー: {e}", ephemeral=True)
+        except Exception as e:
+            logger.error(f"온보딩 액션 처리 중 오류: {e}", exc_info=True)
+            await interaction.followup.send(f"❌ エラーが発生しました。", ephemeral=True)
+
     async def create_introduction(self, interaction: discord.Interaction):
         key = str(interaction.user.id)
         last_time = await get_cooldown(key, "introduction")
@@ -223,18 +241,26 @@ class OnboardingView(ui.View):
 
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
-        super().__init__(timeout=None); self.onboarding_cog = cog_instance
+        super().__init__(timeout=None)
+        self.onboarding_cog = cog_instance
     @ui.button(label="里の案内・住人登録を始める", style=discord.ButtonStyle.success, custom_id="start_onboarding_button_final")
     async def start_onboarding(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            page = GUIDE_PAGES[0]
-            embed = discord.Embed(title=page["title"], description=page["description"], color=discord.Color.purple())
-            if GUIDE_GIF_URL: embed.set_image(url=GUIDE_GIF_URL)
-            await interaction.followup.send(embed=embed, view=OnboardingView(self.onboarding_cog), ephemeral=True)
+            steps_data = await get_onboarding_steps()
+            if not steps_data:
+                await interaction.followup.send("❌ エラー: オンボーディングのステップ情報が見つかりません。", ephemeral=True)
+                return
+            first_step_embed_data = steps_data[0].get("embed_data", {}).get("embed_data")
+            if not first_step_embed_data:
+                 await interaction.followup.send("❌ エラー: オンボーディングの最初のページのデータを読み込めませんでした。", ephemeral=True)
+                 return
+            embed = discord.Embed.from_dict(first_step_embed_data)
+            await interaction.followup.send(embed=embed, view=OnboardingView(self.onboarding_cog, steps_data), ephemeral=True)
         except Exception as e:
             logger.error(f"온보딩 시작 중 오류: {e}", exc_info=True)
-            if not interaction.response.is_done(): await interaction.response.send_message("오류가 발생했습니다.", ephemeral=True)
+            if not interaction.response.is_done():
+                await interaction.followup.send("エラーが発生しました。", ephemeral=True)
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -244,10 +270,8 @@ class Onboarding(commands.Cog):
         self.new_welcome_channel_id: Optional[int] = None; self.approval_role_id: Optional[int] = None
         self.guest_role_id: Optional[int] = None; self.mention_role_id_1: Optional[int] = None
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-    
     def register_persistent_views(self):
         self.bot.add_view(OnboardingPanelView(self))
-    
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
@@ -255,7 +279,6 @@ class Onboarding(commands.Cog):
         self.new_welcome_channel_id = get_id("new_welcome_channel_id"); self.approval_role_id = get_id("role_approval")
         self.guest_role_id = get_id("role_guest"); self.mention_role_id_1 = get_id("role_mention_role_1")
         logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
-        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -269,13 +292,11 @@ class Onboarding(commands.Cog):
                 old_message = await target_channel.fetch_message(old_id)
                 await old_message.delete()
             except (discord.NotFound, discord.Forbidden): pass
-            
         embed_data = await get_embed_from_db("panel_onboarding")
         if not embed_data:
             logger.warning("DB에서 'panel_onboarding' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
             return
         embed = discord.Embed.from_dict(embed_data)
-        
         view = OnboardingPanelView(self)
         new_message = await target_channel.send(embed=embed, view=view)
         await save_panel_id("onboarding", new_message.id, target_channel.id)
