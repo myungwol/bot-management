@@ -1,4 +1,4 @@
-# cogs/server/onboarding.py (승인 로그 형식 수정)
+# cogs/server/onboarding.py (쿨다운 로직 수정)
 
 import discord
 from discord.ext import commands
@@ -10,16 +10,13 @@ from datetime import datetime
 import time
 from typing import List, Dict, Any, Optional
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# 유틸리티 함수 임포트
 from utils.database import (
     get_id, save_panel_id, get_panel_id, get_auto_role_mappings, get_cooldown, set_cooldown, get_embed_from_db
 )
 
-# --- 설정 상수 ---
 GUIDE_GIF_URL = None
 INTRODUCTION_COOLDOWN_SECONDS = 10 * 60
 AGE_ROLE_MAPPING = [{"key": "role_info_age_70s", "range": range(1970, 1980)}, {"key": "role_info_age_80s", "range": range(1980, 1990)}, {"key": "role_info_age_90s", "range": range(1990, 2000)}, {"key": "role_info_age_00s", "range": range(2000, 2010)}]
@@ -49,7 +46,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
 
     async def _post_submission_tasks(self, interaction: discord.Interaction, approval_channel: discord.TextChannel):
         try:
-            await set_cooldown(f"intro_{interaction.user.id}", time.time())
+            await set_cooldown(str(interaction.user.id), "introduction", time.time())
             embed = discord.Embed(title="📝 新しい住人登録票が提出されました", description=f"**作成者:** {interaction.user.mention}", color=discord.Color.blue())
             if interaction.user.display_avatar: 
                 embed.set_thumbnail(url=interaction.user.display_avatar.url)
@@ -118,12 +115,9 @@ class ApprovalView(ui.View):
         for item in self.children: item.disabled = True
         try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
         except (discord.NotFound, discord.HTTPException): pass
-        
         tasks = [self._send_notifications(interaction.user, member, is_approved)]
         if is_approved:
-            # [수정] 처리자를 _send_public_welcome 함수로 넘겨줍니다.
             tasks.extend([self._grant_roles(member), self._update_nickname(member), self._send_public_welcome(interaction.user, member)])
-            
         results = await asyncio.gather(*tasks, return_exceptions=True)
         failed_tasks = [res for res in results if isinstance(res, Exception)]
         if failed_tasks:
@@ -153,22 +147,16 @@ class ApprovalView(ui.View):
     async def _update_nickname(self, member: discord.Member) -> None:
         if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := next((f.value for f in self.original_embed.fields if f.name == "名前"), None)):
             await nick_cog.update_nickname(member, base_name_override=name_field)
-            
-    # [수정] moderator 인자를 받도록 함수 시그니처를 변경합니다.
     async def _send_public_welcome(self, moderator: discord.Member, member: discord.Member) -> None:
         guild = member.guild
         if (ch_id := self.onboarding_cog.introduction_channel_id) and (ch := guild.get_channel(ch_id)):
             embed = self.original_embed.copy()
             embed.title = "ようこそ！新しい仲間です！"
             embed.color = discord.Color.green()
-            # [수정] 처리자 필드를 추가합니다.
             embed.add_field(name="処理者", value=moderator.mention, inline=False)
-            # [수정] 임베드 밖의 멘션을 제거합니다.
             await ch.send(embed=embed)
-            
         if (ch_id := self.onboarding_cog.new_welcome_channel_id) and (ch := guild.get_channel(ch_id)):
             await self._send_new_welcome_message(ch, member, self.onboarding_cog.mention_role_id_1)
-            
     async def _send_notifications(self, moderator: discord.Member, member: discord.Member, is_approved: bool) -> None:
         guild = member.guild
         if is_approved:
@@ -240,7 +228,8 @@ class OnboardingView(ui.View):
             await self._update_message(interaction)
         except Exception as e: await interaction.followup.send(f"❌ エラー: {e}", ephemeral=True)
     async def create_introduction(self, interaction: discord.Interaction):
-        key = f"intro_{interaction.user.id}"; last_time = await get_cooldown(key)
+        key = str(interaction.user.id)
+        last_time = await get_cooldown(key, "introduction")
         if last_time and time.time() - last_time < INTRODUCTION_COOLDOWN_SECONDS:
             rem = INTRODUCTION_COOLDOWN_SECONDS - (time.time() - last_time)
             await interaction.response.send_message(f"次の申請まであと {int(rem/60)}分 お待ちください。", ephemeral=True); return
