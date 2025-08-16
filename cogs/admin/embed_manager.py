@@ -1,4 +1,4 @@
-# cogs/admin/embed_manager.py (새 파일)
+# cogs/admin/embed_manager.py (수정됨)
 
 import discord
 from discord.ext import commands
@@ -11,7 +11,7 @@ from utils.database import get_embed_from_db, save_embed_to_db
 
 logger = logging.getLogger(__name__)
 
-# 봇 전체에서 관리할 임베드 목록
+# [수정] 봇 전체에서 관리할 임베드 목록에 모든 패널 키 추가
 EMBED_KEYS = [
     "welcome_embed", "farewell_embed", "panel_roles", "panel_onboarding",
     "panel_nicknames", "panel_commerce", "panel_fishing", "panel_profile"
@@ -88,7 +88,6 @@ class EmbedManager(commands.Cog):
         current_data = await get_embed_from_db(embed_key)
         if not current_data:
             current_data = DEFAULT_EMBED_DATA.copy()
-            # 기본 설명에 변수 예시 추가
             if "welcome" in embed_key:
                 current_data["description"] = "ようこそ、{member_mention}さん！"
             elif "farewell" in embed_key:
