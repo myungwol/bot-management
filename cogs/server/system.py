@@ -6,29 +6,55 @@ from discord import app_commands, ui
 import logging
 import json
 from typing import Optional, List, Dict, Any
+import copy # [신규] copy 라이브러리 임포트
 
 from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, save_id_to_db, get_config
 
 logger = logging.getLogger(__name__)
 
-# --- [신규] DB에서 가져온 Embed 데이터에 변수를 안전하게 적용하는 헬퍼 함수 ---
+# --- [수정] DB에서 가져온 Embed 데이터에 변수를 안전하게 적용하는 헬퍼 함수 ---
 def format_embed_from_db(embed_data: dict, **kwargs) -> discord.Embed:
-    """DB에서 가져온 Embed 데이터(dict)에 format을 적용하고 discord.Embed 객체로 변환합니다."""
+    """DB에서 가져온 Embed 데이터(dict)에 format을 안전하게 적용하고 discord.Embed 객체로 변환합니다."""
     if not isinstance(embed_data, dict):
         logger.error(f"임베드 데이터가 dict 형식이 아닙니다: {type(embed_data)}")
         return discord.Embed(title="오류", description="임베드 데이터를 불러오는 데 실패했습니다.", color=discord.Color.red())
+
+    # 원본 데이터가 변경되지 않도록 깊은 복사를 사용합니다.
+    formatted_data = copy.deepcopy(embed_data)
+
+    # kwargs에 없는 키가 포맷팅 문자열에 있어도 오류를 내지 않는 클래스
+    class SafeFormatter(dict):
+        def __missing__(self, key):
+            return f'{{{key}}}'
+
+    safe_kwargs = SafeFormatter(**kwargs)
+
     try:
-        # JSON 문자열로 변환 후 format 적용, 다시 dict로 변환
-        json_str = json.dumps(embed_data)
-        # kwargs에 없는 키에 대한 오류를 방지하기 위해 SafeFormatter 사용 고려 가능
-        # 여기서는 단순 .format()을 사용하되, 오류 발생 시 로깅
-        formatted_str = json_str.format(**kwargs)
-        formatted_data = json.loads(formatted_str)
+        # Title, Description 포맷팅
+        if 'title' in formatted_data and isinstance(formatted_data.get('title'), str):
+            formatted_data['title'] = formatted_data['title'].format_map(safe_kwargs)
+        if 'description' in formatted_data and isinstance(formatted_data.get('description'), str):
+            formatted_data['description'] = formatted_data['description'].format_map(safe_kwargs)
+
+        # Footer 포맷팅
+        if 'footer' in formatted_data and isinstance(formatted_data.get('footer'), dict):
+            if 'text' in formatted_data['footer'] and isinstance(formatted_data['footer'].get('text'), str):
+                formatted_data['footer']['text'] = formatted_data['footer']['text'].format_map(safe_kwargs)
+
+        # Fields 포맷팅 (리스트 안의 딕셔너리)
+        if 'fields' in formatted_data and isinstance(formatted_data.get('fields'), list):
+            for field in formatted_data['fields']:
+                if isinstance(field, dict):
+                    if 'name' in field and isinstance(field.get('name'), str):
+                        field['name'] = field['name'].format_map(safe_kwargs)
+                    if 'value' in field and isinstance(field.get('value'), str):
+                        field['value'] = field['value'].format_map(safe_kwargs)
+
         return discord.Embed.from_dict(formatted_data)
-    except (KeyError, json.JSONDecodeError, Exception) as e:
-        logger.error(f"임베드 포매팅 중 오류 발생: {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"임베드 최종 생성 중 오류 발생: {e}", exc_info=True)
         # 포매팅 실패 시, 원본 데이터를 기반으로 최대한 생성 시도
-        return discord.Embed.from_dict(embed_data)
+        return discord.Embed.from_dict(embed_data)```
 
 # --- [삭제] STATIC_AUTO_ROLE_PANELS ---
 # 이 데이터는 이제 DB의 'bot_configs' 테이블에 'STATIC_AUTO_ROLE_PANELS' 키로 저장됩니다.
