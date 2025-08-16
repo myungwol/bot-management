@@ -1,4 +1,4 @@
-# cogs/server/nicknames.py (임베드 DB 연동)
+# cogs/server/nicknames.py (패널 버튼 DB 연동 최종)
 
 import discord
 from discord.ext import commands
@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 
 from utils.database import (
     get_panel_id, save_panel_id, get_cooldown, set_cooldown, 
-    get_id, get_embed_from_db
+    get_id, get_embed_from_db, get_panel_components_from_db
 )
+from cogs.admin.panel_manager import BUTTON_STYLES_MAP # 버튼 스타일 맵 임포트
 
 ALLOWED_NICKNAME_PATTERN = re.compile(r"^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4e00-\u9faf]+$")
 COOLDOWN_SECONDS = 4 * 3600
@@ -112,8 +113,28 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
 
 class NicknameChangerPanelView(ui.View):
     def __init__(self, cog_instance: 'Nicknames'): super().__init__(timeout=None); self.nicknames_cog = cog_instance
-    @ui.button(label="名前変更申請", style=discord.ButtonStyle.primary, custom_id="nickname_change_button_v8")
-    async def request_change(self, i: discord.Interaction, b: ui.Button):
+
+    async def setup_buttons(self):
+        components_data = await get_panel_components_from_db('nicknames')
+        if not components_data:
+            logger.warning("'nicknames' 패널에 대한 컴포넌트 데이터가 DB에 없습니다.")
+            self.add_item(ui.Button(label="名前変更申請", style=discord.ButtonStyle.primary, custom_id="request_nickname_change_default"))
+            return
+        
+        for comp in components_data:
+            if comp.get('component_type') == 'button':
+                button = ui.Button(
+                    label=comp.get('label'),
+                    style=BUTTON_STYLES_MAP.get(comp.get('style', 'secondary')),
+                    emoji=comp.get('emoji'),
+                    row=comp.get('row'),
+                    custom_id=comp.get('component_key')
+                )
+                if comp.get('component_key') == 'request_nickname_change':
+                    button.callback = self.request_change
+                self.add_item(button)
+
+    async def request_change(self, i: discord.Interaction):
         last_time = await get_cooldown(str(i.user.id), "nickname_change")
         if last_time and time.time() - last_time < COOLDOWN_SECONDS:
             rem = COOLDOWN_SECONDS - (time.time() - last_time)
@@ -126,9 +147,14 @@ class Nicknames(commands.Cog):
         self.bot = bot
         self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None; self.nickname_log_channel_id: Optional[int] = None
+        self.view_instance = None # View 인스턴스를 저장할 변수
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
-    def register_persistent_views(self):
-        self.bot.add_view(NicknameChangerPanelView(self))
+
+    async def register_persistent_views(self):
+        self.view_instance = NicknameChangerPanelView(self)
+        await self.view_instance.setup_buttons() # 비동기적으로 버튼을 설정합니다.
+        self.bot.add_view(self.view_instance)
+    
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.panel_channel_id = get_id("nickname_panel_channel_id")
@@ -136,6 +162,7 @@ class Nicknames(commands.Cog):
         self.nickname_log_channel_id = get_id("nickname_log_channel_id")
         self.approval_role_id = get_id("role_approval")
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
+    
     async def get_final_nickname(self, member: discord.Member, base_name: str) -> str:
         prefix = None
         base = base_name.strip() or member.name
@@ -144,6 +171,7 @@ class Nicknames(commands.Cog):
             prefix_len = len(prefix) if prefix else 0
             base = base[:32 - prefix_len]; nick = f"{prefix}{base}" if prefix else base
         return nick
+    
     async def update_nickname(self, member: discord.Member, base_name_override: str):
         try:
             final_name = await self.get_final_nickname(member, base_name=base_name_override)
@@ -154,6 +182,7 @@ class Nicknames(commands.Cog):
         except Exception as e:
             logger.error(f"Onboarding: {member.display_name}의 닉네임 업데이트 실패: {e}", exc_info=True)
             raise
+            
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if after.bot or before.roles == after.roles: return
@@ -163,6 +192,7 @@ class Nicknames(commands.Cog):
         if after.nick != new_nick:
             try: await after.edit(nick=new_nick, reason="역할 변경으로 인한 칭호 업데이트")
             except discord.Forbidden: pass
+            
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -170,6 +200,7 @@ class Nicknames(commands.Cog):
             if channel_id: target_channel = self.bot.get_channel(channel_id)
             else: logger.info("ℹ️ 닉네임 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
         if not target_channel: logger.warning("❌ Nickname panel channel could not be found."); return
+        
         panel_info = get_panel_id("nickname_changer")
         if panel_info and (old_id := panel_info.get('message_id')):
             try:
@@ -183,8 +214,11 @@ class Nicknames(commands.Cog):
             return
         embed = discord.Embed.from_dict(embed_data)
         
-        view = NicknameChangerPanelView(self)
-        new_message = await target_channel.send(embed=embed, view=view)
+        # View 인스턴스를 재생성하고 버튼을 다시 설정합니다.
+        self.view_instance = NicknameChangerPanelView(self)
+        await self.view_instance.setup_buttons()
+        
+        new_message = await target_channel.send(embed=embed, view=self.view_instance)
         await save_panel_id("nickname_changer", new_message.id, target_channel.id)
         logger.info(f"✅ 닉네임 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
 
