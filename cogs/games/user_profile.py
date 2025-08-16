@@ -1,4 +1,4 @@
-# cogs/games/user_profile.py (수정됨)
+# cogs/games/user_profile.py (임베드 DB 연동)
 
 import discord
 from discord.ext import commands
@@ -8,22 +8,17 @@ import logging
 import asyncio
 from typing import Optional, Dict, List, Any
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# 유틸리티 함수 임포트
 from utils.database import (
     get_wallet, get_inventory, get_aquarium,
     get_user_gear, set_user_gear, CURRENCY_ICON,
     ITEM_DATABASE, ROD_HIERARCHY,
-    save_panel_id, get_panel_id, get_id
+    save_panel_id, get_panel_id, get_id, get_embed_from_db
 )
-# Nicknames Cog에서 칭호 목록을 직접 가져오기보다, 의존성을 줄이기 위해 별도로 관리하거나 DB에서 가져오는 것이 좋습니다.
-# 여기서는 일단 기존 구조를 유지합니다.
 from cogs.server.nicknames import NICKNAME_PREFIX_HIERARCHY_NAMES
 
-# --- 상수 정의 ---
 CATEGORIES = ["プロフィール", "装備", "アイテム", "魚", "農業", "ペット"]
 FISH_PER_PAGE = 5
 
@@ -71,11 +66,6 @@ class InventoryView(ui.View):
         balance = self.wallet_data.get('balance', 0)
         embed.add_field(name="💰 所持金", value=f"`{balance:,}` {CURRENCY_ICON}", inline=False)
         prefix = "役職なし"
-        # for role_name in NICKNAME_PREFIX_HIERARCHY_NAMES:
-        #     if discord.utils.get(self.user.roles, name=role_name):
-        #         # 칭호는 DB에 저장된 값을 사용하는 것이 이상적입니다.
-        #         # prefix = f"【{role_name}】"
-        #         break
         embed.add_field(name="📜 等級", value=f"`{prefix}` (칭호 시스템 점검 중)", inline=False)
     def _build_装備_embed(self, embed: discord.Embed):
         rod = self.gear_data.get('rod', '素手')
@@ -148,16 +138,12 @@ class UserProfile(commands.Cog):
         self.bot = bot
         self.inventory_panel_channel_id: Optional[int] = None
         logger.info("UserProfile Cog가 성공적으로 초기화되었습니다.")
-
-    # [수정] 영구 View 등록을 위한 함수 추가
     def register_persistent_views(self):
         self.bot.add_view(InventoryPanelView(self))
-        
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.inventory_panel_channel_id = get_id("inventory_panel_channel_id")
         logger.info(f"[UserProfile Cog] 프로필 패널 채널 ID 로드: {self.inventory_panel_channel_id}")
-        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -171,7 +157,13 @@ class UserProfile(commands.Cog):
                 old_message = await target_channel.fetch_message(old_id)
                 await old_message.delete()
             except (discord.NotFound, discord.Forbidden): pass
-        embed = discord.Embed(title="📦 持ち物", description="下のボタンを押して、あなたの持ち物を開きます。", color=0xC8C8C8)
+            
+        embed_data = await get_embed_from_db("panel_profile")
+        if not embed_data:
+            logger.warning("DB에서 'panel_profile' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
+            return
+        embed = discord.Embed.from_dict(embed_data)
+        
         view = InventoryPanelView(self)
         new_message = await target_channel.send(embed=embed, view=view)
         await save_panel_id("profile", new_message.id, target_channel.id)
