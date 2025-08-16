@@ -1,4 +1,4 @@
-# utils/database.py (패널 컴포넌트 함수 추가)
+# utils/database.py
 
 import os
 import discord
@@ -98,7 +98,7 @@ async def save_id_to_db(key: str, object_id: int):
 
 @supabase_retry_handler()
 async def save_embed_to_db(embed_key: str, embed_data: dict):
-    await supabase.table('embeds').upsert({'embed_key': embed_key, 'embed_data': embed_data}).execute()
+    await supabase.table('embeds').upsert({'embed_key': embed_key, 'embed_data': embed_data}, on_conflict='embed_key').execute()
 
 @supabase_retry_handler()
 async def get_embed_from_db(embed_key: str) -> dict | None:
@@ -184,7 +184,7 @@ async def remove_fish_from_aquarium(fish_id: int):
 
 @supabase_retry_handler()
 async def get_panel_components_from_db(panel_key: str) -> list | None:
-    response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).execute()
+    response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', ascending=True).execute()
     return response.data if response and response.data else None
 
 @supabase_retry_handler()
@@ -193,7 +193,7 @@ async def save_panel_component_to_db(component_data: dict):
 
 @supabase_retry_handler()
 async def get_onboarding_steps() -> list | None:
-    response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
+    response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', ascending=False).execute()
     return response.data if response and response.data else None
 
 async def get_activity_data(user_id_str: str) -> dict:
