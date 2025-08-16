@@ -131,7 +131,7 @@ class ApprovalView(ui.View):
             for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=True)
             embed.add_field(name="担当者", value=moderator.mention, inline=False)
             if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-            await ch.send(f"新しい住民、{member.mention}さんの自己紹介です！", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+            await ch.send(f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
     async def _send_notifications(self, moderator: discord.Member, member: discord.Member, is_approved: bool) -> None:
         guild = member.guild
         if is_approved:
