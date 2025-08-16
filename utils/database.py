@@ -1,4 +1,4 @@
-# utils/database.py (게임 데이터 DB 분리 적용)
+# utils/database.py (NameError: wraps 오류 수정 완료)
 
 import os
 import discord
@@ -6,26 +6,21 @@ from supabase import create_client, AsyncClient
 import logging
 import asyncio
 from typing import Dict, Callable, Any, List
+from functools import wraps # [수정] 빠뜨렸던 import 구문을 추가합니다.
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# [수정] 하드코딩된 데이터 대신, 데이터를 담을 캐시 변수를 선언합니다.
 _cached_ids: Dict[str, int] = {}
 _item_database_cache: Dict[str, Dict[str, Any]] = {}
 _fishing_loot_cache: List[Dict[str, Any]] = []
-
-# [수정] ROD_HIERARCHY는 아이템 DB에 의존하므로, DB 로드 후 생성되도록 변경
 ROD_HIERARCHY: List[str] = []
 
 AUTO_ROLE_MAPPING = [
     {"field_name": "性別", "keywords": ["男", "男性", "おとこ", "オトコ", "man", "male"], "role_id_key": "role_info_male"},
     {"field_name": "性別", "keywords": ["女", "女性", "おんな", "オンナ", "woman", "female"], "role_id_key": "role_info_female"},
 ]
-
 CURRENCY_ICON = "🪙"
-
-# [삭제] 하드코딩된 ITEM_DATABASE 와 FISHING_LOOT 를 완전히 제거했습니다.
 
 supabase: AsyncClient = None
 try:
@@ -59,7 +54,6 @@ def supabase_retry_handler(retries: int = 3, delay: int = 5):
 async def load_game_data_from_db():
     global _item_database_cache, _fishing_loot_cache, ROD_HIERARCHY
     logger.info("------ [ 게임 데이터 로드 시작 ] ------")
-    
     item_response = await supabase.table('items').select('*').execute()
     if item_response and item_response.data:
         temp_item_db = {}
@@ -70,13 +64,11 @@ async def load_game_data_from_db():
             temp_item_db[item_name] = item
         _item_database_cache = temp_item_db
         logger.info(f"✅ {len(_item_database_cache)}개의 아이템 정보를 DB에서 로드했습니다.")
-        
         rod_items = {name: data for name, data in _item_database_cache.items() if data.get('category') == '釣り' and data.get('is_upgrade_item')}
         ROD_HIERARCHY = sorted(rod_items, key=lambda r: rod_items[r].get('good_fish_bonus', 0.0))
         logger.info(f"✅ 낚싯대 등급 정보를 생성했습니다: {ROD_HIERARCHY}")
     else:
         logger.warning("DB 'items' 테이블에서 아이템 정보를 찾을 수 없습니다.")
-
     loot_response = await supabase.table('fishing_loots').select('*').execute()
     if loot_response and loot_response.data:
         _fishing_loot_cache = loot_response.data
