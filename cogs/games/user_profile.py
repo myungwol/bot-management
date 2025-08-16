@@ -120,9 +120,35 @@ class InventoryView(ui.View):
 
 class InventoryPanelView(ui.View):
     def __init__(self, cog_instance: 'UserProfile'):
-        super().__init__(timeout=None); self.user_profile_cog = cog_instance
-    @ui.button(label="📦 持ち物を開く", style=discord.ButtonStyle.blurple, custom_id="open_inventory_view_v3")
-    async def open_inventory(self, interaction: discord.Interaction, button: ui.Button):
+        super().__init__(timeout=None)
+        self.user_profile_cog = cog_instance
+        # [수정] DB에서 버튼 정보를 불러와 동적으로 추가합니다.
+        # 이 작업은 비동기로 이루어져야 하므로, 별도의 async 함수에서 처리합니다.
+        
+    async def setup_buttons(self):
+        components_data = await get_panel_components_from_db('profile')
+        if not components_data:
+            logger.warning("'profile' 패널에 대한 컴포넌트 데이터가 DB에 없습니다.")
+            # DB에 데이터가 없을 경우, 기본 버튼을 추가할 수 있습니다.
+            self.add_item(ui.Button(label="📦 持ち物を開く", custom_id="open_inventory"))
+            return
+
+        for comp in components_data:
+            if comp.get('component_type') == 'button':
+                button = ui.Button(
+                    label=comp.get('label'),
+                    style=BUTTON_STYLES_MAP.get(comp.get('style', 'secondary')),
+                    emoji=comp.get('emoji'),
+                    row=comp.get('row'),
+                    custom_id=comp.get('component_key')
+                )
+                # component_key를 기반으로 적절한 콜백 함수를 연결합니다.
+                if comp.get('component_key') == 'open_inventory':
+                    button.callback = self.open_inventory
+                
+                self.add_item(button)
+
+    async def open_inventory(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             view = InventoryView(interaction.user)
@@ -137,13 +163,19 @@ class UserProfile(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.inventory_panel_channel_id: Optional[int] = None
+        self.view_instance = None # View 인스턴스를 저장할 변수
         logger.info("UserProfile Cog가 성공적으로 초기화되었습니다.")
-    def register_persistent_views(self):
-        self.bot.add_view(InventoryPanelView(self))
+
+    async def register_persistent_views(self):
+        self.view_instance = InventoryPanelView(self)
+        await self.view_instance.setup_buttons() # 비동기적으로 버튼을 설정합니다.
+        self.bot.add_view(self.view_instance)
+        
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.inventory_panel_channel_id = get_id("inventory_panel_channel_id")
         logger.info(f"[UserProfile Cog] 프로필 패널 채널 ID 로드: {self.inventory_panel_channel_id}")
+
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -151,6 +183,7 @@ class UserProfile(commands.Cog):
             if channel_id: target_channel = self.bot.get_channel(channel_id)
             else: logger.info("ℹ️ 프로필 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
         if not target_channel: logger.warning("❌ Inventory panel channel could not be found."); return
+        
         panel_info = get_panel_id("profile")
         if panel_info and (old_id := panel_info.get('message_id')):
             try:
@@ -164,8 +197,11 @@ class UserProfile(commands.Cog):
             return
         embed = discord.Embed.from_dict(embed_data)
         
-        view = InventoryPanelView(self)
-        new_message = await target_channel.send(embed=embed, view=view)
+        # View 인스턴스를 재생성하고 버튼을 다시 설정합니다.
+        self.view_instance = InventoryPanelView(self)
+        await self.view_instance.setup_buttons()
+        
+        new_message = await target_channel.send(embed=embed, view=self.view_instance)
         await save_panel_id("profile", new_message.id, target_channel.id)
         logger.info(f"✅ 프로필 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
 
