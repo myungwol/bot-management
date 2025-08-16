@@ -46,9 +46,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
             await approval_channel.send(content=f"<@&{self.onboarding_cog.approval_role_id}> 新しい住人登録票が提出されました。", embed=embed, view=view)
             await interaction.followup.send("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
-        except Exception as e:
-            logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
+        except Exception as e: logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True); await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
@@ -123,15 +121,32 @@ class ApprovalView(ui.View):
     async def _update_nickname(self, member: discord.Member) -> None:
         if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := self._get_field_value(self.original_embed, "名前")):
             await nick_cog.update_nickname(member, base_name_override=name_field)
+    
+    # --- [수정] 승인 로그 함수 ---
     async def _send_public_welcome(self, moderator: discord.Member, member: discord.Member) -> None:
         if (ch_id := self.onboarding_cog.introduction_channel_id) and (ch := member.guild.get_channel(ch_id)):
-            embed_data = await get_embed_from_db("embed_introduction_log");
-            if not embed_data: return
-            embed = discord.Embed.from_dict(embed_data)
-            for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=True)
+            # [수정] 템플릿을 사용하지 않고 직접 임베드를 생성합니다.
+            embed = discord.Embed(
+                title="📝 自己紹介",
+                color=discord.Color.green() # 초록색
+            )
+            
+            embed.add_field(name="住民", value=member.mention, inline=False)
+            
+            intro_content_parts = []
+            for field in self.original_embed.fields:
+                intro_content_parts.append(f"**{field.name}**\n{field.value}")
+            intro_content = "\n\n".join(intro_content_parts)
+            
+            embed.add_field(name="自己紹介", value=intro_content, inline=False)
             embed.add_field(name="担当者", value=moderator.mention, inline=False)
+            
             if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-            await ch.send(f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+            
+            content = f"||{member.mention}||"
+            await ch.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+
+    # --- [수정] 알림 및 거절 로그 함수 ---
     async def _send_notifications(self, moderator: discord.Member, member: discord.Member, is_approved: bool) -> None:
         guild = member.guild
         if is_approved:
@@ -140,15 +155,36 @@ class ApprovalView(ui.View):
         else:
             try: await member.send(f"❌ お知らせ：「{guild.name}」での住人登録が拒否されました。\n理由: 「{self.rejection_reason}」\n<#{self.onboarding_cog.panel_channel_id}> からやり直してください。")
             except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다.")
+            
             if (ch_id := self.onboarding_cog.rejection_log_channel_id) and (ch := guild.get_channel(ch_id)):
-                embed = self.original_embed.copy(); embed.title = "❌ 住人登録が拒否されました"; embed.color = discord.Color.red(); embed.description = f"**対象者:** {member.mention}"
-                embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False); embed.add_field(name="処理者", value=moderator.mention, inline=False)
-                await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+                # [수정] 템플릿을 사용하지 않고 직접 임베드를 생성합니다.
+                embed = discord.Embed(
+                    title="❌ 住人登録が拒否されました",
+                    color=discord.Color.red() # 빨간색
+                )
+                
+                embed.add_field(name="住民", value=member.mention, inline=False)
+                
+                intro_content_parts = []
+                for field in self.original_embed.fields:
+                    intro_content_parts.append(f"**{field.name}**\n{field.value}")
+                intro_content = "\n\n".join(intro_content_parts)
+                embed.add_field(name="提出内容", value=intro_content, inline=False)
+                
+                embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False)
+                embed.add_field(name="担当者", value=moderator.mention, inline=False)
+                
+                if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
+                
+                content = f"||{member.mention}||"
+                await ch.send(content=content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+
     @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
+# ... 이하 나머지 코드는 변경 사항 없습니다 ...
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
@@ -168,36 +204,30 @@ class OnboardingGuideView(ui.View):
         else:
             next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next", disabled=is_last)
             next_button.callback = self.go_next; self.add_item(next_button)
-    
     async def _update_message(self):
         step_info = self.steps_data[self.current_step]; embed_data = step_info.get("embed_data", {}).get("embed_data")
         if not embed_data: embed = discord.Embed(title="エラー", description="このステップの表示データが見つかりません。", color=discord.Color.red())
         else: embed = format_embed_from_db(embed_data, member_mention=self.user.mention)
         self._update_components()
         if self.message: await self.message.edit(embed=embed, view=self)
-
-    # --- [수정] 모든 버튼 콜백에 defer() 추가 ---
     async def go_next(self, interaction: discord.Interaction):
         await interaction.response.defer()
         if self.current_step < len(self.steps_data) - 1: self.current_step += 1
         await self._update_message()
-
     async def go_previous(self, interaction: discord.Interaction):
         await interaction.response.defer()
         if self.current_step > 0: self.current_step -= 1
         await self._update_message()
-
     async def do_action(self, interaction: discord.Interaction):
-        await interaction.response.defer() # defer를 가장 먼저 호출
+        await interaction.response.defer()
         step_info = self.steps_data[self.current_step]; role_key_to_add = step_info.get("role_key_to_add")
         if role_key_to_add:
             role_id = get_id(role_key_to_add)
             if role_id and isinstance(interaction.user, discord.Member) and (role := interaction.guild.get_role(role_id)):
                 try: await interaction.user.add_roles(role, reason="オンボーディング進行")
-                except Exception as e: await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True) # defer 했으므로 followup 사용
+                except Exception as e: await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True)
         if self.current_step < len(self.steps_data) - 1: self.current_step += 1
         await self._update_message()
-
     async def create_introduction(self, interaction: discord.Interaction):
         cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 600)
         last_time = await get_cooldown(str(interaction.user.id), "introduction")
