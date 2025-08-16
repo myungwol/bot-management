@@ -11,16 +11,18 @@ from utils.database import get_embed_from_db, save_embed_to_db
 
 logger = logging.getLogger(__name__)
 
-# [수정] 봇 전체에서 관리할 임베드 목록에 모든 패널 키 추가
 EMBED_KEYS = [
-    "welcome_embed", "farewell_embed", "panel_roles", "panel_onboarding",
-    "panel_nicknames", "panel_commerce", "panel_fishing", "panel_profile"
+    "welcome_embed", "farewell_embed", 
+    "panel_roles", "panel_onboarding", "panel_nicknames", 
+    "panel_commerce", "panel_fishing", "panel_profile",
+    "onboarding_step_0", "onboarding_step_1", "onboarding_step_2",
+    "onboarding_step_3", "onboarding_step_4", "onboarding_step_5"
 ]
 
 DEFAULT_EMBED_DATA = {
     "title": "（タイトル未設定）",
     "description": "（説明未設定）",
-    "color": 0x5865F2, # Discord Blue
+    "color": 0x5865F2,
     "footer": {"text": ""}
 }
 
@@ -40,7 +42,6 @@ class EmbedEditModal(ui.Modal, title="埋め込みメッセージ編集"):
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        
         color = self.modal_color.value
         try:
             color_value = int(color.lstrip('#'), 16) if color else DEFAULT_EMBED_DATA["color"]
@@ -54,7 +55,6 @@ class EmbedEditModal(ui.Modal, title="埋め込みメッセージ編集"):
             "color": color_value,
             "footer": {"text": self.modal_footer.value}
         }
-
         try:
             await save_embed_to_db(self.embed_key, embed_data)
             preview_embed = discord.Embed.from_dict(embed_data)
@@ -84,7 +84,6 @@ class EmbedManager(commands.Cog):
         if embed_key not in EMBED_KEYS:
             await interaction.response.send_message("❌ 無効な埋め込みキーです。リストから選択してください。", ephemeral=True)
             return
-
         current_data = await get_embed_from_db(embed_key)
         if not current_data:
             current_data = DEFAULT_EMBED_DATA.copy()
@@ -92,7 +91,6 @@ class EmbedManager(commands.Cog):
                 current_data["description"] = "ようこそ、{member_mention}さん！"
             elif "farewell" in embed_key:
                 current_data["description"] = "さようなら、{member_name}さん..."
-        
         modal = EmbedEditModal(embed_key, current_data)
         await interaction.response.send_modal(modal)
 
@@ -104,13 +102,11 @@ class EmbedManager(commands.Cog):
         if embed_key not in EMBED_KEYS:
             await interaction.response.send_message("❌ 無効な埋め込みキーです。リストから選択してください。", ephemeral=True)
             return
-        
         await interaction.response.defer(ephemeral=True)
         embed_data = await get_embed_from_db(embed_key)
         if not embed_data:
             await interaction.followup.send(f"⚠️ **`{embed_key}`** にはデータが保存されていません。", ephemeral=True)
             return
-        
         embed = discord.Embed.from_dict(embed_data)
         await interaction.followup.send(f"プレビュー: **`{embed_key}`**", embed=embed, ephemeral=True)
 
