@@ -1,4 +1,4 @@
-# cogs/economy/commerce.py (UI 중앙 관리 시스템 연동)
+# cogs/economy/commerce.py (게임 데이터 DB 분리 적용)
 
 import discord
 from discord.ext import commands
@@ -11,9 +11,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%
 logger = logging.getLogger(__name__)
 
 from utils.database import (
-    ITEM_DATABASE, FISHING_LOOT, CURRENCY_ICON, ROD_HIERARCHY,
-    get_inventory, get_wallet, get_aquarium, update_wallet,
-    save_panel_id, get_panel_id, get_id, supabase, get_embed_from_db, get_panel_components_from_db
+    CURRENCY_ICON, get_inventory, get_wallet, get_aquarium, update_wallet,
+    save_panel_id, get_panel_id, get_id, supabase, get_embed_from_db, get_panel_components_from_db,
+    get_item_database, get_fishing_loot, ROD_HIERARCHY
 )
 from cogs.server.system import format_embed_from_db
 
@@ -21,7 +21,6 @@ BUTTON_STYLES_MAP = {
     "primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
     "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger,
 }
-
 SELL_CATEGORIES = ["魚", "アイテム"]
 BUY_CATEGORIES = ["里の役職", "釣り", "農業", "牧場"]
 
@@ -58,13 +57,9 @@ class ShopViewBase(ui.View):
         embed = await self._build_embed(); self._build_components()
         original_footer = embed.footer.text if embed.footer else ""
         if temp_footer: embed.set_footer(text=temp_footer)
-        
         target = interaction.followup if interaction.response.is_done() else interaction.response
-        if isinstance(target, discord.InteractionResponse):
-            await target.edit_message(embed=embed, view=self)
-        else: # Followup
-            await target.edit_message(message_id=interaction.message.id, embed=embed, view=self)
-            
+        if isinstance(target, discord.InteractionResponse): await target.edit_message(embed=embed, view=self)
+        else: await target.edit_message(message_id=interaction.message.id, embed=embed, view=self)
         if temp_footer:
             await asyncio.sleep(5)
             embed.set_footer(text=original_footer)
@@ -72,15 +67,11 @@ class ShopViewBase(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
 
 class SellItemView(ShopViewBase):
-    def __init__(self, user: discord.Member):
-        super().__init__(user); self.current_category = SELL_CATEGORIES[0]
+    def __init__(self, user: discord.Member): super().__init__(user); self.current_category = SELL_CATEGORIES[0]
     async def _build_embed(self) -> discord.Embed:
         embed_data = await get_embed_from_db("embed_shop_sell")
-        if not embed_data:
-            return discord.Embed(title=f"📦 販売所 - 「{self.current_category}」", description=f"現在の所持金: `{self.wallet_balance:,}`{CURRENCY_ICON}", color=discord.Color.orange())
-        
+        if not embed_data: return discord.Embed(title=f"📦 販売所 - 「{self.current_category}」", description=f"現在の所持金: `{self.wallet_balance:,}`{CURRENCY_ICON}", color=discord.Color.orange())
         return format_embed_from_db(embed_data, category=self.current_category, balance=f"{self.wallet_balance:,}", currency_icon=CURRENCY_ICON)
-
     def _build_components(self):
         self.clear_items()
         for cat in SELL_CATEGORIES:
@@ -89,19 +80,18 @@ class SellItemView(ShopViewBase):
         options = []
         if self.current_category == "魚":
             for fish in self.aquarium:
-                proto = next((item for item in FISHING_LOOT if item['name'] == fish['name']), None)
-                if not proto or proto.get("value", 1) == 0: continue
+                proto = next((item for item in get_fishing_loot() if item['name'] == fish['name']), None)
+                if not proto or proto.get("base_value") is None: continue
                 price = int(proto.get("base_value", 0) + (fish.get('size', 0) * proto.get("size_multiplier", 0)))
                 options.append(discord.SelectOption(label=f"{fish.get('emoji','🐟')} {fish['name']} ({fish['size']}cm)", value=f"fish_{fish['id']}", description=f"売却価格: {price}{CURRENCY_ICON}"))
         elif self.current_category == "アイテム":
             for name, count in self.inventory.items():
-                if not (proto := ITEM_DATABASE.get(name, {})).get('sellable'): continue
+                if not (proto := get_item_database().get(name, {})).get('sellable'): continue
                 options.append(discord.SelectOption(label=f"{proto.get('emoji','❓')} {name} ({count}個)", value=f"item_{name}", description=f"単価: {proto.get('sell_price', 0)}{CURRENCY_ICON}"))
         select = ui.Select(placeholder=f"売却したい{self.current_category}を選択..." if options else "販売できるものがありません。", options=options or [discord.SelectOption(label="...")], disabled=not options, row=1)
         select.callback = self.sell_callback; self.add_item(select)
     async def category_callback(self, interaction: discord.Interaction):
-        self.current_category = interaction.data['custom_id'].split('_')[-1]
-        await self.update_view(interaction)
+        self.current_category = interaction.data['custom_id'].split('_')[-1]; await self.update_view(interaction)
     async def sell_callback(self, interaction: discord.Interaction):
         sell_type, target = interaction.data['values'][0].split('_', 1)
         uid_str = str(self.user.id); footer_msg = ""
@@ -111,7 +101,7 @@ class SellItemView(ShopViewBase):
                 fish_id = int(target)
                 fish_data = next((f for f in self.aquarium if f.get('id') == fish_id), None)
                 if not fish_data: raise ValueError("選択された魚が見つかりません。")
-                proto = next((it for it in FISHING_LOOT if it['name'] == fish_data['name']), None)
+                proto = next((it for it in get_fishing_loot() if it['name'] == fish_data['name']), None)
                 if not proto: raise ValueError("魚の基本データが見つかりません。")
                 price = int(proto.get("base_value", 0) + (fish_data.get('size', 0) * proto.get("size_multiplier", 0)))
                 await supabase.rpc('sell_fish', {'user_id_param': uid_str, 'fish_id_param': fish_id, 'fish_value_param': price}).execute()
@@ -123,7 +113,7 @@ class SellItemView(ShopViewBase):
                 modal = QuantityModal("販売数量入力", f"{item_name}の販売数量", f"最大 {max_qty}個まで入力できます", max_qty)
                 await interaction.response.send_modal(modal); await modal.wait()
                 if modal.value is None: await self.update_view(interaction, "❌ 販売がキャンセルされました。"); return
-                qty = modal.value; price = ITEM_DATABASE.get(item_name, {}).get('sell_price', 0) * qty
+                qty = modal.value; price = get_item_database().get(item_name, {}).get('sell_price', 0) * qty
                 await supabase.rpc('sell_item', {'user_id_param': uid_str, 'item_name_param': item_name, 'quantity_param': qty, 'total_value_param': price}).execute()
                 self.inventory[item_name] -= qty
                 if self.inventory[item_name] <= 0: del self.inventory[item_name]
@@ -134,18 +124,13 @@ class SellItemView(ShopViewBase):
         await self.update_view(interaction, footer_msg)
 
 class BuyItemView(ShopViewBase):
-    def __init__(self, user: discord.Member):
-        super().__init__(user); self.current_category_index = 0
+    def __init__(self, user: discord.Member): super().__init__(user); self.current_category_index = 0
     async def _build_embed(self) -> discord.Embed:
         category = BUY_CATEGORIES[self.current_category_index]
         embed_data = await get_embed_from_db("embed_shop_buy")
-        if not embed_data:
-            return discord.Embed(title=f"🏪 Dico森商店 - 「{category}」", description=f"現在の所持金: `{self.wallet_balance:,}`{CURRENCY_ICON}", color=discord.Color.blue())
-        
+        if not embed_data: return discord.Embed(title=f"🏪 Dico森商店 - 「{category}」", description=f"現在の所持金: `{self.wallet_balance:,}`{CURRENCY_ICON}", color=discord.Color.blue())
         embed = format_embed_from_db(embed_data, category=category, balance=f"{self.wallet_balance:,}", currency_icon=CURRENCY_ICON)
-        embed.set_footer(text=f"ページ {self.current_category_index + 1}/{len(BUY_CATEGORIES)}")
-        return embed
-
+        embed.set_footer(text=f"ページ {self.current_category_index + 1}/{len(BUY_CATEGORIES)}"); return embed
     def _build_components(self):
         self.clear_items()
         is_first, is_last = self.current_category_index == 0, self.current_category_index >= len(BUY_CATEGORIES) - 1
@@ -153,18 +138,16 @@ class BuyItemView(ShopViewBase):
         prev_btn.callback = self.prev_category_callback; next_btn.callback = self.next_category_callback
         self.add_item(prev_btn); self.add_item(next_btn)
         category = BUY_CATEGORIES[self.current_category_index]
-        items = {n: d for n, d in ITEM_DATABASE.items() if d.get('category') == category and d.get("buyable", False)}
+        items = {n: d for n, d in get_item_database().items() if d.get('category') == category and d.get("buyable", False)}
         options = [discord.SelectOption(label=n, value=n, description=f"{d['price']}{CURRENCY_ICON} - {d.get('description', '')}"[:100], emoji=d.get('emoji')) for n, d in items.items()]
         select = ui.Select(placeholder=f"「{category}」カテゴリの商品を選択" if options else "商品準備中...", options=options or [discord.SelectOption(label="...")], disabled=not options, row=1)
         select.callback = self.select_callback; self.add_item(select)
     async def prev_category_callback(self, i: discord.Interaction):
-        if self.current_category_index > 0: self.current_category_index -= 1
-        await self.update_view(i)
+        if self.current_category_index > 0: self.current_category_index -= 1; await self.update_view(i)
     async def next_category_callback(self, i: discord.Interaction):
-        if self.current_category_index < len(BUY_CATEGORIES) - 1: self.current_category_index += 1
-        await self.update_view(i)
+        if self.current_category_index < len(BUY_CATEGORIES) - 1: self.current_category_index += 1; await self.update_view(i)
     async def select_callback(self, interaction: discord.Interaction):
-        name = interaction.data['values'][0]; data = ITEM_DATABASE.get(name); user = interaction.user; uid_str = str(user.id)
+        name = interaction.data['values'][0]; data = get_item_database().get(name); user = interaction.user; uid_str = str(user.id)
         footer_msg = ""
         if not data: footer_msg = "❌ エラー：商品データが見つかりません。"; return await self.update_view(interaction, footer_msg)
         price = data['price']
@@ -204,8 +187,7 @@ class BuyItemView(ShopViewBase):
         await self.update_view(interaction, footer_msg)
 
 class CommercePanelView(ui.View):
-    def __init__(self, cog_instance: 'Commerce'):
-        super().__init__(timeout=None); self.commerce_cog = cog_instance
+    def __init__(self, cog_instance: 'Commerce'): super().__init__(timeout=None); self.commerce_cog = cog_instance
     async def setup_buttons(self):
         components_data = await get_panel_components_from_db('commerce')
         if not components_data: logger.warning("'commerce' 패널에 대한 컴포넌트 데이터가 DB에 없습니다."); return
@@ -215,13 +197,11 @@ class CommercePanelView(ui.View):
                 if comp.get('component_key') == 'open_shop': button.callback = self.open_shop
                 elif comp.get('component_key') == 'open_market': button.callback = self.open_market
                 self.add_item(button)
-
     async def open_shop(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True, thinking=True)
         view = BuyItemView(i.user); await view.fetch_data()
         embed = await view._build_embed(); view._build_components()
         view.message = await i.followup.send(embed=embed, view=view, ephemeral=True)
-
     async def open_market(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True, thinking=True)
         view = SellItemView(i.user); await view.fetch_data()
@@ -232,15 +212,11 @@ class Commerce(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.commerce_panel_channel_id: Optional[int] = None; self.view_instance = None
         logger.info("Commerce Cog가 성공적으로 초기화되었습니다.")
-
     async def register_persistent_views(self):
         self.view_instance = CommercePanelView(self); await self.view_instance.setup_buttons()
         self.bot.add_view(self.view_instance)
-
     async def cog_load(self): await self.load_all_configs()
-    async def load_all_configs(self):
-        self.commerce_panel_channel_id = get_id("commerce_panel_channel_id")
-        
+    async def load_all_configs(self): self.commerce_panel_channel_id = get_id("commerce_panel_channel_id")
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -248,17 +224,14 @@ class Commerce(commands.Cog):
             if channel_id: target_channel = self.bot.get_channel(channel_id)
             else: logger.info("ℹ️ 상점 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
         if not target_channel: logger.warning("❌ Commerce panel channel could not be found."); return
-        
         panel_info = get_panel_id("commerce")
         if panel_info and (old_id := panel_info.get('message_id')):
             try: await (await target_channel.fetch_message(old_id)).delete()
             except (discord.NotFound, discord.Forbidden): pass
-
         embed_data = await get_embed_from_db("panel_commerce")
         if not embed_data:
             logger.warning("DB에서 'panel_commerce' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다."); return
         embed = discord.Embed.from_dict(embed_data)
-        
         self.view_instance = CommercePanelView(self); await self.view_instance.setup_buttons()
         new_message = await target_channel.send(embed=embed, view=self.view_instance)
         await save_panel_id("commerce", new_message.id, target_channel.id)
