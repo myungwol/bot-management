@@ -11,19 +11,17 @@ import time
 from typing import List, Dict, Any, Optional
 
 from utils.database import (
-    get_id, save_panel_id, get_panel_id, 
-    get_cooldown, set_cooldown, get_embed_from_db, get_onboarding_steps,
-    get_panel_components_from_db, get_config
+    get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
+    get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
 from cogs.server.system import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# --- UI 클래스 (Modals, Views) ---
+# --- UI 클래스 ---
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer()
+    async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
@@ -31,35 +29,20 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
     gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
     hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
-    
-    def __init__(self, cog_instance: 'Onboarding'):
-        super().__init__()
-        self.onboarding_cog = cog_instance
-
+    def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             approval_channel = self.onboarding_cog.approval_channel
-            if not approval_channel:
-                await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True)
-                return
-            
+            if not approval_channel: await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
             await set_cooldown(str(interaction.user.id), "introduction", time.time())
             embed_data = await get_embed_from_db("embed_onboarding_approval")
-            if not embed_data:
-                await interaction.followup.send("❌ エラー: 承認用メッセージのテンプレートが見つかりません。", ephemeral=True)
-                return
-
+            if not embed_data: await interaction.followup.send("❌ エラー: 承認用メッセージのテンプレートが見つかりません。", ephemeral=True); return
             embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention, member_name=interaction.user.display_name)
-            if interaction.user.display_avatar:
-                embed.set_thumbnail(url=interaction.user.display_avatar.url)
-            
-            embed.add_field(name="名前", value=self.name.value, inline=False)
-            embed.add_field(name="年齢", value=self.age.value, inline=False)
-            embed.add_field(name="性別", value=self.gender.value, inline=False)
-            embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
+            if interaction.user.display_avatar: embed.set_thumbnail(url=interaction.user.display_avatar.url)
+            embed.add_field(name="名前", value=self.name.value, inline=False); embed.add_field(name="年齢", value=self.age.value, inline=False)
+            embed.add_field(name="性別", value=self.gender.value, inline=False); embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
-            
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
             await approval_channel.send(content=f"<@&{self.onboarding_cog.approval_role_id}> 新しい住人登録票が提出されました。", embed=embed, view=view)
             await interaction.followup.send("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
@@ -68,10 +51,8 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
 class ApprovalView(ui.View):
-    # 이 클래스는 변경점 없음
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
-        super().__init__(timeout=None)
-        self.author_id = author.id; self.original_embed = original_embed
+        super().__init__(timeout=None); self.author_id = author.id; self.original_embed = original_embed
         self.onboarding_cog = cog_instance; self.rejection_reason: Optional[str] = None
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
@@ -142,13 +123,33 @@ class ApprovalView(ui.View):
     async def _update_nickname(self, member: discord.Member) -> None:
         if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := self._get_field_value(self.original_embed, "名前")):
             await nick_cog.update_nickname(member, base_name_override=name_field)
+    
+    # --- [수정] 이 함수 전체가 변경되었습니다 ---
     async def _send_public_welcome(self, moderator: discord.Member, member: discord.Member) -> None:
         if (ch_id := self.onboarding_cog.introduction_channel_id) and (ch := member.guild.get_channel(ch_id)):
-            embed_data = await get_embed_from_db("embed_onboarding_public_welcome");
+            embed_data = await get_embed_from_db("embed_introduction_log")
             if not embed_data: return
-            embed = format_embed_from_db(embed_data, member_mention=member.mention, moderator_mention=moderator.mention)
-            for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=field.inline)
+            
+            # 1. 기본 임베드를 생성합니다. (format_embed_from_db는 변수가 없어도 안전합니다)
+            embed = format_embed_from_db(embed_data)
+            
+            # 2. 자기소개서의 모든 내용을 하나의 문자열로 합칩니다.
+            intro_content_parts = []
+            for field in self.original_embed.fields:
+                intro_content_parts.append(f"**{field.name}**: {field.value}")
+            intro_content = "\n".join(intro_content_parts)
+            
+            # 3. 요청하신 형식대로 필드를 추가합니다.
+            embed.add_field(name="住民", value=member.mention, inline=False)
+            embed.add_field(name="自己紹介", value=intro_content, inline=False)
+            embed.add_field(name="担当者", value=moderator.mention, inline=False)
+            
+            # 4. 썸네일 설정
+            if member.display_avatar:
+                embed.set_thumbnail(url=member.display_avatar.url)
+            
             await ch.send(f"{member.mention}さんが新しい住民になりました！", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+
     async def _send_notifications(self, moderator: discord.Member, member: discord.Member, is_approved: bool) -> None:
         guild = member.guild
         if is_approved:
@@ -167,91 +168,55 @@ class ApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
 class OnboardingGuideView(ui.View):
-    # [수정] __init__ 변경
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
-        super().__init__(timeout=300)
-        self.onboarding_cog = cog_instance
-        self.steps_data = steps_data
-        self.user = user
-        self.current_step = 0
-        self.message: Optional[discord.WebhookMessage] = None
-
-    # [수정] 뷰의 컴포넌트를 업데이트하는 함수
+        super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
+        self.user = user; self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
     def _update_components(self):
-        self.clear_items()
-        step_info = self.steps_data[self.current_step]
-        is_first = self.current_step == 0
-        is_last = self.current_step == len(self.steps_data) - 1
-        
+        self.clear_items(); step_info = self.steps_data[self.current_step]
+        is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
         prev_button = ui.Button(label="◀ 戻る", style=discord.ButtonStyle.secondary, custom_id="onboarding_prev", row=1, disabled=is_first)
-        prev_button.callback = self.go_previous
-        self.add_item(prev_button)
-        
+        prev_button.callback = self.go_previous; self.add_item(prev_button)
         step_type = step_info.get("step_type")
         if step_type == "intro":
              intro_button = ui.Button(label=step_info.get("button_label", "住民登録票を作成する"), style=discord.ButtonStyle.success, custom_id="onboarding_intro")
-             intro_button.callback = self.create_introduction
-             self.add_item(intro_button)
+             intro_button.callback = self.create_introduction; self.add_item(intro_button)
         elif step_type == "action":
             action_button = ui.Button(label=step_info.get("button_label", "同意する"), style=discord.ButtonStyle.primary, custom_id="onboarding_action", disabled=is_last)
-            action_button.callback = self.do_action
-            self.add_item(action_button)
+            action_button.callback = self.do_action; self.add_item(action_button)
         else:
             next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next", disabled=is_last)
-            next_button.callback = self.go_next
-            self.add_item(next_button)
-
-    # [수정] 메시지를 수정하는 함수
+            next_button.callback = self.go_next; self.add_item(next_button)
     async def _update_message(self, interaction: discord.Interaction):
-        step_info = self.steps_data[self.current_step]
-        embed_data = step_info.get("embed_data", {}).get("embed_data")
-        
-        if not embed_data:
-            embed = discord.Embed(title="エラー", description="このステップの表示データが見つかりません。", color=discord.Color.red())
-        else:
-            embed = format_embed_from_db(embed_data, member_mention=self.user.mention)
-        
-        self._update_components()
-        await interaction.response.edit_message(embed=embed, view=self)
-
+        step_info = self.steps_data[self.current_step]; embed_data = step_info.get("embed_data", {}).get("embed_data")
+        if not embed_data: embed = discord.Embed(title="エラー", description="このステップの表示データが見つかりません。", color=discord.Color.red())
+        else: embed = format_embed_from_db(embed_data, member_mention=self.user.mention)
+        self._update_components(); await interaction.response.edit_message(embed=embed, view=self)
     async def go_next(self, interaction: discord.Interaction):
-        if self.current_step < len(self.steps_data) - 1:
-            self.current_step += 1
+        if self.current_step < len(self.steps_data) - 1: self.current_step += 1
         await self._update_message(interaction)
-
     async def go_previous(self, interaction: discord.Interaction):
-        if self.current_step > 0:
-            self.current_step -= 1
+        if self.current_step > 0: self.current_step -= 1
         await self._update_message(interaction)
-
     async def do_action(self, interaction: discord.Interaction):
-        step_info = self.steps_data[self.current_step]
-        role_key_to_add = step_info.get("role_key_to_add")
+        step_info = self.steps_data[self.current_step]; role_key_to_add = step_info.get("role_key_to_add")
         if role_key_to_add:
             role_id = get_id(role_key_to_add)
             if role_id and isinstance(interaction.user, discord.Member) and (role := interaction.guild.get_role(role_id)):
-                try:
-                    await interaction.user.add_roles(role, reason="オンボーディング進行")
-                except Exception as e:
-                    await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True)
+                try: await interaction.user.add_roles(role, reason="オンボーディング進行")
+                except Exception as e: await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True)
         await self.go_next(interaction)
-
     async def create_introduction(self, interaction: discord.Interaction):
         cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 600)
         last_time = await get_cooldown(str(interaction.user.id), "introduction")
         if last_time and time.time() - last_time < cooldown_seconds:
             rem = cooldown_seconds - (time.time() - last_time); m, s = divmod(int(rem), 60)
             await interaction.response.send_message(f"次の申請まであと {m}分{s}秒 お待ちください。", ephemeral=True); return
-            
         await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
         if self.message: await self.message.delete()
         self.stop()
 
 class OnboardingPanelView(ui.View):
-    def __init__(self, cog_instance: 'Onboarding'):
-        super().__init__(timeout=None)
-        self.onboarding_cog = cog_instance
-
+    def __init__(self, cog_instance: 'Onboarding'): super().__init__(timeout=None); self.onboarding_cog = cog_instance
     async def setup_buttons(self):
         button_styles = get_config("DISCORD_BUTTON_STYLES_MAP", {})
         components_data = await get_panel_components_from_db('onboarding')
@@ -264,55 +229,34 @@ class OnboardingPanelView(ui.View):
                 button = ui.Button(label=comp.get('label'),style=style,emoji=comp.get('emoji'),row=comp.get('row'),custom_id=comp.get('component_key'))
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
-
-    # [수정] start_guide_callback 로직 전체 변경
     async def start_guide_callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         steps = await get_onboarding_steps()
-        if not steps:
-            await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True)
-            return
-            
-        # 1. View 인스턴스 생성
-        guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user)
-        
-        # 2. 첫 단계의 Embed 생성
-        first_step_info = steps[0]
+        if not steps: await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True); return
+        guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user); first_step_info = steps[0]
         embed_data = first_step_info.get("embed_data", {}).get("embed_data")
-        if not embed_data:
-            embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
-        else:
-            embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
-            
-        # 3. View의 첫 컴포넌트 상태 설정
+        if not embed_data: embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
+        else: embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
         guide_view._update_components()
-        
-        # 4. 첫 메시지 전송 및 View에 메시지 객체 저장
         message = await interaction.followup.send(embed=embed, view=guide_view, ephemeral=True)
         guide_view.message = message
 
 # --- Onboarding Cog ---
 class Onboarding(commands.Cog):
-    # 이 클래스는 변경점 없음
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
+        self.bot = bot; self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
-        self.approval_role_id: Optional[int] = None; self.view_instance = None
-        logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
+        self.approval_role_id: Optional[int] = None; self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
     @property
     def approval_channel(self) -> Optional[discord.TextChannel]:
         if self.approval_channel_id: return self.bot.get_channel(self.approval_channel_id)
         return None
     async def register_persistent_views(self):
-        self.view_instance = OnboardingPanelView(self); await self.view_instance.setup_buttons()
-        self.bot.add_view(self.view_instance)
+        self.view_instance = OnboardingPanelView(self); await self.view_instance.setup_buttons(); self.bot.add_view(self.view_instance)
     async def cog_load(self): await self.load_configs()
     async def load_configs(self):
-        self.panel_channel_id = get_id("onboarding_panel_channel_id")
-        self.approval_channel_id = get_id("onboarding_approval_channel_id")
-        self.introduction_channel_id = get_id("introduction_channel_id")
-        self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
+        self.panel_channel_id = get_id("onboarding_panel_channel_id"); self.approval_channel_id = get_id("onboarding_approval_channel_id")
+        self.introduction_channel_id = get_id("introduction_channel_id"); self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
         self.approval_role_id = get_id("role_approval")
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
@@ -326,8 +270,7 @@ class Onboarding(commands.Cog):
             try: await (await target_channel.fetch_message(old_id)).delete()
             except (discord.NotFound, discord.Forbidden): pass
         embed_data = await get_embed_from_db("panel_onboarding")
-        if not embed_data:
-            logger.warning("DB에서 'panel_onboarding' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다."); return
+        if not embed_data: logger.warning("DB에서 'panel_onboarding' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다."); return
         embed = discord.Embed.from_dict(embed_data)
         self.view_instance = OnboardingPanelView(self); await self.view_instance.setup_buttons()
         new_message = await target_channel.send(embed=embed, view=self.view_instance)
