@@ -1,4 +1,4 @@
-# cogs/games/fishing.py (수정됨)
+# cogs/games/fishing.py (임베드 DB 연동)
 
 import discord
 from discord.ext import commands
@@ -8,18 +8,15 @@ import asyncio
 import logging
 from typing import Optional, Set, Dict
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] %(message)s')
 logger = logging.getLogger(__name__)
 
-# 유틸리티 함수 임포트
 from utils.database import (
     update_wallet, get_inventory, update_inventory, add_to_aquarium,
     get_user_gear, set_user_gear, FISHING_LOOT, ITEM_DATABASE,
-    CURRENCY_ICON, save_panel_id, get_panel_id, get_id
+    CURRENCY_ICON, save_panel_id, get_panel_id, get_id, get_embed_from_db
 )
 
-# --- 상수 정의 ---
 BIG_CATCH_THRESHOLD = 70.0
 BITE_REACTION_TIME = 3.0
 
@@ -42,7 +39,6 @@ class FishingGameView(ui.View):
             await asyncio.sleep(random.uniform(*self.bite_range))
             if self.is_finished(): return
             self.game_state = "biting"
-            # self.children은 리스트이므로, 첫 번째 아이템이 버튼인지 확인
             if self.children and isinstance(catch_button := self.children[0], ui.Button):
                 catch_button.style = discord.ButtonStyle.danger; catch_button.label = "釣り上げる！"
             embed = discord.Embed(title="❗ アタリが来た！", description="今だ！ボタンを押して釣り上げよう！", color=discord.Color.red())
@@ -62,7 +58,7 @@ class FishingGameView(ui.View):
         weights = [item['weight'] * (1 + self.rod_bonus if 'base_value' in item else 1) for item in FISHING_LOOT]
         catch_proto = random.choices(FISHING_LOOT, weights=weights, k=1)[0]
         user_mention = self.player.mention; is_big_catch = log_publicly = False
-        if "min_size" in catch_proto: # 물고기를 잡은 경우
+        if "min_size" in catch_proto:
             log_publicly = True
             size = round(random.uniform(catch_proto["min_size"], catch_proto["max_size"]), 1)
             await add_to_aquarium(str(self.player.id), {"name": catch_proto['name'], "size": size, "emoji": catch_proto['emoji']})
@@ -73,7 +69,7 @@ class FishingGameView(ui.View):
             embed = discord.Embed(title=title, description=desc, color=color)
             embed.add_field(name="魚", value=f"{catch_proto['emoji']} **{catch_proto['name']}**", inline=True)
             embed.add_field(name="サイズ", value=f"`{size}`cm", inline=True)
-        else: # 아이템(쓰레기 등)을 잡은 경우
+        else:
             value = catch_proto.get('value', 0)
             if value > 0: await update_wallet(self.player, value)
             log_publicly = catch_proto.get("log_publicly", False)
@@ -98,7 +94,6 @@ class FishingGameView(ui.View):
     async def _send_result(self, embed: discord.Embed, log_publicly: bool = False, is_big_catch: bool = False):
         footer_private = f"残りのエサ: 一般({self.remaining_baits.get('一般の釣りエサ', 0)}個) / 高級({self.remaining_baits.get('高級釣りエサ', 0)}個)"
         footer_public = f"使用した装備: {self.used_rod} / {self.used_bait}"
-        # [로그 문제 해결 지점] fishing_cog.fishing_log_channel_id가 제대로 로드되면 로그가 전송됩니다.
         if log_publicly and (fishing_cog := self.bot.get_cog("Fishing")) and (log_ch_id := fishing_cog.fishing_log_channel_id) and (log_ch := self.bot.get_channel(log_ch_id)):
             public_embed = embed.copy(); public_embed.set_footer(text=footer_public)
             content = self.player.mention if is_big_catch else None
@@ -159,22 +154,16 @@ class FishingPanelView(ui.View):
 
 class Fishing(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.active_fishing_sessions_by_user: Set[int] = set()
-        self.fishing_panel_channel_id: Optional[int] = None
-        self.fishing_log_channel_id: Optional[int] = None
+        self.bot = bot; self.active_fishing_sessions_by_user: Set[int] = set()
+        self.fishing_panel_channel_id: Optional[int] = None; self.fishing_log_channel_id: Optional[int] = None
         logger.info("Fishing Cog가 성공적으로 초기화되었습니다.")
-
-    # [수정] 영구 View 등록을 위한 함수 추가
     def register_persistent_views(self):
         self.bot.add_view(FishingPanelView(self.bot, self))
-        
     async def cog_load(self): await self.load_all_configs()
     async def load_all_configs(self):
         self.fishing_panel_channel_id = get_id("fishing_panel_channel_id")
         self.fishing_log_channel_id = get_id("fishing_log_channel_id")
         logger.info(f"[Fishing Cog] 낚시 패널/로그 채널 ID 로드 완료.")
-        
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
         target_channel = channel
         if target_channel is None:
@@ -188,7 +177,13 @@ class Fishing(commands.Cog):
                 old_message = await target_channel.fetch_message(old_id)
                 await old_message.delete()
             except (discord.NotFound, discord.Forbidden): pass
-        embed = discord.Embed(title="🎣 Dico森 釣り場", description="下のボタンを押して釣りを開始し、コインを獲得しましょう！", color=0x87CEFA)
+            
+        embed_data = await get_embed_from_db("panel_fishing")
+        if not embed_data:
+            logger.warning("DB에서 'panel_fishing' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
+            return
+        embed = discord.Embed.from_dict(embed_data)
+        
         view = FishingPanelView(self.bot, self)
         new_message = await target_channel.send(embed=embed, view=view)
         await save_panel_id("fishing", new_message.id, target_channel.id)
