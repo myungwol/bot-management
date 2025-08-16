@@ -98,19 +98,10 @@ class ApprovalView(ui.View):
         else: await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
         try: await interaction.message.delete()
         except (discord.NotFound, discord.HTTPException): pass
-
     async def _grant_roles(self, member: discord.Member) -> None:
         roles_to_add, guild = [], member.guild
-
-        # 1. '주민' 역할을 추가 리스트에 넣습니다.
-        if (rid := get_id("role_resident")) and (r := guild.get_role(rid)):
-            roles_to_add.append(r)
-            
-        # 2. '새내기 주민' 역할을 추가 리스트에 넣습니다.
-        if (rid := get_id("role_resident_rookie")) and (r := guild.get_role(rid)):
-            roles_to_add.append(r)
-
-        # 3. 성별 및 나이 역할을 추가 리스트에 넣습니다.
+        if (rid := get_id("role_resident")) and (r := guild.get_role(rid)): roles_to_add.append(r)
+        if (rid := get_id("role_resident_rookie")) and (r := guild.get_role(rid)): roles_to_add.append(r)
         gender_role_mapping = get_config("GENDER_ROLE_MAPPING", [])
         if gender_field := self._get_field_value(self.original_embed, "性別"):
             for rule in gender_role_mapping:
@@ -126,13 +117,8 @@ class ApprovalView(ui.View):
                     year_range = range(mapping["range"][0], mapping["range"][1])
                     if birth_year in year_range:
                         if (rid := get_id(mapping["key"])) and (r := guild.get_role(rid)): roles_to_add.append(r); break
-        
-        # 4. 리스트에 있는 모든 역할을 한 번에 부여합니다.
         if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="자기소개서 승인")
-        
-        # 5. '여행자' 역할을 제거합니다.
         if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="자기소개서 승인 완료")
-
     async def _update_nickname(self, member: discord.Member) -> None:
         if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := self._get_field_value(self.original_embed, "名前")):
             await nick_cog.update_nickname(member, base_name_override=name_field)
