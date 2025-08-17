@@ -229,5 +229,49 @@ class ServerSystem(commands.Cog):
         embed.description = "\n\n".join(description)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    # 4. /setup check_counts (멤버 수 진단용 임시 명령어)
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    @setup.command(name="check_counts", description="[관리자] 현재 봇이 인식하는 각종 멤버 수를 직접 확인합니다.")
+    async def check_counts(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+
+        # 1. API가 제공하는 공식 총 인원
+        total_from_api = guild.member_count
+        
+        # 2. 봇의 내부 캐시(목록)에 있는 총 인원
+        total_from_cache = len(guild.members)
+        
+        # 3. 캐시 기반 유저 수
+        humans_from_cache = len([m for m in guild.members if not m.bot])
+        
+        # 4. 캐시 기반 봇 수
+        bots_from_cache = len([m for m in guild.members if m.bot])
+        
+        # 5. 부스터 수
+        boosters = guild.premium_subscription_count
+
+        embed = discord.Embed(title="📊 멤버 수 진단 결과", color=0xFFD700)
+        embed.description = "봇이 현재 인식하고 있는 각 항목별 인원수입니다."
+        
+        embed.add_field(name="1️⃣ Discord API 공식 총 인원 (`guild.member_count`)", value=f"**{total_from_api}** 명", inline=False)
+        embed.add_field(name="2️⃣ 봇의 내부 목록상 총 인원 (`len(guild.members)`)", value=f"**{total_from_cache}** 명", inline=False)
+        embed.add_field(name="3️⃣ 내부 목록상 유저 수 (봇 제외)", value=f"**{humans_from_cache}** 명", inline=False)
+        embed.add_field(name="4️⃣ 내부 목록상 봇 수", value=f"**{bots_from_cache}** 명", inline=False)
+        embed.add_field(name="5️⃣ 서버 부스터 수", value=f"**{boosters}** 개", inline=False)
+        
+        if total_from_api != total_from_cache:
+            embed.add_field(
+                name="🔍 분석",
+                value=f"**1번**과 **2번**의 차이가 **{total_from_api - total_from_cache}명** 만큼 발생했습니다.\n이는 봇의 내부 멤버 목록이 불완전하다는 명확한 증거입니다. 다음 단계에서 이 문제를 해결하겠습니다.",
+                inline=False
+            )
+            embed.color = 0xED4245 # Error Red
+        else:
+            embed.add_field(name="🔍 분석", value="API와 내부 목록의 인원수가 일치합니다. 문제가 다른 곳에 있을 수 있습니다.", inline=False)
+
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
