@@ -11,19 +11,17 @@ from typing import List, Dict, Any, Optional
 
 from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
-    get_embed_from_db, get_onboarding_steps, get_panel_components_from_db,
-    # [수정] 쿨타임 설정을 DB에서 읽어오기 위해 get_config를 다시 가져옵니다.
-    get_config
+    get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
 from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
 # --- UI 클래스 (변경 없음) ---
-# ... (이전과 동일, 생략하지 않음) ...
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
+
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
     age = ui.TextInput(label="年齢", placeholder="例：20代、90年生まれ、30歳、非公開", required=True, max_length=20)
@@ -51,6 +49,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         except Exception as e: 
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
+
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
@@ -134,7 +133,6 @@ class ApprovalView(ui.View):
             else: failed_to_find_roles.append(resident_role_key)
             if (rid := get_id(rookie_role_key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
             else: failed_to_find_roles.append(rookie_role_key)
-            from utils.database import get_config
             gender_role_mapping = get_config("GENDER_ROLE_MAPPING", [])
             if gender_field := self._get_field_value(self.original_embed, "性別"):
                 for rule in gender_role_mapping:
@@ -227,13 +225,12 @@ class OnboardingGuideView(ui.View):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
         self.user = user; self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
     async def on_timeout(self) -> None:
-        self.onboarding_cog.active_onboarding_sessions.discard(self.user.id)
         if self.message:
             for item in self.children: item.disabled = True
             try: await self.message.edit(content="案内の時間が経過しました。最初からやり直してください。", view=self)
             except (discord.NotFound, discord.HTTPException): pass
     def stop(self):
-        self.onboarding_cog.active_onboarding_sessions.discard(self.user.id); super().stop()
+        super().stop()
     def _update_components(self):
         self.clear_items(); step_info = self.steps_data[self.current_step]
         is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
@@ -287,7 +284,6 @@ class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
     async def setup_buttons(self):
-        from utils.database import get_config
         button_styles = get_config("DISCORD_BUTTON_STYLES_MAP", {})
         components_data = await get_panel_components_from_db('onboarding')
         if not components_data:
@@ -303,7 +299,6 @@ class OnboardingPanelView(ui.View):
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        # [수정] DB에서 쿨타임 설정을 다시 불러오되, 기본값은 300초로 안전하게 설정합니다.
         cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
 
         utc_now = datetime.now(timezone.utc).timestamp()
@@ -315,13 +310,8 @@ class OnboardingPanelView(ui.View):
             seconds = int(remaining_time % 60)
             await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
             return
-
-        if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
-            await interaction.response.send_message("すでに案内の手続きを開始しています。DMをご確認ください。", ephemeral=True)
-            return
         
         await set_cooldown(user_id_str, cooldown_key)
-        self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
         
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
@@ -335,8 +325,10 @@ class OnboardingPanelView(ui.View):
             message = await interaction.followup.send(**content, ephemeral=True)
             guide_view.message = message
             await guide_view.wait()
-        finally:
-            self.onboarding_cog.active_onboarding_sessions.discard(interaction.user.id)
+        except Exception as e:
+            logger.error(f"안내 가이드 시작 중 오류: {e}", exc_info=True)
+            if not interaction.is_done():
+                await interaction.followup.send("エラーが発生しました。もう一度お試しください。", ephemeral=True)
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -344,7 +336,7 @@ class Onboarding(commands.Cog):
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None; self.main_chat_channel_id: Optional[int] = None
         self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-        self.active_onboarding_sessions: set = set()
+        # [최종 수정] 'active_sessions'를 완전히 삭제합니다.
         self._user_locks: Dict[int, asyncio.Lock] = {}
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
         if user_id not in self._user_locks: self._user_locks[user_id] = asyncio.Lock()
