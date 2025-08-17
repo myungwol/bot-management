@@ -121,11 +121,13 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
 
         # --- 2. 역할 관련 로직 ---
-        elif action == "roles_sync":
+         elif action == "roles_sync":
+            # 이 부분이 from utils.ui_defaults import UI_ROLE_KEY_MAP 로 시작해야 합니다.
             from utils.ui_defaults import UI_ROLE_KEY_MAP
 
             role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
             await save_config_to_db("ROLE_KEY_MAP", role_name_map)
+            
 
             synced_roles, missing_roles, error_roles = [], [], []
             server_roles_by_name = {r.name: r.id for r in interaction.guild.roles}
