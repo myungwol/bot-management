@@ -27,7 +27,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
     age = ui.TextInput(label="年齢", placeholder="例：20代、90年生まれ、30歳、非公開", required=True, max_length=20)
     gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
-    hobby = ui.TextInput(label="趣味", placeholder="趣味を自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
+    hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
     async def on_submit(self, interaction: discord.Interaction):
@@ -35,7 +35,10 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         try:
             approval_channel = self.onboarding_cog.approval_channel
             if not approval_channel: await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
-            await set_cooldown(str(interaction.user.id), "introduction", time.time())
+            
+            # [수정] 자기소개서 제출 시에는 쿨타임을 설정하지 않습니다.
+            # await set_cooldown(str(interaction.user.id), "introduction", time.time())
+            
             embed_data = await get_embed_from_db("embed_onboarding_approval")
             if not embed_data: await interaction.followup.send("❌ エラー: 承認用メッセージのテンプレートが見つかりません。", ephemeral=True); return
             embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention, member_name=interaction.user.display_name)
@@ -160,7 +163,6 @@ class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
         self.user = user; self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
-        self.user_lock = asyncio.Lock()
     async def on_timeout(self) -> None:
         self.onboarding_cog.active_onboarding_sessions.discard(self.user.id)
         logger.info(f"온보딩 세션 타임아웃: {self.user.name} ({self.user.id})")
@@ -169,8 +171,7 @@ class OnboardingGuideView(ui.View):
             try: await self.message.edit(content="案内の時間が経過しました。最初からやり直してください。", view=self)
             except (discord.NotFound, discord.HTTPException): pass
     def stop(self):
-        self.onboarding_cog.active_onboarding_sessions.discard(self.user.id)
-        super().stop()
+        self.onboarding_cog.active_onboarding_sessions.discard(self.user.id); super().stop()
     def _update_components(self):
         self.clear_items(); step_info = self.steps_data[self.current_step]
         is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
@@ -211,15 +212,7 @@ class OnboardingGuideView(ui.View):
         if self.current_step < len(self.steps_data) - 1: self.current_step += 1
         await self._update_message()
     async def create_introduction(self, interaction: discord.Interaction):
-        async with self.user_lock:
-            cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
-            last_time = await get_cooldown(str(interaction.user.id), "introduction")
-            expiration_time = last_time + cooldown_seconds; current_time = time.time()
-            if current_time < expiration_time:
-                remaining_time = expiration_time - current_time
-                minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
-                await interaction.response.send_message(f"次の申請まであと {minutes}分{seconds}秒 お待ちください。", ephemeral=True); return
-            await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
+        await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
         if self.message:
             try: await self.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
@@ -240,17 +233,28 @@ class OnboardingPanelView(ui.View):
                 button = ui.Button(label=comp.get('label'),style=style,emoji=comp.get('emoji'),row=comp.get('row'),custom_id=comp.get('component_key'))
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
+    
+    # --- [수정] 쿨타임 로직을 이 함수로 이동 ---
     async def start_guide_callback(self, interaction: discord.Interaction):
         if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
-            await interaction.response.send_message("すでに案内の手続きを開始しています。DMを確認してください。", ephemeral=True)
-            return
+            await interaction.response.send_message("すでに案内の手続きを開始しています。DMを確認してください。", ephemeral=True); return
+            
+        cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
+        last_time = await get_cooldown(str(interaction.user.id), "onboarding_start")
+        expiration_time = last_time + cooldown_seconds; current_time = time.time()
+        
+        if current_time < expiration_time:
+            remaining_time = expiration_time - current_time
+            minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
+            await interaction.response.send_message(f"次の案内まであと {minutes}分{seconds}秒 お待ちください。", ephemeral=True); return
+        
+        await set_cooldown(str(interaction.user.id), "onboarding_start", time.time())
         self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
+        
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             steps = await get_onboarding_steps()
-            if not steps:
-                await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True)
-                return
+            if not steps: await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True); return
             guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user); first_step_info = steps[0]
             embed_data = first_step_info.get("embed_data", {}).get("embed_data")
             if not embed_data: embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
