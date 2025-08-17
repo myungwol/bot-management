@@ -1,187 +1,162 @@
-# bot-management/main.py
+# cogs/server/system.py
 
 import discord
 from discord.ext import commands
-import os
-import asyncio
+from discord import app_commands
 import logging
-import logging.handlers
-from datetime import datetime, timezone
+from typing import Optional, List
 
-from utils.database import load_all_data_from_db, sync_defaults_to_db
+from utils.database import get_id, save_id_to_db, load_channel_ids_from_db, get_config
 
-# --- 중앙 로깅 설정 ---
-log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s')
-
-# 단일 StreamHandler 사용 (콘솔에 로그 출력)
-log_handler = logging.StreamHandler()
-log_handler.setFormatter(log_formatter)
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-if root_logger.hasHandlers():
-    root_logger.handlers.clear()
-root_logger.addHandler(log_handler)
-
-logging.getLogger('discord').setLevel(logging.WARNING)
-logging.getLogger('discord.http').setLevel(logging.WARNING)
-logging.getLogger('websockets').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
-# --- 환경 변수 및 인텐트 설정 ---
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
-RAW_TEST_GUILD_ID = os.environ.get('TEST_GUILD_ID') # 원본 문자열 ID
-TEST_GUILD_ID = None
-if RAW_TEST_GUILD_ID:
-    try:
-        TEST_GUILD_ID = int(RAW_TEST_GUILD_ID)
-        logger.info(f"TEST_GUILD_ID가 {TEST_GUILD_ID}로 설정되었습니다.")
-    except ValueError:
-        logger.error(f"❌ TEST_GUILD_ID 환경 변수가 유효한 숫자가 아닙니다: '{RAW_TEST_GUILD_ID}'")
+# --- ServerSystem Cog ---
+class ServerSystem(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
 
-intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True
-intents.voice_states = True
+    # ==============================================================================
+    # 통합 /setup 명령어 그룹 생성
+    # ==============================================================================
+    setup = app_commands.Group(name="setup", description="[관리자] 서버의 패널, 채널, 역할 등 봇의 모든 설정을 관리합니다.")
 
-# Railway 재배포를 확실히 하기 위해 버전을 올립니다.
-BOT_VERSION = "v1.6-true-final-logic"
+    # ==============================================================================
+    # 1. /setup set (채널/패널 설정)
+    # ==============================================================================
+    
+    # 자동완성 목록 생성 (채널/패널 설정용)
+    def get_channel_setup_choices(self) -> List[app_commands.Choice[str]]:
+        setup_map = get_config("SETUP_COMMAND_MAP", {})
+        choices = []
+        for key, info in setup_map.items():
+            type_prefix = "[패널]" if info.get('type') == 'panel' else "[채널]"
+            choices.append(app_commands.Choice(name=f"{type_prefix} {info.get('friendly_name', key)}", value=key))
+        return choices
 
-# --- 커스텀 봇 클래스 ---
-class MyBot(commands.Bot):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    @setup.command(name="set", description="[관리자] 각종 채널을 설정하거나 패널을 설치합니다.")
+    @app_commands.describe(setting_type="설정할 항목을 선택하세요.", channel="설정할 텍스트 채널을 지정하세요.")
+    @app_commands.autocomplete('setting_type')
+    async def setup_set_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        choices = self.get_channel_setup_choices()
+        # 사용자가 입력한 내용을 기반으로 자동완성 목록 필터링
+        return [choice for choice in choices if current.lower() in choice.name.lower()][:25]
 
-    async def setup_hook(self):
-        # 영구 View 등록 전에 Cog가 완전히 로드되었는지 확인
-        await self.load_all_extensions()
+    @setup_set.error
+    async def on_setup_set_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message("❌ 이 명령어를 사용하려면 서버 관리 권한이 필요합니다.", ephemeral=True)
+        else:
+            logger.error(f"/setup set 명령어 오류 발생: {error}", exc_info=True)
+            await interaction.response.send_message("❌ 명령어 처리 중 오류가 발생했습니다.", ephemeral=True)
 
-        # register_persistent_views를 가진 Cog만 필터링하여 등록
-        cogs_with_persistent_views = ["RolePanel", "Onboarding", "Nicknames"]
-        registered_views_count = 0
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def setup_set_command(self, interaction: discord.Interaction, setting_type: str, channel: discord.TextChannel):
+        # 자동완성 목록을 다시 가져와 유효한 값인지 확인
+        valid_keys = [choice.value for choice in self.get_channel_setup_choices()]
+        if setting_type not in valid_keys:
+            await interaction.response.send_message("❌ 잘못된 설정 항목입니다. 목록에서 선택해주세요.", ephemeral=True)
+            return
 
-        for cog_name in cogs_with_persistent_views:
-            cog = self.get_cog(cog_name)
-            if cog and hasattr(cog, 'register_persistent_views'):
-                try:
-                    await cog.register_persistent_views()
-                    registered_views_count += 1
-                    logger.info(f"✅ '{cog_name}' Cog의 영구 View가 등록되었습니다.")
-                except Exception as e:
-                    logger.error(f"❌ '{cog_name}' Cog의 영구 View 등록 중 오류 발생: {e}", exc_info=True)
-            elif not cog:
-                logger.warning(f"⚠️ '{cog_name}' Cog가 로드되지 않았거나 찾을 수 없습니다.")
-
-        logger.info(f"✅ 총 {registered_views_count}개의 Cog에서 영구 View를 성공적으로 등록했습니다.")
-
-    async def load_all_extensions(self):
-        logger.info("------ [ Cog 로드 시작 ] ------")
-        cogs_dir = './cogs'
-        if not os.path.exists(cogs_dir):
-            logger.critical(f"❌ Cogs 디렉토리를 찾을 수 없습니다: {cogs_dir}. 봇이 시작되지 못할 수 있습니다."); return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        setup_map = get_config("SETUP_COMMAND_MAP", {})
+        config = setup_map.get(setting_type)
         
-        # cogs/server/* 형태의 하위 디렉토리를 로드하기 위함
-        loaded_count = 0
-        for folder in sorted(os.listdir(cogs_dir)):
-            folder_path = os.path.join(cogs_dir, folder)
-            if os.path.isdir(folder_path):
-                # 하위 디렉토리 내의 Python 파일 탐색
-                for filename in os.listdir(folder_path):
-                    if filename.endswith('.py') and not filename.startswith('__'):
-                        try:
-                            # 예: cogs.server.system
-                            extension_path = f'cogs.{folder}.{filename[:-3]}'
-                            await self.load_extension(extension_path)
-                            logger.info(f'✅ Cog 로드 성공: {extension_path}')
-                            loaded_count += 1
-                        except commands.ExtensionAlreadyLoaded:
-                            logger.warning(f'⚠️ Cog가 이미 로드되었습니다: {extension_path}')
-                        except commands.ExtensionNotFound:
-                            logger.error(f'❌ Cog를 찾을 수 없습니다: {extension_path}. 파일 경로를 확인해주세요.')
-                        except commands.NoEntryPointError:
-                            logger.error(f'❌ "{extension_path}" Cog에 setup 함수가 없습니다. setup 함수를 정의해주세요.')
-                        except Exception as e:
-                            logger.error(f'❌ Cog 로드 실패: {extension_path} | {e}', exc_info=True)
-        logger.info(f"------ [ {loaded_count}개의 Cog 로드 완료 ] ------")
-
-
-bot = MyBot(command_prefix="/", intents=intents)
-
-async def regenerate_all_panels():
-    """봇 시작 시 모든 패널을 강제로 재생성합니다."""
-    logger.info("------ [ 모든 패널 자동 재생성 시작 ] ------")
-    regenerated_panels_count = 0
-    # 패널 재생성을 지원하는 Cog 목록
-    panel_cogs = ["RolePanel", "Onboarding", "Nicknames"] 
-    
-    for cog_name in panel_cogs:
-        cog = bot.get_cog(cog_name)
-        if cog and hasattr(cog, 'regenerate_panel'):
-            try: 
-                # regenerate_panel에 channel=None을 넘겨 Cog 내부 로직이 DB에서 채널 ID를 찾도록 함
-                await cog.regenerate_panel(channel=None) 
-                regenerated_panels_count += 1
-            except Exception as e: 
-                logger.error(f"❌ '{cog_name}' 패널 재생성 작업 중 오류 발생: {e}", exc_info=True)
-        else:
-            logger.warning(f"⚠️ '{cog_name}' Cog가 없거나 'regenerate_panel' 메서드를 가지고 있지 않습니다. 스킵합니다.")
-
-    logger.info(f"✅ 총 {regenerated_panels_count}개의 패널에 대한 재생성 작업이 요청되었습니다.")
-    logger.info("------ [ 모든 패널 자동 재생성 완료 ] ------")
-
-@bot.event
-async def on_ready():
-    logger.info("==================================================")
-    logger.info(f"✅ {bot.user.name}(이)가 성공적으로 로그인했습니다.")
-    logger.info(f"✅ 봇 버전: {BOT_VERSION}")
-    logger.info(f"✅ 현재 UTC 시간: {datetime.now(timezone.utc)}")
-    logger.info("==================================================")
-    
-    # DB에서 기본값을 동기화하고 모든 설정을 로드
-    await sync_defaults_to_db()
-    await load_all_data_from_db()
-    
-    logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
-    refreshed_cogs_count = 0
-    for cog_name, cog in bot.cogs.items():
-        if hasattr(cog, 'load_configs'):
-            try: 
-                await cog.load_configs()
-                refreshed_cogs_count += 1
-                logger.info(f"✅ '{cog_name}' Cog 설정 새로고침 완료.")
-            except Exception as e: 
-                logger.error(f"❌ '{cog_name}' Cog 설정 새로고침 중 오류: {e}", exc_info=True)
-    logger.info(f"✅ 총 {refreshed_cogs_count}개의 Cog 설정이 새로고침되었습니다.")
-    logger.info("------ [ 모든 Cog 설정 새로고침 완료 ] ------")
-    
-    try:
-        if TEST_GUILD_ID:
-            # TEST_GUILD_ID가 None이 아니고 유효한 정수일 때만 사용
-            guild = discord.Object(id=TEST_GUILD_ID)
-            await bot.tree.sync(guild=guild)
-            logger.info(f'✅ 테스트 서버({TEST_GUILD_ID})에 명령어를 동기화했습니다.')
-        else:
-            # TEST_GUILD_ID가 없거나 유효하지 않으면 전역 동기화 시도
-            synced = await bot.tree.sync()
-            logger.info(f'✅ {len(synced)}개의 슬래시 명령어를 전체 서버에 동기화했습니다.')
-    except Exception as e: 
-        logger.error(f'❌ 명령어 동기화 중 오류가 발생했습니다: {e}', exc_info=True)
-    
-    # 패널 재생성 (필요에 따라 제어할 수 있도록 추후 옵션화 고려)
-    await regenerate_all_panels()
-
-async def main():
-    async with bot:
-        await bot.start(BOT_TOKEN)
-
-if __name__ == "__main__":
-    if BOT_TOKEN is None: 
-        logger.critical("❌ BOT_TOKEN 환경 변수가 설정되지 않았습니다. 봇을 실행할 수 없습니다.")
-    else:
         try:
-            asyncio.run(main())
-        except discord.errors.LoginFailure: 
-            logger.critical("❌ 봇 토큰이 유효하지 않습니다. 환경 변수 'BOT_TOKEN'을 확인해주세요.")
-        except KeyboardInterrupt:
-            logger.info("봇이 사용자 요청에 의해 종료됩니다.")
-        except Exception as e: 
-            logger.critical(f"🚨 봇 실행 중 치명적인 오류 발생: {e}", exc_info=True)
+            db_key, friendly_name = config['key'], config['friendly_name']
+            await save_id_to_db(db_key, channel.id)
+            
+            # Cog 설정 리로드
+            cog_to_reload = self.bot.get_cog(config["cog_name"])
+            if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
+                await cog_to_reload.load_configs()
+                logger.info(f"'{config['cog_name']}' Cog의 설정을 새로고침했습니다.")
+
+            # 패널 재생성
+            if config["type"] == "panel":
+                if hasattr(cog_to_reload, 'regenerate_panel'):
+                    await cog_to_reload.regenerate_panel(channel)
+                    await interaction.followup.send(f"✅ `{channel.mention}` 채널에 **{friendly_name}** 패널을 성공적으로 설치했습니다.", ephemeral=True)
+                else:
+                    await interaction.followup.send(f"⚠️ **{friendly_name}** 설정은 완료되었지만, 패널 자동 생성 기능(`regenerate_panel`)이 없습니다.", ephemeral=True)
+            else: # 채널 설정
+                await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
+
+        except Exception as e:
+            logger.error(f"채널/패널 설정({setting_type}) 처리 중 오류 발생: {e}", exc_info=True)
+            await interaction.followup.send(f"❌ 설정 중 오류가 발생했습니다. 봇 로그를 확인해주세요.", ephemeral=True)
+
+    # 실제 명령어 콜백을 등록
+    setup.command(name="set", description="[관리자] 각종 채널을 설정하거나 패널을 설치합니다.")(setup_set_command)
+
+
+    # ==============================================================================
+    # 2. /setup roles (역할 관련 명령어 그룹)
+    # ==============================================================================
+    roles = app_commands.Group(name="roles", parent=setup, description="[관리자] 서버 역할을 DB와 동기화하거나 개별 설정합니다.")
+
+    @roles.command(name="sync", description="[관리자] 서버의 모든 역할을 이름 기준으로 DB와 한번에 동기화합니다.")
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def roles_sync(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        guild = interaction.guild
+        role_key_map_config = get_config("ROLE_KEY_MAP", {})
+        if not role_key_map_config:
+            await interaction.followup.send("❌ `ROLE_KEY_MAP` 설정이 DB에 없습니다. 관리자에게 문의하세요.", ephemeral=True)
+            return
+
+        synced_roles, missing_roles, error_roles = [], [], []
+        server_roles_by_name = {role.name: role.id for role in guild.roles}
+        
+        for db_key, role_name in role_key_map_config.items():
+            role_id = server_roles_by_name.get(role_name)
+            if role_id:
+                try:
+                    await save_id_to_db(db_key, role_id)
+                    synced_roles.append(f"・**{role_name}** (`{db_key}`)")
+                except Exception as e:
+                    error_roles.append(f"・**{role_name}**: `{e}`")
+            else:
+                missing_roles.append(f"・**{role_name}** (`{db_key}`)")
+        
+        embed = discord.Embed(title="⚙️ 역할 데이터베이스 전체 동기화 결과", color=0x2ECC71)
+        embed.set_footer(text=f"총 {len(role_key_map_config)}개 중 성공: {len(synced_roles)} / 실패: {len(missing_roles) + len(error_roles)}")
+        if synced_roles:
+            embed.add_field(name=f"✅ 동기화 성공 ({len(synced_roles)}개)", value="\n".join(synced_roles)[:1024], inline=False)
+        if missing_roles:
+            embed.color = 0xFEE75C # Warning Yellow
+            embed.add_field(name=f"⚠️ 서버에 역할 없음 ({len(missing_roles)}개)", value="\n".join(missing_roles)[:1024], inline=False)
+        if error_roles:
+            embed.color = 0xED4245 # Error Red
+            embed.add_field(name=f"❌ DB 저장 오류 ({len(error_roles)}개)", value="\n".join(error_roles)[:1024], inline=False)
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def role_type_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        role_key_map = get_config("ROLE_KEY_MAP", {})
+        return [app_commands.Choice(name=f"{key} ({name_info.get('name', '')})", value=key) for key, name_info in role_key_map.items() if current.lower() in key.lower() or current.lower() in name_info.get('name', '').lower()][:25]
+
+    @roles.command(name="set", description="[관리자] 특정 역할을 DB에 개별적으로 설정합니다.")
+    @app_commands.describe(role_type="DB에 저장할 역할의 종류 (예: role_resident)", role="서버에 실제로 존재하는 역할을 선택하세요.")
+    @app_commands.autocomplete(role_type=role_type_autocomplete)
+    @app_commands.checks.has_permissions(manage_roles=True)
+    async def roles_set(self, interaction: discord.Interaction, role_type: str, role: discord.Role):
+        role_key_map = get_config("ROLE_KEY_MAP", {})
+        if role_type not in role_key_map:
+            await interaction.response.send_message(f"❌ '{role_type}'은(는) 유효하지 않은 역할 종류입니다. 목록에서 선택해주세요.", ephemeral=True)
+            return
+        
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await save_id_to_db(role_type, role.id)
+            await load_channel_ids_from_db() # 캐시 새로고침
+            embed = discord.Embed(title="✅ 역할 설정 완료", description=f"DB의 `{role_type}` 키에 {role.mention} 역할이 성공적으로 연결되었습니다.", color=discord.Color.blue())
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            logger.error(f"개별 역할 설정 중 오류: {e}", exc_info=True)
+            embed = discord.Embed(title="❌ 오류 발생", description=f"`{role_type}` 역할 설정 중 오류가 발생했습니다.", color=discord.Color.red())
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(ServerSystem(bot))
