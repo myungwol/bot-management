@@ -223,3 +223,39 @@ async def add_stats_channel(channel_id: int, guild_id: int, stat_type: str, temp
 @supabase_retry_handler()
 async def remove_stats_channel(channel_id: int):
     await supabase.table('stats_channels').delete().eq('channel_id', channel_id).execute()
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 9. 임시 음성 채널 (temp_voice_channels) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def get_all_temp_channels() -> List[Dict[str, Any]]:
+    """DB에 저장된 모든 임시 채널 정보를 불러옵니다."""
+    response = await supabase.table('temp_voice_channels').select('*').execute()
+    return response.data if response.data else []
+
+@supabase_retry_handler()
+async def add_temp_channel(channel_id: int, owner_id: int, guild_id: int, message_id: int, channel_type: str):
+    """새로운 임시 채널 정보를 DB에 추가합니다."""
+    await supabase.table('temp_voice_channels').insert({
+        "channel_id": channel_id,
+        "owner_id": owner_id,
+        "guild_id": guild_id,
+        "message_id": message_id,
+        "channel_type": channel_type
+    }).execute()
+
+@supabase_retry_handler()
+async def update_temp_channel_owner(channel_id: int, new_owner_id: int):
+    """임시 채널의 소유자 정보를 DB에서 업데이트합니다."""
+    await supabase.table('temp_voice_channels').update({"owner_id": new_owner_id}).eq('channel_id', channel_id).execute()
+
+@supabase_retry_handler()
+async def remove_temp_channel(channel_id: int):
+    """임시 채널 정보를 DB에서 삭제합니다."""
+    await supabase.table('temp_voice_channels').delete().eq('channel_id', channel_id).execute()
+
+@supabase_retry_handler()
+async def remove_multiple_temp_channels(channel_ids: List[int]):
+    """여러 임시 채널 정보를 DB에서 한 번에 삭제합니다."""
+    if not channel_ids: return
+    await supabase.table('temp_voice_channels').delete().in_('channel_id', channel_ids).execute()
