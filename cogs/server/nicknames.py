@@ -35,52 +35,48 @@ class NicknameApprovalView(ui.View):
         self.new_name = new_name
         self.nicknames_cog = cog_instance
         self.original_name = member.display_name
+    
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.nicknames_cog.approval_role_id
         if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(r.id == approval_role_id for r in interaction.user.roles):
             await interaction.response.send_message("❌ このボタンを押す権限がありません。", ephemeral=True)
             return False
         return True
+
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
+        
         member = interaction.guild.get_member(self.target_member_id)
         if not member:
-            try:
-                await interaction.message.delete()
-            except discord.NotFound:
-                pass
+            try: await interaction.message.delete()
+            except discord.NotFound: pass
             await interaction.response.send_message("❌ エラー: 対象のメンバーがサーバーに見つかりませんでした。", ephemeral=True)
             return
+
         rejection_reason = None
         if not is_approved:
             modal = RejectionReasonModal()
             await interaction.response.send_modal(modal)
-            if await modal.wait() or not modal.reason.value:
-                return
+            if await modal.wait() or not modal.reason.value: return
             rejection_reason = modal.reason.value
         else:
             await interaction.response.defer()
         
-        for item in self.children:
-            item.disabled = True
-        try:
-            await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
-        except (discord.NotFound, discord.HTTPException):
-            pass
+        for item in self.children: item.disabled = True
+        try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
+        except (discord.NotFound, discord.HTTPException): pass
 
         final_name = await self.nicknames_cog.get_final_nickname(member, base_name=self.new_name)
         error_report = ""
         if is_approved:
             try:
                 await member.edit(nick=final_name, reason=f"관리자({interaction.user}) 승인")
-            except Exception as e:
-                error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
+            except Exception as e: error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
         
         log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
         try:
             await self._send_log_message(log_embed)
-        except Exception as e:
-            error_report += f"- 로그 메시지 전송 실패: `{type(e).__name__}: {e}`\n"
+        except Exception as e: error_report += f"- 로그 메시지 전송 실패: `{type(e).__name__}: {e}`\n"
         
         status_text = "承認" if is_approved else "拒否"
         if error_report:
@@ -88,10 +84,11 @@ class NicknameApprovalView(ui.View):
         else:
             await interaction.followup.send(f"✅ {status_text} 処理が正常に完了しました。", ephemeral=True)
         
-        try:
-            await interaction.message.delete()
-        except discord.NotFound:
-            pass
+        try: await interaction.message.delete()
+        except discord.NotFound: pass
+
+        # [수정] 패널이 묻히지 않도록 승인/거절 처리 후 패널을 자동으로 재생성합니다.
+        await self.nicknames_cog.regenerate_panel()
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
@@ -219,7 +216,6 @@ class Nicknames(commands.Cog):
         self.approval_role_id = get_id("role_approval")
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
-    # [수정] get_final_nickname 메서드
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
         prefix_hierarchy = get_config("NICKNAME_PREFIX_HIERARCHY", [])
         prefix = None
@@ -227,7 +223,6 @@ class Nicknames(commands.Cog):
         
         for prefix_name in prefix_hierarchy:
             if prefix_name in member_role_names:
-                # [수정] 접두사 형식을 원래대로 되돌립니다.
                 prefix = f"『 {prefix_name} 』"
                 break
         
@@ -237,10 +232,8 @@ class Nicknames(commands.Cog):
             current_nick = member.nick or member.name
             base = current_nick
             for p_name in prefix_hierarchy:
-                # [수정] 접두사를 찾는 형식도 원래대로 되돌립니다.
                 prefix_to_check = f"『 {p_name} 』"
                 if current_nick.startswith(prefix_to_check):
-                    # [수정] 접두사를 제거하는 정규식도 원래대로 되돌립니다.
                     base = re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", current_nick)
                     break
         
