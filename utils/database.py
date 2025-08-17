@@ -8,16 +8,17 @@ import asyncio
 from typing import Dict, Callable, Any, List
 from functools import wraps
 
-# [수정] GAME_CONFIGS를 임포트하지 않습니다.
-from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP
+# [개선] UI_DEFAULTS에서 SETUP_COMMAND_MAP도 가져옵니다.
+from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP
 
 logger = logging.getLogger(__name__)
 
 # --- 캐시 영역 ---
 _bot_configs_cache: Dict[str, Any] = {}
 _channel_id_cache: Dict[str, int] = {}
-_item_database_cache: Dict[str, Dict[str, Any]] = {}
-_fishing_loot_cache: List[Dict[str, Any]] = []
+# [수정] 서버 관리 봇에서는 게임 관련 캐시를 사용하지 않습니다.
+# _item_database_cache: Dict[str, Dict[str, Any]] = {}
+# _fishing_loot_cache: List[Dict[str, Any]] = []
 
 # --- Supabase 클라이언트 초기화 ---
 supabase: AsyncClient = None
@@ -69,22 +70,26 @@ async def sync_defaults_to_db():
         prefix_hierarchy = sorted([info["name"] for info in UI_ROLE_KEY_MAP.values() if info.get("is_prefix")], key=lambda name: next((info.get("priority", 0) for info in UI_ROLE_KEY_MAP.values() if info["name"] == name), 0), reverse=True)
         await save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy)
         logger.info(f"✅ 닉네임 접두사 목록(NICKNAME_PREFIX_HIERARCHY)을 DB에 동기화했습니다.")
+        
         # 2. 임베드 동기화
         for key, data in UI_EMBEDS.items(): await save_embed_to_db(key, data)
         logger.info(f"✅ {len(UI_EMBEDS)}개의 임베드 기본값을 DB에 동기화했습니다.")
+
         # 3. 패널 컴포넌트 동기화
         for component_data in UI_PANEL_COMPONENTS: await save_panel_component_to_db(component_data)
         logger.info(f"✅ {len(UI_PANEL_COMPONENTS)}개의 패널 컴포넌트 기본값을 DB에 동기화했습니다.")
         
-        # [삭제] 게임 설정 동기화 로직을 삭제합니다.
-        
+        # [개선] /setup 명령어의 설정 맵을 DB에 동기화합니다.
+        await save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP)
+        logger.info(f"✅ /setup 명령어 설정 맵(SETUP_COMMAND_MAP)을 DB에 동기화했습니다.")
+
     except Exception as e: logger.error(f"❌ 기본값 DB 동기화 중 오류 발생: {e}", exc_info=True)
     logger.info("------ [ 기본값 DB 동기화 완료 ] ------")
 
-# ... (파일 하단은 이전과 동일하며 생략하지 않습니다) ...
 async def load_all_data_from_db():
     logger.info("------ [ 모든 DB 데이터 로드 시작 ] ------")
-    await asyncio.gather(load_bot_configs_from_db(), load_channel_ids_from_db(), load_game_data_from_db())
+    # [수정] 서버 관리 봇에서는 게임 데이터를 로드하지 않습니다.
+    await asyncio.gather(load_bot_configs_from_db(), load_channel_ids_from_db())
     logger.info("------ [ 모든 DB 데이터 로드 완료 ] ------")
 
 @supabase_retry_handler()
@@ -99,18 +104,13 @@ def get_config(key: str, default: Any = None) -> Any:
     if value is None: logger.warning(f"[Config Cache Miss] '{key}'에 해당하는 설정을 캐시에서 찾을 수 없습니다. 기본값을 사용합니다."); return default
     return value
 
-@supabase_retry_handler()
-async def load_game_data_from_db():
-    global _item_database_cache, _fishing_loot_cache
-    item_response = await supabase.table('items').select('*').execute();
-    if item_response.data: _item_database_cache = {item.pop('name'): item for item in item_response.data}; logger.info(f"✅ {len(_item_database_cache)}개의 아이템 정보를 DB에서 로드했습니다.")
-    else: logger.warning("DB 'items' 테이블에서 아이템 정보를 찾을 수 없습니다.")
-    loot_response = await supabase.table('fishing_loots').select('*').execute()
-    if loot_response.data: _fishing_loot_cache = loot_response.data; logger.info(f"✅ {len(_fishing_loot_cache)}개의 낚시 결과물 정보를 DB에서 로드했습니다.")
-    else: logger.warning("DB 'fishing_loots' 테이블에서 낚시 결과물 정보를 찾을 수 없습니다.")
+# [수정] 서버 관리 봇에서는 게임 관련 데이터를 로드/사용하는 함수들이 필요 없습니다.
+# 하지만 다른 봇(게임 봇)과의 호환성을 위해 함수 정의는 남겨두되, 내용은 비워두거나 단순화 할 수 있습니다.
+# 여기서는 일단 해당 함수들을 주석 처리하거나 삭제하는 방향으로 진행합니다.
 
-def get_item_database() -> Dict[str, Dict[str, Any]]: return _item_database_cache
-def get_fishing_loot() -> List[Dict[str, Any]]: return _fishing_loot_cache
+# def get_item_database() -> Dict[str, Dict[str, Any]]: return _item_database_cache
+# def get_fishing_loot() -> List[Dict[str, Any]]: return _fishing_loot_cache
+# async def load_game_data_from_db(): ... (함수 전체 삭제 또는 주석 처리)
 
 @supabase_retry_handler()
 async def load_channel_ids_from_db():
@@ -153,56 +153,27 @@ async def save_panel_component_to_db(component_data: dict): await supabase.table
 async def get_onboarding_steps() -> list:
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
     return response.data if response.data else []
-@supabase_retry_handler()
-async def get_or_create_user(table_name: str, user_id_str: str, default_data: dict) -> dict:
-    try:
-        response = await supabase.table(table_name).select("*").eq("user_id", user_id_str).limit(1).execute()
-        if response.data: return response.data[0]
-        insert_data = {"user_id": user_id_str, **default_data}
-        response = await supabase.table(table_name).insert(insert_data, returning="representation").execute()
-        return response.data[0] if response.data else default_data
-    except Exception as e: logger.error(f"'{table_name}' 테이블에서 유저 데이터 조회/생성 실패. 기본 데이터를 반환합니다: {e}"); return default_data
-async def get_wallet(user_id: int) -> dict: return await get_or_create_user('wallets', str(user_id), {"balance": 0})
-@supabase_retry_handler()
-async def update_wallet(user: discord.User, amount: int) -> dict | None:
-    params = {'user_id_param': str(user.id), 'amount_param': amount}
-    response = await supabase.rpc('increment_wallet_balance', params).execute()
-    return response.data[0] if response.data else None
-@supabase_retry_handler()
-async def get_inventory(user_id_str: str) -> dict:
-    response = await supabase.table('inventories').select('item_name, quantity').eq('user_id', user_id_str).gt('quantity', 0).execute()
-    return {item['item_name']: item['quantity'] for item in response.data} if response.data else {}
-@supabase_retry_handler()
-async def update_inventory(user_id_str: str, item_name: str, quantity: int):
-    params = {'user_id_param': user_id_str, 'item_name_param': item_name, 'amount_param': quantity}
-    await supabase.rpc('increment_inventory_quantity', params).execute()
-async def get_user_gear(user_id_str: str) -> dict:
-    default_rod = get_config("DEFAULT_ROD", "古い釣竿"); default_bait = "エサなし"
-    default_gear = {"rod": default_rod, "bait": default_bait}
-    gear = await get_or_create_user('gear_setups', user_id_str, default_gear);
-    if not gear: gear = default_gear
-    inv = await get_inventory(user_id_str); rod = gear.get('rod', '素手')
-    if rod not in ["素手", default_rod] and inv.get(rod, 0) <= 0: rod = default_rod
-    bait = gear.get('bait', default_bait)
-    if bait != default_bait and inv.get(bait, 0) <= 0: bait = default_bait
-    return {"rod": rod, "bait": bait}
-@supabase_retry_handler()
-async def set_user_gear(user_id_str: str, rod: str = None, bait: str = None):
-    default_rod = get_config("DEFAULT_ROD", "古い釣竿"); default_bait = "エサなし"
-    await get_or_create_user('gear_setups', user_id_str, {"rod": default_rod, "bait": default_bait})
-    data_to_update = {}
-    if rod is not None: data_to_update['rod'] = rod
-    if bait is not None: data_to_update['bait'] = bait
-    if data_to_update: await supabase.table('gear_setups').update(data_to_update).eq('user_id', user_id_str).execute()
-@supabase_retry_handler()
-async def get_aquarium(user_id_str: str) -> list:
-    response = await supabase.table('aquariums').select('id, name, size, emoji').eq('user_id', user_id_str).execute()
-    return response.data if response.data else []
-@supabase_retry_handler()
-async def add_to_aquarium(user_id_str: str, fish_data: dict):
-    insert_data = {"user_id": user_id_str, **fish_data}; await supabase.table('aquariums').insert(insert_data).execute()
-@supabase_retry_handler()
-async def remove_fish_from_aquarium(fish_id: int): await supabase.table('aquariums').delete().eq('id', fish_id).execute()
+
+# [수정] 아래는 게임 봇에서 주로 사용할 함수들이므로, 서버 관리 봇에서는 일단 주석처리 합니다.
+# @supabase_retry_handler()
+# async def get_or_create_user(table_name: str, user_id_str: str, default_data: dict) -> dict: ...
+# async def get_wallet(user_id: int) -> dict: ...
+# @supabase_retry_handler()
+# async def update_wallet(user: discord.User, amount: int) -> dict | None: ...
+# @supabase_retry_handler()
+# async def get_inventory(user_id_str: str) -> dict: ...
+# @supabase_retry_handler()
+# async def update_inventory(user_id_str: str, item_name: str, quantity: int): ...
+# async def get_user_gear(user_id_str: str) -> dict: ...
+# @supabase_retry_handler()
+# async def set_user_gear(user_id_str: str, rod: str = None, bait: str = None): ...
+# @supabase_retry_handler()
+# async def get_aquarium(user_id_str: str) -> list: ...
+# @supabase_retry_handler()
+# async def add_to_aquarium(user_id_str: str, fish_data: dict): ...
+# @supabase_retry_handler()
+# async def remove_fish_from_aquarium(fish_id: int): ...
+
 @supabase_retry_handler()
 async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
     response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
