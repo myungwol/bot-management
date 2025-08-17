@@ -18,7 +18,7 @@ from cogs.server.system import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# --- UI 클래스 ---
+# --- UI 클래스 (이전과 동일) ---
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -35,7 +35,11 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         try:
             approval_channel = self.onboarding_cog.approval_channel
             if not approval_channel: await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
-            await set_cooldown(str(interaction.user.id), "introduction", time.time())
+            # [디버그] 쿨타임이 설정되는 시점의 타임스탬프를 로그로 남깁니다.
+            current_timestamp = time.time()
+            logger.info(f"--- [디버그] 쿨타임 설정: key='introduction', value='{current_timestamp}' ---")
+            await set_cooldown(str(interaction.user.id), "introduction", current_timestamp)
+
             embed_data = await get_embed_from_db("embed_onboarding_approval")
             if not embed_data: await interaction.followup.send("❌ エラー: 承認用メッセージのテンプレートが見つかりません。", ephemeral=True); return
             embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention, member_name=interaction.user.display_name)
@@ -200,14 +204,36 @@ class OnboardingGuideView(ui.View):
                 except Exception as e: await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True); return
         if self.current_step < len(self.steps_data) - 1: self.current_step += 1
         await self._update_message()
+    
+    # --- [디버깅] 이 함수 전체에 로그가 추가되었습니다 ---
     async def create_introduction(self, interaction: discord.Interaction):
         async with self.user_lock:
+            logger.info("--- [디버그] '주민등록표 작성' 버튼 클릭됨, 쿨타임 체크 시작 ---")
+            
             cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
+            logger.info(f"[디버그] 1. DB에서 가져온 쿨타임 설정(초): {cooldown_seconds}")
+            
             last_time = await get_cooldown(str(interaction.user.id), "introduction")
-            if last_time and (time.time() - last_time) < cooldown_seconds:
-                rem = cooldown_seconds - (time.time() - last_time); m, s = divmod(int(rem), 60)
-                await interaction.response.send_message(f"次の申請まであと {m}分{s}秒 お待ちください。", ephemeral=True); return
+            logger.info(f"[디버그] 2. DB에서 가져온 마지막 실행 시간(타임스탬프): {last_time}")
+            
+            current_time = time.time()
+            logger.info(f"[디버그] 3. 현재 시간(타임스탬프): {current_time}")
+            
+            time_since_last = current_time - last_time
+            logger.info(f"[디버그] 4. 마지막 실행 후 경과 시간(초): {time_since_last}")
+            
+            if last_time and time_since_last < cooldown_seconds:
+                remaining_time = cooldown_seconds - time_since_last
+                minutes = int(remaining_time // 60)
+                seconds = int(remaining_time % 60)
+                logger.info(f"[디버그] 5. 쿨타임 남음. 계산된 남은 시간: {minutes}분 {seconds}초")
+                
+                await interaction.response.send_message(f"次の申請まであと {minutes}分{seconds}秒 お待ちください。", ephemeral=True)
+                return
+            
+            logger.info("[디버그] 6. 쿨타임 없음. 모달 창 전송.")
             await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
+
         if self.message:
             try: await self.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
@@ -229,7 +255,6 @@ class OnboardingPanelView(ui.View):
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
     async def start_guide_callback(self, interaction: discord.Interaction):
-        # [수정] Lock을 이 함수 안으로 이동
         lock = self.onboarding_cog.user_locks.setdefault(interaction.user.id, asyncio.Lock())
         if lock.locked(): return await interaction.response.send_message("以前のリクエストを処理中です。", ephemeral=True)
         async with lock:
@@ -250,7 +275,7 @@ class Onboarding(commands.Cog):
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None; self.main_chat_channel_id: Optional[int] = None
         self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-        self.user_locks: Dict[int, asyncio.Lock] = {} # [신규] Onboarding Cog가 user lock을 관리
+        self.user_locks: Dict[int, asyncio.Lock] = {}
     @property
     def approval_channel(self) -> Optional[discord.TextChannel]:
         if self.approval_channel_id: return self.bot.get_channel(self.approval_channel_id)
