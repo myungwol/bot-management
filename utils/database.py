@@ -7,7 +7,6 @@ import logging
 import asyncio
 from typing import Dict, Callable, Any, List
 from functools import wraps
-# [수정] datetime 객체는 여전히 UTC 시간을 가져오기 위해 사용합니다.
 from datetime import datetime, timezone
 
 from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP
@@ -21,11 +20,14 @@ _channel_id_cache: Dict[str, int] = {}
 # --- Supabase 클라이언트 초기화 ---
 supabase: AsyncClient = None
 try:
-    url: str = os.environ.get("SUPABASE_URL"); key: str = os.environ.get("SUPABASE_KEY")
-    if not url or not key: raise ValueError("SUPABASE_URL 또는 SUPABASE_KEY 환경 변수가 설정되지 않았습니다.")
+    url: str = os.environ.get("SUPABASE_URL")
+    key: str = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        raise ValueError("SUPABASE_URL 또는 SUPABASE_KEY 환경 변수가 설정되지 않았습니다.")
     supabase = AsyncClient(supabase_url=url, supabase_key=key)
     logger.info("✅ Supabase 비동기 클라이언트가 성공적으로 생성되었습니다.")
-except Exception as e: logger.critical(f"❌ Supabase 클라이언트 생성 실패: {e}", exc_info=True)
+except Exception as e:
+    logger.critical(f"❌ Supabase 클라이언트 생성 실패: {e}", exc_info=True)
 
 # --- 범용 재시도 핸들러 ---
 def supabase_retry_handler(retries: int = 3, delay: int = 5):
@@ -34,19 +36,21 @@ def supabase_retry_handler(retries: int = 3, delay: int = 5):
         async def wrapper(*args, **kwargs):
             if not supabase:
                 logger.error(f"❌ Supabase 클라이언트가 없어 '{func.__name__}' 함수를 실행할 수 없습니다.")
-                return_type = func.__annotations__.get("return");
+                return_type = func.__annotations__.get("return")
                 if return_type:
                     if "dict" in str(return_type).lower(): return {}
                     if "list" in str(return_type).lower(): return []
                 return None
             for attempt in range(retries):
-                try: return await func(*args, **kwargs)
+                try:
+                    return await func(*args, **kwargs)
                 except Exception as e:
                     logger.warning(f"⚠️ '{func.__name__}' 함수 실행 중 오류 발생 (시도 {attempt + 1}/{retries}): {e}")
-                    if attempt < retries - 1: await asyncio.sleep(delay)
+                    if attempt < retries - 1:
+                        await asyncio.sleep(delay)
                     else:
                         logger.error(f"❌ '{func.__name__}' 함수가 모든 재시도({retries}번)에 실패했습니다.", exc_info=True)
-                        return_type = func.__annotations__.get("return");
+                        return_type = func.__annotations__.get("return")
                         if return_type:
                             if "dict" in str(return_type).lower(): return {}
                             if "list" in str(return_type).lower(): return []
@@ -64,16 +68,23 @@ async def sync_defaults_to_db():
         role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
         await save_config_to_db("ROLE_KEY_MAP", role_name_map)
         logger.info(f"✅ 역할 이름 맵(ROLE_KEY_MAP)을 DB에 동기화했습니다.")
-        prefix_hierarchy = sorted([info["name"] for info in UI_ROLE_KEY_MAP.values() if info.get("is_prefix")], key=lambda name: next((info.get("priority", 0) for info in UI_ROLE_KEY_MAP.values() if info["name"] == name), 0), reverse=True)
+        prefix_hierarchy = sorted(
+            [info["name"] for info in UI_ROLE_KEY_MAP.values() if info.get("is_prefix")],
+            key=lambda name: next((info.get("priority", 0) for info in UI_ROLE_KEY_MAP.values() if info["name"] == name), 0),
+            reverse=True
+        )
         await save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy)
         logger.info(f"✅ 닉네임 접두사 목록(NICKNAME_PREFIX_HIERARCHY)을 DB에 동기화했습니다.")
-        for key, data in UI_EMBEDS.items(): await save_embed_to_db(key, data)
+        for key, data in UI_EMBEDS.items():
+            await save_embed_to_db(key, data)
         logger.info(f"✅ {len(UI_EMBEDS)}개의 임베드 기본값을 DB에 동기화했습니다.")
-        for component_data in UI_PANEL_COMPONENTS: await save_panel_component_to_db(component_data)
+        for component_data in UI_PANEL_COMPONENTS:
+            await save_panel_component_to_db(component_data)
         logger.info(f"✅ {len(UI_PANEL_COMPONENTS)}개의 패널 컴포넌트 기본값을 DB에 동기화했습니다.")
         await save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP)
         logger.info(f"✅ /setup 명령어 설정 맵(SETUP_COMMAND_MAP)을 DB에 동기화했습니다.")
-    except Exception as e: logger.error(f"❌ 기본값 DB 동기화 중 오류 발생: {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"❌ 기본값 DB 동기화 중 오류 발생: {e}", exc_info=True)
     logger.info("------ [ 기본값 DB 동기화 완료 ] ------")
 
 async def load_all_data_from_db():
@@ -85,74 +96,119 @@ async def load_all_data_from_db():
 async def load_bot_configs_from_db():
     global _bot_configs_cache
     response = await supabase.table('bot_configs').select('config_key, config_value').execute()
-    if response.data: _bot_configs_cache = {item['config_key']: item['config_value'] for item in response.data}; logger.info(f"✅ {len(_bot_configs_cache)}개의 봇 설정을 DB에서 로드했습니다.")
-    else: logger.warning("DB 'bot_configs' 테이블에서 설정 정보를 찾을 수 없습니다.")
+    if response.data:
+        _bot_configs_cache = {item['config_key']: item['config_value'] for item in response.data}
+        logger.info(f"✅ {len(_bot_configs_cache)}개의 봇 설정을 DB에서 로드했습니다.")
+    else:
+        logger.warning("DB 'bot_configs' 테이블에서 설정 정보를 찾을 수 없습니다.")
 
 def get_config(key: str, default: Any = None) -> Any:
     value = _bot_configs_cache.get(key)
-    if value is None: logger.warning(f"[Config Cache Miss] '{key}'에 해당하는 설정을 캐시에서 찾을 수 없습니다. 기본값을 사용합니다."); return default
+    if value is None:
+        logger.warning(f"[Config Cache Miss] '{key}'에 해당하는 설정을 캐시에서 찾을 수 없습니다. 기본값을 사용합니다.")
+        return default
     return value
 
 @supabase_retry_handler()
 async def load_channel_ids_from_db():
     global _channel_id_cache
     response = await supabase.table('channel_configs').select('channel_key, channel_id').execute()
-    if response.data: _channel_id_cache = {item['channel_key']: int(item['channel_id']) for item in response.data}; logger.info(f"✅ {len(_channel_id_cache)}개의 채널/역할 ID를 DB에서 로드했습니다.")
-    else: logger.warning("DB 'channel_configs' 테이블에서 ID 정보를 찾을 수 없습니다.")
+    if response.data:
+        _channel_id_cache = {item['channel_key']: int(item['channel_id']) for item in response.data}
+        logger.info(f"✅ {len(_channel_id_cache)}개의 채널/역할 ID를 DB에서 로드했습니다.")
+    else:
+        logger.warning("DB 'channel_configs' 테이블에서 ID 정보를 찾을 수 없습니다.")
 
 def get_id(key: str) -> int | None:
     config_id = _channel_id_cache.get(key)
-    if config_id is None: logger.warning(f"[ID Cache Miss] '{key}'에 해당하는 ID를 캐시에서 찾을 수 없습니다.")
+    if config_id is None:
+        logger.warning(f"[ID Cache Miss] '{key}'에 해당하는 ID를 캐시에서 찾을 수 없습니다.")
     return config_id
 
 @supabase_retry_handler()
 async def save_id_to_db(key: str, object_id: int):
     global _channel_id_cache
     await supabase.table('channel_configs').upsert({"channel_key": key, "channel_id": str(object_id)}, on_conflict="channel_key").execute()
-    _channel_id_cache[key] = object_id; logger.info(f"✅ '{key}' ID({object_id})를 DB와 캐시에 저장했습니다.")
+    _channel_id_cache[key] = object_id
+    logger.info(f"✅ '{key}' ID({object_id})를 DB와 캐시에 저장했습니다.")
 
 async def save_panel_id(panel_name: str, message_id: int, channel_id: int):
-    await save_id_to_db(f"panel_{panel_name}_message_id", message_id); await save_id_to_db(f"panel_{panel_name}_channel_id", channel_id)
+    await save_id_to_db(f"panel_{panel_name}_message_id", message_id)
+    await save_id_to_db(f"panel_{panel_name}_channel_id", channel_id)
 
 def get_panel_id(panel_name: str) -> dict | None:
-    message_id = get_id(f"panel_{panel_name}_message_id"); channel_id = get_id(f"panel_{panel_name}_channel_id")
+    message_id = get_id(f"panel_{panel_name}_message_id")
+    channel_id = get_id(f"panel_{panel_name}_channel_id")
     return {"message_id": message_id, "channel_id": channel_id} if message_id and channel_id else None
 
 @supabase_retry_handler()
-async def save_embed_to_db(embed_key: str, embed_data: dict): await supabase.table('embeds').upsert({'embed_key': embed_key, 'embed_data': embed_data}, on_conflict='embed_key').execute()
+async def save_embed_to_db(embed_key: str, embed_data: dict):
+    await supabase.table('embeds').upsert({'embed_key': embed_key, 'embed_data': embed_data}, on_conflict='embed_key').execute()
+
 @supabase_retry_handler()
 async def get_embed_from_db(embed_key: str) -> dict | None:
     response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
     return response.data[0]['embed_data'] if response.data else None
+
 @supabase_retry_handler()
 async def get_panel_components_from_db(panel_key: str) -> list:
     response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).execute()
     return response.data if response.data else []
+
 @supabase_retry_handler()
-async def save_panel_component_to_db(component_data: dict): await supabase.table('panel_components').upsert(component_data, on_conflict='component_key').execute()
+async def save_panel_component_to_db(component_data: dict):
+    await supabase.table('panel_components').upsert(component_data, on_conflict='component_key').execute()
+
 @supabase_retry_handler()
 async def get_onboarding_steps() -> list:
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
     return response.data if response.data else []
 
-# [수정] 함수 이름을 원래대로 되돌리고, 반환 타입을 float으로 명시합니다.
+
+# ==============================================================================
+# [수정된 쿨다운 함수]
+# ==============================================================================
+
 @supabase_retry_handler()
 async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
+    """
+    데이터베이스에서 쿨다운 정보를 가져와 float 형식의 Unix 타임스탬프로 반환합니다.
+    DB에 저장된 값이 숫자든, ISO 8601 형식의 문자열이든 모두 처리합니다.
+    """
     response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
-    if response.data and response.data[0].get('last_cooldown_timestamp') is not None:
-        return float(response.data[0]['last_cooldown_timestamp'])
+    
+    if response.data and (timestamp_val := response.data[0].get('last_cooldown_timestamp')) is not None:
+        if isinstance(timestamp_val, (int, float)):
+            # 값이 이미 숫자 형식인 경우 (이전 버전 호환)
+            return float(timestamp_val)
+        elif isinstance(timestamp_val, str):
+            # 값이 ISO 8601 형식의 문자열인 경우
+            try:
+                # 'Z'로 끝나는 UTC 시간 형식을 처리하기 위해 Z를 +00:00으로 변경
+                if timestamp_val.endswith('Z'):
+                    timestamp_val = timestamp_val[:-1] + '+00:00'
+                # ISO 형식 문자열을 datetime 객체로 변환 후, float 타임스탬프로 변경
+                return datetime.fromisoformat(timestamp_val).timestamp()
+            except ValueError:
+                logger.error(f"DB의 타임스탬프 문자열 형식이 올바르지 않습니다: '{timestamp_val}'")
+                return 0.0
+    
+    # 데이터가 없거나, 값이 None인 경우
     return 0.0
 
-# [수정] 함수 이름을 원래대로 되돌리고, UTC 기준 timestamp(숫자)를 저장하도록 로직을 변경합니다.
 @supabase_retry_handler()
 async def set_cooldown(user_id_str: str, cooldown_key: str):
-    # 항상 UTC 시간 기준의 timestamp(숫자)를 가져옵니다.
-    utc_timestamp = datetime.now(timezone.utc).timestamp()
+    """
+    현재 UTC 시간을 ISO 8601 형식의 문자열로 데이터베이스에 저장합니다.
+    이 방식은 데이터베이스의 'timestamp with time zone' 타입과 가장 호환성이 좋습니다.
+    """
+    # UTC 시간 기준의 ISO 8601 형식 문자열 생성
+    utc_iso_string = datetime.now(timezone.utc).isoformat()
     
     data_to_upsert = {
         "user_id": user_id_str,
         "cooldown_key": cooldown_key,
-        "last_cooldown_timestamp": utc_timestamp
+        "last_cooldown_timestamp": utc_iso_string
     }
     
     await supabase.table('cooldowns').upsert(data_to_upsert, on_conflict='user_id,cooldown_key').execute()
