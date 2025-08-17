@@ -17,7 +17,7 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# --- UI 클래스들 (기존과 동일) ---
+# --- UI 클래스 (RejectionReasonModal, IntroductionModal) 기존과 동일 ---
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -50,18 +50,22 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
+# --- ApprovalView 수정 ---
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
         self.author_id = author.id; self.original_embed = original_embed
         self.onboarding_cog = cog_instance; self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
+
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
         if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
             await interaction.response.send_message("❌ このボタンを押す権限がありません。", ephemeral=True); return False
         return True
+
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
+
     def _parse_birth_year(self, text: str) -> Optional[int]:
         if not text: return None
         text = text.strip().lower()
@@ -83,11 +87,13 @@ class ApprovalView(ui.View):
         if age_match := re.search(r'(\d+)', text):
             if "歳" in text or "才" in text: return datetime.now().year - int(age_match.group(1))
         return None
+
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
         if self.user_process_lock.locked():
             await interaction.response.send_message("⏳ 他の管理者がこの申請を処理中です。少し待ってからお試しください。", ephemeral=True)
             return
+        
         async with self.user_process_lock:
             member = interaction.guild.get_member(self.author_id)
             if not member:
@@ -96,25 +102,49 @@ class ApprovalView(ui.View):
                     await interaction.response.send_message("❌ 対象メンバーが見つかりません。サーバーから退出したようです。", ephemeral=True)
                 except (discord.NotFound, discord.HTTPException): pass
                 return
+            
             rejection_reason = None
             if not is_approved:
                 rejection_modal = RejectionReasonModal()
                 await interaction.response.send_modal(rejection_modal)
-                if await rejection_modal.wait() or not rejection_modal.reason.value: return
+                if await rejection_modal.wait() or not rejection_modal.reason.value:
+                    # 모달이 닫히거나 타임아웃되면, 락을 해제하고 함수를 종료
+                    return
                 rejection_reason = rejection_modal.reason.value
-            else: await interaction.response.defer()
+            else:
+                await interaction.response.defer()
+
             for item in self.children: item.disabled = True
             try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
             except (discord.NotFound, discord.HTTPException): pass
-            if is_approved: success, results = await self._process_approval(member)
-            else: success, results = await self._process_rejection(interaction.user, member, rejection_reason)
+
+            if is_approved:
+                success, results = await self._process_approval(member)
+            else:
+                success, results = await self._process_rejection(interaction.user, member, rejection_reason)
+
             status_text = "承認" if is_approved else "拒否"
-            if success: await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
+            if success:
+                # defer()를 사용하지 않은 경우(거절 시) followup을 사용할 수 없으므로 edit_original_response 사용
+                if interaction.response.is_done():
+                    await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
+                else:
+                    await interaction.edit_original_response(content=f"✅ **{status_text}**処理が完了しました。", view=None)
             else:
                 error_report = f"❌ **{status_text}**処理中にエラーが発生しました:\n" + "\n".join(f"- {res}" for res in results)
-                await interaction.followup.send(error_report, ephemeral=True)
+                if interaction.response.is_done():
+                    await interaction.followup.send(error_report, ephemeral=True)
+                else:
+                    await interaction.edit_original_response(content=error_report, view=None)
+
             try: await interaction.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
+        
+        # [수정] 모든 처리가 끝난 후, 락 객체를 딕셔너리에서 확실하게 제거합니다.
+        if self.author_id in self.onboarding_cog._user_locks:
+            del self.onboarding_cog._user_locks[self.author_id]
+
+    # --- _process_approval, _process_rejection 등 나머지 메서드는 기존과 동일 ---
     async def _process_approval(self, member: discord.Member) -> (bool, List[str]):
         tasks = [ self._grant_roles(member), self._update_nickname(member), self._send_public_welcome(member), self._send_main_chat_welcome(member), self._send_dm_notification(member, is_approved=True) ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -216,11 +246,13 @@ class ApprovalView(ui.View):
         except Exception as e:
             logger.error(f"거부 로그 전송 실패: {e}", exc_info=True); return "거부 로그 채널에 메시지 전송 실패."
         return None
+
     @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
+# --- 나머지 클래스들 (OnboardingGuideView, OnboardingPanelView, Onboarding)은 기존과 동일 ---
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
@@ -285,7 +317,6 @@ class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
         self.onboarding_cog = cog_instance
-    
     async def setup_buttons(self):
         self.clear_items()
         button_styles = get_config("DISCORD_BUTTON_STYLES_MAP", {})
@@ -302,55 +333,29 @@ class OnboardingPanelView(ui.View):
                 if comp.get('component_key') == 'start_onboarding_guide':
                     button.callback = self.start_guide_callback
                 self.add_item(button)
-    
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        
         try:
-            cooldown_seconds_from_db = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
-            cooldown_seconds = int(cooldown_seconds_from_db)
+            cooldown_seconds = int(get_config("ONBOARDING_COOLDOWN_SECONDS", 300))
         except (ValueError, TypeError):
             cooldown_seconds = 300
-            logger.warning(f"ONBOARDING_COOLDOWN_SECONDS({cooldown_seconds_from_db}) 설정값이 숫자가 아니므로 기본값(300)을 사용합니다.")
-
+            logger.warning("ONBOARDING_COOLDOWN_SECONDS 설정값이 숫자가 아니므로 기본값(300)을 사용합니다.")
         utc_now = datetime.now(timezone.utc).timestamp()
         last_time = await get_cooldown(user_id_str, cooldown_key)
-
-        # ==============================================================================
-        # [진단용 로그 추가]
-        # ==============================================================================
-        logger.info("========== 쿨다운 진단 시작 ==========")
-        logger.info(f"설정된 쿨다운 시간 (cooldown_seconds): {cooldown_seconds} (타입: {type(cooldown_seconds)})")
-        logger.info(f"DB에서 가져온 마지막 시간 (last_time): {last_time} (타입: {type(last_time)})")
-        logger.info(f"현재 시간 (utc_now): {utc_now}")
-        
-        if last_time > 0:
-            time_diff = utc_now - last_time
-            logger.info(f"시간 차이 (time_diff): {time_diff}")
-            logger.info(f"쿨다운 조건 확인: {time_diff} < {cooldown_seconds}  ==> {time_diff < cooldown_seconds}")
-        
-        logger.info("======================================")
-        # ==============================================================================
-
         if last_time > 0 and (utc_now - last_time) < cooldown_seconds:
             remaining_time = cooldown_seconds - (utc_now - last_time)
             minutes = int(remaining_time // 60)
             seconds = int(remaining_time % 60)
             await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
             return
-        
         await interaction.response.defer(ephemeral=True, thinking=True)
-        
-        # defer() 후에 쿨다운을 설정하여, defer()가 실패하면 쿨다운도 설정되지 않도록 함
         await set_cooldown(user_id_str, cooldown_key)
-        
         try:
             steps = await get_onboarding_steps()
             if not steps: 
                 await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True)
                 return
-            
             guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user)
             content = guide_view._prepare_next_step_message_content()
             message = await interaction.followup.send(**content, ephemeral=True, wait=True)
@@ -359,12 +364,9 @@ class OnboardingPanelView(ui.View):
         except Exception as e:
             logger.error(f"안내 가이드 시작 중 오류: {e}", exc_info=True)
             if not interaction.is_done():
-                try:
-                    await interaction.followup.send("エラーが発生しました。もう一度お試しください。", ephemeral=True)
-                except discord.NotFound:
-                    logger.warning("안내 가이드 시작 오류 메시지 전송 실패: Interaction not found.")
+                try: await interaction.followup.send("エラーが発生しました。もう一度お試しください。", ephemeral=True)
+                except discord.NotFound: logger.warning("안내 가이드 시작 오류 메시지 전송 실패: Interaction not found.")
 
-# --- Onboarding Cog (기존과 동일) ---
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
@@ -373,7 +375,8 @@ class Onboarding(commands.Cog):
         self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
         self._user_locks: Dict[int, asyncio.Lock] = {}
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
-        if user_id not in self._user_locks: self._user_locks[user_id] = asyncio.Lock()
+        if user_id not in self._user_locks:
+            self._user_locks[user_id] = asyncio.Lock()
         return self._user_locks[user_id]
     @property
     def approval_channel(self) -> Optional[discord.TextChannel]:
