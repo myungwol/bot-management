@@ -12,20 +12,8 @@ from utils.database import load_all_data_from_db, sync_defaults_to_db
 
 # --- 중앙 로깅 설정 ---
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s')
-# 로그 파일 핸들러 추가 (옵션): Production 환경에서 로그를 파일로 저장하고 싶을 때 유용
-# file_handler = logging.handlers.RotatingFileHandler(
-#     filename='discord_bot.log',
-#     encoding='utf-8',
-#     maxBytes=32 * 1024 * 1024,  # 32 MiB
-#     backupCount=5,  # Rotate through 5 files
-# )
-# file_handler.setFormatter(log_formatter)
-# root_logger = logging.getLogger(); root_logger.setLevel(logging.INFO)
-# if root_logger.hasHandlers(): root_logger.handlers.clear()
-# root_logger.addHandler(log_handler) # 콘솔 핸들러
-# root_logger.addHandler(file_handler) # 파일 핸들러 (선택 사항)
 
-# 단일 StreamHandler 사용 (현재 코드 유지)
+# 단일 StreamHandler 사용 (콘솔에 로그 출력)
 log_handler = logging.StreamHandler()
 log_handler.setFormatter(log_formatter)
 root_logger = logging.getLogger()
@@ -55,7 +43,7 @@ intents.members = True
 intents.message_content = True
 intents.voice_states = True
 
-# [수정] Railway 재배포를 확실히 하기 위해 버전을 올립니다.
+# Railway 재배포를 확실히 하기 위해 버전을 올립니다.
 BOT_VERSION = "v1.6-true-final-logic"
 
 # --- 커스텀 봇 클래스 ---
@@ -69,7 +57,7 @@ class MyBot(commands.Bot):
 
         # register_persistent_views를 가진 Cog만 필터링하여 등록
         cogs_with_persistent_views = ["RolePanel", "Onboarding", "Nicknames"]
-        registered_views_count = 0 # 이름 충돌 방지를 위해 변수명 변경
+        registered_views_count = 0
 
         for cog_name in cogs_with_persistent_views:
             cog = self.get_cog(cog_name)
@@ -121,7 +109,7 @@ bot = MyBot(command_prefix="/", intents=intents)
 async def regenerate_all_panels():
     """봇 시작 시 모든 패널을 강제로 재생성합니다."""
     logger.info("------ [ 모든 패널 자동 재생성 시작 ] ------")
-    regenerated_panels_count = 0 # 이름 충돌 방지를 위해 변수명 변경
+    regenerated_panels_count = 0
     # 패널 재생성을 지원하는 Cog 목록
     panel_cogs = ["RolePanel", "Onboarding", "Nicknames"] 
     
@@ -153,7 +141,7 @@ async def on_ready():
     await load_all_data_from_db()
     
     logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
-    refreshed_cogs_count = 0 # 이름 충돌 방지를 위해 변수명 변경
+    refreshed_cogs_count = 0
     for cog_name, cog in bot.cogs.items():
         if hasattr(cog, 'load_configs'):
             try: 
