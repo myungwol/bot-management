@@ -1,4 +1,4 @@
-# bot-management/utils/database.py
+# utils/database.py
 
 import os
 import discord
@@ -8,7 +8,6 @@ import asyncio
 from typing import Dict, Callable, Any, List
 from functools import wraps
 
-# [개선] UI_DEFAULTS에서 SETUP_COMMAND_MAP도 가져옵니다.
 from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP
 
 logger = logging.getLogger(__name__)
@@ -16,9 +15,6 @@ logger = logging.getLogger(__name__)
 # --- 캐시 영역 ---
 _bot_configs_cache: Dict[str, Any] = {}
 _channel_id_cache: Dict[str, int] = {}
-# [수정] 서버 관리 봇에서는 게임 관련 캐시를 사용하지 않습니다.
-# _item_database_cache: Dict[str, Dict[str, Any]] = {}
-# _fishing_loot_cache: List[Dict[str, Any]] = []
 
 # --- Supabase 클라이언트 초기화 ---
 supabase: AsyncClient = None
@@ -63,32 +59,23 @@ async def save_config_to_db(key: str, value: Any):
 async def sync_defaults_to_db():
     logger.info("------ [ 기본값 DB 동기화 시작 ] ------")
     try:
-        # 1. 역할 맵 동기화
         role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
         await save_config_to_db("ROLE_KEY_MAP", role_name_map)
         logger.info(f"✅ 역할 이름 맵(ROLE_KEY_MAP)을 DB에 동기화했습니다.")
         prefix_hierarchy = sorted([info["name"] for info in UI_ROLE_KEY_MAP.values() if info.get("is_prefix")], key=lambda name: next((info.get("priority", 0) for info in UI_ROLE_KEY_MAP.values() if info["name"] == name), 0), reverse=True)
         await save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy)
         logger.info(f"✅ 닉네임 접두사 목록(NICKNAME_PREFIX_HIERARCHY)을 DB에 동기화했습니다.")
-        
-        # 2. 임베드 동기화
         for key, data in UI_EMBEDS.items(): await save_embed_to_db(key, data)
         logger.info(f"✅ {len(UI_EMBEDS)}개의 임베드 기본값을 DB에 동기화했습니다.")
-
-        # 3. 패널 컴포넌트 동기화
         for component_data in UI_PANEL_COMPONENTS: await save_panel_component_to_db(component_data)
         logger.info(f"✅ {len(UI_PANEL_COMPONENTS)}개의 패널 컴포넌트 기본값을 DB에 동기화했습니다.")
-        
-        # [개선] /setup 명령어의 설정 맵을 DB에 동기화합니다.
         await save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP)
         logger.info(f"✅ /setup 명령어 설정 맵(SETUP_COMMAND_MAP)을 DB에 동기화했습니다.")
-
     except Exception as e: logger.error(f"❌ 기본값 DB 동기화 중 오류 발생: {e}", exc_info=True)
     logger.info("------ [ 기본값 DB 동기화 완료 ] ------")
 
 async def load_all_data_from_db():
     logger.info("------ [ 모든 DB 데이터 로드 시작 ] ------")
-    # [수정] 서버 관리 봇에서는 게임 데이터를 로드하지 않습니다.
     await asyncio.gather(load_bot_configs_from_db(), load_channel_ids_from_db())
     logger.info("------ [ 모든 DB 데이터 로드 완료 ] ------")
 
@@ -103,14 +90,6 @@ def get_config(key: str, default: Any = None) -> Any:
     value = _bot_configs_cache.get(key)
     if value is None: logger.warning(f"[Config Cache Miss] '{key}'에 해당하는 설정을 캐시에서 찾을 수 없습니다. 기본값을 사용합니다."); return default
     return value
-
-# [수정] 서버 관리 봇에서는 게임 관련 데이터를 로드/사용하는 함수들이 필요 없습니다.
-# 하지만 다른 봇(게임 봇)과의 호환성을 위해 함수 정의는 남겨두되, 내용은 비워두거나 단순화 할 수 있습니다.
-# 여기서는 일단 해당 함수들을 주석 처리하거나 삭제하는 방향으로 진행합니다.
-
-# def get_item_database() -> Dict[str, Dict[str, Any]]: return _item_database_cache
-# def get_fishing_loot() -> List[Dict[str, Any]]: return _fishing_loot_cache
-# async def load_game_data_from_db(): ... (함수 전체 삭제 또는 주석 처리)
 
 @supabase_retry_handler()
 async def load_channel_ids_from_db():
@@ -154,30 +133,21 @@ async def get_onboarding_steps() -> list:
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
     return response.data if response.data else []
 
-# [수정] 아래는 게임 봇에서 주로 사용할 함수들이므로, 서버 관리 봇에서는 일단 주석처리 합니다.
-# @supabase_retry_handler()
-# async def get_or_create_user(table_name: str, user_id_str: str, default_data: dict) -> dict: ...
-# async def get_wallet(user_id: int) -> dict: ...
-# @supabase_retry_handler()
-# async def update_wallet(user: discord.User, amount: int) -> dict | None: ...
-# @supabase_retry_handler()
-# async def get_inventory(user_id_str: str) -> dict: ...
-# @supabase_retry_handler()
-# async def update_inventory(user_id_str: str, item_name: str, quantity: int): ...
-# async def get_user_gear(user_id_str: str) -> dict: ...
-# @supabase_retry_handler()
-# async def set_user_gear(user_id_str: str, rod: str = None, bait: str = None): ...
-# @supabase_retry_handler()
-# async def get_aquarium(user_id_str: str) -> list: ...
-# @supabase_retry_handler()
-# async def add_to_aquarium(user_id_str: str, fish_data: dict): ...
-# @supabase_retry_handler()
-# async def remove_fish_from_aquarium(fish_id: int): ...
-
 @supabase_retry_handler()
 async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
     response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
     if response.data and response.data[0].get('last_cooldown_timestamp') is not None: return float(response.data[0]['last_cooldown_timestamp'])
     return 0.0
+
+# [수정] 쿨타임 공유 버그를 해결하기 위해 '삭제 후 삽입' 방식으로 로직을 변경합니다.
 @supabase_retry_handler()
-async def set_cooldown(user_id_str: str, cooldown_key: str, timestamp: float): await supabase.table('cooldowns').upsert({"user_id": user_id_str, "cooldown_key": cooldown_key, "last_cooldown_timestamp": timestamp}).execute()
+async def set_cooldown(user_id_str: str, cooldown_key: str, timestamp: float):
+    # 1. 이 유저와 이 키에 해당하는 기존 쿨타임 데이터를 먼저 삭제합니다.
+    await supabase.table('cooldowns').delete().eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).execute()
+    
+    # 2. 새로운 쿨타임 데이터를 삽입합니다.
+    await supabase.table('cooldowns').insert({
+        "user_id": user_id_str, 
+        "cooldown_key": cooldown_key, 
+        "last_cooldown_timestamp": timestamp
+    }).execute()
