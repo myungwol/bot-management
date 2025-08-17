@@ -181,4 +181,4 @@ class ServerSystem(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(ServerSystem(bot)))
+    await bot.add_cog(ServerSystem(bot))
