@@ -7,7 +7,7 @@ import logging
 import asyncio
 from typing import Dict, Callable, Any, List
 from functools import wraps
-# [수정] 시간대(Timezone) 문제를 해결하기 위해 datetime과 timezone을 가져옵니다.
+# [수정] datetime 객체는 여전히 UTC 시간을 가져오기 위해 사용합니다.
 from datetime import datetime, timezone
 
 from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP
@@ -135,27 +135,24 @@ async def get_onboarding_steps() -> list:
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
     return response.data if response.data else []
 
-# [수정] float 대신 timezone-aware datetime 객체를 반환하도록 함수를 수정합니다.
+# [수정] 함수 이름을 원래대로 되돌리고, 반환 타입을 float으로 명시합니다.
 @supabase_retry_handler()
-async def get_cooldown_dt(user_id_str: str, cooldown_key: str) -> datetime | None:
+async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
     response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
     if response.data and response.data[0].get('last_cooldown_timestamp') is not None:
-        # DB에서 온 ISO 형식 문자열을 timezone-aware datetime 객체로 변환
-        return datetime.fromisoformat(response.data[0]['last_cooldown_timestamp'])
-    return None
+        return float(response.data[0]['last_cooldown_timestamp'])
+    return 0.0
 
-# [수정] float 대신 timezone-aware datetime 객체를 저장하도록 함수를 수정합니다.
+# [수정] 함수 이름을 원래대로 되돌리고, UTC 기준 timestamp(숫자)를 저장하도록 로직을 변경합니다.
 @supabase_retry_handler()
-async def set_cooldown_dt(user_id_str: str, cooldown_key: str):
-    # 항상 현재의 UTC 시간을 가져옵니다.
-    now_utc = datetime.now(timezone.utc)
+async def set_cooldown(user_id_str: str, cooldown_key: str):
+    # 항상 UTC 시간 기준의 timestamp(숫자)를 가져옵니다.
+    utc_timestamp = datetime.now(timezone.utc).timestamp()
     
     data_to_upsert = {
         "user_id": user_id_str,
         "cooldown_key": cooldown_key,
-        # DB에 저장할 때는 국제 표준(ISO) 형식의 문자열로 변환합니다.
-        "last_cooldown_timestamp": now_utc.isoformat()
+        "last_cooldown_timestamp": utc_timestamp
     }
     
-    # 'user_id'와 'cooldown_key'를 기준으로 데이터를 찾아 덮어쓰거나 새로 만듭니다.
     await supabase.table('cooldowns').upsert(data_to_upsert, on_conflict='user_id,cooldown_key').execute()
