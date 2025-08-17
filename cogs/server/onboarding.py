@@ -14,7 +14,8 @@ from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
     get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
-from cogs.server.system import format_embed_from_db
+# [수정] system.py가 아닌 새로운 helpers.py 파일에서 함수를 가져옵니다.
+from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,6 @@ class ApprovalView(ui.View):
         self.author_id = author.id
         self.original_embed = original_embed
         self.onboarding_cog = cog_instance
-        # [개선] 동시성 문제를 방지하기 위해 각 유저별로 Lock을 생성합니다.
         self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
 
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
@@ -74,59 +74,37 @@ class ApprovalView(ui.View):
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
 
-    # [개선] 더 많은 패턴을 인식하고 안정적으로 연도를 파싱하도록 로직을 강화합니다.
     def _parse_birth_year(self, text: str) -> Optional[int]:
         if not text: return None
         text = text.strip().lower()
         if "非公開" in text or "ひこうかい" in text: return 0
-        
-        # '平成5年', 'H5' 등 연호 패턴
         era_patterns = {'heisei': r'(?:h|平成)\s*(\d{1,2})', 'showa': r'(?:s|昭和)\s*(\d{1,2})', 'reiwa': r'(?:r|令和)\s*(\d{1,2})'}
         era_start_years = {"heisei": 1989, "showa": 1926, "reiwa": 2019}
         for era, pattern in era_patterns.items():
             if match := re.search(pattern, text):
                 return era_start_years[era] + int(match.group(1)) - 1
-        
-        # '90年代', '90s' 등 년대 패턴
         if dai_match := re.search(r'(\d{2,4})\s*(?:s|年代)', text):
             year_prefix = dai_match.group(1)
-            if len(year_prefix) == 2: # '90s'
-                return 1900 + int(year_prefix)
-            elif len(year_prefix) == 4: # '1990s'
-                return int(year_prefix)
-        
-        # '30代' 등 연령대 패턴
+            if len(year_prefix) == 2: return 1900 + int(year_prefix)
+            elif len(year_prefix) == 4: return int(year_prefix)
         if dai_match := re.search(r'(\d{1,2})\s*代', text):
-            # 30대 -> 30~39세. 평균적으로 35세로 계산하여 출생년도 추정
             return datetime.now().year - (int(dai_match.group(1)) + 5)
-        
-        # '1995年生まれ', '95年' 등 출생년도 패턴
         if year_match := re.search(r'(\d{2,4})', text):
             if "年" in text or "生まれ" in text or "생" in text:
                 year = int(year_match.group(1))
-                if year < 100: # '95년' -> 1995년으로 변환
-                    return year + (1900 if year > datetime.now().year % 100 else 2000)
+                if year < 100: return year + (1900 if year > datetime.now().year % 100 else 2000)
                 return year
-        
-        # '28歳', '28才' 등 나이 패턴
         if age_match := re.search(r'(\d+)', text):
             if "歳" in text or "才" in text:
                 return datetime.now().year - int(age_match.group(1))
-                
         return None
 
-    # [개선] 승인/거부 처리 전체 흐름을 관리하는 메인 함수
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
-        # 1. 권한 확인
         if not await self._check_permission(interaction): return
-
-        # [개선] 다른 관리자가 이미 이 유저를 처리 중인지 확인
         if self.user_process_lock.locked():
             await interaction.response.send_message("⏳ 他の管理者がこの申請を処理中です。少し待ってからお試しください。", ephemeral=True)
             return
-
         async with self.user_process_lock:
-            # 2. 대상 멤버 확인
             member = interaction.guild.get_member(self.author_id)
             if not member:
                 try:
@@ -134,86 +112,46 @@ class ApprovalView(ui.View):
                     await interaction.response.send_message("❌ 対象メンバーが見つかりません。サーバーから退出したようです。", ephemeral=True)
                 except (discord.NotFound, discord.HTTPException): pass
                 return
-            
-            # 3. 거부 시, 거부 이유 받기
             rejection_reason = None
             if not is_approved:
                 rejection_modal = RejectionReasonModal()
                 await interaction.response.send_modal(rejection_modal)
-                if await rejection_modal.wait() or not rejection_modal.reason.value:
-                    # 타임아웃 되거나 이유를 적지 않으면 처리 중단
-                    return
+                if await rejection_modal.wait() or not rejection_modal.reason.value: return
                 rejection_reason = rejection_modal.reason.value
-            else:
-                await interaction.response.defer()
-
-            # 4. 처리 시작: 버튼 비활성화 및 처리 중 메시지 표시
+            else: await interaction.response.defer()
             for item in self.children: item.disabled = True
-            try:
-                await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
+            try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
             except (discord.NotFound, discord.HTTPException): pass
-
-            # 5. 핵심 로직 실행 (승인 또는 거부)
-            if is_approved:
-                success, results = await self._process_approval(member)
-            else:
-                success, results = await self._process_rejection(interaction.user, member, rejection_reason)
-
-            # 6. 최종 결과 알림
+            if is_approved: success, results = await self._process_approval(member)
+            else: success, results = await self._process_rejection(interaction.user, member, rejection_reason)
             status_text = "承認" if is_approved else "拒否"
-            if success:
-                await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
+            if success: await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
             else:
                 error_report = f"❌ **{status_text}**処理中にエラーが発生しました:\n" + "\n".join(f"- {res}" for res in results)
                 await interaction.followup.send(error_report, ephemeral=True)
-
-            # 7. 정리: 원래 승인/거부 메시지 삭제
             try: await interaction.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
 
-    # [신규] 승인 처리에 관련된 작업들을 모아놓은 함수
     async def _process_approval(self, member: discord.Member) -> (bool, List[str]):
-        tasks = [
-            self._grant_roles(member),
-            self._update_nickname(member),
-            self._send_public_welcome(member),
-            self._send_main_chat_welcome(member),
-            self._send_dm_notification(member, is_approved=True)
-        ]
+        tasks = [ self._grant_roles(member), self._update_nickname(member), self._send_public_welcome(member), self._send_main_chat_welcome(member), self._send_dm_notification(member, is_approved=True) ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # [개선] 실패한 작업만 필터링하여 에러 메시지를 생성
         failed_tasks_messages = [res for res in results if isinstance(res, str)]
-        
         return not failed_tasks_messages, failed_tasks_messages
 
-    # [신규] 거부 처리에 관련된 작업들을 모아놓은 함수
     async def _process_rejection(self, moderator: discord.Member, member: discord.Member, reason: str) -> (bool, List[str]):
-        tasks = [
-            self._send_rejection_log(moderator, member, reason),
-            self._send_dm_notification(member, is_approved=False, reason=reason)
-        ]
+        tasks = [ self._send_rejection_log(moderator, member, reason), self._send_dm_notification(member, is_approved=False, reason=reason) ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
         failed_tasks_messages = [res for res in results if isinstance(res, str)]
-
         return not failed_tasks_messages, failed_tasks_messages
     
     async def _grant_roles(self, member: discord.Member) -> Optional[str]:
         try:
-            guild = member.guild
-            roles_to_add: List[discord.Role] = []
-            failed_to_find_roles: List[str] = []
-
-            # 1. 기본 역할 추가 (주민, 신입 주민)
-            resident_role_key = "role_resident"
-            rookie_role_key = "role_resident_rookie"
+            guild = member.guild; roles_to_add: List[discord.Role] = []; failed_to_find_roles: List[str] = []
+            resident_role_key = "role_resident"; rookie_role_key = "role_resident_rookie"
             if (rid := get_id(resident_role_key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
             else: failed_to_find_roles.append(resident_role_key)
             if (rid := get_id(rookie_role_key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
             else: failed_to_find_roles.append(rookie_role_key)
-            
-            # 2. 성별 역할 추가
             gender_role_mapping = get_config("GENDER_ROLE_MAPPING", [])
             if gender_field := self._get_field_value(self.original_embed, "性別"):
                 for rule in gender_role_mapping:
@@ -221,12 +159,10 @@ class ApprovalView(ui.View):
                         if (rid := get_id(rule["role_id_key"])) and (r := guild.get_role(rid)): roles_to_add.append(r)
                         else: failed_to_find_roles.append(rule["role_id_key"])
                         break
-
-            # 3. 나이 역할 추가
             age_role_mapping = get_config("AGE_ROLE_MAPPING", [])
             if age_field := self._get_field_value(self.original_embed, "年齢"):
                 birth_year = self._parse_birth_year(age_field)
-                if birth_year == 0: # 비공개
+                if birth_year == 0:
                     age_private_key = "role_info_age_private"
                     if (rid := get_id(age_private_key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
                     else: failed_to_find_roles.append(age_private_key)
@@ -236,30 +172,21 @@ class ApprovalView(ui.View):
                             if (rid := get_id(mapping["key"])) and (r := guild.get_role(rid)): roles_to_add.append(r)
                             else: failed_to_find_roles.append(mapping["key"])
                             break
-            
-            # 4. 역할 일괄 부여 및 '손님' 역할 제거
             if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="自己紹介の承認")
             if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="自己紹介の承認完了")
-            
-            if failed_to_find_roles:
-                return f"역할을 찾지 못함: `{', '.join(failed_to_find_roles)}`. `/setup-roles sync` 명령어를 실행해주세요."
-        except discord.Forbidden:
-            return "봇 권한 부족: 봇이 역할을 부여/제거할 권한이 없습니다."
+            if failed_to_find_roles: return f"역할을 찾지 못함: `{', '.join(failed_to_find_roles)}`. `/setup-roles sync` 명령어를 실행해주세요."
+        except discord.Forbidden: return "봇 권한 부족: 봇이 역할을 부여/제거할 권한이 없습니다."
         except Exception as e:
-            logger.error(f"역할 부여 중 오류: {e}", exc_info=True)
-            return f"역할 부여 중 알 수 없는 오류 발생."
+            logger.error(f"역할 부여 중 오류: {e}", exc_info=True); return f"역할 부여 중 알 수 없는 오류 발생."
         return None
-
 
     async def _update_nickname(self, member: discord.Member) -> Optional[str]:
         try:
             if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := self._get_field_value(self.original_embed, "名前")):
                 await nick_cog.update_nickname(member, base_name_override=name_field)
-        except discord.Forbidden:
-            return "봇 권한 부족: 봇이 닉네임을 변경할 권한보다 낮은 위치에 있습니다."
+        except discord.Forbidden: return "봇 권한 부족: 봇이 닉네임을 변경할 권한보다 낮은 위치에 있습니다."
         except Exception as e:
-            logger.error(f"닉네임 업데이트 중 오류: {e}", exc_info=True)
-            return f"닉네임 업데이트 중 알 수 없는 오류 발생."
+            logger.error(f"닉네임 업데이트 중 오류: {e}", exc_info=True); return f"닉네임 업데이트 중 알 수 없는 오류 발생."
         return None
 
     async def _send_public_welcome(self, member: discord.Member) -> Optional[str]:
@@ -268,15 +195,11 @@ class ApprovalView(ui.View):
             if ch_id and (ch := member.guild.get_channel(ch_id)):
                 embed = discord.Embed(title="📝 自己紹介", color=discord.Color.green())
                 embed.add_field(name="住民", value=member.mention, inline=False)
-                for field in self.original_embed.fields:
-                    embed.add_field(name=field.name, value=field.value, inline=False)
-                
+                for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-                
                 await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
-            logger.error(f"공개 환영 메시지 전송 실패: {e}", exc_info=True)
-            return "자기소개 채널에 메시지 전송 실패."
+            logger.error(f"공개 환영 메시지 전송 실패: {e}", exc_info=True); return "자기소개 채널에 메시지 전송 실패."
         return None
 
     async def _send_main_chat_welcome(self, member: discord.Member) -> Optional[str]:
@@ -288,26 +211,20 @@ class ApprovalView(ui.View):
                 embed = format_embed_from_db(embed_data, member_mention=member.mention)
                 await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
-            logger.error(f"메인 채팅 환영 메시지 전송 실패: {e}", exc_info=True)
-            return "메인 채팅 채널에 메시지 전송 실패."
+            logger.error(f"메인 채팅 환영 메시지 전송 실패: {e}", exc_info=True); return "메인 채팅 채널에 메시지 전송 실패."
         return None
         
     async def _send_dm_notification(self, member: discord.Member, is_approved: bool, reason: str = "") -> None:
         try:
             guild_name = member.guild.name
-            if is_approved:
-                await member.send(f"✅ お知らせ：「{guild_name}」での住人登録が承認されました。")
+            if is_approved: await member.send(f"✅ お知らせ：「{guild_name}」での住人登録が承認されました。")
             else:
                 panel_channel_id = self.onboarding_cog.panel_channel_id
                 message = f"❌ お知らせ：「{guild_name}」での住人登録が拒否されました。\n理由: 「{reason}」"
-                if panel_channel_id:
-                    message += f"\n<#{panel_channel_id}> からやり直してください。"
+                if panel_channel_id: message += f"\n<#{panel_channel_id}> からやり直してください。"
                 await member.send(message)
-        except discord.Forbidden:
-            logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다 (DM 차단됨).")
-        except Exception as e:
-            logger.error(f"DM 알림 전송 실패: {e}", exc_info=True)
-        # DM 발송은 실패해도 전체 프로세스 실패로 간주하지 않으므로 에러 메시지를 반환하지 않음
+        except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다 (DM 차단됨).")
+        except Exception as e: logger.error(f"DM 알림 전송 실패: {e}", exc_info=True)
         return None
 
     async def _send_rejection_log(self, moderator: discord.Member, member: discord.Member, reason: str) -> Optional[str]:
@@ -316,26 +233,18 @@ class ApprovalView(ui.View):
             if ch_id and (ch := member.guild.get_channel(ch_id)):
                 embed = discord.Embed(title="❌ 住人登録が拒否されました", color=discord.Color.red())
                 embed.add_field(name="旅の人", value=member.mention, inline=False)
-                for field in self.original_embed.fields:
-                    embed.add_field(name=field.name, value=field.value, inline=False)
-                embed.add_field(name="拒否理由", value=reason, inline=False)
-                embed.add_field(name="担当者", value=moderator.mention, inline=False)
+                for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
+                embed.add_field(name="拒否理由", value=reason, inline=False); embed.add_field(name="担当者", value=moderator.mention, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-                
                 await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions.none())
         except Exception as e:
-            logger.error(f"거부 로그 전송 실패: {e}", exc_info=True)
-            return "거부 로그 채널에 메시지 전송 실패."
+            logger.error(f"거부 로그 전송 실패: {e}", exc_info=True); return "거부 로그 채널에 메시지 전송 실패."
         return None
 
     @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
-
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
-
-# ... (OnboardingGuideView, OnboardingPanelView, Onboarding Cog는 이전과 동일) ...
-# 단, Onboarding Cog에 get_user_lock 헬퍼 함수를 추가합니다.
 
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
@@ -347,8 +256,7 @@ class OnboardingGuideView(ui.View):
             for item in self.children: item.disabled = True
             try: await self.message.edit(content="案内の時間が経過しました。最初からやり直してください。", view=self)
             except (discord.NotFound, discord.HTTPException): pass
-    def stop(self):
-        self.onboarding_cog.active_onboarding_sessions.discard(self.user.id); super().stop()
+    def stop(self): self.onboarding_cog.active_onboarding_sessions.discard(self.user.id); super().stop()
     def _update_components(self):
         self.clear_items(); step_info = self.steps_data[self.current_step]
         is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
@@ -441,10 +349,8 @@ class Onboarding(commands.Cog):
         self.approval_role_id: Optional[int] = None; self.main_chat_channel_id: Optional[int] = None
         self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
         self.active_onboarding_sessions: set = set()
-        # [신규] 유저별 Lock 객체를 저장할 딕셔너리
         self._user_locks: Dict[int, asyncio.Lock] = {}
 
-    # [신규] 유저 ID에 해당하는 Lock을 가져오거나 새로 생성하는 헬퍼 함수
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
         if user_id not in self._user_locks:
             self._user_locks[user_id] = asyncio.Lock()
