@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 CHANNEL_TYPE_INFO = {
     "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": False, "default_name": "みんなの広場"},
-    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のゲーム部屋"},
+    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "プレイ中のゲーム名に変更してください"},
     "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "新人のベンチ"},
     "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のハウス"},
     "normal":   {"emoji": "🍀", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}の部屋"} # Fallback
 }
 
-# ... (VCEditModal 및 Select UI 클래스들은 이전과 동일) ...
+# ... (VCEditModal 및 Select UI 클래스들은 이전과 동일하므로 생략) ...
 class VCEditModal(ui.Modal, title="🔊 ボイスチャンネル設定"):
     def __init__(self, name_editable: bool, limit_editable: bool, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -180,12 +180,11 @@ class VoiceMaster(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.creator_channel_configs: Dict[int, Dict] = {}
-        self.temp_channels: Dict[int, Dict[str, Any]] = {} # 메모리 캐시
+        self.temp_channels: Dict[int, Dict[str, Any]] = {}
         logger.info("VoiceMaster Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
         await self.load_configs()
-        # [수정] 봇 재시작시 View 복구를 위해, on_ready 이후에 동기화 실행
         self.bot.loop.create_task(self.sync_channels_from_db())
 
     async def load_configs(self):
@@ -198,22 +197,17 @@ class VoiceMaster(commands.Cog):
         self.creator_channel_configs = {k: v for k, v in self.creator_channel_configs.items() if k is not None}
         logger.info(f"[VoiceMaster] 생성 채널 설정을 로드했습니다: {self.creator_channel_configs}")
 
-    # [신규] 봇 재시작 시 DB와 동기화하는 함수
     async def sync_channels_from_db(self):
         await self.bot.wait_until_ready()
         db_channels = await get_all_temp_channels()
         if not db_channels: return
-
         logger.info(f"[VoiceMaster] DB에서 {len(db_channels)}개의 임시 채널 정보를 발견하여 동기화를 시작합니다.")
-        
         zombie_channel_ids = []
         for ch_data in db_channels:
             channel_id = ch_data.get("channel_id")
             guild_id = ch_data.get("guild_id")
             guild = self.bot.get_guild(guild_id)
-
             if guild and guild.get_channel(channel_id):
-                # 채널이 실제로 존재하면 메모리에 로드하고 View를 다시 붙여줌
                 self.temp_channels[channel_id] = {
                     "owner_id": ch_data.get("owner_id"),
                     "message_id": ch_data.get("message_id"),
@@ -222,40 +216,31 @@ class VoiceMaster(commands.Cog):
                 view = ControlPanelView(self, ch_data.get("owner_id"), channel_id, ch_data.get("channel_type", "normal"))
                 self.bot.add_view(view, message_id=ch_data.get("message_id"))
             else:
-                # 채널이 존재하지 않으면 '좀비 데이터'로 간주
                 zombie_channel_ids.append(channel_id)
-
-        # '좀비 데이터'를 DB에서 한 번에 삭제
         if zombie_channel_ids:
             await remove_multiple_temp_channels(zombie_channel_ids)
             logger.warning(f"[VoiceMaster] 존재하지 않는 {len(zombie_channel_ids)}개의 '좀비' 채널을 DB에서 정리했습니다.")
-        
         logger.info(f"[VoiceMaster] 임시 채널 동기화 완료. (활성: {len(self.temp_channels)} / 정리: {len(zombie_channel_ids)})")
-
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot: return
-
         if after.channel and after.channel.id in self.creator_channel_configs:
             config = self.creator_channel_configs[after.channel.id]
             if any(info.get('owner_id') == member.id for info in self.temp_channels.values()): return
             is_allowed = False
             if allowed_role_key := config.get("allowed_role_key"):
                 allowed_role_id = get_id(allowed_role_key)
-                if allowed_role_id and allowed_role_id in [r.id for r in member.roles]:
-                    is_allowed = True
+                if allowed_role_id and allowed_role_id in [r.id for r in member.roles]: is_allowed = True
             if not is_allowed and (required_role_key := config.get("required_role_key")):
                 required_role_id = get_id(required_role_key)
-                if required_role_id and required_role_id in [r.id for r in member.roles]:
-                    is_allowed = True
+                if required_role_id and required_role_id in [r.id for r in member.roles]: is_allowed = True
             if config.get("required_role_key") and not is_allowed:
                 try: await member.send(f"❌ 「{after.channel.name}」チャンネルに入るには特別な役割が必要です。")
                 except discord.Forbidden: pass
                 await member.move_to(None, reason="요구 역할 없음")
                 return
             await self._create_temp_channel(member, config)
-
         if before.channel and before.channel.id in self.temp_channels:
             info = self.temp_channels.get(before.channel.id)
             if info and (not before.channel.members or member.id == info.get("owner_id")):
@@ -265,7 +250,7 @@ class VoiceMaster(commands.Cog):
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
         if not isinstance(channel, discord.VoiceChannel): return
         if channel.id in self.temp_channels:
-            await remove_temp_channel(channel.id) # DB에서도 삭제
+            await remove_temp_channel(channel.id)
             self.temp_channels.pop(channel.id, None)
             logger.info(f"임시 채널 '{channel.name}'(ID: {channel.id})이 수동으로 삭제되어 내부 데이터와 DB에서 제거합니다.")
 
@@ -276,8 +261,41 @@ class VoiceMaster(commands.Cog):
         try:
             creator_channel = guild.get_channel(next(iter(self.creator_channel_configs)))
             if not creator_channel: return logger.error("VC 생성 채널을 찾을 수 없습니다.")
-            clean_member_name = get_clean_display_name(member)
-            base_name = type_info["default_name"].format(member_name=clean_member_name)
+
+            # --- [신규] 채널 번호 계산 로직 ---
+            base_name_template = type_info["default_name"]
+            base_name = base_name_template.format(member_name=get_clean_display_name(member))
+            
+            # 이름 변경이 불가능한 채널 타입일 경우 (광장, 벤치)
+            if not type_info["name_editable"]:
+                # 현재 활성화된 같은 타입의 채널들을 찾음
+                existing_channels = [
+                    ch for ch in self.temp_channels.values() 
+                    if ch.get("type") == channel_type
+                ]
+                
+                # 사용된 번호들을 집합으로 만듬 (예: {1, 3})
+                used_numbers = set()
+                for ch_info in existing_channels:
+                    # 서버에서 실제 채널 객체를 가져와 이름 분석
+                    channel_obj = guild.get_channel(next(k for k, v in self.temp_channels.items() if v == ch_info))
+                    if channel_obj and channel_obj.name.endswith("-"):
+                        try:
+                            num_str = channel_obj.name.split('-')[-1]
+                            used_numbers.add(int(num_str))
+                        except (ValueError, IndexError):
+                            pass
+
+                # 사용되지 않은 가장 작은 번호를 찾음 (1부터 시작)
+                next_number = 1
+                while next_number in used_numbers:
+                    next_number += 1
+
+                # 첫 번째 채널은 번호 없이, 두 번째부터 번호를 붙임
+                if next_number > 1:
+                    base_name = f"{base_name}-{next_number}"
+            # --- 번호 계산 로직 끝 ---
+
             vc_name = f"・ {type_info['emoji']} ꒱ {base_name}"
             overwrites = { member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True) }
             if channel_type == 'vip':
@@ -289,11 +307,8 @@ class VoiceMaster(commands.Cog):
             embed.description = "ここはあなたのプライベートチャンネルです。\n下のボタンでチャンネルを管理できます。"
             view = ControlPanelView(self, member.id, vc.id, channel_type)
             panel_message = await vc.send(embed=embed, view=view)
-            
-            # [수정] 메모리와 DB에 동시 저장
             self.temp_channels[vc.id] = {"owner_id": member.id, "message_id": panel_message.id, "type": channel_type}
             await add_temp_channel(vc.id, member.id, guild.id, panel_message.id, channel_type)
-            
             logger.info(f"'{channel_type}' 타입 임시 채널 '{vc.name}'을 생성하고 DB에 저장했습니다.")
             await member.move_to(vc, reason="생성된 임시 채널로 자동 이동")
         except Exception as e:
@@ -303,12 +318,10 @@ class VoiceMaster(commands.Cog):
     async def _delete_temp_channel(self, vc: discord.VoiceChannel):
         try:
             await vc.delete(reason="채널에 아무도 없거나 소유자가 나갔기 때문에 자동 삭제")
-            # [수정] 메모리와 DB에서 동시 삭제
             self.temp_channels.pop(vc.id, None)
             await remove_temp_channel(vc.id)
             logger.info(f"임시 채널 '{vc.name}'을 자동 삭제하고 DB에서 제거했습니다.")
         except discord.NotFound:
-            # 채널이 이미 삭제된 경우에도 DB와 메모리 정리를 시도
             self.temp_channels.pop(vc.id, None)
             await remove_temp_channel(vc.id)
         except Exception as e: logger.error(f"임시 채널 '{vc.name}' 삭제 중 오류: {e}", exc_info=True)
@@ -320,11 +333,8 @@ class VoiceMaster(commands.Cog):
         try:
             await vc.set_permissions(new_owner, manage_channels=True, manage_permissions=True, connect=True)
             if old_owner: await vc.set_permissions(old_owner, overwrite=None)
-            
-            # [수정] 메모리와 DB의 소유자 정보 동시 업데이트
             info['owner_id'] = new_owner.id
             await update_temp_channel_owner(vc.id, new_owner.id)
-            
             new_view = ControlPanelView(self, new_owner.id, vc.id, info['type'])
             panel_message = await vc.fetch_message(info['message_id'])
             embed = panel_message.embeds[0]
@@ -335,6 +345,7 @@ class VoiceMaster(commands.Cog):
         except Exception as e:
             logger.error(f"소유권 이전 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ 所有権の移譲中にエラーが発生しました。", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(VoiceMaster(bot))
