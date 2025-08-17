@@ -7,8 +7,11 @@ import copy
 import logging
 from typing import Any, Dict
 import re
-from .database import get_config # .database로 상대 경로 임포트
+# [수정] database.py의 get_config 함수를 불러오기 위한 import문 추가
+from .database import get_config
+
 logger = logging.getLogger(__name__)
+
 
 def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.Embed:
     """
@@ -25,7 +28,6 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
         discord.Embed: 포맷팅이 완료된 discord.Embed 객체. 오류 발생 시 기본 오류 임베드를 반환합니다.
     """
     if not isinstance(embed_data, dict):
-        # [개선] 어떤 타입이 들어왔는지 로그에 명시하여 디버깅을 용이하게 함
         logger.error(f"임베드 데이터가 dict 형식이 아닙니다. 실제 타입: {type(embed_data)}")
         error_embed = discord.Embed(
             title="오류 발생",
@@ -34,10 +36,8 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
         )
         return error_embed
     
-    # 원본 데이터가 변경되지 않도록 깊은 복사를 사용
     formatted_data: Dict[str, Any] = copy.deepcopy(embed_data)
 
-    # 존재하지 않는 키로 format을 시도할 때 에러 대신 {key}를 그대로 남겨두는 클래스
     class SafeFormatter(dict):
         def __missing__(self, key: str) -> str:
             return f'{{{key}}}'
@@ -45,7 +45,6 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
     safe_kwargs = SafeFormatter(**kwargs)
     
     try:
-        # 각 필드의 타입을 확인하고 문자열인 경우에만 포맷팅을 시도하여 안정성 향상
         if formatted_data.get('title') and isinstance(formatted_data['title'], str):
             formatted_data['title'] = formatted_data['title'].format_map(safe_kwargs)
             
@@ -68,12 +67,10 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
         
     except (KeyError, ValueError) as e:
         logger.error(f"임베드 데이터 포맷팅 중 오류 발생: {e}", exc_info=True)
-        # 포맷팅에 실패하더라도, 원본 데이터로 임베드를 생성하여 반환 시도
         try:
             return discord.Embed.from_dict(embed_data)
         except Exception as final_e:
             logger.critical(f"원본 임베드 데이터로도 임베드 생성 실패: {final_e}", exc_info=True)
-            # 최악의 경우를 대비한 최종 오류 임베드
             fatal_error_embed = discord.Embed(
                 title="치명적 오류",
                 description="임베드 생성에 실패했습니다. 데이터 형식을 확인해주세요.",
@@ -81,6 +78,7 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
             )
             return fatal_error_embed
 
+# --- [신규] 아래 함수가 이전 단계에서 추가된 부분입니다 ---
 def get_clean_display_name(member: discord.Member) -> str:
     """
     멤버의 display_name에서 역할 접두사(예: 『칭호』)를 제거한 순수한 이름을 반환합니다.
