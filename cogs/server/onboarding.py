@@ -50,22 +50,18 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
-# --- ApprovalView 수정 ---
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
         self.author_id = author.id; self.original_embed = original_embed
         self.onboarding_cog = cog_instance; self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
-
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
         if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
             await interaction.response.send_message("❌ このボタンを押す権限がありません。", ephemeral=True); return False
         return True
-
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
-
     def _parse_birth_year(self, text: str) -> Optional[int]:
         if not text: return None
         text = text.strip().lower()
@@ -87,7 +83,7 @@ class ApprovalView(ui.View):
         if age_match := re.search(r'(\d+)', text):
             if "歳" in text or "才" in text: return datetime.now().year - int(age_match.group(1))
         return None
-
+        
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
         if self.user_process_lock.locked():
@@ -107,9 +103,7 @@ class ApprovalView(ui.View):
             if not is_approved:
                 rejection_modal = RejectionReasonModal()
                 await interaction.response.send_modal(rejection_modal)
-                if await rejection_modal.wait() or not rejection_modal.reason.value:
-                    # 모달이 닫히거나 타임아웃되면, 락을 해제하고 함수를 종료
-                    return
+                if await rejection_modal.wait() or not rejection_modal.reason.value: return
                 rejection_reason = rejection_modal.reason.value
             else:
                 await interaction.response.defer()
@@ -125,7 +119,6 @@ class ApprovalView(ui.View):
 
             status_text = "承認" if is_approved else "拒否"
             if success:
-                # defer()를 사용하지 않은 경우(거절 시) followup을 사용할 수 없으므로 edit_original_response 사용
                 if interaction.response.is_done():
                     await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
                 else:
@@ -140,16 +133,38 @@ class ApprovalView(ui.View):
             try: await interaction.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
         
-        # [수정] 모든 처리가 끝난 후, 락 객체를 딕셔너리에서 확실하게 제거합니다.
         if self.author_id in self.onboarding_cog._user_locks:
             del self.onboarding_cog._user_locks[self.author_id]
 
-    # --- _process_approval, _process_rejection 등 나머지 메서드는 기존과 동일 ---
+    # [수정] _process_approval 메서드
     async def _process_approval(self, member: discord.Member) -> (bool, List[str]):
-        tasks = [ self._grant_roles(member), self._update_nickname(member), self._send_public_welcome(member), self._send_main_chat_welcome(member), self._send_dm_notification(member, is_approved=True) ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # 1. 가장 중요한 역할 부여를 먼저 실행합니다.
+        role_grant_error = await self._grant_roles(member)
+        
+        # 2. 역할 부여에 실패했다면, 즉시 중단하고 오류 메시지를 반환합니다.
+        if role_grant_error:
+            logger.error(f"자기소개 승인 실패: 역할 부여 중 오류 발생 - {role_grant_error}")
+            return False, [role_grant_error]
+        
+        # 3. 역할 부여가 성공했다면, 나머지 작업들을 동시에 실행합니다.
+        remaining_tasks = [
+            self._update_nickname(member),
+            self._send_public_welcome(member),
+            self._send_main_chat_welcome(member),
+            self._send_dm_notification(member, is_approved=True)
+        ]
+        results = await asyncio.gather(*remaining_tasks, return_exceptions=True)
+        
+        # 4. 나머지 작업들의 실패 결과를 정리하여 반환합니다.
         failed_tasks_messages = [res for res in results if isinstance(res, str)]
-        return not failed_tasks_messages, failed_tasks_messages
+        
+        # 나머지 작업 중 실패가 있더라도, 핵심인 역할 부여는 성공했으므로 전체 프로세스는 성공으로 간주합니다.
+        # 하지만 로그에는 남겨야 하므로, 실패 메시지 목록을 함께 반환합니다.
+        if failed_tasks_messages:
+            logger.warning(f"자기소개 승인 후 부가 작업 실패: {failed_tasks_messages}")
+
+        return True, failed_tasks_messages
+
     async def _process_rejection(self, moderator: discord.Member, member: discord.Member, reason: str) -> (bool, List[str]):
         tasks = [ self._send_rejection_log(moderator, member, reason), self._send_dm_notification(member, is_approved=False, reason=reason) ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -251,7 +266,7 @@ class ApprovalView(ui.View):
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
-
+    
 # --- 나머지 클래스들 (OnboardingGuideView, OnboardingPanelView, Onboarding)은 기존과 동일 ---
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
