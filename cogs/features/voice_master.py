@@ -126,7 +126,6 @@ class VCOwnerSelect(ui.UserSelect):
         try: await interaction.delete_original_response()
         except discord.NotFound: pass
 
-
 # --- 메인 제어판 View ---
 class ControlPanelView(ui.View):
     def __init__(self, cog: 'VoiceMaster', owner_id: int, vc_id: int, channel_type: str):
@@ -138,26 +137,39 @@ class ControlPanelView(ui.View):
         self.setup_buttons()
 
     def setup_buttons(self):
+        """채널 타입에 따라 제어판 버튼의 레이아웃을 동적으로 설정합니다."""
         self.clear_items()
         type_info = CHANNEL_TYPE_INFO.get(self.channel_type, CHANNEL_TYPE_INFO["normal"])
+
+        # --- [수정] 요청하신 레이아웃에 맞춰 버튼 추가 로직 변경 ---
+        
+        # 1. 설정 버튼 (변경 가능한 경우 항상 첫째 줄, 첫 번째 위치)
         if type_info["name_editable"] or type_info["limit_editable"]:
             self.add_item(ui.Button(label="設定", style=discord.ButtonStyle.primary, emoji="⚙️", custom_id="vc_edit", row=0))
+
+        # 2. 채널 타입별로 다른 버튼 구성
+        if self.channel_type in ['plaza', 'game']:
+            # 광장, 게임방 레이아웃
+            self.add_item(ui.Button(label="ブラックリスト追加", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="vc_add_blacklist", row=0))
+            self.add_item(ui.Button(label="所有権移譲", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="vc_transfer", row=1))
+            self.add_item(ui.Button(label="ブラックリスト解除", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="vc_remove_blacklist", row=1))
         
-        # [수정] VIP 채널이 아닐 경우에만 소유권 양도 버튼 추가
-        if self.channel_type != 'vip':
+        elif self.channel_type == 'vip':
+            # 개인방(VIP) 레이아웃
+            self.add_item(ui.Button(label="招待", style=discord.ButtonStyle.success, emoji="📨", custom_id="vc_invite", row=0))
+            self.add_item(ui.Button(label="追放", style=discord.ButtonStyle.danger, emoji="👢", custom_id="vc_kick", row=0))
+            # 개인방에는 소유권 양도 없음
+
+        else: # newbie 또는 normal(fallback)
+            # 뉴비방, 기본방 레이아웃
             self.add_item(ui.Button(label="所有権移譲", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="vc_transfer", row=0))
 
-        # [수정] 채널 타입에 따라 다른 버튼 세트 추가
-        if self.channel_type == 'vip':
-            self.add_item(ui.Button(label="招待", style=discord.ButtonStyle.success, emoji="📨", custom_id="vc_invite", row=1))
-            self.add_item(ui.Button(label="追放", style=discord.ButtonStyle.danger, emoji="👢", custom_id="vc_kick", row=1))
-        elif self.channel_type in ['plaza', 'game']:
-            self.add_item(ui.Button(label="ブラックリスト追加", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="vc_add_blacklist", row=1))
-            self.add_item(ui.Button(label="ブラックリスト解除", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="vc_remove_blacklist", row=1))
-
+        # 모든 버튼에 콜백 함수 할당
         for item in self.children:
-            if isinstance(item, ui.Button): item.callback = self.dispatch_button
-
+            if isinstance(item, ui.Button):
+                item.callback = self.dispatch_button
+    
+    # ... (이하 ControlPanelView의 나머지 함수들은 이전과 동일) ...
     async def dispatch_button(self, interaction: discord.Interaction):
         custom_id = interaction.data.get("custom_id")
         dispatch_map = { 
@@ -221,7 +233,6 @@ class ControlPanelView(ui.View):
         view = ui.View(timeout=180).add_item(VCKickSelect(self, invited_members))
         await interaction.response.send_message("追放するメンバーを選んでください。", view=view, ephemeral=True)
 
-    # [신규] 블랙리스트 추가/해제 콜백 함수
     async def add_to_blacklist(self, interaction: discord.Interaction):
         view = ui.View(timeout=180).add_item(VCAddBlacklistSelect(self))
         await interaction.response.send_message("ブラックリストに追加するメンバーを選んでください。", view=view, ephemeral=True)
