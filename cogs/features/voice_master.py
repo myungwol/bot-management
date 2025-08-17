@@ -330,6 +330,7 @@ class VoiceMaster(commands.Cog):
         self.temp_channels.pop(channel_id, None)
         await remove_temp_channel(channel_id)
 
+
     async def _create_temp_channel(self, member: discord.Member, config: Dict):
         guild = member.guild
         channel_type = config.get("type", "normal")
@@ -353,6 +354,7 @@ class VoiceMaster(commands.Cog):
                 next_number = 1
                 while next_number in used_numbers: next_number += 1
                 if next_number > 1: base_name = f"{base_name}-{next_number}"
+            
             vc_name = f"・ {type_info['emoji']} ꒱ {base_name}"
             overwrites = { member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True) }
             if channel_type == 'vip':
@@ -365,11 +367,15 @@ class VoiceMaster(commands.Cog):
                 if admin_role_id and (admin_role := guild.get_role(admin_role_id)): overwrites[admin_role] = discord.PermissionOverwrite(connect=True)
             else:
                 overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True)
+            
             vc = await guild.create_voice_channel(name=vc_name, category=creator_channel.category, overwrites=overwrites, user_limit=user_limit, reason=f"{member.display_name}の要請")
             embed = discord.Embed(title=f"ようこそ、{get_clean_display_name(member)}さん！", color=0x7289DA).add_field(name="チャンネルタイプ", value=f"`{channel_type.upper()}`", inline=False)
             embed.description = "ここはあなたのプライベートチャンネルです。\n下のボタンでチャンネルを管理できます。"
             view = ControlPanelView(self, member.id, vc.id, channel_type)
-            panel_message = await vc.send(embed=embed, view=view)
+            
+            # --- [수정] content=member.mention 을 추가하여 메시지 상단에 유저를 멘션합니다. ---
+            panel_message = await vc.send(content=member.mention, embed=embed, view=view)
+            
             self.temp_channels[vc.id] = {"owner_id": member.id, "message_id": panel_message.id, "type": channel_type}
             await add_temp_channel(vc.id, member.id, guild.id, panel_message.id, channel_type)
             logger.info(f"'{channel_type}' 타입 임시 채널 '{vc.name}'을 생성하고 DB에 저장했습니다.")
@@ -377,7 +383,7 @@ class VoiceMaster(commands.Cog):
         except Exception as e:
             logger.error(f"임시 채널 생성 중 오류: {e}", exc_info=True)
             if member.voice: await member.move_to(None)
-
+                
     async def _delete_temp_channel(self, vc: discord.VoiceChannel):
         vc_id = vc.id
         try:
