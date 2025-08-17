@@ -114,5 +114,57 @@ class MemberEvents(commands.Cog):
         except Exception as e:
             logger.error(f"퇴장 메시지 전송 중 예기치 않은 오류 발생: {e}", exc_info=True)
 
+
+    # [추가] 서버 부스트 상태 변경 감지 리스너
+    @commands.Cog.listener()
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """멤버의 상태(역할, 닉네임, 부스트 등)가 변경될 때 호출됩니다."""
+        # [핵심] 부스트 상태가 변경되지 않았으면 함수 종료
+        if before.premium_since == after.premium_since:
+            return
+
+        key_role_id = get_id("role_personal_room_key")
+        if not key_role_id:
+            logger.warning("부스트 감지: '個人部屋の鍵' 역할의 ID가 DB에 설정되지 않았습니다.")
+            return
+        
+        key_role = after.guild.get_role(key_role_id)
+        if not key_role:
+            logger.warning(f"부스트 감지: 서버에서 '個人部屋の鍵' 역할(ID: {key_role_id})을 찾을 수 없습니다.")
+            return
+
+        # --- [핵심] 부스트 시작 감지 ---
+        # 이전에는 부스트를 안 했고 (before.premium_since is None)
+        # 이후에는 부스트를 한 경우 (after.premium_since is not None)
+        if before.premium_since is None and after.premium_since is not None:
+            if key_role not in after.roles:
+                try:
+                    await after.add_roles(key_role, reason="支援者開始")
+                    logger.info(f"{after.display_name}님이 서버 부스트를 시작하여 '個人部屋の鍵' 역할을 지급했습니다.")
+                    try:
+                        await after.send(
+                            f"🎉 **{after.guild.name}** 支援していただきありがとうございます！\n"
+                            "特典として**プライベートボイスチャンネル**を作成できる`個人部屋の鍵`の役割が付与されました。"
+                        )
+                    except discord.Forbidden:
+                        logger.warning(f"{after.display_name}님에게 DM을 보낼 수 없어 부스트 감사 메시지를 보내지 못했습니다.")
+                except discord.Forbidden:
+                    logger.error(f"{after.display_name}님에게 '個人部屋の鍵' 역할을 지급하지 못했습니다. (권한 부족)")
+                except Exception as e:
+                    logger.error(f"{after.display_name}님에게 역할 지급 중 오류 발생: {e}", exc_info=True)
+
+        # --- [핵심] 부스트 중단 감지 ---
+        # 이전에는 부스트를 했고 (before.premium_since is not None)
+        # 이후에는 부스트를 안 한 경우 (after.premium_since is None)
+        elif before.premium_since is not None and after.premium_since is None:
+            if key_role in after.roles:
+                try:
+                    await after.remove_roles(key_role, reason="サーバーブースト停止")
+                    logger.info(f"{after.display_name}님이 서버 부스트를 중지하여 '個人部屋の鍵' 역할을 회수했습니다.")
+                except discord.Forbidden:
+                    logger.error(f"{after.display_name}님의 '個人部屋の鍵' 역할을 회수하지 못했습니다. (권한 부족)")
+                except Exception as e:
+                    logger.error(f"{after.display_name}님의 역할 회수 중 오류 발생: {e}", exc_info=True)
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemberEvents(bot))
