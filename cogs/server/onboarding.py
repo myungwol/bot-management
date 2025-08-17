@@ -18,7 +18,7 @@ from cogs.server.system import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# --- UI 클래스 (이전과 동일) ---
+# --- UI 클래스 ---
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -35,11 +35,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         try:
             approval_channel = self.onboarding_cog.approval_channel
             if not approval_channel: await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
-            # [디버그] 쿨타임이 설정되는 시점의 타임스탬프를 로그로 남깁니다.
-            current_timestamp = time.time()
-            logger.info(f"--- [디버그] 쿨타임 설정: key='introduction', value='{current_timestamp}' ---")
-            await set_cooldown(str(interaction.user.id), "introduction", current_timestamp)
-
+            await set_cooldown(str(interaction.user.id), "introduction", time.time())
             embed_data = await get_embed_from_db("embed_onboarding_approval")
             if not embed_data: await interaction.followup.send("❌ エラー: 承認用メッセージのテンプレートが見つかりません。", ephemeral=True); return
             embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention, member_name=interaction.user.display_name)
@@ -121,8 +117,8 @@ class ApprovalView(ui.View):
                     year_range = range(mapping["range"][0], mapping["range"][1])
                     if birth_year in year_range:
                         if (rid := get_id(mapping["key"])) and (r := guild.get_role(rid)): roles_to_add.append(r); break
-        if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="자기소개서 승인")
-        if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="자기소개서 승인 완료")
+        if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="自己紹介の承認")
+        if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="自己紹介の承認完了")
     async def _update_nickname(self, member: discord.Member) -> None:
         if (nick_cog := self.onboarding_cog.bot.get_cog("Nicknames")) and (name_field := self._get_field_value(self.original_embed, "名前")):
             await nick_cog.update_nickname(member, base_name_override=name_field)
@@ -150,7 +146,8 @@ class ApprovalView(ui.View):
             except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다.")
             if (ch_id := self.onboarding_cog.rejection_log_channel_id) and (ch := guild.get_channel(ch_id)):
                 embed = discord.Embed(title="❌ 住人登録が拒否されました", color=discord.Color.red())
-                embed.add_field(name="住民", value=member.mention, inline=False)
+                # [수정] "住民" -> "旅の人"으로 필드 이름 변경
+                embed.add_field(name="旅の人", value=member.mention, inline=False)
                 for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
                 embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False); embed.add_field(name="担当者", value=moderator.mention, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
@@ -204,36 +201,16 @@ class OnboardingGuideView(ui.View):
                 except Exception as e: await interaction.followup.send(f"❌ 役割の付与中にエラー: {e}", ephemeral=True); return
         if self.current_step < len(self.steps_data) - 1: self.current_step += 1
         await self._update_message()
-    
-    # --- [디버깅] 이 함수 전체에 로그가 추가되었습니다 ---
     async def create_introduction(self, interaction: discord.Interaction):
         async with self.user_lock:
-            logger.info("--- [디버그] '주민등록표 작성' 버튼 클릭됨, 쿨타임 체크 시작 ---")
-            
             cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
-            logger.info(f"[디버그] 1. DB에서 가져온 쿨타임 설정(초): {cooldown_seconds}")
-            
             last_time = await get_cooldown(str(interaction.user.id), "introduction")
-            logger.info(f"[디버그] 2. DB에서 가져온 마지막 실행 시간(타임스탬프): {last_time}")
-            
-            current_time = time.time()
-            logger.info(f"[디버그] 3. 현재 시간(타임스탬프): {current_time}")
-            
-            time_since_last = current_time - last_time
-            logger.info(f"[디버그] 4. 마지막 실행 후 경과 시간(초): {time_since_last}")
-            
-            if last_time and time_since_last < cooldown_seconds:
-                remaining_time = cooldown_seconds - time_since_last
-                minutes = int(remaining_time // 60)
-                seconds = int(remaining_time % 60)
-                logger.info(f"[디버그] 5. 쿨타임 남음. 계산된 남은 시간: {minutes}분 {seconds}초")
-                
-                await interaction.response.send_message(f"次の申請まであと {minutes}分{seconds}秒 お待ちください。", ephemeral=True)
-                return
-            
-            logger.info("[디버그] 6. 쿨타임 없음. 모달 창 전송.")
+            expiration_time = last_time + cooldown_seconds; current_time = time.time()
+            if current_time < expiration_time:
+                remaining_time = expiration_time - current_time
+                minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
+                await interaction.response.send_message(f"次の申請まであと {minutes}分{seconds}秒 お待ちください。", ephemeral=True); return
             await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
-
         if self.message:
             try: await self.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
@@ -254,20 +231,41 @@ class OnboardingPanelView(ui.View):
                 button = ui.Button(label=comp.get('label'),style=style,emoji=comp.get('emoji'),row=comp.get('row'),custom_id=comp.get('component_key'))
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
+    
+    # --- [수정] 중복 실행 방지 로직 추가 ---
     async def start_guide_callback(self, interaction: discord.Interaction):
-        lock = self.onboarding_cog.user_locks.setdefault(interaction.user.id, asyncio.Lock())
-        if lock.locked(): return await interaction.response.send_message("以前のリクエストを処理中です。", ephemeral=True)
-        async with lock:
-            await interaction.response.defer(ephemeral=True, thinking=True)
+        # 1. 이 유저가 이미 안내를 진행 중인지 확인합니다.
+        if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
+            await interaction.response.send_message("すでに案内の手続きを開始しています。DMを確認してください。", ephemeral=True)
+            return
+        
+        # 2. 진행 중인 유저로 등록합니다.
+        self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
+        
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
+        try:
             steps = await get_onboarding_steps()
-            if not steps: await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True); return
-            guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user); first_step_info = steps[0]
+            if not steps:
+                await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True)
+                return
+            
+            guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user)
+            first_step_info = steps[0]
             embed_data = first_step_info.get("embed_data", {}).get("embed_data")
-            if not embed_data: embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
-            else: embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
+            if not embed_data:
+                embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
+            else:
+                embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
+            
             guide_view._update_components()
             message = await interaction.followup.send(embed=embed, view=guide_view, ephemeral=True)
             guide_view.message = message
+            
+            # 3. View가 끝나면(타임아웃 또는 완료) 진행 중인 유저 목록에서 제거합니다.
+            await guide_view.wait()
+        finally:
+            self.onboarding_cog.active_onboarding_sessions.discard(interaction.user.id)
 
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -275,7 +273,7 @@ class Onboarding(commands.Cog):
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None; self.main_chat_channel_id: Optional[int] = None
         self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-        self.user_locks: Dict[int, asyncio.Lock] = {}
+        self.active_onboarding_sessions: set = set() # [신규] 현재 온보딩을 진행 중인 유저를 추적
     @property
     def approval_channel(self) -> Optional[discord.TextChannel]:
         if self.approval_channel_id: return self.bot.get_channel(self.approval_channel_id)
@@ -297,7 +295,7 @@ class Onboarding(commands.Cog):
         panel_info = get_panel_id("onboarding");
         if panel_info and (old_id := panel_info.get('message_id')):
             try: await (await target_channel.fetch_message(old_id)).delete()
-            except (discord.NotFound, discord.Forbidden): pass
+            except (discord.NotFound, discord.HTTPException): pass
         embed_data = await get_embed_from_db("panel_onboarding")
         if not embed_data: logger.warning("DB에서 'panel_onboarding' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다."); return
         embed = discord.Embed.from_dict(embed_data)
