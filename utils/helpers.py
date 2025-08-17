@@ -10,33 +10,6 @@ import re
 from .database import get_config # .database로 상대 경로 임포트
 logger = logging.getLogger(__name__)
 
-def get_clean_display_name(member: discord.Member) -> str:
-    """
-    멤버의 display_name에서 역할 접두사(예: 『칭호』)를 제거한 순수한 이름을 반환합니다.
-
-    Args:
-        member (discord.Member): 대상 멤버 객체
-
-    Returns:
-        str: 역할 접두사가 제거된 이름
-    """
-    display_name = member.display_name
-    prefix_hierarchy = get_config("NICKNAME_PREFIX_HIERARCHY", [])
-    
-    # 설정된 모든 접두사를 순회하며 확인
-    for prefix_name in prefix_hierarchy:
-        # 『 칭호 』 형식의 전체 접두사 문자열 생성
-        prefix_to_check = f"『 {prefix_name} 』"
-        
-        # 만약 display_name이 해당 접두사로 시작한다면
-        if display_name.startswith(prefix_to_check):
-            # 정규표현식을 사용하여 접두사와 뒤따르는 공백을 제거하고 반환
-            # re.escape를 사용하여 접두사 이름에 특수문자가 있어도 안전하게 처리
-            return re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", display_name).strip()
-            
-    # 일치하는 접두사가 없으면 원래 display_name을 그대로 반환
-    return display_name
-
 def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.Embed:
     """
     데이터베이스에서 가져온 dict 형식의 임베드 데이터를 실제 discord.Embed 객체로 변환합니다.
@@ -107,3 +80,30 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
                 color=discord.Color.dark_red()
             )
             return fatal_error_embed
+
+def get_clean_display_name(member: discord.Member) -> str:
+    """
+    멤버의 display_name에서 역할 접두사(예: 『칭호』)를 제거한 순수한 이름을 반환합니다.
+
+    Args:
+        member (discord.Member): 대상 멤버 객체
+
+    Returns:
+        str: 역할 접두사가 제거된 이름
+    """
+    display_name = member.display_name
+    prefix_hierarchy = get_config("NICKNAME_PREFIX_HIERARCHY", [])
+    
+    # 설정된 모든 접두사를 순회하며 확인
+    for prefix_name in prefix_hierarchy:
+        # 『 칭호 』 형식의 전체 접두사 문자열 생성
+        prefix_to_check = f"『 {prefix_name} 』"
+        
+        # 만약 display_name이 해당 접두사로 시작한다면
+        if display_name.startswith(prefix_to_check):
+            # 정규표현식을 사용하여 접두사와 뒤따르는 공백을 제거하고 반환
+            # re.escape를 사용하여 접두사 이름에 특수문자가 있어도 안전하게 처리
+            return re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", display_name).strip()
+            
+    # 일치하는 접두사가 없으면 원래 display_name을 그대로 반환
+    return display_name
