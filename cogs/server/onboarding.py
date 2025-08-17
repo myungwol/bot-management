@@ -314,10 +314,9 @@ class OnboardingPanelView(ui.View):
             last_time = await get_cooldown(user_id_str, cooldown_key)
             remaining_time = cooldown_seconds - (time.time() - last_time)
             
-            message = "すでに案内の手続きを開始しています。DMを確認してください。"
             if remaining_time > 0:
                 minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
-                message += f"\n案内が終了した場合、次の案内まであと {minutes}分{seconds}秒 お待ちください。"
+                message += f"案内が終了した場合、次の案内まであと {minutes}分{seconds}秒 お待ちください。"
 
             await interaction.response.send_message(message, ephemeral=True)
             return
