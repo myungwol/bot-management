@@ -53,11 +53,11 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
 
 # --- ApprovalView (변경 없음) ---
 class ApprovalView(ui.View):
+    # ... (이전과 동일, 생략하지 않음) ...
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
         self.author_id = author.id; self.original_embed = original_embed
         self.onboarding_cog = cog_instance; self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
-    # ... (이전과 동일, 생략하지 않음) ...
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
         if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
@@ -287,7 +287,7 @@ class OnboardingGuideView(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
-# --- OnboardingPanelView (쿨타임 로직 강화) ---
+# --- OnboardingPanelView (메시지 일본어 번역) ---
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
@@ -307,26 +307,26 @@ class OnboardingPanelView(ui.View):
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
+        cooldown_seconds = 300 # 5분
 
-        # [요청 사항 반영] "이미 진행 중"일 때도 남은 쿨타임을 알려주도록 메시지 개선
-        if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
-            last_time = await get_cooldown(user_id_str, cooldown_key)
-            remaining_time = cooldown_seconds - (time.time() - last_time)
-
-            message = "案内が終了した場合、"
-            if remaining_time > 0:
-                minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
-                message += f"\n次の案内まであと {minutes}分{seconds}秒 お待ちください。"
-
-            await interaction.response.send_message(message, ephemeral=True)
-            return
-            
         last_time = await get_cooldown(user_id_str, cooldown_key)
+
         if last_time > 0 and (time.time() - last_time) < cooldown_seconds:
             remaining_time = cooldown_seconds - (time.time() - last_time)
-            minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
-            await interaction.response.send_message(f"次の案内まであと {minutes}分{seconds}秒 お待ちください。", ephemeral=True); return
+            minutes = int(remaining_time // 60)
+            seconds = int(remaining_time % 60)
+            # [수정] 쿨타임 메시지를 일본어로 변경
+            await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
+            return
+
+        if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
+            remaining_time = cooldown_seconds - (time.time() - last_time)
+            if remaining_time < 0: remaining_time = 0
+            minutes = int(remaining_time // 60)
+            seconds = int(remaining_time % 60)
+            # [수정] 쿨타임 메시지를 일본어로 변경
+            await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
+            return
         
         await set_cooldown(user_id_str, cooldown_key, time.time())
         self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
@@ -336,7 +336,6 @@ class OnboardingPanelView(ui.View):
             steps = await get_onboarding_steps()
             if not steps: 
                 await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True)
-                # [요청 사항 반영] 어떤 상황에서도 쿨타임 초기화 코드를 실행하지 않도록 해당 라인 삭제
                 return
             
             guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user)
