@@ -208,13 +208,14 @@ class OnboardingGuideView(ui.View):
                 rem = cooldown_seconds - (time.time() - last_time); m, s = divmod(int(rem), 60)
                 await interaction.response.send_message(f"次の申請まであと {m}分{s}秒 お待ちください。", ephemeral=True); return
             await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
-        if self.message: await self.message.delete()
+        if self.message:
+            try: await self.message.delete()
+            except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
-        self.user_locks: Dict[int, asyncio.Lock] = {}
     async def setup_buttons(self):
         button_styles = get_config("DISCORD_BUTTON_STYLES_MAP", {})
         components_data = await get_panel_components_from_db('onboarding')
@@ -228,7 +229,8 @@ class OnboardingPanelView(ui.View):
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
     async def start_guide_callback(self, interaction: discord.Interaction):
-        lock = self.user_locks.setdefault(interaction.user.id, asyncio.Lock())
+        # [수정] Lock을 이 함수 안으로 이동
+        lock = self.onboarding_cog.user_locks.setdefault(interaction.user.id, asyncio.Lock())
         if lock.locked(): return await interaction.response.send_message("以前のリクエストを処理中です。", ephemeral=True)
         async with lock:
             await interaction.response.defer(ephemeral=True, thinking=True)
@@ -248,6 +250,7 @@ class Onboarding(commands.Cog):
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None; self.main_chat_channel_id: Optional[int] = None
         self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
+        self.user_locks: Dict[int, asyncio.Lock] = {} # [신규] Onboarding Cog가 user lock을 관리
     @property
     def approval_channel(self) -> Optional[discord.TextChannel]:
         if self.approval_channel_id: return self.bot.get_channel(self.approval_channel_id)
