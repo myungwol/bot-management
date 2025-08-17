@@ -1,16 +1,10 @@
 # cogs/server/system.py
-"""
-서버 관리와 관련된 모든 통합 명령어를 담당하는 Cog입니다.
-- /setup 그룹 명령어를 통해 봇의 모든 설정을 관리합니다.
-- 채널/패널 설정, 역할 동기화, 통계 채널 관리 등의 기능을 포함합니다.
-"""
 import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
 from typing import Optional, List
 
-# [수정] database.py에서 필요한 모든 함수를 가져옵니다.
 from utils.database import (
     get_config, save_id_to_db, load_channel_ids_from_db,
     get_all_stats_channels, add_stats_channel, remove_stats_channel
@@ -23,7 +17,6 @@ class ServerSystem(commands.Cog):
         self.bot = bot
         logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
 
-    # Cog 전역 오류 처리기
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingPermissions):
             await interaction.response.send_message(
@@ -37,19 +30,14 @@ class ServerSystem(commands.Cog):
             else:
                 await interaction.response.send_message("❌ 명령어를 처리하는 중에 예기치 않은 오류가 발생했습니다. 봇 로그를 확인해주세요.", ephemeral=True)
 
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    # /setup 명령어 그룹
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     setup = app_commands.Group(
         name="setup",
         description="[관리자] 서버의 패널, 채널, 역할 등 봇의 모든 설정을 관리합니다.",
         default_permissions=discord.Permissions(manage_guild=True),
         guild_only=True
     )
-
-    # ------------------------------------------------------------------------------
-    # 1. /setup set (채널/패널 설정)
-    # ------------------------------------------------------------------------------
+    
+    # --- 1. /setup set (채널/패널 설정) ---
     async def setup_set_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         setup_map = get_config("SETUP_COMMAND_MAP", {})
         choices = []
@@ -60,12 +48,14 @@ class ServerSystem(commands.Cog):
                 choices.append(app_commands.Choice(name=choice_name, value=key))
         return choices[:25]
 
-    # [수정] 데코레이터 순서를 올바르게 변경하고 명령어 정의를 통합
     @setup.command(name="set", description="각종 채널을 설정하거나 패널을 설치합니다.")
     @app_commands.describe(setting_type="설정할 항목을 선택하세요.", channel="설정할 텍스트 채널을 지정하세요.")
-    @app_commands.autocomplete(setting_type=setup_set_autocomplete)
+    # @app_commands.autocomplete('setting_type') # <-- 이 부분 제거
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_set(self, interaction: discord.Interaction, setting_type: str, channel: discord.TextChannel):
+        # 여기서 autocomplete 콜백을 직접 호출
+        await interaction.autocomplete(name='setup_set_autocomplete', choices=await self.setup_set_autocomplete(interaction, "")) # 초기 호출 시에는 빈 문자열
+
         setup_map = get_config("SETUP_COMMAND_MAP", {})
         if setting_type not in setup_map:
             await interaction.response.send_message("❌ 잘못된 설정 항목입니다. 목록에서 선택해주세요.", ephemeral=True)
@@ -91,9 +81,7 @@ class ServerSystem(commands.Cog):
         else:
             await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
 
-    # ------------------------------------------------------------------------------
-    # 2. /setup roles (역할 관련 하위 명령어 그룹)
-    # ------------------------------------------------------------------------------
+    # --- 2. /setup roles (역할 관련 하위 명령어 그룹) ---
     roles = app_commands.Group(name="roles", parent=setup, description="서버 역할을 DB와 동기화하거나 개별 설정합니다.")
 
     @roles.command(name="sync", description="서버의 모든 역할을 이름 기준으로 DB와 한번에 동기화합니다.")
@@ -158,10 +146,35 @@ class ServerSystem(commands.Cog):
         embed = discord.Embed(title="✅ 역할 설정 완료", description=f"DB의 `{role_type}` 키에 {role.mention} 역할이 성공적으로 연결되었습니다.", color=0x3498DB)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    # ------------------------------------------------------------------------------
-    # 3. /setup stats (서버 통계 채널 관리 그룹)
-    # ------------------------------------------------------------------------------
+    # --- 3. /setup stats (서버 통계 채널 관리 그룹) ---
     stats = app_commands.Group(name="stats", parent=setup, description="서버 통계 채널을 관리합니다.")
+
+    async def stats_add_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        """/setup stats add 명령어의 stat_type 옵션 자동완성 목록을 생성합니다."""
+        choices = []
+        for choice_data in [
+            app_commands.Choice(name="전체 인원 (봇 포함)", value="total"),
+            app_commands.Choice(name="유저 인원 (봇 제외)", value="humans"),
+            app_commands.Choice(name="봇 개수", value="bots"),
+            app_commands.Choice(name="서버 부스터 수", value="boosters"),
+            app_commands.Choice(name="특정 역할 인원", value="role"),
+        ]:
+            if current.lower() in choice_data.name.lower():
+                choices.append(choice_data)
+        return choices[:25]
+    
+    async def stats_channel_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        """/setup stats add 명령어의 channel 옵션 자동완성 목록을 생성합니다."""
+        guild = interaction.guild
+        if not guild: return []
+        
+        choices = []
+        # 음성 채널 및 카테고리만 표시 (텍스트 채널 제외)
+        for channel in guild.voice_channels + guild.categories:
+            choice_name = f"#{channel.name}"
+            if current.lower() in choice_name.lower():
+                choices.append(app_commands.Choice(name=choice_name, value=channel.id))
+        return choices[:25]
 
     @stats.command(name="add", description="통계 정보를 표시할 채널을 추가하거나 수정합니다.")
     @app_commands.describe(
@@ -177,9 +190,10 @@ class ServerSystem(commands.Cog):
         app_commands.Choice(name="서버 부스터 수", value="boosters"),
         app_commands.Choice(name="특정 역할 인원", value="role"),
     ])
+    @app_commands.autocomplete(stat_type=stats_add_autocomplete)
     async def stats_add(self, interaction: discord.Interaction,
                         stat_type: str,
-                        channel: discord.VoiceChannel,
+                        channel: discord.VoiceChannel, # 채널 타입을 VoiceChannel로 지정
                         template: str,
                         role: Optional[discord.Role] = None):
         
@@ -199,6 +213,7 @@ class ServerSystem(commands.Cog):
 
         stats_cog = self.bot.get_cog("StatsUpdater")
         if stats_cog and hasattr(stats_cog, 'update_stats_loop'):
+            # 루프를 즉시 재시작하여 변경사항을 반영하도록 함
             stats_cog.update_stats_loop.restart()
 
         await interaction.followup.send(f"✅ `{channel.name}` 채널에 통계 설정을 추가했습니다. 잠시 후 채널 이름이 변경됩니다.", ephemeral=True)
@@ -219,59 +234,24 @@ class ServerSystem(commands.Cog):
             return
         
         embed = discord.Embed(title="📊 설정된 통계 채널 목록", color=0x3498DB)
-        description = []
+        description_lines = []
         for config in configs:
             ch = self.bot.get_channel(config['channel_id'])
             ch_mention = f"<#{ch.id}>" if ch else f"삭제된 채널({config['channel_id']})"
-            description.append(f"**채널:** {ch_mention}\n"
-                               f"**종류:** `{config['stat_type']}`\n"
-                               f"**이름 형식:** `{config['channel_name_template']}`")
-        embed.description = "\n\n".join(description)
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    # 4. /setup check_counts (멤버 수 진단용 임시 명령어)
-    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    @setup.command(name="check_counts", description="[관리자] 현재 봇이 인식하는 각종 멤버 수를 직접 확인합니다.")
-    async def check_counts(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        guild = interaction.guild
-
-        # 1. API가 제공하는 공식 총 인원
-        total_from_api = guild.member_count
-        
-        # 2. 봇의 내부 캐시(목록)에 있는 총 인원
-        total_from_cache = len(guild.members)
-        
-        # 3. 캐시 기반 유저 수
-        humans_from_cache = len([m for m in guild.members if not m.bot])
-        
-        # 4. 캐시 기반 봇 수
-        bots_from_cache = len([m for m in guild.members if m.bot])
-        
-        # 5. 부스터 수
-        boosters = guild.premium_subscription_count
-
-        embed = discord.Embed(title="📊 멤버 수 진단 결과", color=0xFFD700)
-        embed.description = "봇이 현재 인식하고 있는 각 항목별 인원수입니다."
-        
-        embed.add_field(name="1️⃣ Discord API 공식 총 인원 (`guild.member_count`)", value=f"**{total_from_api}** 명", inline=False)
-        embed.add_field(name="2️⃣ 봇의 내부 목록상 총 인원 (`len(guild.members)`)", value=f"**{total_from_cache}** 명", inline=False)
-        embed.add_field(name="3️⃣ 내부 목록상 유저 수 (봇 제외)", value=f"**{humans_from_cache}** 명", inline=False)
-        embed.add_field(name="4️⃣ 내부 목록상 봇 수", value=f"**{bots_from_cache}** 명", inline=False)
-        embed.add_field(name="5️⃣ 서버 부스터 수", value=f"**{boosters}** 개", inline=False)
-        
-        if total_from_api != total_from_cache:
-            embed.add_field(
-                name="🔍 분석",
-                value=f"**1번**과 **2번**의 차이가 **{total_from_api - total_from_cache}명** 만큼 발생했습니다.\n이는 봇의 내부 멤버 목록이 불완전하다는 명확한 증거입니다. 다음 단계에서 이 문제를 해결하겠습니다.",
-                inline=False
+            
+            stat_desc_map = {
+                "total": "전체 인원 (봇 포함)", "humans": "유저 인원 (봇 제외)", "bots": "봇 개수",
+                "boosters": "서버 부스터 수", "role": "특정 역할 인원"
+            }
+            stat_type_name = stat_desc_map.get(config.get('stat_type', 'unknown'), config.get('stat_type'))
+            
+            description_lines.append(
+                f"**채널:** {ch_mention}\n"
+                f"**종류:** `{stat_type_name}`\n"
+                f"**이름 형식:** `{config.get('channel_name_template', 'N/A')}`"
             )
-            embed.color = 0xED4245 # Error Red
-        else:
-            embed.add_field(name="🔍 분석", value="API와 내부 목록의 인원수가 일치합니다. 문제가 다른 곳에 있을 수 있습니다.", inline=False)
-
+        embed.description = "\n\n".join(description_lines)
         await interaction.followup.send(embed=embed, ephemeral=True)
-        
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
