@@ -221,7 +221,7 @@ class VoiceMaster(commands.Cog):
         logger.info(f"[VoiceMaster] 임시 채널 동기화 완료. (활성: {len(self.temp_channels)} / 정리: {len(zombie_channel_ids)})")
 
     async def schedule_channel_check_and_delete(self, channel: discord.VoiceChannel):
-        await asyncio.sleep(2)
+        await asyncio.sleep(1) # 1초로 수정
         refreshed_channel = channel.guild.get_channel(channel.id)
         if refreshed_channel and not refreshed_channel.members:
             await self._delete_temp_channel(refreshed_channel)
@@ -229,21 +229,14 @@ class VoiceMaster(commands.Cog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot: return
-
-        # --- 채널 생성 로직 ---
         if after.channel and after.channel.id in self.creator_channel_configs:
             config = self.creator_channel_configs[after.channel.id]
-            
-            # [수정] 채널 타입별로 소유하고 있는지 확인
             channel_type_to_create = config.get("type")
             if any(info.get('owner_id') == member.id and info.get('type') == channel_type_to_create for info in self.temp_channels.values()):
-                try:
-                    await member.send(f"❌ 「{CHANNEL_TYPE_INFO[channel_type_to_create]['default_name']}」タイプのチャンネルはすでに所有しています。")
-                except discord.Forbidden:
-                    pass
+                try: await member.send(f"❌ 「{CHANNEL_TYPE_INFO[channel_type_to_create]['default_name']}」タイプのチャンネルはすでに所有しています。")
+                except discord.Forbidden: pass
                 await member.move_to(None, reason="같은 종류의 채널을 이미 소유 중")
                 return
-
             is_allowed = False
             if allowed_role_key := config.get("allowed_role_key"):
                 allowed_role_id = get_id(allowed_role_key)
@@ -257,8 +250,6 @@ class VoiceMaster(commands.Cog):
                 await member.move_to(None, reason="요구 역할 없음")
                 return
             await self._create_temp_channel(member, config)
-
-        # --- 채널 삭제 로직 ---
         if before.channel and before.channel.id in self.temp_channels:
             self.bot.loop.create_task(self.schedule_channel_check_and_delete(before.channel))
 
@@ -291,18 +282,35 @@ class VoiceMaster(commands.Cog):
                     if channel_obj and base_name in channel_obj.name:
                         try:
                             num_part = channel_obj.name.split(f"{base_name}-")
-                            if len(num_part) > 1:
-                                used_numbers.add(int(num_part[1]))
+                            if len(num_part) > 1: used_numbers.add(int(num_part[1]))
                         except (ValueError, IndexError): pass
                 next_number = 1
                 while next_number in used_numbers: next_number += 1
                 if next_number > 1: base_name = f"{base_name}-{next_number}"
+            
             vc_name = f"・ {type_info['emoji']} ꒱ {base_name}"
+            
+            # --- [수정] 뉴비 채널 권한 설정 로직 ---
             overwrites = { member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True) }
+            
             if channel_type == 'vip':
                 overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
+            elif channel_type == 'newbie':
+                overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
+                
+                # 뉴비 역할 가져오기
+                newbie_role_id = get_id(config.get("required_role_key"))
+                if newbie_role_id and (newbie_role := guild.get_role(newbie_role_id)):
+                    overwrites[newbie_role] = discord.PermissionOverwrite(connect=True)
+
+                # 관리자 역할 가져오기
+                admin_role_id = get_id(config.get("allowed_role_key"))
+                if admin_role_id and (admin_role := guild.get_role(admin_role_id)):
+                    overwrites[admin_role] = discord.PermissionOverwrite(connect=True)
             else:
                 overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True)
+            # --- 권한 설정 로직 끝 ---
+
             vc = await guild.create_voice_channel(name=vc_name, category=creator_channel.category, overwrites=overwrites, user_limit=user_limit, reason=f"{member.display_name}の要請")
             embed = discord.Embed(title=f"ようこそ、{get_clean_display_name(member)}さん！", color=0x7289DA).add_field(name="チャンネルタイプ", value=f"`{channel_type.upper()}`", inline=False)
             embed.description = "ここはあなたのプライベートチャンネルです。\n下のボタンでチャンネルを管理できます。"
