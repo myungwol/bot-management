@@ -90,22 +90,22 @@ UI_ROLE_KEY_MAP = {
         "priority": 5
     },
     "role_onboarding_step_1": {
-        "name": "━━━━━━ ゲーム ━━━━━━",
+        "name": "════════════ゲーム══════════",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_2": {
-        "name": "━━━━━━ 通知 ━━━━━━",
+        "name": "═════════════通知═══════════",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_3": {
-        "name": "━━━━━━ 情報 ━━━━━━",
+        "name": "═════════════情報═══════════",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_4": {
-        "name": "━━━━━━ 住民 ━━━━━━",
+        "name": "═════════════住人═══════════",
         "is_prefix": False,
         "priority": 0
     },
