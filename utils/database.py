@@ -245,5 +245,30 @@ async def set_cooldown(user_id_str: str, cooldown_key: str):
     - DB가 'now()' 함수를 통해 현재 시간을 직접 기록하도록 합니다.
     - 기존 기록을 삭제하고 새로 삽입하여 안정성을 확보합니다.
     """
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 8. 통계 채널 (stats_channels) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+@supabase_retry_handler()
+async def get_all_stats_channels() -> List[Dict[str, Any]]:
+    """DB에 설정된 모든 통계 채널 목록을 가져옵니다."""
+    response = await supabase.table('stats_channels').select('*').execute()
+    return response.data if response.data else []
+
+@supabase_retry_handler()
+async def add_stats_channel(channel_id: int, guild_id: int, stat_type: str, template: str, role_id: Optional[int] = None):
+    """새로운 통계 채널 설정을 DB에 추가(upsert)합니다."""
+    await supabase.table('stats_channels').upsert({
+        "channel_id": channel_id,
+        "guild_id": guild_id,
+        "stat_type": stat_type,
+        "channel_name_template": template,
+        "role_id": role_id
+    }, on_conflict="channel_id").execute()
+
+@supabase_retry_handler()
+async def remove_stats_channel(channel_id: int):
+    """통계 채널 설정을 DB에서 삭제합니다."""
+    await supabase.table('stats_channels').delete().eq('channel_id', channel_id).execute()
     await supabase.table('cooldowns').delete().eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).execute()
     await supabase.table('cooldowns').insert({ "user_id": user_id_str, "cooldown_key": cooldown_key }).execute()
