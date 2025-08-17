@@ -6,12 +6,13 @@ from discord import app_commands, ui
 import asyncio
 import logging
 import re
-from datetime import datetime
-import time
+# [수정] 시간대(Timezone) 문제를 해결하기 위해 datetime과 timezone을 가져옵니다.
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
+# [수정] 새로운 쿨타임 함수를 가져옵니다.
 from utils.database import (
-    get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
+    get_id, save_panel_id, get_panel_id, get_cooldown_dt, set_cooldown_dt, 
     get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
 from utils.helpers import format_embed_from_db
@@ -19,10 +20,10 @@ from utils.helpers import format_embed_from_db
 logger = logging.getLogger(__name__)
 
 # --- UI 클래스 (변경 없음) ---
+# ... (이전과 동일, 생략하지 않음) ...
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
-
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
     age = ui.TextInput(label="年齢", placeholder="例：20代、90年生まれ、30歳、非公開", required=True, max_length=20)
@@ -50,10 +51,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         except Exception as e: 
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
-
-# --- ApprovalView (변경 없음) ---
 class ApprovalView(ui.View):
-    # ... (이전과 동일, 생략하지 않음) ...
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
         self.author_id = author.id; self.original_embed = original_embed
@@ -223,10 +221,7 @@ class ApprovalView(ui.View):
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
-
-# --- OnboardingGuideView (변경 없음) ---
 class OnboardingGuideView(ui.View):
-    # ... (이전과 동일, 생략하지 않음) ...
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
         self.user = user; self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
@@ -287,7 +282,7 @@ class OnboardingGuideView(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
-# --- OnboardingPanelView (디버깅 로그 추가) ---
+# --- OnboardingPanelView (시차 문제 최종 해결) ---
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
@@ -305,55 +300,36 @@ class OnboardingPanelView(ui.View):
                 self.add_item(button)
     
     async def start_guide_callback(self, interaction: discord.Interaction):
-        # [디버깅 로그 추가]
-        logger.info(f"--- 案内ボタンクリック: {interaction.user.name} ({interaction.user.id}) ---")
-        
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        cooldown_seconds = 300
+        cooldown_seconds = 300 # 5분
 
-        # 1. 쿨타임 확인
-        logger.info(f"[1] DB에서 '{user_id_str}'의 쿨타임 확인 시작...")
-        last_time = await get_cooldown(user_id_str, cooldown_key)
-        
-        if last_time == 0.0:
-            logger.info(f"[1] DB 결과: 기록 없음 (최초 실행 가능).")
-        else:
-            # 보기 편하게 날짜/시간 형태로 변환하여 로그 출력
-            logger.info(f"[1] DB 결과: 마지막 실행 시간 = {datetime.fromtimestamp(last_time)}")
+        # [수정] 새로운 get_cooldown_dt 함수를 사용합니다.
+        last_cooldown_dt = await get_cooldown_dt(user_id_str, cooldown_key)
+        now_utc = datetime.now(timezone.utc)
 
-        current_time = time.time()
-        logger.info(f"[~] 현재 시간 = {datetime.fromtimestamp(current_time)}")
+        if last_cooldown_dt:
+            # [수정] datetime 객체를 사용하여 시간 차이를 정확하게 계산합니다.
+            seconds_passed = (now_utc - last_cooldown_dt).total_seconds()
+            if seconds_passed < cooldown_seconds:
+                remaining_time = cooldown_seconds - seconds_passed
+                minutes = int(remaining_time // 60)
+                seconds = int(remaining_time % 60)
+                await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
+                return
 
-        if last_time > 0 and (current_time - last_time) < cooldown_seconds:
-            remaining_time = cooldown_seconds - (current_time - last_time)
-            minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
-            message = f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。"
-            
-            # [디버깅 로그 추가]
-            logger.warning(f"[!] 쿨타임 적용됨! (남은 시간: {remaining_time:.1f}초). 메시지 전송.")
-            await interaction.response.send_message(message, ephemeral=True)
-            return
-
-        # 2. 현재 진행 중인 세션 확인
         if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
-            # [디버깅 로그 추가]
-            logger.warning(f"[!] 이미 안내 세션 진행 중. 메시지 전송.")
             await interaction.response.send_message("すでに案内の手続きを開始しています。DMをご確認ください。", ephemeral=True)
             return
         
-        # 3. 모든 확인 통과, 안내 시작
-        # [디버깅 로그 추가]
-        logger.info(f"[2] 쿨타임 설정 시작... 현재 시간({datetime.fromtimestamp(current_time)})을 DB에 저장.")
-        await set_cooldown(user_id_str, cooldown_key, current_time)
+        # [수정] 새로운 set_cooldown_dt 함수를 사용하여 현재 UTC 시간을 저장합니다.
+        await set_cooldown_dt(user_id_str, cooldown_key)
         self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
         
-        logger.info(f"[3] 안내 절차를 시작합니다.")
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             steps = await get_onboarding_steps()
             if not steps: 
-                logger.warning("[!] DB에 온보딩 단계가 설정되지 않아 안내를 시작할 수 없음.")
                 await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True)
                 return
             
@@ -364,7 +340,6 @@ class OnboardingPanelView(ui.View):
             await guide_view.wait()
         finally:
             self.onboarding_cog.active_onboarding_sessions.discard(interaction.user.id)
-            logger.info(f"--- 안내 절차 종료: {interaction.user.name} ({interaction.user.id}) ---")
 
 # --- Onboarding Cog (변경 없음) ---
 class Onboarding(commands.Cog):
