@@ -120,21 +120,33 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
 
         # --- 2. 역할 관련 로직 ---
-        elif action == "roles_sync":
-             # 이 부분이 DB에 저장된 예전 데이터를 불러오고 있습니다.
-             role_key_map_config = get_config("ROLE_KEY_MAP", {})
-             synced_roles, missing_roles, error_roles = [], [], []
+          elif action == "roles_sync":
+            # [수정] DB 대신, ui_defaults.py의 최신 데이터를 직접 가져오도록 변경
+            from utils.ui_defaults import UI_ROLE_KEY_MAP
+
+            # [신규] 봇 시작 시 실행되는 동기화 로직을 여기서도 한 번 더 실행하여 DB를 최신 상태로 갱신
+            role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
+            await save_config_to_db("ROLE_KEY_MAP", role_name_map) # database.py의 save_config_to_db 함수 임포트 필요 (상단에)
+
+            synced_roles, missing_roles, error_roles = [], [], []
+            server_roles_by_name = {r.name: r.id for r in interaction.guild.roles}
             
-            for db_key, role_name in role_key_map_config.items():
+            # [수정] role_key_map_config 대신 UI_ROLE_KEY_MAP을 사용
+            for db_key, role_info in UI_ROLE_KEY_MAP.items():
+                role_name = role_info.get('name')
+                if not role_name: continue
+
                 if role_id := server_roles_by_name.get(role_name):
                     try:
                         await save_id_to_db(db_key, role_id)
                         synced_roles.append(f"・**{role_name}** (`{db_key}`)")
-                    except Exception as e: error_roles.append(f"・**{role_name}**: `{e}`")
-                else: missing_roles.append(f"・**{role_name}** (`{db_key}`)")
+                    except Exception as e:
+                        error_roles.append(f"・**{role_name}**: `{e}`")
+                else:
+                    missing_roles.append(f"・**{role_name}** (`{db_key}`)")
             
             embed = discord.Embed(title="⚙️ 役割データベースの完全同期結果", color=0x2ECC71)
-            embed.set_footer(text=f"合計 {len(role_key_map_config)}個中 成功: {len(synced_roles)} / 失敗: {len(missing_roles) + len(error_roles)}")
+            embed.set_footer(text=f"合計 {len(UI_ROLE_KEY_MAP)}個中 成功: {len(synced_roles)} / 失敗: {len(missing_roles) + len(error_roles)}")
             if synced_roles: embed.add_field(name=f"✅ 同期成功 ({len(synced_roles)}個)", value="\n".join(synced_roles)[:1024], inline=False)
             if missing_roles:
                 embed.color = 0xFEE75C
@@ -143,7 +155,7 @@ class ServerSystem(commands.Cog):
                 embed.color = 0xED4245
                 embed.add_field(name=f"❌ DB保存エラー ({len(error_roles)}個)", value="\n".join(error_roles)[:1024], inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
-
+              
         # --- 3. 통계 관련 로직 ---
         elif action == "stats_set":
             if not channel or not isinstance(channel, discord.VoiceChannel):
