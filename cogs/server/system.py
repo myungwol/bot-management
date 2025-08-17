@@ -121,9 +121,9 @@ class ServerSystem(commands.Cog):
 
         # --- 2. 역할 관련 로직 ---
         elif action == "roles_sync":
-            role_key_map_config = get_config("ROLE_KEY_MAP", {})
-            synced_roles, missing_roles, error_roles = [], [], []
-            server_roles_by_name = {r.name: r.id for r in interaction.guild.roles}
+             # 이 부분이 DB에 저장된 예전 데이터를 불러오고 있습니다.
+             role_key_map_config = get_config("ROLE_KEY_MAP", {})
+             synced_roles, missing_roles, error_roles = [], [], []
             
             for db_key, role_name in role_key_map_config.items():
                 if role_id := server_roles_by_name.get(role_name):
