@@ -164,44 +164,39 @@ async def get_onboarding_steps() -> list:
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
     return response.data if response.data else []
 
-
-# ==============================================================================
-# [수정된 쿨다운 함수]
-# ==============================================================================
-
 @supabase_retry_handler()
 async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
-    """
-    데이터베이스에서 쿨다운 정보를 가져와 float 형식의 Unix 타임스탬프로 반환합니다.
-    """
     response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
-    
-    # 데이터가 있고, 'last_cooldown_timestamp' 값이 None이 아닌지 확인
     if response.data and response.data[0].get('last_cooldown_timestamp') is not None:
         try:
-            # DB에서 온 값(숫자 타입)을 float으로 변환하여 반환
             return float(response.data[0]['last_cooldown_timestamp'])
         except (ValueError, TypeError):
-            # 혹시라도 잘못된 타입의 데이터가 들어있을 경우 에러 로깅 후 0.0 반환
             logger.error(f"DB의 타임스탬프 값이 숫자가 아닙니다: {response.data[0]['last_cooldown_timestamp']}")
             return 0.0
-            
-    # 데이터가 없으면 0.0을 반환하여 쿨다운이 없음을 알림
     return 0.0
 
+# ==============================================================================
+# [최종 수정된 쿨다운 함수]
+# ==============================================================================
 @supabase_retry_handler()
 async def set_cooldown(user_id_str: str, cooldown_key: str):
     """
-    현재 UTC 시간을 float 형식의 Unix 타임스탬프로 데이터베이스에 저장합니다.
-    이 방식은 데이터베이스의 'real' 또는 'float' 타입과 호환됩니다.
+    기존 쿨다운 기록을 삭제하고, 현재 시간으로 새로운 기록을 삽입합니다.
+    upsert의 예상치 못한 동작을 회피하기 위한 가장 확실한 방법입니다.
     """
-    # UTC 시간 기준의 float 형식 Unix 타임스탬프를 가져옵니다.
-    utc_timestamp = datetime.now(timezone.utc).timestamp()
-    
-    data_to_upsert = {
-        "user_id": user_id_str,
-        "cooldown_key": cooldown_key,
-        "last_cooldown_timestamp": utc_timestamp
-    }
-    
-    await supabase.table('cooldowns').upsert(data_to_upsert, on_conflict='user_id,cooldown_key').execute()
+    try:
+        # 1단계: 기존 기록을 먼저 삭제합니다.
+        await supabase.table('cooldowns').delete().eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).execute()
+
+        # 2단계: 새로운 기록을 삽입합니다.
+        utc_timestamp = datetime.now(timezone.utc).timestamp()
+        data_to_insert = {
+            "user_id": user_id_str,
+            "cooldown_key": cooldown_key,
+            "last_cooldown_timestamp": utc_timestamp
+        }
+        await supabase.table('cooldowns').insert(data_to_insert).execute()
+        
+    except Exception as e:
+        logger.error(f"쿨다운 설정(삭제 후 삽입) 중 오류 발생: {e}", exc_info=True)
+        # 이 함수는 supabase_retry_handler에 의해 이미 재시도되므로, 여기서 다시 예외를 발생시키지 않습니다.
