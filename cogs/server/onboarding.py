@@ -53,13 +53,11 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
 
 # --- ApprovalView (변경 없음) ---
 class ApprovalView(ui.View):
-    # ... (이전과 동일, 생략하지 않음) ...
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
-        self.author_id = author.id
-        self.original_embed = original_embed
-        self.onboarding_cog = cog_instance
-        self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
+        self.author_id = author.id; self.original_embed = original_embed
+        self.onboarding_cog = cog_instance; self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
+    # ... (이전과 동일, 생략하지 않음) ...
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
         if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
@@ -226,24 +224,20 @@ class ApprovalView(ui.View):
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
-# --- OnboardingGuideView (속도 최적화 적용) ---
+# --- OnboardingGuideView (변경 없음) ---
 class OnboardingGuideView(ui.View):
+    # ... (이전과 동일, 생략하지 않음) ...
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
-        super().__init__(timeout=300)
-        self.onboarding_cog = cog_instance; self.steps_data = steps_data
-        self.user = user; self.current_step = 0
-        self.message: Optional[discord.WebhookMessage] = None
-
+        super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
+        self.user = user; self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
     async def on_timeout(self) -> None:
         self.onboarding_cog.active_onboarding_sessions.discard(self.user.id)
         if self.message:
             for item in self.children: item.disabled = True
             try: await self.message.edit(content="案内の時間が経過しました。最初からやり直してください。", view=self)
             except (discord.NotFound, discord.HTTPException): pass
-
     def stop(self):
         self.onboarding_cog.active_onboarding_sessions.discard(self.user.id); super().stop()
-
     def _update_components(self):
         self.clear_items(); step_info = self.steps_data[self.current_step]
         is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
@@ -256,22 +250,14 @@ class OnboardingGuideView(ui.View):
         else:
             next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next", disabled=is_last)
             next_button.callback = self.go_next; self.add_item(next_button)
-
-    # [개선] go_next에서 사용할 역할 부여 헬퍼 함수
     async def _grant_step_role(self, interaction: discord.Interaction, role_key_to_add: str):
         role_id = get_id(role_key_to_add)
         if role_id and isinstance(interaction.user, discord.Member):
             if role := interaction.guild.get_role(role_id):
                 try:
-                    if role not in interaction.user.roles:
-                        await interaction.user.add_roles(role, reason="オンボーディング進行")
-                except Exception as e:
-                    logger.error(f"온보딩 가이드 중 역할 부여 실패: {e}")
-                    # 에러가 발생해도 조용히 넘어감 (사용자에게 직접적인 피드백은 생략)
-            else:
-                logger.warning(f"온보딩: DB에 설정된 역할 ID({role_id})를 서버에서 찾을 수 없습니다. ({role_key_to_add})")
-    
-    # [개선] go_next에서 사용할 메시지 업데이트 헬퍼 함수
+                    if role not in interaction.user.roles: await interaction.user.add_roles(role, reason="オンボーディング進行")
+                except Exception as e: logger.error(f"온보딩 가이드 중 역할 부여 실패: {e}")
+            else: logger.warning(f"온보딩: DB에 설정된 역할 ID({role_id})를 서버에서 찾을 수 없습니다. ({role_key_to_add})")
     def _prepare_next_step_message_content(self) -> dict:
         step_info = self.steps_data[self.current_step]
         embed_data = step_info.get("embed_data", {}).get("embed_data")
@@ -279,38 +265,21 @@ class OnboardingGuideView(ui.View):
         else: embed = format_embed_from_db(embed_data, member_mention=self.user.mention)
         self._update_components()
         return {"embed": embed, "view": self}
-
-    # [개선] 역할 부여와 페이지 전환을 동시에 처리하여 속도를 최적화
     async def go_next(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        
         tasks = []
-        # 1. 현재 스텝에서 부여할 역할이 있다면, 역할 부여 작업을 준비
         step_info = self.steps_data[self.current_step]
         role_key_to_add = step_info.get("role_key_to_add")
-        if role_key_to_add:
-            tasks.append(self._grant_step_role(interaction, role_key_to_add))
-        
-        # 2. 다음 스텝으로 상태를 변경
-        if self.current_step < len(self.steps_data) - 1:
-            self.current_step += 1
-        
-        # 3. 다음 페이지의 내용을 준비하고, 메시지 수정 작업을 준비
+        if role_key_to_add: tasks.append(self._grant_step_role(interaction, role_key_to_add))
+        if self.current_step < len(self.steps_data) - 1: self.current_step += 1
         content = self._prepare_next_step_message_content()
         tasks.append(self.message.edit(**content))
-
-        # 4. 준비된 모든 작업(역할 부여, 메시지 수정)을 동시에 실행
         await asyncio.gather(*tasks)
-    
     async def go_previous(self, interaction: discord.Interaction):
         await interaction.response.defer()
         if self.current_step > 0: self.current_step -= 1
-        
-        # 여기서는 메시지 업데이트만 필요
         content = self._prepare_next_step_message_content()
-        if self.message:
-            await self.message.edit(**content)
-
+        if self.message: await self.message.edit(**content)
     async def create_introduction(self, interaction: discord.Interaction):
         await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
         if self.message:
@@ -318,9 +287,8 @@ class OnboardingGuideView(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
-# --- OnboardingPanelView (변경 없음) ---
+# --- OnboardingPanelView (쿨타임 로직 강화) ---
 class OnboardingPanelView(ui.View):
-    # ... (이전과 동일, 생략하지 않음) ...
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
     async def setup_buttons(self):
@@ -335,24 +303,42 @@ class OnboardingPanelView(ui.View):
                 button = ui.Button(label=comp.get('label'),style=style,emoji=comp.get('emoji'),row=comp.get('row'),custom_id=comp.get('component_key'))
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
+    
     async def start_guide_callback(self, interaction: discord.Interaction):
-        if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
-            await interaction.response.send_message("すでに案内の手続きを開始しています。DMを確認してください。", ephemeral=True); return
-        user_id_str = str(interaction.user.id); cooldown_key = "onboarding_start"
+        user_id_str = str(interaction.user.id)
+        cooldown_key = "onboarding_start"
         cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
+
+        # [요청 사항 반영] "이미 진행 중"일 때도 남은 쿨타임을 알려주도록 메시지 개선
+        if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
+            last_time = await get_cooldown(user_id_str, cooldown_key)
+            remaining_time = cooldown_seconds - (time.time() - last_time)
+            
+            message = "すでに案内の手続きを開始しています。DMを確認してください。"
+            if remaining_time > 0:
+                minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
+                message += f"\n案内が終了した場合、次の案内まであと {minutes}分{seconds}秒 お待ちください。"
+
+            await interaction.response.send_message(message, ephemeral=True)
+            return
+            
         last_time = await get_cooldown(user_id_str, cooldown_key)
         if last_time > 0 and (time.time() - last_time) < cooldown_seconds:
             remaining_time = cooldown_seconds - (time.time() - last_time)
             minutes = int(remaining_time // 60); seconds = int(remaining_time % 60)
             await interaction.response.send_message(f"次の案内まであと {minutes}分{seconds}秒 お待ちください。", ephemeral=True); return
+        
         await set_cooldown(user_id_str, cooldown_key, time.time())
         self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
+        
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             steps = await get_onboarding_steps()
             if not steps: 
                 await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True)
-                await set_cooldown(user_id_str, cooldown_key, 0); return
+                # [요청 사항 반영] 어떤 상황에서도 쿨타임 초기화 코드를 실행하지 않도록 해당 라인 삭제
+                return
+            
             guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user)
             content = guide_view._prepare_next_step_message_content()
             message = await interaction.followup.send(**content, ephemeral=True)
@@ -372,8 +358,7 @@ class Onboarding(commands.Cog):
         self.active_onboarding_sessions: set = set()
         self._user_locks: Dict[int, asyncio.Lock] = {}
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
-        if user_id not in self._user_locks:
-            self._user_locks[user_id] = asyncio.Lock()
+        if user_id not in self._user_locks: self._user_locks[user_id] = asyncio.Lock()
         return self._user_locks[user_id]
     @property
     def approval_channel(self) -> Optional[discord.TextChannel]:
