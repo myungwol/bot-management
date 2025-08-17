@@ -27,7 +27,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
     age = ui.TextInput(label="年齢", placeholder="例：20代、90年生まれ、30歳、非公開", required=True, max_length=20)
     gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
-    hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
+    hobby = ui.TextInput(label="趣味", placeholder="趣味を自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
     async def on_submit(self, interaction: discord.Interaction):
@@ -146,7 +146,6 @@ class ApprovalView(ui.View):
             except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다.")
             if (ch_id := self.onboarding_cog.rejection_log_channel_id) and (ch := guild.get_channel(ch_id)):
                 embed = discord.Embed(title="❌ 住人登録が拒否されました", color=discord.Color.red())
-                # [수정] "住民" -> "旅の人"으로 필드 이름 변경
                 embed.add_field(name="旅の人", value=member.mention, inline=False)
                 for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
                 embed.add_field(name="拒否理由", value=self.rejection_reason or "理由未入力", inline=False); embed.add_field(name="担当者", value=moderator.mention, inline=False)
@@ -162,6 +161,16 @@ class OnboardingGuideView(ui.View):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
         self.user = user; self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
         self.user_lock = asyncio.Lock()
+    async def on_timeout(self) -> None:
+        self.onboarding_cog.active_onboarding_sessions.discard(self.user.id)
+        logger.info(f"온보딩 세션 타임아웃: {self.user.name} ({self.user.id})")
+        if self.message:
+            for item in self.children: item.disabled = True
+            try: await self.message.edit(content="案内の時間が経過しました。最初からやり直してください。", view=self)
+            except (discord.NotFound, discord.HTTPException): pass
+    def stop(self):
+        self.onboarding_cog.active_onboarding_sessions.discard(self.user.id)
+        super().stop()
     def _update_components(self):
         self.clear_items(); step_info = self.steps_data[self.current_step]
         is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
@@ -231,38 +240,24 @@ class OnboardingPanelView(ui.View):
                 button = ui.Button(label=comp.get('label'),style=style,emoji=comp.get('emoji'),row=comp.get('row'),custom_id=comp.get('component_key'))
                 if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
                 self.add_item(button)
-    
-    # --- [수정] 중복 실행 방지 로직 추가 ---
     async def start_guide_callback(self, interaction: discord.Interaction):
-        # 1. 이 유저가 이미 안내를 진행 중인지 확인합니다.
         if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
             await interaction.response.send_message("すでに案内の手続きを開始しています。DMを確認してください。", ephemeral=True)
             return
-        
-        # 2. 진행 중인 유저로 등록합니다.
         self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
-        
         await interaction.response.defer(ephemeral=True, thinking=True)
-        
         try:
             steps = await get_onboarding_steps()
             if not steps:
                 await interaction.followup.send("現在、案内を準備中です。しばらくお待ちください。", ephemeral=True)
                 return
-            
-            guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user)
-            first_step_info = steps[0]
+            guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user); first_step_info = steps[0]
             embed_data = first_step_info.get("embed_data", {}).get("embed_data")
-            if not embed_data:
-                embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
-            else:
-                embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
-            
+            if not embed_data: embed = discord.Embed(title="エラー", description="表示データが見つかりません。", color=discord.Color.red())
+            else: embed = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
             guide_view._update_components()
             message = await interaction.followup.send(embed=embed, view=guide_view, ephemeral=True)
             guide_view.message = message
-            
-            # 3. View가 끝나면(타임아웃 또는 완료) 진행 중인 유저 목록에서 제거합니다.
             await guide_view.wait()
         finally:
             self.onboarding_cog.active_onboarding_sessions.discard(interaction.user.id)
@@ -273,7 +268,7 @@ class Onboarding(commands.Cog):
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None; self.main_chat_channel_id: Optional[int] = None
         self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-        self.active_onboarding_sessions: set = set() # [신규] 현재 온보딩을 진행 중인 유저를 추적
+        self.active_onboarding_sessions: set = set()
     @property
     def approval_channel(self) -> Optional[discord.TextChannel]:
         if self.approval_channel_id: return self.bot.get_channel(self.approval_channel_id)
