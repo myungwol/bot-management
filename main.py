@@ -6,7 +6,7 @@ import os
 import asyncio
 import logging
 import logging.handlers
-from datetime import datetime, timezone # [수정] 버전 정보 표시를 위해 import
+from datetime import datetime, timezone
 
 from utils.database import load_all_data_from_db, sync_defaults_to_db
 
@@ -23,23 +23,15 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get('BOT_TOKEN'); TEST_GUILD_ID = os.environ.get('TEST_GUILD_ID')
 intents = discord.Intents.default(); intents.members = True; intents.message_content = True; intents.voice_states = True
 
-# [수정] Railway 재배포를 확실히 하기 위해 버전 정보를 추가합니다.
-BOT_VERSION = "v1.2-cooldown-fix"
+# [수정] Railway 재배포를 확실히 하기 위해 버전을 올립니다.
+BOT_VERSION = "v1.3-final-cooldown-fix"
 
 # --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs)
     async def setup_hook(self):
         await self.load_all_extensions()
-        
-        # 이 봇이 관리하는 View 목록
-        # [수정] 분리된 Cog 이름에 맞게 수정
-        cogs_with_persistent_views = [
-            "RolePanel", 
-            "Onboarding", 
-            "Nicknames"
-        ]
-        
+        cogs_with_persistent_views = ["RolePanel", "Onboarding", "Nicknames"]
         registered_views = 0
         for cog_name in cogs_with_persistent_views:
             cog = self.get_cog(cog_name)
@@ -70,7 +62,6 @@ bot = MyBot(command_prefix="/", intents=intents)
 async def regenerate_all_panels():
     logger.info("------ [ 모든 패널 자동 재생성 시작 ] ------")
     regenerated_panels = 0
-    # [수정] 분리된 Cog 이름에 맞게 수정
     panel_cogs = ["RolePanel", "Onboarding", "Nicknames"]
     for cog_name in panel_cogs:
         cog = bot.get_cog(cog_name)
@@ -84,16 +75,13 @@ async def regenerate_all_panels():
 
 @bot.event
 async def on_ready():
-    # [수정] 봇 버전 정보를 로그에 표시합니다.
     logger.info("==================================================")
     logger.info(f"✅ {bot.user.name}(이)가 성공적으로 로그인했습니다.")
     logger.info(f"✅ 봇 버전: {BOT_VERSION}")
     logger.info(f"✅ 현재 UTC 시간: {datetime.now(timezone.utc)}")
     logger.info("==================================================")
-
     await sync_defaults_to_db()
     await load_all_data_from_db()
-    
     logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
     refreshed_cogs = 0
     for cog_name, cog in bot.cogs.items():
@@ -102,7 +90,6 @@ async def on_ready():
             except Exception as e: logger.error(f"❌ '{cog_name}' Cog 설정 새로고침 중 오류: {e}", exc_info=True)
     logger.info(f"✅ 총 {refreshed_cogs}개의 Cog 설정이 새로고침되었습니다.")
     logger.info("------ [ 모든 Cog 설정 새로고침 완료 ] ------")
-
     try:
         if TEST_GUILD_ID:
             guild = discord.Object(id=int(TEST_GUILD_ID)); await bot.tree.sync(guild=guild)
