@@ -4,12 +4,9 @@
 봇이 시작될 때 이 파일의 데이터가 Supabase 데이터베이스에 동기화됩니다.
 """
 
-# ==============================================================================
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 1. 역할 키 맵 (Role Key Map)
-# - 역할의 논리적 이름(key)과 실제 Discord 역할 이름(name), 속성을 매핑합니다.
-# - is_prefix: 닉네임 접두사(칭호)로 사용될지 여부
-# - priority: 접두사 우선순위 (높을수록 우선)
-# ==============================================================================
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_ROLE_KEY_MAP = {
     # --- 관리/스태프 역할 ---
     "role_admin_total":         {"name": "森の妖精", "is_prefix": True, "priority": 100},
@@ -69,108 +66,48 @@ UI_ROLE_KEY_MAP = {
     "role_platform_switch":     {"name": "スイッチ", "is_prefix": False, "priority": 0},
 }
 
-
-# ==============================================================================
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 2. 임베드(Embed) 기본값
-# - 봇이 사용하는 모든 임베드의 기본 템플릿입니다.
-# - {placeholder} 형식으로 변수를 사용하여 동적으로 내용을 채울 수 있습니다.
-# ==============================================================================
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_EMBEDS = {
     # --- 서버 입장/퇴장 ---
-    "welcome_embed": {
-        "title": "🎉 {guild_name}へようこそ！",
-        "description": "{member_mention}さん、はじめまして！\n\nまずは、サーバーの案内を読んで、自己紹介の作成をお願いします。",
-        "color": 0x3498DB
-    },
-    "farewell_embed": {
-        "title": "👋 また会いましょう",
-        "description": "{member_name}さんが村から旅立ちました。",
-        "color": 0x99AAB5
-    },
-
+    "welcome_embed": {"title": "🎉 {guild_name}へようこそ！", "description": "{member_mention}さん、はじめまして！\n\nまずは、サーバーの案内を読んで、自己紹介の作成をお願いします。", "color": 0x3498DB},
+    "farewell_embed": {"title": "👋 また会いましょう", "description": "{member_name}さんが村から旅立ちました。", "color": 0x99AAB5},
     # --- 패널 ---
-    "panel_roles": {
-        "title": "📖 役割付与",
-        "description": "下のメニューからカテゴリーを選択して、自分に必要な役割を受け取ってください。",
-        "color": 0x5865F2
-    },
-    "panel_onboarding": {
-        "title": "📝 村役場・案内所",
-        "description": "初めての方は、まず「案内を読む」ボタンを押して、サーバーでの過ごし方を確認してください。",
-        "color": 0x5865F2
-    },
-    "panel_nicknames": {
-        "title": "✒️ 名前変更",
-        "description": "村で使う名前を変更したい場合は、下のボタンから申請してください。",
-        "color": 0x5865F2
-    },
-    
+    "panel_roles": {"title": "📖 役割付与", "description": "下のメニューからカテゴリーを選択して、自分に必要な役割を受け取ってください。", "color": 0x5865F2},
+    "panel_onboarding": {"title": "📝 村役場・案内所", "description": "初めての方は、まず「案内を読む」ボタンを押して、サーバーでの過ごし方を確認してください。", "color": 0x5865F2},
+    "panel_nicknames": {"title": "✒️ 名前変更", "description": "村で使う名前を変更したい場合は、下のボタンから申請してください。", "color": 0x5865F2},
     # --- 온보딩 프로세스 ---
-    "embed_onboarding_info_roles": {
-        "title": "📖 役割付与 (情報)",
-        "description": "次に、ご自身の情報を表す役割を選択してください。\n\nこの情報は、他の住民があなたをよりよく知るのに役立ちます。（非公開も可能です）",
-        "color": 0x5865F2
-    },
-    "embed_onboarding_final_rules": {
-        "title": "📝 最終確認",
-        "description": "ありがとうございます！\n\n最後に、村のルールをもう一度確認してください。\n\n- 他の住民を尊重し、迷惑をかけないこと。\n- 問題が発生した場合は、すぐに村役場（管理者）に報告すること。\n\n下のボタンを押すと、住民登録票の作成に進みます。",
-        "color": 0x3498DB
-    },
-    "embed_onboarding_approval": {
-        "title": "📝 新しい住民登録票",
-        "description": "{member_mention}さんが住民登録票を提出しました。",
-        "color": 0xE67E22
-    },
-    "embed_main_chat_welcome": {
-        "description": "🎉 {member_mention}さんが新しい住民になりました！これからよろしくお願いします！",
-        "color": 0x2ECC71
-    },
-    "embed_introduction_log": {
-        "title": "📝 自己紹介",
-        "description": "新しい住民がやってきました！みんなで歓迎しましょう！",
-        "color": 0x2ECC71
-    },
+    "embed_onboarding_info_roles": {"title": "📖 役割付与 (情報)", "description": "次に、ご自身の情報を表す役割を選択してください。\n\nこの情報は、他の住民があなたをよりよく知るのに役立ちます。（非公開も可能です）", "color": 0x5865F2},
+    "embed_onboarding_final_rules": {"title": "📝 最終確認", "description": "ありがとうございます！\n\n最後に、村のルールをもう一度確認してください。\n\n- 他の住民を尊重し、迷惑をかけないこと。\n- 問題が発生した場合は、すぐに村役場（管理者）に報告すること。\n\n下のボタンを押すと、住民登録票の作成に進みます。", "color": 0x3498DB},
+    "embed_onboarding_approval": {"title": "📝 新しい住民登録票", "description": "{member_mention}さんが住民登録票を提出しました。", "color": 0xE67E22},
+    "embed_main_chat_welcome": {"description": "🎉 {member_mention}さんが新しい住民になりました！これからよろしくお願いします！", "color": 0x2ECC71},
+    "embed_introduction_log": {"title": "📝 自己紹介", "description": "新しい住民がやってきました！みんなで歓迎しましょう！", "color": 0x2ECC71},
 }
 
-
-# ==============================================================================
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 3. 패널 컴포넌트(Panel Components) 기본값
-# - 패널에 표시될 버튼 등의 UI 컴포넌트 정보입니다.
-# ==============================================================================
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_PANEL_COMPONENTS = [
-    # --- 온보딩 패널 ---
     {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0},
-    
-    # --- 닉네임 변경 패널 ---
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0},
 ]
 
-
-# ==============================================================================
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 4. /setup 명령어 설정 맵
-# - /setup 명령어로 설정할 수 있는 항목들의 목록입니다.
-# - type: 'panel' 또는 'channel'
-# - cog_name: 이 설정을 사용하는 Cog의 이름 (설정 변경 시 해당 Cog의 설정을 리로드하기 위함)
-# - key: 데이터베이스 `channel_configs` 테이블에 저장될 키
-# - friendly_name: 명령어 선택지에 표시될 이름
-# ==============================================================================
+# - friendly_name: 명령어 선택지에 표시될 이름 (관리자 편의를 위해 한글로 작성)
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 SETUP_COMMAND_MAP = {
-    # --- 패널 설치 ---
-    "panel_roles":      {"type": "panel",   "cog_name": "RolePanel",    "key": "auto_role_channel_id",            "friendly_name": "役割パネル"},
-    "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "案内パネル"},
-    "panel_nicknames":  {"type": "panel",   "cog_name": "Nicknames",    "key": "nickname_panel_channel_id",       "friendly_name": "名前変更パネル"},
-    
-    # --- 일반 채널 설정 ---
-    "channel_new_welcome": {"type": "channel", "cog_name": "MemberEvents", "key": "new_welcome_channel_id",      "friendly_name": "新規参加者歓迎チャンネル"},
-    "channel_farewell":    {"type": "channel", "cog_name": "MemberEvents", "key": "farewell_channel_id",         "friendly_name": "退場メッセージチャンネル"},
-    "channel_main_chat":   {"type": "channel", "cog_name": "Onboarding",   "key": "main_chat_channel_id",        "friendly_name": "メインチャットチャンネル"},
-
-    # --- 승인/알림용 채널 설정 ---
-    "channel_onboarding_approval": {"type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id", "friendly_name": "自己紹介承認チャンネル"},
-    "channel_nickname_approval":   {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_approval_channel_id",   "friendly_name": "名前変更承認チャンネル"},
-    
-    # --- 로그 채널 설정 ---
-    "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "名前変更ログ"},
-    "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "自己紹介承認ログ"},
-    "log_intro_rejection":   {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",  "friendly_name": "自己紹介拒否ログ"},
+    # --- [채널/패널 설정] ---
+    "panel_roles":      {"type": "panel",   "cog_name": "RolePanel",    "key": "auto_role_channel_id",            "friendly_name": "역할 자동부여 패널"},
+    "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "서버 안내 패널"},
+    "panel_nicknames":  {"type": "panel",   "cog_name": "Nicknames",    "key": "nickname_panel_channel_id",       "friendly_name": "닉네임 변경 패널"},
+    "channel_new_welcome": {"type": "channel", "cog_name": "MemberEvents", "key": "new_welcome_channel_id",      "friendly_name": "신규 멤버 환영 채널"},
+    "channel_farewell":    {"type": "channel", "cog_name": "MemberEvents", "key": "farewell_channel_id",         "friendly_name": "멤버 퇴장 안내 채널"},
+    "channel_main_chat":   {"type": "channel", "cog_name": "Onboarding",   "key": "main_chat_channel_id",        "friendly_name": "메인 채팅 채널 (자기소개 승인 후 안내)"},
+    "channel_onboarding_approval": {"type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id", "friendly_name": "자기소개 승인/거절 채널"},
+    "channel_nickname_approval":   {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_approval_channel_id",   "friendly_name": "닉네임 변경 승인 채널"},
+    "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록"},
+    "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "[로그] 자기소개 승인 기록"},
+    "log_intro_rejection":   {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",  "friendly_name": "[로그] 자기소개 거절 기록"},
 }
