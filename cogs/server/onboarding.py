@@ -6,13 +6,14 @@ from discord import app_commands, ui
 import asyncio
 import logging
 import re
-# [수정] 시간대(Timezone) 문제를 해결하기 위해 datetime과 timezone을 가져옵니다.
+# [수정] time 모듈을 다시 사용합니다.
+import time
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-# [수정] 새로운 쿨타임 함수를 가져옵니다.
+# [수정] 원래의 쿨타임 함수 이름을 다시 사용하도록 수정합니다.
 from utils.database import (
-    get_id, save_panel_id, get_panel_id, get_cooldown_dt, set_cooldown_dt, 
+    get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
     get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
 from utils.helpers import format_embed_from_db
@@ -282,7 +283,6 @@ class OnboardingGuideView(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
-# --- OnboardingPanelView (시차 문제 최종 해결) ---
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
@@ -302,28 +302,26 @@ class OnboardingPanelView(ui.View):
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        cooldown_seconds = 300 # 5분
+        cooldown_seconds = 300
 
-        # [수정] 새로운 get_cooldown_dt 함수를 사용합니다.
-        last_cooldown_dt = await get_cooldown_dt(user_id_str, cooldown_key)
-        now_utc = datetime.now(timezone.utc)
+        # [수정] UTC 기준 현재 시간을 가져옵니다.
+        # time.time() 대신 datetime.now(timezone.utc).timestamp()를 사용하여 시차 문제를 원천 방지합니다.
+        utc_now = datetime.now(timezone.utc).timestamp()
+        last_time = await get_cooldown(user_id_str, cooldown_key)
 
-        if last_cooldown_dt:
-            # [수정] datetime 객체를 사용하여 시간 차이를 정확하게 계산합니다.
-            seconds_passed = (now_utc - last_cooldown_dt).total_seconds()
-            if seconds_passed < cooldown_seconds:
-                remaining_time = cooldown_seconds - seconds_passed
-                minutes = int(remaining_time // 60)
-                seconds = int(remaining_time % 60)
-                await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
-                return
+        if last_time > 0 and (utc_now - last_time) < cooldown_seconds:
+            remaining_time = cooldown_seconds - (utc_now - last_time)
+            minutes = int(remaining_time // 60)
+            seconds = int(remaining_time % 60)
+            await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
+            return
 
         if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
             await interaction.response.send_message("すでに案内の手続きを開始しています。DMをご確認ください。", ephemeral=True)
             return
         
-        # [수정] 새로운 set_cooldown_dt 함수를 사용하여 현재 UTC 시간을 저장합니다.
-        await set_cooldown_dt(user_id_str, cooldown_key)
+        # [수정] 현재 UTC 시간을 기준으로 쿨타임을 설정합니다.
+        await set_cooldown(user_id_str, cooldown_key)
         self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
         
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -341,9 +339,7 @@ class OnboardingPanelView(ui.View):
         finally:
             self.onboarding_cog.active_onboarding_sessions.discard(interaction.user.id)
 
-# --- Onboarding Cog (변경 없음) ---
 class Onboarding(commands.Cog):
-    # ... (이전과 동일, 생략하지 않음) ...
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
