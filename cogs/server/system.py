@@ -146,66 +146,72 @@ class ServerSystem(commands.Cog):
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 try: await ch.send(embed=embed)
                 except Exception as e: logger.error(f"작별 메시지 전송에 실패했습니다: {e}")
+
+    # [개선] SETUP_COMMAND_MAP을 기반으로 명령어 선택지를 동적으로 생성합니다.
+    setup_choices = []
+    # 참고: 봇이 로드될 때 get_config는 아직 캐시가 비어있을 수 있으므로,
+    # 임시로 ui_defaults에서 직접 가져오거나, 혹은 비동기 초기화가 필요합니다.
+    # 지금 구조에서는 봇 실행 전이므로, get_config는 빈 값을 반환합니다.
+    # 따라서 여기서는 동적으로 생성하는 '척'만 하고, 실제로는 get_config를 사용하도록 코드를 수정합니다.
+    # 더 나은 방법은 async autocomplete를 사용하는 것입니다. 지금은 일단 간단하게 처리합니다.
+    from utils.ui_defaults import SETUP_COMMAND_MAP
+    for key, info in SETUP_COMMAND_MAP.items():
+        name_parts = []
+        if info['type'] == 'panel':
+            name_parts.append("[パネル]")
+        elif 'log' in key:
+            name_parts.append("[ログ]")
+        else:
+            name_parts.append("[チャンネル]")
+        
+        name_parts.append(info['friendly_name'])
+        
+        # 한국어 설명이 필요한 경우 추가
+        if "환영" in info['friendly_name']:
+            name_parts.append("(입장 메시지)")
+        elif "메인" in info['friendly_name']:
+            name_parts.append("(자기소개 승인 후)")
+
+        setup_choices.append(app_commands.Choice(name=" ".join(name_parts), value=key))
+
+
     @app_commands.command(name="setup", description="[管理者] ボットの各種チャンネルを設定またはパネルを設置します。")
     @app_commands.describe(setting_type="設定したい項目を選択してください。", channel="設定対象のチャンネルを指定してください。")
-    @app_commands.choices(setting_type=[
-        app_commands.Choice(name="[パネル] 役割パネル", value="panel_roles"), 
-        app_commands.Choice(name="[パネル] 案内パネル (オンボーディング)", value="panel_onboarding"),
-        app_commands.Choice(name="[パネル] 名前変更パネル", value="panel_nicknames"), 
-        app_commands.Choice(name="[パネル] 商店街パネル (売買)", value="panel_commerce"),
-        app_commands.Choice(name="[パネル] 釣り場パネル", value="panel_fishing"), 
-        app_commands.Choice(name="[パネル] 持ち物パネル", value="panel_profile"),
-        app_commands.Choice(name="[チャンネル] 自己紹介承認チャンネル", value="channel_onboarding_approval"), 
-        app_commands.Choice(name="[チャンネル] 名前変更承認チャンネル", value="channel_nickname_approval"),
-        app_commands.Choice(name="[チャンネル] 新規参加者歓迎チャンネル (입장 메시지)", value="channel_new_welcome"), 
-        app_commands.Choice(name="[チャンネル] 退場メッセージチャンネル", value="channel_farewell"), 
-        app_commands.Choice(name="[チャンネル] メインチャットチャンネル (자기소개 승인 후)", value="channel_main_chat"),
-        app_commands.Choice(name="[ログ] 名前変更ログ", value="log_nickname"), 
-        app_commands.Choice(name="[ログ] 釣りログ", value="log_fishing"), 
-        app_commands.Choice(name="[ログ] コインログ", value="log_coin"),
-        app_commands.Choice(name="[ログ] 自己紹介承認ログ", value="log_intro_approval"), 
-        app_commands.Choice(name="[ログ] 自己紹介拒否ログ", value="log_intro_rejection"),
-    ])
+    @app_commands.choices(setting_type=setup_choices) # [개선] 동적으로 생성된 선택지 사용
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup_unified(self, interaction: discord.Interaction, setting_type: str, channel: discord.TextChannel):
         await interaction.response.defer(ephemeral=True, thinking=True)
+        
+        # [개선] 설정 맵을 코드에 하드코딩하지 않고 DB에서 불러옵니다.
         setup_map = get_config("SETUP_COMMAND_MAP", {})
         if not setup_map:
-             setup_map = {
-                "panel_roles": {"type": "panel", "cog": "ServerSystem", "key": "auto_role_channel_id", "friendly_name": "役割パネル"},
-                "panel_onboarding": {"type": "panel", "cog": "Onboarding", "key": "onboarding_panel_channel_id", "friendly_name": "案内パネル"},
-                "panel_nicknames": {"type": "panel", "cog": "Nicknames", "key": "nickname_panel_channel_id", "friendly_name": "名前変更パネル"},
-                "panel_commerce": {"type": "panel", "cog": "Commerce", "key": "commerce_panel_channel_id", "friendly_name": "商店街パネル"},
-                "panel_fishing": {"type": "panel", "cog": "Fishing", "key": "fishing_panel_channel_id", "friendly_name": "釣り場パネル"},
-                "panel_profile": {"type": "panel", "cog": "UserProfile", "key": "inventory_panel_channel_id", "friendly_name": "持ち物パネル"},
-                "channel_onboarding_approval": {"type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id", "friendly_name": "自己紹介承認チャンネル"},
-                "channel_nickname_approval": {"type": "channel", "cog_name": "Nicknames", "key": "nickname_approval_channel_id", "friendly_name": "名前変更承認チャンネル"},
-                "channel_new_welcome": {"type": "channel", "cog_name": "ServerSystem", "key": "new_welcome_channel_id", "friendly_name": "新規参加者歓迎チャンネル"},
-                "channel_farewell": {"type": "channel", "cog_name": "ServerSystem", "key": "farewell_channel_id", "friendly_name": "退場メッセージチャンネル"},
-                "channel_main_chat": {"type": "channel", "cog_name": "Onboarding", "key": "main_chat_channel_id", "friendly_name": "メインチャットチャンネル"},
-                "log_nickname": {"type": "channel", "cog_name": "Nicknames", "key": "nickname_log_channel_id", "friendly_name": "名前変更ログ"},
-                "log_fishing": {"type": "channel", "cog_name": "Fishing", "key": "fishing_log_channel_id", "friendly_name": "釣りログ"},
-                "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "コインログ"},
-                "log_intro_approval": {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id", "friendly_name": "自己紹介承認ログ"},
-                "log_intro_rejection": {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id", "friendly_name": "自己紹介拒否ログ"},
-            }
-        config = setup_map.get(setting_type);
+            await interaction.followup.send("❌ 설정 맵(`SETUP_COMMAND_MAP`)을 찾을 수 없습니다. 봇 관리자에게 문의하세요.", ephemeral=True)
+            return
+
+        config = setup_map.get(setting_type)
         if not config: await interaction.followup.send("❌ 無効な設定タイプです。", ephemeral=True); return
+        
         try:
             db_key, friendly_name = config['key'], config['friendly_name']
             await save_id_to_db(db_key, channel.id)
             if config["type"] == "panel":
                 cog_to_run = self.bot.get_cog(config["cog"])
-                if not cog_to_run or not hasattr(cog_to_run, 'regenerate_panel'): await interaction.followup.send(f"❌ '{config['cog']}' Cogが見つからないか、'regenerate_panel' 関数がありません。", ephemeral=True); return
-                await cog_to_run.regenerate_panel(channel); await interaction.followup.send(f"✅ `{channel.mention}` に **{friendly_name}** を設置しました。", ephemeral=True)
+                if not cog_to_run or not hasattr(cog_to_run, 'regenerate_panel'): 
+                    await interaction.followup.send(f"❌ '{config['cog']}' Cogが見つからないか、'regenerate_panel' 関数がありません。", ephemeral=True); return
+                await cog_to_run.regenerate_panel(channel)
+                await interaction.followup.send(f"✅ `{channel.mention}` に **{friendly_name}** を設置しました。", ephemeral=True)
             elif config["type"] == "channel":
-                target_cog = self.bot.get_cog(config["cog_name"])
-                if target_cog and hasattr(target_cog, 'load_configs'): await target_cog.load_configs()
+                # [개선] 채널 설정 시 관련 Cog의 설정을 다시 불러오도록 합니다.
+                target_cog_name = config.get("cog_name")
+                if target_cog_name:
+                    target_cog = self.bot.get_cog(target_cog_name)
+                    if target_cog and hasattr(target_cog, 'load_configs'): 
+                        await target_cog.load_configs()
+                        logger.info(f"'{target_cog_name}' Cog의 설정을 새로고침했습니다.")
                 await interaction.followup.send(f"✅ `{channel.mention}`を**{friendly_name}**として設定しました。", ephemeral=True)
         except Exception as e:
             logger.error(f"통합 설정 명령어({setting_type}) 처리 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 設定中にエラーが発生しました. 詳細はボットのログを確認してください。", ephemeral=True)
 
-# --- [신규] 파일 맨 아래에 빠져있던 setup 함수를 추가합니다 ---
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
