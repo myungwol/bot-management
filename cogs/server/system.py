@@ -229,7 +229,7 @@ class ServerSystem(commands.Cog):
         embed.description = "\n\n".join(description)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     # 4. /setup check_counts (멤버 수 진단용 임시 명령어)
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     @setup.command(name="check_counts", description="[관리자] 현재 봇이 인식하는 각종 멤버 수를 직접 확인합니다.")
@@ -272,6 +272,6 @@ class ServerSystem(commands.Cog):
             embed.add_field(name="🔍 분석", value="API와 내부 목록의 인원수가 일치합니다. 문제가 다른 곳에 있을 수 있습니다.", inline=False)
 
         await interaction.followup.send(embed=embed, ephemeral=True)
-
+        
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
