@@ -13,6 +13,8 @@ from utils.database import (
     get_all_stats_channels, add_stats_channel, remove_stats_channel,
     save_config_to_db # 역할 동기화를 위해 추가
 )
+# [수정] 역할 동기화 시 최신 데이터를 가져오기 위해 직접 임포트
+from utils.ui_defaults import UI_ROLE_KEY_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -121,17 +123,15 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
 
         # --- 2. 역할 관련 로직 ---
-         elif action == "roles_sync":
-            # 이 부분이 from utils.ui_defaults import UI_ROLE_KEY_MAP 로 시작해야 합니다.
-            from utils.ui_defaults import UI_ROLE_KEY_MAP
-
+        elif action == "roles_sync":
+            # DB의 ROLE_KEY_MAP을 최신 상태로 먼저 업데이트
             role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
             await save_config_to_db("ROLE_KEY_MAP", role_name_map)
-            
 
             synced_roles, missing_roles, error_roles = [], [], []
             server_roles_by_name = {r.name: r.id for r in interaction.guild.roles}
             
+            # 최신 UI_ROLE_KEY_MAP을 기준으로 동기화 진행
             for db_key, role_info in UI_ROLE_KEY_MAP.items():
                 role_name = role_info.get('name')
                 if not role_name: continue
