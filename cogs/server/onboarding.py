@@ -6,15 +6,12 @@ from discord import app_commands, ui
 import asyncio
 import logging
 import re
-# [수정] time 모듈을 다시 사용합니다.
-import time
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-# [수정] 원래의 쿨타임 함수 이름을 다시 사용하도록 수정합니다.
 from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
-    get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
+    get_embed_from_db, get_onboarding_steps, get_panel_components_from_db
 )
 from utils.helpers import format_embed_from_db
 
@@ -135,6 +132,7 @@ class ApprovalView(ui.View):
             else: failed_to_find_roles.append(resident_role_key)
             if (rid := get_id(rookie_role_key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
             else: failed_to_find_roles.append(rookie_role_key)
+            from utils.database import get_config # Local import to avoid circular dependency
             gender_role_mapping = get_config("GENDER_ROLE_MAPPING", [])
             if gender_field := self._get_field_value(self.original_embed, "性別"):
                 for rule in gender_role_mapping:
@@ -287,6 +285,7 @@ class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
     async def setup_buttons(self):
+        from utils.database import get_config
         button_styles = get_config("DISCORD_BUTTON_STYLES_MAP", {})
         components_data = await get_panel_components_from_db('onboarding')
         if not components_data:
@@ -302,10 +301,9 @@ class OnboardingPanelView(ui.View):
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
+        # [최종 수정] DB나 캐시에 의존하지 않고, 쿨타임은 무조건 300초(5분)로 고정합니다.
         cooldown_seconds = 300
 
-        # [수정] UTC 기준 현재 시간을 가져옵니다.
-        # time.time() 대신 datetime.now(timezone.utc).timestamp()를 사용하여 시차 문제를 원천 방지합니다.
         utc_now = datetime.now(timezone.utc).timestamp()
         last_time = await get_cooldown(user_id_str, cooldown_key)
 
@@ -320,7 +318,6 @@ class OnboardingPanelView(ui.View):
             await interaction.response.send_message("すでに案内の手続きを開始しています。DMをご確認ください。", ephemeral=True)
             return
         
-        # [수정] 현재 UTC 시간을 기준으로 쿨타임을 설정합니다.
         await set_cooldown(user_id_str, cooldown_key)
         self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
         
