@@ -56,7 +56,7 @@ class NicknameApprovalView(ui.View):
             modal = RejectionReasonModal()
             await interaction.response.send_modal(modal)
             if await modal.wait() or not modal.reason.value:
-                return # Modal timeout or no reason given
+                return
             rejection_reason = modal.reason.value
         else:
             await interaction.response.defer()
@@ -176,7 +176,6 @@ class NicknameChangerPanelView(ui.View):
         if lock.locked():
             return await i.response.send_message("以前のリクエストを処理中です。", ephemeral=True)
         async with lock:
-            # [수정] get_config로 가져온 값을 int()로 감싸서 숫자로 만듭니다.
             try:
                 cooldown_seconds = int(get_config("NICKNAME_CHANGE_COOLDOWN_SECONDS", 14400))
             except (ValueError, TypeError):
@@ -220,13 +219,16 @@ class Nicknames(commands.Cog):
         self.approval_role_id = get_id("role_approval")
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
+    # [수정] get_final_nickname 메서드
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
         prefix_hierarchy = get_config("NICKNAME_PREFIX_HIERARCHY", [])
         prefix = None
         member_role_names = {role.name for role in member.roles}
+        
         for prefix_name in prefix_hierarchy:
             if prefix_name in member_role_names:
-                prefix = f"[{prefix_name}]"
+                # [수정] 접두사 형식을 원래대로 되돌립니다.
+                prefix = f"『 {prefix_name} 』"
                 break
         
         if base_name.strip():
@@ -235,8 +237,11 @@ class Nicknames(commands.Cog):
             current_nick = member.nick or member.name
             base = current_nick
             for p_name in prefix_hierarchy:
-                if current_nick.startswith(f"[{p_name}]"):
-                    base = re.sub(rf"^\[{re.escape(p_name)}\]\s*", "", current_nick)
+                # [수정] 접두사를 찾는 형식도 원래대로 되돌립니다.
+                prefix_to_check = f"『 {p_name} 』"
+                if current_nick.startswith(prefix_to_check):
+                    # [수정] 접두사를 제거하는 정규식도 원래대로 되돌립니다.
+                    base = re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", current_nick)
                     break
         
         final_nick = f"{prefix} {base}" if prefix else base
