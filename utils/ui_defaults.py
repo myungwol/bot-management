@@ -110,4 +110,5 @@ SETUP_COMMAND_MAP = {
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록"},
     "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "[로그] 자기소개 승인 기록"},
     "log_intro_rejection":   {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",  "friendly_name": "[로그] 자기소개 거절 기록"},
+    "channel_voice_creator": {"type": "channel", "cog_name": "VoiceMaster", "key": "voice_creator_channel_id", "friendly_name": "음성 채널 자동 생성 채널"}, 
 }
