@@ -170,7 +170,11 @@ class Nicknames(commands.Cog):
             if channel_id: target_channel = self.bot.get_channel(channel_id)
             else: logger.info("ℹ️ 닉네임 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다."); return
         if not target_channel: logger.warning("❌ Nickname panel channel could not be found."); return
-        panel_info = get_panel_id("nickname_changer")
+        
+        # [수정] 패널 키를 'nicknames'로 통일합니다.
+        panel_key = "nicknames"
+        panel_info = get_panel_id(panel_key) 
+        
         if panel_info and (old_id := panel_info.get('message_id')):
             try: await (await target_channel.fetch_message(old_id)).delete()
             except (discord.NotFound, discord.Forbidden): pass
@@ -179,9 +183,8 @@ class Nicknames(commands.Cog):
         embed = discord.Embed.from_dict(embed_data)
         self.view_instance = NicknameChangerPanelView(self); await self.view_instance.setup_buttons()
         new_message = await target_channel.send(embed=embed, view=self.view_instance)
-        await save_panel_id("nickname_changer", new_message.id, target_channel.id)
+        await save_panel_id(panel_key, new_message.id, target_channel.id)
         logger.info(f"✅ 닉네임 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
 
-# --- [수정] 이 파일의 올바른 setup 함수 ---
 async def setup(bot: commands.Bot):
     await bot.add_cog(Nicknames(bot))
