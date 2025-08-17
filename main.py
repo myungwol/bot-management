@@ -1,4 +1,4 @@
-# main.py
+# bot-management/main.py
 
 import discord
 from discord.ext import commands
@@ -7,7 +7,6 @@ import asyncio
 import logging
 import logging.handlers
 
-# [수정] 함수의 이름이 sync_defaults_to_db 입니다.
 from utils.database import load_all_data_from_db, sync_defaults_to_db
 
 # --- 중앙 로깅 설정 ---
@@ -28,7 +27,14 @@ class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs)
     async def setup_hook(self):
         await self.load_all_extensions()
-        cogs_with_persistent_views = ["ServerSystem", "Onboarding", "Nicknames", "UserProfile", "Fishing", "Commerce"]
+        
+        # [수정] 이 봇이 관리하는 View 목록에서 게임 관련 Cog를 삭제합니다.
+        cogs_with_persistent_views = [
+            "ServerSystem", 
+            "Onboarding", 
+            "Nicknames"
+        ]
+        
         registered_views = 0
         for cog_name in cogs_with_persistent_views:
             cog = self.get_cog(cog_name)
