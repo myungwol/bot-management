@@ -9,6 +9,7 @@ import re
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
+# [수정] get_config를 더 이상 사용하지 않으므로 import 목록에서 정리합니다.
 from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
     get_embed_from_db, get_onboarding_steps, get_panel_components_from_db
@@ -132,7 +133,7 @@ class ApprovalView(ui.View):
             else: failed_to_find_roles.append(resident_role_key)
             if (rid := get_id(rookie_role_key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
             else: failed_to_find_roles.append(rookie_role_key)
-            from utils.database import get_config # Local import to avoid circular dependency
+            from utils.database import get_config
             gender_role_mapping = get_config("GENDER_ROLE_MAPPING", [])
             if gender_field := self._get_field_value(self.original_embed, "性別"):
                 for rule in gender_role_mapping:
@@ -301,7 +302,6 @@ class OnboardingPanelView(ui.View):
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        # [최종 수정] DB나 캐시에 의존하지 않고, 쿨타임은 무조건 300초(5분)로 고정합니다.
         cooldown_seconds = 300
 
         utc_now = datetime.now(timezone.utc).timestamp()
