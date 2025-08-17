@@ -9,10 +9,11 @@ import re
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-# [수정] get_config를 더 이상 사용하지 않으므로 import 목록에서 정리합니다.
 from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
-    get_embed_from_db, get_onboarding_steps, get_panel_components_from_db
+    get_embed_from_db, get_onboarding_steps, get_panel_components_from_db,
+    # [수정] 쿨타임 설정을 DB에서 읽어오기 위해 get_config를 다시 가져옵니다.
+    get_config
 )
 from utils.helpers import format_embed_from_db
 
@@ -302,7 +303,8 @@ class OnboardingPanelView(ui.View):
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        cooldown_seconds = 300
+        # [수정] DB에서 쿨타임 설정을 다시 불러오되, 기본값은 300초로 안전하게 설정합니다.
+        cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
 
         utc_now = datetime.now(timezone.utc).timestamp()
         last_time = await get_cooldown(user_id_str, cooldown_key)
