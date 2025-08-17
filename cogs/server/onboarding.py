@@ -287,7 +287,7 @@ class OnboardingGuideView(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
-# --- OnboardingPanelView (메시지 일본어 번역) ---
+# --- OnboardingPanelView (쿨타임 로직 최종 수정) ---
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None); self.onboarding_cog = cog_instance
@@ -307,27 +307,24 @@ class OnboardingPanelView(ui.View):
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        cooldown_seconds = 300 # 5분
+        cooldown_seconds = 300 # 5분으로 고정
 
+        # [개선] 쿨타임 확인 로직을 맨 앞으로 통합
         last_time = await get_cooldown(user_id_str, cooldown_key)
-
         if last_time > 0 and (time.time() - last_time) < cooldown_seconds:
             remaining_time = cooldown_seconds - (time.time() - last_time)
             minutes = int(remaining_time // 60)
             seconds = int(remaining_time % 60)
-            # [수정] 쿨타임 메시지를 일본어로 변경
             await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
             return
 
+        # [개선] 쿨타임이 지난 후, 현재 진행 중인 세션이 있는지 확인
         if interaction.user.id in self.onboarding_cog.active_onboarding_sessions:
-            remaining_time = cooldown_seconds - (time.time() - last_time)
-            if remaining_time < 0: remaining_time = 0
-            minutes = int(remaining_time // 60)
-            seconds = int(remaining_time % 60)
-            # [수정] 쿨타임 메시지를 일본어로 변경
-            await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
+            # 이 메시지는 거의 볼 일이 없지만, 만약의 경우를 대비해 남겨둡니다.
+            await interaction.response.send_message("すでに案内の手続きを開始しています。DMをご確認ください。", ephemeral=True)
             return
         
+        # 모든 관문을 통과하면 쿨타임을 설정하고 안내 시작
         await set_cooldown(user_id_str, cooldown_key, time.time())
         self.onboarding_cog.active_onboarding_sessions.add(interaction.user.id)
         
