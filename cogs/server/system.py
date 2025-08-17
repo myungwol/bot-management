@@ -159,6 +159,81 @@ class ServerSystem(commands.Cog):
         
         embed = discord.Embed(title="✅ 역할 설정 완료", description=f"DB의 `{role_type}` 키에 {role.mention} 역할이 성공적으로 연결되었습니다.", color=0x3498DB)
         await interaction.followup.send(embed=embed, ephemeral=True)
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    # 3. /setup stats (서버 통계 채널 관리 그룹)
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    stats = app_commands.Group(name="stats", parent=setup, description="서버 통계 채널을 관리합니다.")
+
+    @stats.command(name="add", description="통계 정보를 표시할 채널을 추가하거나 수정합니다.")
+    @app_commands.describe(
+        stat_type="표시할 통계의 종류를 선택하세요.",
+        channel="통계를 표시할 음성 채널 또는 카테고리를 선택하세요.",
+        template="채널 이름 형식을 지정하세요. 반드시 '{count}'를 포함해야 합니다.",
+        role="통계 종류가 '특정 역할'인 경우에만 역할을 선택하세요."
+    )
+    @app_commands.choices(stat_type=[
+        app_commands.Choice(name="전체 인원 (봇 포함)", value="total"),
+        app_commands.Choice(name="유저 인원 (봇 제외)", value="humans"),
+        app_commands.Choice(name="봇 개수", value="bots"),
+        app_commands.Choice(name="서버 부스터 수", value="boosters"),
+        app_commands.Choice(name="특정 역할 인원", value="role"),
+    ])
+    async def stats_add(self, interaction: discord.Interaction,
+                        stat_type: str,
+                        channel: discord.VoiceChannel,
+                        template: str,
+                        role: Optional[discord.Role] = None):
+        
+        # 입력값 유효성 검사
+        if "{count}" not in template:
+            await interaction.response.send_message("❌ 이름 형식(`template`)에는 반드시 `{count}`가 포함되어야 합니다.", ephemeral=True)
+            return
+        if stat_type == "role" and not role:
+            await interaction.response.send_message("❌ '특정 역할 인원'을 선택했다면, 반드시 역할을 지정해야 합니다.", ephemeral=True)
+            return
+        if stat_type != "role" and role:
+            await interaction.response.send_message("⚠️ 역할은 '특정 역할 인원' 통계에서만 의미가 있습니다.", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True)
+        
+        # DB에 저장
+        from utils.database import add_stats_channel
+        role_id = role.id if role else None
+        await add_stats_channel(channel.id, interaction.guild_id, stat_type, template, role_id)
+
+        # 즉시 업데이트를 위해 루프를 한번 실행
+        stats_cog = self.bot.get_cog("StatsUpdater")
+        if stats_cog:
+            await stats_cog.update_stats_loop()
+
+        await interaction.followup.send(f"✅ `{channel.name}` 채널에 통계 설정을 추가했습니다. 잠시 후 채널 이름이 변경됩니다.", ephemeral=True)
+
+    @stats.command(name="remove", description="통계 채널 설정을 제거합니다.")
+    @app_commands.describe(channel="설정을 제거할 채널을 선택하세요.")
+    async def stats_remove(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
+        await interaction.response.defer(ephemeral=True)
+        from utils.database import remove_stats_channel
+        await remove_stats_channel(channel.id)
+        await interaction.followup.send(f"✅ `{channel.name}` 채널의 통계 설정을 제거했습니다.", ephemeral=True)
+
+    @stats.command(name="list", description="현재 설정된 모든 통계 채널 목록을 봅니다.")
+    async def stats_list(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        configs = await get_all_stats_channels()
+        if not configs:
+            await interaction.followup.send("ℹ️ 설정된 통계 채널이 없습니다.", ephemeral=True)
+            return
+        
+        embed = discord.Embed(title="📊 설정된 통계 채널 목록", color=0x3498DB)
+        description = []
+        for config in configs:
+            ch = self.bot.get_channel(config['channel_id'])
+            ch_mention = f"<#{ch.id}>" if ch else f"삭제된 채널({config['channel_id']})"
+            description.append(f"**채널:** {ch_mention}\n"
+                               f"**종류:** `{config['stat_type']}`\n"
+                               f"**이름 형식:** `{config['channel_name_template']}`")
+        embed.description = "\n\n".join(description)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
