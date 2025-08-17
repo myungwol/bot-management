@@ -41,7 +41,8 @@ class VCInviteSelect(ui.UserSelect):
         invited_members = []
         for member in self.values:
             if isinstance(member, discord.Member):
-                await vc.set_permissions(member, view_channel=True, reason=f"{interaction.user.display_name}からの招待")
+                # [수정] view_channel 대신 connect 권한을 부여하여 채널에 접속할 수 있게 합니다.
+                await vc.set_permissions(member, connect=True, reason=f"{interaction.user.display_name}からの招待")
                 invited_members.append(member.mention)
         
         await interaction.followup.send(f"✅ {', '.join(invited_members)} さんをチャンネルに招待しました。", ephemeral=True)
@@ -121,13 +122,11 @@ class ControlPanelView(ui.View):
             self.add_item(ui.Button(label="招待", style=discord.ButtonStyle.success, emoji="📨", custom_id="vc_invite", row=1))
             self.add_item(ui.Button(label="追放", style=discord.ButtonStyle.danger, emoji="👢", custom_id="vc_kick", row=1))
 
-        # 모든 버튼에 하나의 dispatch 콜백을 연결
         for item in self.children:
             if isinstance(item, ui.Button):
                 item.callback = self.dispatch_button
 
     async def dispatch_button(self, interaction: discord.Interaction):
-        """버튼 custom_id에 따라 적절한 함수를 호출합니다."""
         custom_id = interaction.data.get("custom_id")
         dispatch_map = {
             "vc_edit": self.edit_channel,
@@ -159,7 +158,7 @@ class ControlPanelView(ui.View):
         await modal.wait()
 
         if modal.submitted:
-            vc = self.cog.bot.get_channel(self.vc_id) # 최신 상태 다시 가져오기
+            vc = self.cog.bot.get_channel(self.vc_id)
             if not vc: return await interaction.followup.send("❌ 処理中にチャンネルが見つからなくなりました。", ephemeral=True)
 
             new_name = f"🔊︱{modal.name.value or vc.name.split('︱')[-1].strip()}"
@@ -190,7 +189,7 @@ class ControlPanelView(ui.View):
         
         invited_members = [
             target for target, overwrite in vc.overwrites.items()
-            if isinstance(target, discord.Member) and target.id != self.owner_id and overwrite.view_channel is True
+            if isinstance(target, discord.Member) and target.id != self.owner_id and overwrite.connect is True
         ]
         if not invited_members:
             return await interaction.response.send_message("ℹ️ 招待されたメンバーがいません。", ephemeral=True)
@@ -206,7 +205,7 @@ class VoiceMaster(commands.Cog):
         self.bot = bot
         self.creator_channel_configs: Dict[int, Dict] = {}
         self.temp_channels: Dict[int, Dict] = {}
-        self.bot.add_view(ControlPanelView(self, 0, 0, "normal")) # 봇 재시작시 View 유지를 위해 등록
+        self.bot.add_view(ControlPanelView(self, 0, 0, "normal"))
         logger.info("VoiceMaster Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
@@ -219,7 +218,6 @@ class VoiceMaster(commands.Cog):
             get_id("vc_creator_channel_id_newbie"): {"type": "newbie", "min_limit": 1, "required_role_key": "role_resident_rookie"},
             get_id("vc_creator_channel_id_vip"): {"type": "vip", "min_limit": 1, "required_role_key": "role_personal_room_key"},
         }
-        # DB에서 ID를 못가져온 None key는 제거
         self.creator_channel_configs = {k: v for k, v in self.creator_channel_configs.items() if k is not None}
         logger.info(f"[VoiceMaster] 생성 채널 설정을 로드했습니다: {self.creator_channel_configs}")
 
@@ -227,30 +225,22 @@ class VoiceMaster(commands.Cog):
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot: return
 
-        # --- 채널 생성 로직 ---
         if after.channel and after.channel.id in self.creator_channel_configs:
             config = self.creator_channel_configs[after.channel.id]
+            if any(info.get('owner_id') == member.id for info in self.temp_channels.values()): return
 
-            # 이미 개인 채널을 소유하고 있는지 확인
-            if any(info.get('owner_id') == member.id for info in self.temp_channels.values()):
-                return
-
-            # 채널 생성에 필요한 역할이 있는지 확인
             if role_key := config.get("required_role_key"):
                 role_id = get_id(role_key)
                 if not role_id or role_id not in [r.id for r in member.roles]:
                     try:
                         await member.send(f"❌ 「{after.channel.name}」チャンネルに入るには特別な役割が必要です。")
-                    except discord.Forbidden:
-                        pass # DM 차단 유저
+                    except discord.Forbidden: pass
                     await member.move_to(None, reason="요구 역할 없음")
                     return
 
             await self._create_temp_channel(member, config)
 
-        # --- 채널 삭제 로직 ---
         if before.channel and before.channel.id in self.temp_channels:
-            # 채널에 아무도 없으면 삭제
             if not before.channel.members:
                 await self._delete_temp_channel(before.channel)
 
@@ -260,18 +250,18 @@ class VoiceMaster(commands.Cog):
         min_limit = config.get("min_limit", 1)
         
         try:
-            # 설정된 생성 채널 중 하나를 기준으로 카테고리 위치를 정함
             creator_channel = guild.get_channel(next(iter(self.creator_channel_configs)))
             if not creator_channel:
                  logger.error("VC 생성 채널을 찾을 수 없어 카테고리를 지정할 수 없습니다.")
                  return
 
             vc_name = f"🔊︱{member.display_name}さんの部屋"
-            overwrites = { member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True) }
+            # [수정] 소유자에게는 connect 권한을 명시적으로 부여합니다.
+            overwrites = { member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True) }
             
-            # VIP 채널은 비공개로, 나머지는 공개로 설정
+            # [수정] VIP 채널의 기본 권한을 view_channel=True, connect=False로 변경합니다.
             if channel_type == 'vip':
-                overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+                overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
             else:
                 overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True)
 
@@ -316,14 +306,12 @@ class VoiceMaster(commands.Cog):
         old_owner = interaction.guild.get_member(info['owner_id'])
         
         try:
-            # 권한 업데이트
-            await vc.set_permissions(new_owner, manage_channels=True, manage_permissions=True)
+            # [수정] 새 소유자에게도 connect 권한을 명시적으로 부여합니다.
+            await vc.set_permissions(new_owner, manage_channels=True, manage_permissions=True, connect=True)
             if old_owner: await vc.set_permissions(old_owner, overwrite=None)
             
-            # 봇 내부 정보 업데이트
             info['owner_id'] = new_owner.id
             
-            # 새 소유자 정보로 제어판 View 교체
             new_view = ControlPanelView(self, new_owner.id, vc.id, info['type'])
             panel_message = await vc.fetch_message(info['message_id'])
             await panel_message.edit(view=new_view)
