@@ -10,7 +10,8 @@ from typing import Optional, List
 
 from utils.database import (
     get_config, save_id_to_db, load_channel_ids_from_db,
-    get_all_stats_channels, add_stats_channel, remove_stats_channel
+    get_all_stats_channels, add_stats_channel, remove_stats_channel,
+    save_config_to_db  # <--- 이 부분을 추가해주세요.
 )
 
 logger = logging.getLogger(__name__)
