@@ -24,7 +24,7 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN'); TEST_GUILD_ID = os.environ.get('TEST_GU
 intents = discord.Intents.default(); intents.members = True; intents.message_content = True; intents.voice_states = True
 
 # [수정] Railway 재배포를 확실히 하기 위해 버전을 올립니다.
-BOT_VERSION = "v1.3-final-cooldown-fix"
+BOT_VERSION = "v1.6-true-final-logic"
 
 # --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
