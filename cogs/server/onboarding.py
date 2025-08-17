@@ -17,7 +17,7 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# --- UI 클래스 (RejectionReasonModal, IntroductionModal, ApprovalView) 기존과 동일 ---
+# --- UI 클래스들 (기존과 동일) ---
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -221,7 +221,6 @@ class ApprovalView(ui.View):
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
-# --- OnboardingGuideView 기존과 동일 ---
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
@@ -282,7 +281,6 @@ class OnboardingGuideView(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
-# --- OnboardingPanelView 수정 ---
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
@@ -309,16 +307,31 @@ class OnboardingPanelView(ui.View):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
         
-        # [수정] get_config로 가져온 값을 int()로 감싸서 숫자로 만듭니다.
         try:
-            cooldown_seconds = int(get_config("ONBOARDING_COOLDOWN_SECONDS", 300))
+            cooldown_seconds_from_db = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
+            cooldown_seconds = int(cooldown_seconds_from_db)
         except (ValueError, TypeError):
-            # 만약 값이 숫자가 아니거나 None이면 기본값 300을 사용
             cooldown_seconds = 300
-            logger.warning("ONBOARDING_COOLDOWN_SECONDS 설정값이 숫자가 아니므로 기본값(300)을 사용합니다.")
+            logger.warning(f"ONBOARDING_COOLDOWN_SECONDS({cooldown_seconds_from_db}) 설정값이 숫자가 아니므로 기본값(300)을 사용합니다.")
 
         utc_now = datetime.now(timezone.utc).timestamp()
         last_time = await get_cooldown(user_id_str, cooldown_key)
+
+        # ==============================================================================
+        # [진단용 로그 추가]
+        # ==============================================================================
+        logger.info("========== 쿨다운 진단 시작 ==========")
+        logger.info(f"설정된 쿨다운 시간 (cooldown_seconds): {cooldown_seconds} (타입: {type(cooldown_seconds)})")
+        logger.info(f"DB에서 가져온 마지막 시간 (last_time): {last_time} (타입: {type(last_time)})")
+        logger.info(f"현재 시간 (utc_now): {utc_now}")
+        
+        if last_time > 0:
+            time_diff = utc_now - last_time
+            logger.info(f"시간 차이 (time_diff): {time_diff}")
+            logger.info(f"쿨다운 조건 확인: {time_diff} < {cooldown_seconds}  ==> {time_diff < cooldown_seconds}")
+        
+        logger.info("======================================")
+        # ==============================================================================
 
         if last_time > 0 and (utc_now - last_time) < cooldown_seconds:
             remaining_time = cooldown_seconds - (utc_now - last_time)
@@ -327,10 +340,11 @@ class OnboardingPanelView(ui.View):
             await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
             return
         
-        # 정상적으로 진행될 때만 쿨다운 시간을 새로고침
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
+        # defer() 후에 쿨다운을 설정하여, defer()가 실패하면 쿨다운도 설정되지 않도록 함
         await set_cooldown(user_id_str, cooldown_key)
         
-        await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             steps = await get_onboarding_steps()
             if not steps: 
@@ -350,7 +364,7 @@ class OnboardingPanelView(ui.View):
                 except discord.NotFound:
                     logger.warning("안내 가이드 시작 오류 메시지 전송 실패: Interaction not found.")
 
-# --- Onboarding Cog 기존과 동일 ---
+# --- Onboarding Cog (기존과 동일) ---
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
