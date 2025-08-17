@@ -173,42 +173,35 @@ async def get_onboarding_steps() -> list:
 async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
     """
     데이터베이스에서 쿨다운 정보를 가져와 float 형식의 Unix 타임스탬프로 반환합니다.
-    DB에 저장된 값이 숫자든, ISO 8601 형식의 문자열이든 모두 처리합니다.
     """
     response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
     
-    if response.data and (timestamp_val := response.data[0].get('last_cooldown_timestamp')) is not None:
-        if isinstance(timestamp_val, (int, float)):
-            # 값이 이미 숫자 형식인 경우 (이전 버전 호환)
-            return float(timestamp_val)
-        elif isinstance(timestamp_val, str):
-            # 값이 ISO 8601 형식의 문자열인 경우
-            try:
-                # 'Z'로 끝나는 UTC 시간 형식을 처리하기 위해 Z를 +00:00으로 변경
-                if timestamp_val.endswith('Z'):
-                    timestamp_val = timestamp_val[:-1] + '+00:00'
-                # ISO 형식 문자열을 datetime 객체로 변환 후, float 타임스탬프로 변경
-                return datetime.fromisoformat(timestamp_val).timestamp()
-            except ValueError:
-                logger.error(f"DB의 타임스탬프 문자열 형식이 올바르지 않습니다: '{timestamp_val}'")
-                return 0.0
-    
-    # 데이터가 없거나, 값이 None인 경우
+    # 데이터가 있고, 'last_cooldown_timestamp' 값이 None이 아닌지 확인
+    if response.data and response.data[0].get('last_cooldown_timestamp') is not None:
+        try:
+            # DB에서 온 값(숫자 타입)을 float으로 변환하여 반환
+            return float(response.data[0]['last_cooldown_timestamp'])
+        except (ValueError, TypeError):
+            # 혹시라도 잘못된 타입의 데이터가 들어있을 경우 에러 로깅 후 0.0 반환
+            logger.error(f"DB의 타임스탬프 값이 숫자가 아닙니다: {response.data[0]['last_cooldown_timestamp']}")
+            return 0.0
+            
+    # 데이터가 없으면 0.0을 반환하여 쿨다운이 없음을 알림
     return 0.0
 
 @supabase_retry_handler()
 async def set_cooldown(user_id_str: str, cooldown_key: str):
     """
-    현재 UTC 시간을 ISO 8601 형식의 문자열로 데이터베이스에 저장합니다.
-    이 방식은 데이터베이스의 'timestamp with time zone' 타입과 가장 호환성이 좋습니다.
+    현재 UTC 시간을 float 형식의 Unix 타임스탬프로 데이터베이스에 저장합니다.
+    이 방식은 데이터베이스의 'real' 또는 'float' 타입과 호환됩니다.
     """
-    # UTC 시간 기준의 ISO 8601 형식 문자열 생성
-    utc_iso_string = datetime.now(timezone.utc).isoformat()
+    # UTC 시간 기준의 float 형식 Unix 타임스탬프를 가져옵니다.
+    utc_timestamp = datetime.now(timezone.utc).timestamp()
     
     data_to_upsert = {
         "user_id": user_id_str,
         "cooldown_key": cooldown_key,
-        "last_cooldown_timestamp": utc_iso_string
+        "last_cooldown_timestamp": utc_timestamp
     }
     
     await supabase.table('cooldowns').upsert(data_to_upsert, on_conflict='user_id,cooldown_key').execute()
