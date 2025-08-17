@@ -7,17 +7,16 @@ import discord
 from discord.ext import commands
 from discord import ui
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from utils.database import get_id
 
 logger = logging.getLogger(__name__)
 
 
-# --- 제어판용 UI 클래스들 ---
+# --- 모달 및 선택 메뉴 UI 클래스들 ---
 
 class VCEditModal(ui.Modal, title="🔊 ボイスチャンネル設定"):
-    # [수정] 모달이 제출되었는지 확인하기 위한 변수 추가
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.submitted = False
@@ -26,91 +25,14 @@ class VCEditModal(ui.Modal, title="🔊 ボイスチャンネル設定"):
     limit = ui.TextInput(label="最大入室人数", placeholder="数字を入力 (例: 5)。0は無制限です。", required=False, max_length=2)
 
     async def on_submit(self, interaction: discord.Interaction):
-        # [수정] 제출 시 변수 값을 True로 변경
         self.submitted = True
         await interaction.response.defer(ephemeral=True)
 
-
-class ControlPanelView(ui.View):
-    def __init__(self, cog: 'VoiceMaster', owner_id: int, vc_id: int):
-        super().__init__(timeout=None)
-        self.cog = cog
-        self.owner_id = owner_id
-        self.vc_id = vc_id
-        self.update_blacklist_button_state()
-
-    def update_blacklist_button_state(self):
-        """블랙리스트 버튼의 상태(레이블, 스타일)를 동적으로 업데이트합니다."""
-        blacklist_button: Optional[ui.Button] = discord.utils.get(self.children, custom_id="vc_blacklist")
-        if not blacklist_button: return
-
-        vc = self.cog.bot.get_channel(self.vc_id)
-        if vc:
-            is_blacklisted = any(
-                isinstance(target, discord.Member) and overwrite.view_channel is False
-                for target, overwrite in vc.overwrites.items()
-            )
-            blacklist_button.style = discord.ButtonStyle.secondary if is_blacklisted else discord.ButtonStyle.danger
-            blacklist_button.label = "ブラックリスト管理"
-            blacklist_button.emoji = "🛡️" if is_blacklisted else "🚫"
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if self.cog.bot.get_channel(self.vc_id) is None:
-            await interaction.response.send_message("❌ このチャンネルはすでに削除されています。", ephemeral=True, view=None)
-            self.stop()
-            return False
-        if interaction.user.id != self.owner_id:
-            await interaction.response.send_message("❌ このチャンネルの所有者のみが操作できます。", ephemeral=True)
-            return False
-        return True
-
-    @ui.button(label="設定", style=discord.ButtonStyle.primary, emoji="⚙️", custom_id="vc_edit")
-    async def edit_channel(self, interaction: discord.Interaction, button: ui.Button):
-        vc = self.cog.bot.get_channel(self.vc_id)
-        if not vc: return
-
-        modal = VCEditModal()
-        modal.name.default = vc.name.split("︱")[-1].strip()
-        modal.limit.default = str(vc.user_limit)
-        await interaction.response.send_modal(modal)
-        await modal.wait()
-
-        # [수정] modal.is_submitted() 대신 modal.submitted 플래그를 확인
-        if modal.submitted:
-            vc = self.cog.bot.get_channel(self.vc_id)
-            if not vc: return await interaction.followup.send("❌ 処理中にチャンネルが見つからなくなりました。", ephemeral=True)
-
-            new_name = f"🔊︱{modal.name.value or vc.name.split('︱')[-1].strip()}"
-            try:
-                new_limit = int(modal.limit.value or vc.user_limit)
-                if not (0 <= new_limit <= 99): raise ValueError()
-                info = self.cog.temp_channels.get(self.vc_id, {})
-                min_limit = info.get("min_limit", 0)
-                if 0 < new_limit < min_limit:
-                    return await interaction.followup.send(f"❌ このチャンネルは最低{min_limit}人が必要です。それより少ない人数には設定できません。", ephemeral=True)
-            except (ValueError, TypeError):
-                return await interaction.followup.send("❌ 人数制限は0から99までの数字で入力してください。", ephemeral=True)
-
-            await vc.edit(name=new_name, user_limit=new_limit, reason=f"{interaction.user.display_name}の要請")
-            await interaction.followup.send("✅ チャンネル名と人数制限を更新しました。", ephemeral=True)
-
-    @ui.button(label="ブラックリスト管理", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="vc_blacklist")
-    async def blacklist_member(self, interaction: discord.Interaction, button: ui.Button):
-        view = ui.View(timeout=180)
-        view.add_item(VCBlacklistSelect(self))
-        await interaction.response.send_message("ブラックリストに追加/削除するメンバーを選んでください。", view=view, ephemeral=True)
-
-    @ui.button(label="所有権移譲", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="vc_transfer")
-    async def transfer_owner(self, interaction: discord.Interaction, button: ui.Button):
-        view = ui.View(timeout=180)
-        view.add_item(VCOwnerSelect(self))
-        await interaction.response.send_message("新しい所有者を選んでください。", view=view, ephemeral=True)
-
-
-class VCBlacklistSelect(ui.UserSelect):
-    def __init__(self, panel_view: ControlPanelView):
+# [신규] 블랙리스트에 '추가'할 멤버를 선택하는 드롭다운
+class VCAddBlacklistSelect(ui.UserSelect):
+    def __init__(self, panel_view: 'ControlPanelView'):
         self.panel_view = panel_view
-        super().__init__(placeholder="ブラックリストに追加/削除するメンバーを選択...", min_values=1, max_values=1)
+        super().__init__(placeholder="ブラックリストに追加するメンバーを選択...", min_values=1, max_values=1)
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -123,35 +45,50 @@ class VCBlacklistSelect(ui.UserSelect):
         if target_member.id == self.panel_view.owner_id:
             return await interaction.followup.send("❌ チャンネルの所有者をブラックリストに追加することはできません。", ephemeral=True)
 
-        current_overwrite = vc.overwrites_for(target_member)
-        is_blacklisted = current_overwrite.view_channel is False
-
-        message = ""
-        if is_blacklisted:
-            await vc.set_permissions(target_member, overwrite=None, reason=f"{interaction.user.display_name}がブラックリストから解除")
-            message = f"✅ {target_member.mention} さんをブラックリストから解除しました。"
-        else:
-            await vc.set_permissions(target_member, view_channel=False, reason=f"{interaction.user.display_name}がブラックリストに追加")
-            if target_member in vc.members:
-                await target_member.move_to(None, reason="ブラックリストに追加されたため")
-            message = f"✅ {target_member.mention} さんをブラックリストに追加しました。"
-
-        self.panel_view.update_blacklist_button_state()
-        try:
-            panel_message = await vc.fetch_message(self.panel_view.cog.temp_channels[vc.id]['message_id'])
-            await panel_message.edit(view=self.panel_view)
-        except (discord.NotFound, KeyError):
-            logger.warning(f"블랙리스트 업데이트 후 패널 메시지를 수정하지 못했습니다 (VC ID: {vc.id})")
-
-        await interaction.followup.send(message, ephemeral=True)
+        await vc.set_permissions(target_member, view_channel=False, reason=f"{interaction.user.display_name}がブラックリストに追加")
+        if target_member in vc.members:
+            await target_member.move_to(None, reason="ブラックリストに追加されたため")
+        
+        await interaction.followup.send(f"✅ {target_member.mention} さんをブラックリストに追加しました。", ephemeral=True)
         try:
             await interaction.delete_original_response()
         except discord.NotFound:
             pass
 
+# [신규] 블랙리스트에서 '해제'할 멤버를 선택하는 드롭다운
+class VCRemoveBlacklistSelect(ui.Select):
+    def __init__(self, panel_view: 'ControlPanelView', blacklisted_members: List[discord.Member]):
+        self.panel_view = panel_view
+        options = [
+            discord.SelectOption(label=member.display_name, value=str(member.id))
+            for member in blacklisted_members
+        ]
+        super().__init__(placeholder="ブラックリストから解除するメンバーを選択...", min_values=1, max_values=len(options), options=options)
 
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
+        if not vc: return await interaction.followup.send("❌ チャンネルが見つかりませんでした。", ephemeral=True)
+
+        removed_members = []
+        for member_id_str in self.values:
+            member_id = int(member_id_str)
+            target_member = interaction.guild.get_member(member_id)
+            if target_member:
+                await vc.set_permissions(target_member, overwrite=None, reason=f"{interaction.user.display_name}がブラックリストから解除")
+                removed_members.append(target_member.mention)
+        
+        if removed_members:
+            await interaction.followup.send(f"✅ {', '.join(removed_members)} さんをブラックリストから解除しました。", ephemeral=True)
+        
+        try:
+            await interaction.delete_original_response()
+        except discord.NotFound:
+            pass
+
+# [신규] 새로운 소유자를 선택하는 드롭다운
 class VCOwnerSelect(ui.UserSelect):
-    def __init__(self, panel_view: ControlPanelView):
+    def __init__(self, panel_view: 'ControlPanelView'):
         self.panel_view = panel_view
         super().__init__(placeholder="新しい所有者を選択してください...", min_values=1, max_values=1)
 
@@ -176,12 +113,91 @@ class VCOwnerSelect(ui.UserSelect):
             pass
 
 
+# --- 메인 제어판 View ---
+
+class ControlPanelView(ui.View):
+    def __init__(self, cog: 'VoiceMaster', owner_id: int, vc_id: int):
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.vc_id = vc_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if self.cog.bot.get_channel(self.vc_id) is None:
+            await interaction.response.send_message("❌ このチャンネルはすでに削除されています。", ephemeral=True, view=None)
+            self.stop()
+            return False
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("❌ このチャンネルの所有者のみが操作できます。", ephemeral=True)
+            return False
+        return True
+
+    @ui.button(label="設定", style=discord.ButtonStyle.primary, emoji="⚙️", custom_id="vc_edit", row=0)
+    async def edit_channel(self, interaction: discord.Interaction, button: ui.Button):
+        vc = self.cog.bot.get_channel(self.vc_id)
+        if not vc: return
+
+        modal = VCEditModal()
+        modal.name.default = vc.name.split("︱")[-1].strip()
+        modal.limit.default = str(vc.user_limit)
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+
+        if modal.submitted:
+            vc = self.cog.bot.get_channel(self.vc_id)
+            if not vc: return await interaction.followup.send("❌ 処理中にチャンネルが見つからなくなりました。", ephemeral=True)
+
+            new_name = f"🔊︱{modal.name.value or vc.name.split('︱')[-1].strip()}"
+            try:
+                new_limit = int(modal.limit.value or vc.user_limit)
+                if not (0 <= new_limit <= 99): raise ValueError()
+                info = self.cog.temp_channels.get(self.vc_id, {})
+                min_limit = info.get("min_limit", 0)
+                if 0 < new_limit < min_limit:
+                    return await interaction.followup.send(f"❌ このチャンネルは最低{min_limit}人が必要です。それより少ない人数には設定できません。", ephemeral=True)
+            except (ValueError, TypeError):
+                return await interaction.followup.send("❌ 人数制限は0から99までの数字で入力してください。", ephemeral=True)
+
+            await vc.edit(name=new_name, user_limit=new_limit, reason=f"{interaction.user.display_name}の要請")
+            await interaction.followup.send("✅ チャンネル名と人数制限を更新しました。", ephemeral=True)
+
+    @ui.button(label="ブラックリスト追加", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="vc_add_blacklist", row=1)
+    async def add_to_blacklist(self, interaction: discord.Interaction, button: ui.Button):
+        view = ui.View(timeout=180)
+        view.add_item(VCAddBlacklistSelect(self))
+        await interaction.response.send_message("ブラックリストに追加するメンバーを選んでください。", view=view, ephemeral=True)
+
+    @ui.button(label="ブラックリスト解除", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="vc_remove_blacklist", row=1)
+    async def remove_from_blacklist(self, interaction: discord.Interaction, button: ui.Button):
+        vc = self.cog.bot.get_channel(self.vc_id)
+        if not vc or not interaction.guild: return
+        
+        blacklisted_members = [
+            target for target, overwrite in vc.overwrites.items()
+            if isinstance(target, discord.Member) and overwrite.view_channel is False
+        ]
+
+        if not blacklisted_members:
+            return await interaction.response.send_message("ℹ️ ブラックリストに登録されているメンバーはいません。", ephemeral=True)
+
+        view = ui.View(timeout=180)
+        view.add_item(VCRemoveBlacklistSelect(self, blacklisted_members))
+        await interaction.response.send_message("ブラックリストから解除するメンバーを選んでください。", view=view, ephemeral=True)
+
+    @ui.button(label="所有権移譲", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="vc_transfer", row=0)
+    async def transfer_owner(self, interaction: discord.Interaction, button: ui.Button):
+        view = ui.View(timeout=180)
+        view.add_item(VCOwnerSelect(self))
+        await interaction.response.send_message("新しい所有者を選んでください。", view=view, ephemeral=True)
+
+
+# --- VoiceMaster Cog ---
+
 class VoiceMaster(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.creator_channel_ids: Dict[int, int] = {}
         self.temp_channels: Dict[int, Dict] = {}
-        # [추가] 봇이 재시작되어도 View가 계속 동작하도록 등록
         self.bot.add_view(ControlPanelView(self, 0, 0))
         logger.info("VoiceMaster Cog가 성공적으로 초기화되었습니다.")
 
