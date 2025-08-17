@@ -122,39 +122,29 @@ class ServerSystem(commands.Cog):
             else:
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
 
-        # --- 2. 역할 관련 로직 ---
+    # --- 2. 역할 관련 로직 ---
         elif action == "roles_sync":
-            # DB의 ROLE_KEY_MAP을 최신 상태로 먼저 업데이트
-            role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
-            await save_config_to_db("ROLE_KEY_MAP", role_name_map)
+            # [진단용 코드] 현재 봇이 읽고 있는 UI_ROLE_KEY_MAP의 내용을 확인합니다.
+            from utils.ui_defaults import UI_ROLE_KEY_MAP
 
-            synced_roles, missing_roles, error_roles = [], [], []
-            server_roles_by_name = {r.name: r.id for r in interaction.guild.roles}
+            # 봇이 인식하고 있는 역할 목록을 텍스트로 만듭니다.
+            loaded_roles_text = "\n".join([f"- {key}: {info.get('name')}" for key, info in UI_ROLE_KEY_MAP.items()])
             
-            # 최신 UI_ROLE_KEY_MAP을 기준으로 동기화 진행
-            for db_key, role_info in UI_ROLE_KEY_MAP.items():
-                role_name = role_info.get('name')
-                if not role_name: continue
+            # 임베드에 현재 불러온 역할 목록을 그대로 출력
+            embed = discord.Embed(
+                title="⚙️ 역할 데이터베이스 동기화 (진단 모드)",
+                description=f"봇이 현재 Railway 서버에서 읽고 있는 역할은 총 **{len(UI_ROLE_KEY_MAP)}개** 입니다.",
+                color=0xFEE75C # 노란색
+            )
+            
+            # 글자 수가 1024자를 넘을 수 있으므로 여러 필드에 나누어 담습니다.
+            chunk_size = 1024
+            for i in range(0, len(loaded_roles_text), chunk_size):
+                chunk = loaded_roles_text[i:i+chunk_size]
+                embed.add_field(name=f"불러온 역할 목록 (부분 {i//chunk_size + 1})", value=f"```{chunk}```", inline=False)
 
-                if role_id := server_roles_by_name.get(role_name):
-                    try:
-                        await save_id_to_db(db_key, role_id)
-                        synced_roles.append(f"・**{role_name}** (`{db_key}`)")
-                    except Exception as e:
-                        error_roles.append(f"・**{role_name}**: `{e}`")
-                else:
-                    missing_roles.append(f"・**{role_name}** (`{db_key}`)")
-            
-            embed = discord.Embed(title="⚙️ 役割データベースの完全同期結果", color=0x2ECC71)
-            embed.set_footer(text=f"合計 {len(UI_ROLE_KEY_MAP)}個中 成功: {len(synced_roles)} / 失敗: {len(missing_roles) + len(error_roles)}")
-            if synced_roles: embed.add_field(name=f"✅ 同期成功 ({len(synced_roles)}個)", value="\n".join(synced_roles)[:1024], inline=False)
-            if missing_roles:
-                embed.color = 0xFEE75C
-                embed.add_field(name=f"⚠️ サーバーに該当の役割なし ({len(missing_roles)}個)", value="\n".join(missing_roles)[:1024], inline=False)
-            if error_roles:
-                embed.color = 0xED4245
-                embed.add_field(name=f"❌ DB保存エラー ({len(error_roles)}個)", value="\n".join(error_roles)[:1024], inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
+            return # [중요] 실제 동기화 로직은 실행하지 않고 진단 결과만 보여주고 종료
 
         # --- 3. 통계 관련 로직 ---
         elif action == "stats_set":
