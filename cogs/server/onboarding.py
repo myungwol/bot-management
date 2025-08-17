@@ -17,7 +17,7 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# --- UI 클래스 (변경 없음) ---
+# --- UI 클래스 (RejectionReasonModal, IntroductionModal, ApprovalView) 기존과 동일 ---
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -220,6 +220,8 @@ class ApprovalView(ui.View):
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
+
+# --- OnboardingGuideView 기존과 동일 ---
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
@@ -280,26 +282,40 @@ class OnboardingGuideView(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
+# --- OnboardingPanelView 수정 ---
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
-        super().__init__(timeout=None); self.onboarding_cog = cog_instance
+        super().__init__(timeout=None)
+        self.onboarding_cog = cog_instance
+    
     async def setup_buttons(self):
+        self.clear_items()
         button_styles = get_config("DISCORD_BUTTON_STYLES_MAP", {})
         components_data = await get_panel_components_from_db('onboarding')
         if not components_data:
-            default_button = ui.Button(label="案内を読む", style=discord.ButtonStyle.success, custom_id="start_onboarding_guide");
-            default_button.callback = self.start_guide_callback; self.add_item(default_button); return
+            default_button = ui.Button(label="案内を読む", style=discord.ButtonStyle.success, custom_id="start_onboarding_guide")
+            default_button.callback = self.start_guide_callback
+            self.add_item(default_button)
+            return
         for comp in components_data:
             if comp.get('component_type') == 'button' and comp.get('component_key'):
                 style = button_styles.get(comp.get('style','secondary'), discord.ButtonStyle.secondary)
                 button = ui.Button(label=comp.get('label'),style=style,emoji=comp.get('emoji'),row=comp.get('row'),custom_id=comp.get('component_key'))
-                if comp.get('component_key') == 'start_onboarding_guide': button.callback = self.start_guide_callback
+                if comp.get('component_key') == 'start_onboarding_guide':
+                    button.callback = self.start_guide_callback
                 self.add_item(button)
     
     async def start_guide_callback(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         cooldown_key = "onboarding_start"
-        cooldown_seconds = get_config("ONBOARDING_COOLDOWN_SECONDS", 300)
+        
+        # [수정] get_config로 가져온 값을 int()로 감싸서 숫자로 만듭니다.
+        try:
+            cooldown_seconds = int(get_config("ONBOARDING_COOLDOWN_SECONDS", 300))
+        except (ValueError, TypeError):
+            # 만약 값이 숫자가 아니거나 None이면 기본값 300을 사용
+            cooldown_seconds = 300
+            logger.warning("ONBOARDING_COOLDOWN_SECONDS 설정값이 숫자가 아니므로 기본값(300)을 사용합니다.")
 
         utc_now = datetime.now(timezone.utc).timestamp()
         last_time = await get_cooldown(user_id_str, cooldown_key)
@@ -311,6 +327,7 @@ class OnboardingPanelView(ui.View):
             await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
             return
         
+        # 정상적으로 진행될 때만 쿨다운 시간을 새로고침
         await set_cooldown(user_id_str, cooldown_key)
         
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -322,21 +339,24 @@ class OnboardingPanelView(ui.View):
             
             guide_view = OnboardingGuideView(self.onboarding_cog, steps, interaction.user)
             content = guide_view._prepare_next_step_message_content()
-            message = await interaction.followup.send(**content, ephemeral=True)
+            message = await interaction.followup.send(**content, ephemeral=True, wait=True)
             guide_view.message = message
             await guide_view.wait()
         except Exception as e:
             logger.error(f"안내 가이드 시작 중 오류: {e}", exc_info=True)
             if not interaction.is_done():
-                await interaction.followup.send("エラーが発生しました。もう一度お試しください。", ephemeral=True)
+                try:
+                    await interaction.followup.send("エラーが発生しました。もう一度お試しください。", ephemeral=True)
+                except discord.NotFound:
+                    logger.warning("안내 가이드 시작 오류 메시지 전송 실패: Interaction not found.")
 
+# --- Onboarding Cog 기존과 동일 ---
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.panel_channel_id: Optional[int] = None; self.approval_channel_id: Optional[int] = None
         self.introduction_channel_id: Optional[int] = None; self.rejection_log_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None; self.main_chat_channel_id: Optional[int] = None
         self.view_instance = None; logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
-        # [최종 수정] 'active_sessions'를 완전히 삭제합니다.
         self._user_locks: Dict[int, asyncio.Lock] = {}
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
         if user_id not in self._user_locks: self._user_locks[user_id] = asyncio.Lock()
@@ -361,12 +381,16 @@ class Onboarding(commands.Cog):
         if not target_channel: logger.warning("❌ Onboarding panel channel could not be found."); return
         panel_info = get_panel_id("onboarding");
         if panel_info and (old_id := panel_info.get('message_id')):
-            try: await (await target_channel.fetch_message(old_id)).delete()
+            try: 
+                old_message = await target_channel.fetch_message(old_id)
+                await old_message.delete()
             except (discord.NotFound, discord.HTTPException): pass
         embed_data = await get_embed_from_db("panel_onboarding")
         if not embed_data: logger.warning("DB에서 'panel_onboarding' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다."); return
         embed = discord.Embed.from_dict(embed_data)
-        self.view_instance = OnboardingPanelView(self); await self.view_instance.setup_buttons()
+        if self.view_instance is None:
+            self.view_instance = OnboardingPanelView(self)
+        await self.view_instance.setup_buttons()
         new_message = await target_channel.send(embed=embed, view=self.view_instance)
         await save_panel_id("onboarding", new_message.id, target_channel.id)
         logger.info(f"✅ 온보딩 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
