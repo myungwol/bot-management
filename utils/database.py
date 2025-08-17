@@ -1,4 +1,4 @@
-# utils/database.py
+# bot-management/utils/database.py
 
 import os
 import discord
@@ -8,7 +8,8 @@ import asyncio
 from typing import Dict, Callable, Any, List
 from functools import wraps
 
-from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, GAME_CONFIGS
+# [수정] GAME_CONFIGS를 임포트하지 않습니다.
+from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -74,13 +75,13 @@ async def sync_defaults_to_db():
         # 3. 패널 컴포넌트 동기화
         for component_data in UI_PANEL_COMPONENTS: await save_panel_component_to_db(component_data)
         logger.info(f"✅ {len(UI_PANEL_COMPONENTS)}개의 패널 컴포넌트 기본값을 DB에 동기화했습니다.")
-        # 4. 게임 설정 동기화
-        for key, value in GAME_CONFIGS.items():
-            await save_config_to_db(key, value)
-        logger.info(f"✅ {len(GAME_CONFIGS)}개의 게임 설정을 DB에 동기화했습니다.")
+        
+        # [삭제] 게임 설정 동기화 로직을 삭제합니다.
+        
     except Exception as e: logger.error(f"❌ 기본값 DB 동기화 중 오류 발생: {e}", exc_info=True)
     logger.info("------ [ 기본값 DB 동기화 완료 ] ------")
 
+# ... (파일 하단은 이전과 동일하며 생략하지 않습니다) ...
 async def load_all_data_from_db():
     logger.info("------ [ 모든 DB 데이터 로드 시작 ] ------")
     await asyncio.gather(load_bot_configs_from_db(), load_channel_ids_from_db(), load_game_data_from_db())
