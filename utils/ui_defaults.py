@@ -21,12 +21,14 @@ UI_ROLE_KEY_MAP = {
     "role_approval":            {"name": "役場の職員", "is_prefix": True, "priority": 60},
 
     # --- 주민 등급 역할 ---
+    "role_premium_booster":     {"name": "支援者", "is_prefix": True, "priority": 55},
     "role_resident_elder":      {"name": "長老", "is_prefix": True, "priority": 50},
     "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": True, "priority": 40},
     "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": True, "priority": 30},
     "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": True, "priority": 20},
     "role_resident":            {"name": "住民", "is_prefix": True, "priority": 10},
     "role_guest":               {"name": "旅の人", "is_prefix": True, "priority": 5},
+    "role_personal_room_key":   {"name": "個人部屋の鍵", "is_prefix": False, "priority": 0},
 
     # --- 온보딩/역할 패널 구분선 역할 ---
     "role_onboarding_step_1":   {"name": "════════════ゲーム══════════", "is_prefix": False, "priority": 0},
@@ -115,6 +117,8 @@ SETUP_COMMAND_MAP = {
     # [수정] 음성 채널 설정 추가
     "channel_vc_creator_3p": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_3p", "friendly_name": "음성 채널 자동 생성 (최소 3인)", "channel_type": "voice"},
     "channel_vc_creator_4p": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_4p", "friendly_name": "음성 채널 자동 생성 (최소 4인)", "channel_type": "voice"},
+    "channel_vc_creator_newbie": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_newbie", "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"},
+    "channel_vc_creator_vip":    {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_vip", "friendly_name": "[음성 채널] VIP 전용 생성기", "channel_type": "voice"},
 
     # --- [로그 채널 설정] ---
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
