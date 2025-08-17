@@ -1,5 +1,6 @@
 # cogs/admin/config_menu.py (Modal 전송 오류 수정 완료)
 
+
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
