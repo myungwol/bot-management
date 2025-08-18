@@ -11,7 +11,7 @@ from utils.ui_defaults import TICKET_INQUIRY_ROLES, TICKET_REPORT_ROLES
 
 logger = logging.getLogger(__name__)
 
-# --- 모달 클래스 ---
+# --- 모달 및 UI 클래스 (이전과 동일) ---
 class InquiryModal(ui.Modal, title="お問い合わせ・ご提案"):
     title_input = ui.TextInput(label="件名", placeholder="お問い合わせの件名を入力してください。", max_length=100)
     content_input = ui.TextInput(label="内容", placeholder="お問い合わせ内容を詳しく入力してください。", style=discord.TextStyle.paragraph, max_length=1000)
@@ -41,8 +41,6 @@ class ReportModal(ui.Modal, title="通報"):
         title = f"通報: {self.target_user.value}"
         content = f"**通報対象者:** {self.target_user.value}\n\n**内容:**\n{self.content_input.value}"
         await self.cog.create_ticket(interaction, "report", self.forum_channel, title, content)
-
-# --- 제어판 View ---
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str):
         super().__init__(timeout=None)
@@ -80,22 +78,28 @@ class TicketSystem(commands.Cog):
         self.guild: Optional[discord.Guild] = None
         self.inquiry_forum: Optional[discord.ForumChannel] = None
         self.report_forum: Optional[discord.ForumChannel] = None
+        # [수정] View 인스턴스를 클래스 변수로 관리하여 제거/재등록이 용이하게 함
+        self.inquiry_panel_view = self.create_panel_view("inquiry")
+        self.report_panel_view = self.create_panel_view("report")
         logger.info("TicketSystem Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
-        # View는 regenerate_panel에서 동적으로 생성되므로 여기서 등록할 필요 없음
         await self.load_configs()
         self.bot.loop.create_task(self.sync_tickets_from_db())
 
     async def load_configs(self):
+        # [수정] View를 등록하는 로직을 load_configs로 이동
+        self.bot.add_view(self.inquiry_panel_view)
+        self.bot.add_view(self.report_panel_view)
+        
         inquiry_forum_id = get_id("inquiry_forum_channel_id")
-        if inquiry_forum_id:
-            self.inquiry_forum = self.bot.get_channel(inquiry_forum_id)
+        if inquiry_forum_id and (channel := self.bot.get_channel(inquiry_forum_id)):
+            self.inquiry_forum = channel
             if self.inquiry_forum: self.guild = self.inquiry_forum.guild
         
         report_forum_id = get_id("report_forum_channel_id")
-        if report_forum_id:
-            self.report_forum = self.bot.get_channel(report_forum_id)
+        if report_forum_id and (channel := self.bot.get_channel(report_forum_id)):
+            self.report_forum = channel
             if self.report_forum and not self.guild: self.guild = self.report_forum.guild
 
         if self.guild:
@@ -104,68 +108,6 @@ class TicketSystem(commands.Cog):
             self.report_role_ids = [r_id for key in TICKET_REPORT_ROLES if (r_id := get_id(key))]
             logger.info(f"[TicketSystem] {len(self.master_role_ids)}개의 마스터 역할을, {len(self.inquiry_role_ids)}개의 문의 역할을, {len(self.report_role_ids)}개의 신고 역할을 로드했습니다.")
     
-    async def sync_tickets_from_db(self):
-        await self.bot.wait_until_ready()
-        db_tickets = await get_all_tickets()
-        if not db_tickets: return
-        zombie_ids = []
-        for ticket_data in db_tickets:
-            thread_id = ticket_data.get("thread_id")
-            # 스레드가 실제로 존재하는지 확인 (get_thread는 비공개 스레드도 찾아줌)
-            if self.guild and self.guild.get_thread(thread_id):
-                self.tickets[thread_id] = ticket_data
-                self.bot.add_view(TicketControlView(self, ticket_data.get("ticket_type")))
-            else:
-                zombie_ids.append(thread_id)
-        if zombie_ids: await remove_multiple_tickets(zombie_ids)
-
-    async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, forum_channel: discord.ForumChannel, title: str, content: str, excluded_role_ids: List[int] = []):
-        try:
-            role_ids_to_add = self.inquiry_role_ids if ticket_type == "inquiry" else self.report_role_ids
-            final_role_ids = [r_id for r_id in role_ids_to_add if r_id not in excluded_role_ids]
-            roles_to_add = [interaction.guild.get_role(r_id) for r_id in final_role_ids if interaction.guild.get_role(r_id)]
-            
-            thread_content = f"**作成者:** {interaction.user.mention}\n\n**内容:**\n{content}"
-            # 비공개 스레드를 만들고, 생성자와 담당 역할 멤버들을 초대
-            thread = await forum_channel.create_thread(name=title, content=thread_content[:1900], auto_archive_duration=10080)
-            
-            # 비공개 스레드로 만들기 위해 권한 수정 (스레드 생성 후 가능)
-            # 현재 discord.py에서는 스레드 권한을 직접 수정하는 API가 공식적으로 지원되지 않음
-            # 대신, 생성 시점에 초대하는 방식으로 구현
-            
-            await add_ticket(thread.id, interaction.user.id, interaction.guild.id, ticket_type)
-            self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type}
-            
-            # 스레드에 작성자(이미 추가됨)와 관리자들을 추가
-            members_to_add = {interaction.user}
-            for role in roles_to_add:
-                for member in role.members:
-                    members_to_add.add(member)
-            
-            # 초대 메시지 (실제 초대는 아님, 멘션용)
-            mention_string = ' '.join(role.mention for role in roles_to_add)
-
-            # 첫 메시지 수정하여 제어판과 멘션 추가
-            control_view = TicketControlView(self, ticket_type)
-            first_message = await thread.fetch_message(thread.id)
-            await first_message.edit(view=control_view)
-            await thread.send(f"担当者: {mention_string}", allowed_mentions=discord.AllowedMentions(roles=True))
-
-            await interaction.edit_original_response(content=f"✅ 非公開のチケットを作成しました: {thread.mention}")
-            
-        except Exception as e:
-            logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
-            try: await interaction.edit_original_response(content="❌ チケットの作成中にエラーが発生しました。")
-            except discord.NotFound: pass
-
-    async def _cleanup_ticket_data(self, thread_id: int):
-        self.tickets.pop(thread_id, None); await remove_ticket(thread_id)
-
-    @commands.Cog.listener()
-    async def on_thread_delete(self, thread):
-        if thread.id in self.tickets:
-            await self._cleanup_ticket_data(thread.id)
-
     def create_panel_view(self, panel_type: str):
         view = ui.View(timeout=None)
         if panel_type == "inquiry":
@@ -184,52 +126,101 @@ class TicketSystem(commands.Cog):
             view.add_item(button)
         return view
 
-    async def regenerate_panel(self, channel: discord.ForumChannel) -> bool:
-        panel_type = None
-        if channel.id == get_id("inquiry_forum_channel_id"):
-            panel_type = "inquiry"
-        elif channel.id == get_id("report_forum_channel_id"):
-            panel_type = "report"
-        
-        if panel_type:
-            view = self.create_panel_view(panel_type)
-            embed_title = "サーバーへのお問い合わせ・ご提案" if panel_type == "inquiry" else "ユーザーへの通報"
-            embed_desc = "下のボタンを押して新しいチケットを作成してください。"
-            embed = discord.Embed(title=embed_title, description=embed_desc)
+    async def sync_tickets_from_db(self):
+        await self.bot.wait_until_ready()
+        db_tickets = await get_all_tickets()
+        if not db_tickets: return
+        zombie_ids = []
+        for ticket_data in db_tickets:
+            thread_id = ticket_data.get("thread_id")
+            if self.guild and self.guild.get_thread(thread_id):
+                self.tickets[thread_id] = ticket_data
+                self.bot.add_view(TicketControlView(self, ticket_data.get("ticket_type")))
+            else:
+                zombie_ids.append(thread_id)
+        if zombie_ids: await remove_multiple_tickets(zombie_ids)
+
+    async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, forum_channel: discord.ForumChannel, title: str, content: str, excluded_role_ids: List[int] = []):
+        try:
+            role_ids_to_add = self.inquiry_role_ids if ticket_type == "inquiry" else self.report_role_ids
+            final_role_ids = [r_id for r_id in role_ids_to_add if r_id not in excluded_role_ids]
+            roles_to_add = [interaction.guild.get_role(r_id) for r_id in final_role_ids if interaction.guild.get_role(r_id)]
+            thread_content = f"**作成者:** {interaction.user.mention}\n\n**内容:**\n{content}"
             
+            thread = await forum_channel.create_thread(name=title, content=thread_content[:1900], auto_archive_duration=10080, reason=f"{interaction.user.name}님의 티켓 생성")
+            
+            await add_ticket(thread.id, interaction.user.id, interaction.guild.id, ticket_type)
+            self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type}
+            
+            await thread.add_user(interaction.user)
+            for role in roles_to_add:
+                for member in role.members:
+                    if not any(excluded_role.id in [r.id for r in member.roles] for excluded_role in roles_to_add if excluded_role.id in excluded_role_ids):
+                         try: await thread.add_user(member)
+                         except: pass
+
+            mention_string = ' '.join(role.mention for role in roles_to_add)
+            control_view = TicketControlView(self, ticket_type)
+            await thread.send(f"**[チケット管理パネル]**\n担当者: {mention_string}", view=control_view, allowed_mentions=discord.AllowedMentions(roles=True))
+            
+            await interaction.edit_original_response(content=f"✅ 非公開のチケットを作成しました: {thread.mention}")
+            
+        except discord.Forbidden:
+            logger.error(f"티켓 생성 실패 (권한 부족): #{forum_channel.name}")
+            await interaction.edit_original_response(content=f"❌ チケットの作成に失敗しました。ボットに`#{forum_channel.name}`チャンネルでスレッドを作成する権限があるか確認してください。")
+        except Exception as e:
+            logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
+            try: await interaction.edit_original_response(content="❌ チケットの作成中にエラーが発生しました。")
+            except discord.NotFound: pass
+
+    async def _cleanup_ticket_data(self, thread_id: int):
+        self.tickets.pop(thread_id, None); await remove_ticket(thread_id)
+
+    @commands.Cog.listener()
+    async def on_thread_delete(self, thread):
+        if thread.id in self.tickets:
+            await self._cleanup_ticket_data(thread.id)
+
+    async def regenerate_panel(self, channel: discord.ForumChannel, panel_type: str) -> bool:
+        if not isinstance(channel, discord.ForumChannel):
+            logger.error(f"regenerate_panel: 채널 타입이 포럼이 아닙니다: {type(channel)}")
+            return False
+
+        view = self.create_panel_view(panel_type)
+        embed_title = "サーバーへのお問い合わせ・ご提案" if panel_type == "inquiry" else "ユーザーへの通報"
+        embed_desc = "下のボタンを押して新しいチケットを作成してください。"
+        embed = discord.Embed(title=embed_title, description=embed_desc)
+        
+        try:
+            # 기존 패널용 게시물이 있는지 확인하고 있다면 삭제
+            all_threads = channel.threads
             try:
-                # [수정] 기존 패널용 게시물이 있는지 확인하고 있다면 삭제 (아카이브된 스레드 포함)
-                # 공개 스레드와 봇이 접근 가능한 비공개 스레드를 모두 확인
-                all_threads = channel.threads
-                try:
-                    archived = [t async for t in channel.archived_threads(limit=None)]
-                    all_threads.extend(archived)
-                except discord.Forbidden:
-                    logger.warning(f"보관된 스레드를 가져올 권한이 없습니다: #{channel.name}")
+                archived = [t async for t in channel.archived_threads(limit=None)]
+                all_threads.extend(archived)
+            except discord.Forbidden:
+                logger.warning(f"보관된 스레드를 가져올 권한이 없습니다: #{channel.name}")
 
-                for thread in all_threads:
-                    if thread.owner == self.bot.user and "チケット作成はこちらから" in thread.name:
-                        try:
-                            await thread.delete(reason="古いパネルを削除")
-                            logger.info(f"기존 패널 게시물 #{thread.name} 을(를) 삭제했습니다.")
-                        except discord.Forbidden:
-                            logger.error(f"기존 패널 게시물 #{thread.name} 을(를) 삭제할 권한이 없습니다.")
+            for thread in all_threads:
+                if thread.owner == self.bot.user and "チケット作成はこちらから" in thread.name:
+                    try:
+                        await thread.delete(reason="古いパネルを削除")
+                        logger.info(f"기존 패널 게시물 #{thread.name} 을(를) 삭제했습니다.")
+                    except discord.Forbidden:
+                        logger.error(f"기존 패널 게시물 #{thread.name} 을(를) 삭제할 권한이 없습니다.")
 
-                # [수정] 포럼 채널에 새 게시물(스레드)을 만드는 가장 안정적인 방법
-                # 1. 먼저 채널에 메시지(내용+버튼)를 보낸다.
-                starter_message = await channel.send(embed=embed, view=view)
-                
-                # 2. 방금 보낸 메시지로부터 스레드를 생성한다.
-                await starter_message.create_thread(name="チケット作成はこちらから", auto_archive_duration=10080)
-                
-                logger.info(f"✅ {panel_type} 패널을 포럼 #{channel.name}에 성공적으로 생성했습니다.")
-                return True # 성공 반환
+            # 포럼 채널에 시작용 게시물(스레드)을 만들어서 패널을 설치
+            starter_message = await channel.send(embed=embed, view=view)
+            await starter_message.create_thread(name="チケット作成はこちらから", auto_archive_duration=10080)
             
-            except Exception as e:
-                logger.error(f"❌ #{channel.name} 채널에 패널 생성 중 치명적인 오류 발생: {e}", exc_info=True)
-                return False # 실패 반환
+            logger.info(f"✅ {panel_type} 패널을 포럼 #{channel.name}에 성공적으로 생성했습니다.")
+            return True
         
-        return False # 일치하는 패널 타입이 없음
-        
+        except discord.Forbidden:
+            logger.error(f"❌ #{channel.name} 포럼에 메시지를 보내거나 스레드를 만들 권한이 없습니다.")
+            return False
+        except Exception as e:
+            logger.error(f"❌ #{channel.name} 채널에 패널 생성 중 치명적인 오류 발생: {e}", exc_info=True)
+            return False
+
 async def setup(bot):
     await bot.add_cog(TicketSystem(bot))
