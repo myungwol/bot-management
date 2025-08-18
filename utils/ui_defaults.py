@@ -28,7 +28,7 @@ UI_ROLE_KEY_MAP = {
     "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": False, "priority": 20},
     "role_resident":            {"name": "住民", "is_prefix": True, "priority": 10},
     "role_guest":               {"name": "旅の人", "is_prefix": True, "priority": 5},
-    "role_personal_room_key":   {"name": "個人部屋の鍵", "is_prefix": False, "priority": 0},
+
     
     # --- 온보딩/역할 패널 구분선 역할 ---
     "role_onboarding_step_1":   {"name": "════════════ゲーム══════════", "is_prefix": False, "priority": 0},
@@ -36,6 +36,7 @@ UI_ROLE_KEY_MAP = {
     "role_onboarding_step_3":   {"name": "════════════情報════════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_4":   {"name": "════════════等級════════════", "is_prefix": False, "priority": 0},
     "role_warning_separator":   {"name": "════════════警告════════════", "is_prefix": False, "priority": 0},
+    "role_shop_separator":      {"name": "════════════商店════════════", "is_prefix": False, "priority": 0},
     
     # --- 개인 정보 역할 (성별, 연령대) ---
     "role_info_male":           {"name": "男性", "is_prefix": False, "priority": 0},
@@ -45,6 +46,11 @@ UI_ROLE_KEY_MAP = {
     "role_info_age_80s":        {"name": "80年代生", "is_prefix": False, "priority": 0},
     "role_info_age_90s":        {"name": "90年代生", "is_prefix": False, "priority": 0},
     "role_info_age_00s":        {"name": "00年代生", "is_prefix": False, "priority": 0},
+    
+    # --- 상점/아이템 역할 ---
+    "role_item_event_priority": {"name": "イベント優先権", "is_prefix": False, "priority": 0},
+    "role_item_warning_deduct": {"name": "警告1個差引権", "is_prefix": False, "priority": 0},
+    "role_personal_room_key":   {"name": "個人部屋の鍵", "is_prefix": False, "priority": 0},
 
     # --- 알림 역할 ---
     "role_notify_voice":        {"name": "通話", "is_prefix": False, "priority": 0},
