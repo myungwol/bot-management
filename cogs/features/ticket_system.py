@@ -11,32 +11,40 @@ from utils.ui_defaults import TICKET_INQUIRY_ROLES, TICKET_REPORT_ROLES
 
 logger = logging.getLogger(__name__)
 
-# --- 모달 클래스 (on_submit 로직 변경) ---
+# --- [수정] RoleSelect를 일반 Select로 변경 ---
+class ExcludeAdminSelect(ui.Select):
+    def __init__(self, allowed_roles: List[discord.Role]):
+        options = [
+            discord.SelectOption(label=role.name, value=str(role.id))
+            for role in allowed_roles
+        ]
+        super().__init__(
+            placeholder="この管理者を相談から除外します...",
+            min_values=0,
+            max_values=len(options),
+            options=options
+        )
+
 class InquiryModal(ui.Modal, title="お問い合わせ・ご提案"):
     title_input = ui.TextInput(label="件名", placeholder="お問い合わせの件名を入力してください。", max_length=100)
     content_input = ui.TextInput(label="内容", placeholder="お問い合わせ内容を詳しく入力してください。", style=discord.TextStyle.paragraph, max_length=1000)
     def __init__(self, cog: 'TicketSystem', forum_channel: discord.ForumChannel):
         super().__init__(timeout=None)
         self.cog = cog; self.forum_channel = forum_channel
-        if self.cog.guild and (guild := self.cog.bot.get_guild(self.cog.guild.id)):
-            inquiry_roles = [role for role_id in self.cog.inquiry_role_ids if (role := guild.get_role(role_id))]
+        if self.cog.guild:
+            inquiry_roles = [role for role_id in self.cog.inquiry_role_ids if (role := self.cog.guild.get_role(role_id))]
             if inquiry_roles:
-                self.exclude_select = ui.RoleSelect(placeholder="この管理者を相談から除外します...", min_values=0, max_values=len(inquiry_roles), role_ids=[r.id for r in inquiry_roles])
+                self.exclude_select = ExcludeAdminSelect(inquiry_roles)
                 self.add_item(self.exclude_select)
     
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
-        
         try:
             excluded_role_ids = []
             if hasattr(self, 'exclude_select'):
-                excluded_role_ids = [int(role.id) for role in self.exclude_select.values]
-            
-            # [수정] create_ticket 함수 호출을 try 블록 안으로 이동
+                excluded_role_ids = [int(role_id_str) for role_id_str in self.exclude_select.values]
             await self.cog.create_ticket(interaction, "inquiry", self.forum_channel, self.title_input.value, self.content_input.value, excluded_role_ids=excluded_role_ids)
-        
         except Exception as e:
-            # [신규] create_ticket에서 어떤 오류가 발생하든 여기서 잡아서 사용자에게 알림
             logger.error(f"InquiryModal on_submit에서 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ チケットの作成中に予期せぬエラーが発生しました。", ephemeral=True)
 
@@ -46,23 +54,16 @@ class ReportModal(ui.Modal, title="通報"):
     def __init__(self, cog: 'TicketSystem', forum_channel: discord.ForumChannel):
         super().__init__(timeout=None)
         self.cog = cog; self.forum_channel = forum_channel
-
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
-        
         try:
             title = f"通報: {self.target_user.value}"
             content = f"**通報対象者:** {self.target_user.value}\n\n**内容:**\n{self.content_input.value}"
-            
-            # [수정] create_ticket 함수 호출을 try 블록 안으로 이동
             await self.cog.create_ticket(interaction, "report", self.forum_channel, title, content)
-        
         except Exception as e:
-            # [신규] create_ticket에서 어떤 오류가 발생하든 여기서 잡아서 사용자에게 알림
             logger.error(f"ReportModal on_submit에서 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ チケットの作成中に予期せぬエラーが発生しました。", ephemeral=True)
-            
-# --- 제어판 View (이전과 동일) ---
+
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str):
         super().__init__(timeout=None)
@@ -89,7 +90,6 @@ class TicketControlView(ui.View):
         try: await interaction.channel.delete(reason=f"{interaction.user.display_name}による削除")
         except discord.NotFound: pass
 
-# --- 메인 Cog ---
 class TicketSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -173,8 +173,7 @@ class TicketSystem(commands.Cog):
                     is_excluded = False
                     for ex_role_id in excluded_role_ids:
                         if ex_role_id in [r.id for r in member.roles]:
-                            is_excluded = True
-                            break
+                            is_excluded = True; break
                     if not is_excluded:
                         try: await thread.add_user(member)
                         except: pass
@@ -183,14 +182,14 @@ class TicketSystem(commands.Cog):
             control_view = TicketControlView(self, ticket_type)
             await thread.send(f"**[チケット管理パネル]**\n担当者: {mention_string}", view=control_view, allowed_mentions=discord.AllowedMentions(roles=True))
             
-            # [수정] defer()에 대한 후속 응답으로 followup.send()를 사용
-            await interaction.followup.send(content=f"✅ 非公開のチケットを作成しました: {thread.mention}", ephemeral=True)
+            await interaction.followup.send(f"✅ 非公開のチケットを作成しました: {thread.mention}", ephemeral=True)
             
+        except discord.Forbidden:
+            logger.error(f"티켓 생성 실패 (권한 부족): #{forum_channel.name}")
+            await interaction.followup.send(f"❌ チケットの作成に失敗しました。ボットに`#{forum_channel.name}`チャンネルでスレッドを作成する権限があるか確認してください。", ephemeral=True)
         except Exception as e:
             logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
-            try:
-                # [수정] defer()에 대한 후속 응답으로 followup.send()를 사용
-                await interaction.followup.send(content="❌ チケットの作成中にエラーが発生しました。", ephemeral=True)
+            try: await interaction.followup.send("❌ チケットの作成中にエラーが発生しました。", ephemeral=True)
             except discord.NotFound: pass
 
     async def _cleanup_ticket_data(self, thread_id: int):
