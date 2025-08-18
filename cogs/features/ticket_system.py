@@ -11,42 +11,18 @@ from utils.ui_defaults import TICKET_INQUIRY_ROLES, TICKET_REPORT_ROLES
 
 logger = logging.getLogger(__name__)
 
-# --- [수정] RoleSelect를 일반 Select로 변경 ---
-class ExcludeAdminSelect(ui.Select):
-    def __init__(self, allowed_roles: List[discord.Role]):
-        options = [
-            discord.SelectOption(label=role.name, value=str(role.id))
-            for role in allowed_roles
-        ]
-        super().__init__(
-            placeholder="この管理者を相談から除外します...",
-            min_values=0,
-            max_values=len(options),
-            options=options
-        )
-
+# --- UI 클래스 ---
 class InquiryModal(ui.Modal, title="お問い合わせ・ご提案"):
     title_input = ui.TextInput(label="件名", placeholder="お問い合わせの件名を入力してください。", max_length=100)
     content_input = ui.TextInput(label="内容", placeholder="お問い合わせ内容を詳しく入力してください。", style=discord.TextStyle.paragraph, max_length=1000)
-    def __init__(self, cog: 'TicketSystem', forum_channel: discord.ForumChannel):
+    def __init__(self, cog: 'TicketSystem', forum_channel: discord.ForumChannel, excluded_roles: List[discord.Role]):
         super().__init__(timeout=None)
-        self.cog = cog; self.forum_channel = forum_channel
-        if self.cog.guild:
-            inquiry_roles = [role for role_id in self.cog.inquiry_role_ids if (role := self.cog.guild.get_role(role_id))]
-            if inquiry_roles:
-                self.exclude_select = ExcludeAdminSelect(inquiry_roles)
-                self.add_item(self.exclude_select)
-    
+        self.cog = cog
+        self.forum_channel = forum_channel
+        self.excluded_role_ids = [r.id for r in excluded_roles]
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            excluded_role_ids = []
-            if hasattr(self, 'exclude_select'):
-                excluded_role_ids = [int(role_id_str) for role_id_str in self.exclude_select.values]
-            await self.cog.create_ticket(interaction, "inquiry", self.forum_channel, self.title_input.value, self.content_input.value, excluded_role_ids=excluded_role_ids)
-        except Exception as e:
-            logger.error(f"InquiryModal on_submit에서 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send("❌ チケットの作成中に予期せぬエラーが発生しました。", ephemeral=True)
+        await self.cog.create_ticket(interaction, "inquiry", self.forum_channel, self.title_input.value, self.content_input.value, excluded_role_ids=self.excluded_role_ids)
 
 class ReportModal(ui.Modal, title="通報"):
     target_user = ui.TextInput(label="対象者", placeholder="通報する相手の名前を正確に入力してください。")
@@ -56,13 +32,46 @@ class ReportModal(ui.Modal, title="通報"):
         self.cog = cog; self.forum_channel = forum_channel
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            title = f"通報: {self.target_user.value}"
-            content = f"**通報対象者:** {self.target_user.value}\n\n**内容:**\n{self.content_input.value}"
-            await self.cog.create_ticket(interaction, "report", self.forum_channel, title, content)
-        except Exception as e:
-            logger.error(f"ReportModal on_submit에서 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send("❌ チケットの作成中に予期せぬエラーが発生しました。", ephemeral=True)
+        title = f"通報: {self.target_user.value}"
+        content = f"**通報対象者:** {self.target_user.value}\n\n**内容:**\n{self.content_input.value}"
+        await self.cog.create_ticket(interaction, "report", self.forum_channel, title, content)
+
+# [신규] 관리자 제외 선택 후 다음 단계로 넘어가는 View
+class InquiryStartView(ui.View):
+    def __init__(self, cog: 'TicketSystem', forum_channel: discord.ForumChannel):
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.forum_channel = forum_channel
+        self.excluded_roles: List[discord.Role] = []
+
+        # 드롭다운 메뉴 추가
+        if self.cog.guild:
+            inquiry_roles = [role for role_id in self.cog.inquiry_role_ids if (role := self.cog.guild.get_role(role_id))]
+            if inquiry_roles:
+                self.add_item(self.ExcludeSelect(inquiry_roles))
+        
+        # '내용 입력' 버튼 추가
+        self.add_item(self.ProceedButton())
+
+    # 드롭다운 메뉴를 내부 클래스로 정의
+    class ExcludeSelect(ui.Select):
+        def __init__(self, allowed_roles: List[discord.Role]):
+            options = [discord.SelectOption(label=role.name, value=str(role.id)) for role in allowed_roles]
+            super().__init__(placeholder="この管理者を相談から除外します...", min_values=0, max_values=len(options), options=options)
+        async def callback(self, interaction: discord.Interaction):
+            # 선택된 역할을 View 변수에 저장
+            self.view.excluded_roles = [interaction.guild.get_role(int(role_id)) for role_id in self.values]
+            await interaction.response.defer()
+
+    # '내용 입력' 버튼을 내부 클래스로 정의
+    class ProceedButton(ui.Button):
+        def __init__(self):
+            super().__init__(label="内容入力へ進む", style=discord.ButtonStyle.success)
+        async def callback(self, interaction: discord.Interaction):
+            # View에 저장된 제외 역할을 모달에 전달
+            await interaction.response.send_modal(InquiryModal(self.view.cog, self.view.forum_channel, self.view.excluded_roles))
+            # 버튼 클릭 후에는 원래 메시지를 삭제하여 깔끔하게 처리
+            await interaction.delete_original_response()
 
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str):
@@ -130,7 +139,8 @@ class TicketSystem(commands.Cog):
             button = ui.Button(label="お問い合わせ・ご提案", style=discord.ButtonStyle.primary, emoji="📨", custom_id="ticket_inquiry_panel")
             async def inquiry_callback(interaction: discord.Interaction):
                 if not self.inquiry_forum: return await interaction.response.send_message("❌ お問い合わせフォーラムが設定されていません。", ephemeral=True)
-                await interaction.response.send_modal(InquiryModal(self, self.inquiry_forum))
+                # [수정] 모달 대신 InquiryStartView를 보냄
+                await interaction.response.send_message("相談から除外したい管理者がいる場合は選択してください。", view=InquiryStartView(self, self.inquiry_forum), ephemeral=True)
             button.callback = inquiry_callback
             view.add_item(button)
         elif panel_type == "report":
