@@ -284,3 +284,23 @@ async def update_ticket_lock_status(thread_id: int, is_locked: bool):
 async def remove_multiple_tickets(thread_ids: List[int]):
     if not thread_ids: return
     await supabase.table('tickets').delete().in_('thread_id', thread_ids).execute()
+
+@supabase_retry_handler()
+async def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: str, amount: int) -> Optional[dict]:
+    """새로운 경고를 데이터베이스에 추가합니다."""
+    response = await supabase.table('warnings').insert({
+        "guild_id": guild_id,
+        "user_id": user_id,
+        "moderator_id": moderator_id,
+        "reason": reason,
+        "amount": amount
+    }).execute()
+    return response.data[0] if response.data else None
+
+@supabase_retry_handler()
+async def get_total_warning_count(user_id: int, guild_id: int) -> int:
+    """특정 유저의 누적 경고 갯수를 가져옵니다."""
+    response = await supabase.table('warnings').select('amount').eq('user_id', user_id).eq('guild_id', guild_id).execute()
+    if response.data:
+        return sum(item['amount'] for item in response.data)
+    return 0
