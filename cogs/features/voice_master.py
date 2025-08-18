@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 CHANNEL_TYPE_INFO = {
     "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": True, "default_name": "みんなの広場"},
-    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のゲーム部屋"},
+    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "プレイ中のゲーム名に変更してください"},
     "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "新人のベンチ"},
     "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のハウス"},
     "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}の部屋"} # Fallback
