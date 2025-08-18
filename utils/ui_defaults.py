@@ -32,10 +32,11 @@ UI_ROLE_KEY_MAP = {
     
     # --- 온보딩/역할 패널 구분선 역할 ---
     "role_onboarding_step_1":   {"name": "════════════ゲーム══════════", "is_prefix": False, "priority": 0},
-    "role_onboarding_step_2":   {"name": "═════════════通知═══════════", "is_prefix": False, "priority": 0},
-    "role_onboarding_step_3":   {"name": "═════════════情報═══════════", "is_prefix": False, "priority": 0},
-    "role_onboarding_step_4":   {"name": "═════════════等級═══════════", "is_prefix": False, "priority": 0},
-
+    "role_onboarding_step_2":   {"name": "════════════通知════════════", "is_prefix": False, "priority": 0},
+    "role_onboarding_step_3":   {"name": "════════════情報════════════", "is_prefix": False, "priority": 0},
+    "role_onboarding_step_4":   {"name": "════════════等級════════════", "is_prefix": False, "priority": 0},
+    "role_warning_separator":   {"name": "════════════警告════════════", "is_prefix": False, "priority": 0},
+    
     # --- 개인 정보 역할 (성별, 연령대) ---
     "role_info_male":           {"name": "男性", "is_prefix": False, "priority": 0},
     "role_info_female":         {"name": "女性", "is_prefix": False, "priority": 0},
@@ -66,6 +67,12 @@ UI_ROLE_KEY_MAP = {
     "role_platform_steam":      {"name": "スチーム", "is_prefix": False, "priority": 0},
     "role_platform_smartphone": {"name": "スマートフォン", "is_prefix": False, "priority": 0},
     "role_platform_switch":     {"name": "スイッチ", "is_prefix": False, "priority": 0},
+
+    # --- 경고 역할 ---
+    "role_warning_level_1":     {"name": "警告1回", "is_prefix": False, "priority": 0},
+    "role_warning_level_2":     {"name": "警告2回", "is_prefix": False, "priority": 0},
+    "role_warning_level_3":     {"name": "警告3回", "is_prefix": False, "priority": 0},
+    "role_warning_level_4":     {"name": "警告4回", "is_prefix": False, "priority": 0},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -184,4 +191,14 @@ TICKET_STAFF_SPECIFIC_ROLES = [
 # '유저 신고' 티켓 생성 시 자동으로 초대될 역할 키 목록
 TICKET_REPORT_ROLES = [
     "role_staff_police", # 交番さん
+]
+
+# 누적 경고 횟수에 따라 부여될 역할 목록
+# count: 이 횟수에 '도달하면' 해당 역할을 부여합니다.
+# 봇은 이 목록에 있는 모든 역할 중, 유저의 경고 횟수에 맞는 가장 높은 단계의 역할 '하나만'을 부여합니다.
+WARNING_THRESHOLDS = [
+    {"count": 1, "role_key": "role_warning_level_1"},
+    {"count": 2, "role_key": "role_warning_level_2"},
+    {"count": 3, "role_key": "role_warning_level_3"},
+    {"count": 4, "role_key": "role_warning_level_4"},
 ]
