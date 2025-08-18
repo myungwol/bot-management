@@ -117,9 +117,9 @@ SETUP_COMMAND_MAP = {
     "channel_vc_creator_newbie": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_newbie", "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"},
     "channel_vc_creator_vip":    {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_vip", "friendly_name": "[음성 채널] VIP 전용 생성기", "channel_type": "voice"},
 
-    # [수정] 티켓 설정을 2개의 포럼 채널로 지정하도록 변경
-    "forum_inquiry": {"type": "channel", "cog_name": "TicketSystem", "key": "inquiry_forum_channel_id", "friendly_name": "[티켓] 문의/건의 포럼", "channel_type": "forum"},
-    "forum_report":  {"type": "channel", "cog_name": "TicketSystem", "key": "report_forum_channel_id",  "friendly_name": "[티켓] 유저 신고 포럼", "channel_type": "forum"},
+    # [수정] 티켓 패널 설정의 "type"을 "panel"로, key를 "panel_inquiry" 등으로 변경
+    "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_forum_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "forum"},
+    "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_forum_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "forum"},
 
     # --- [로그 채널 설정] ---
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
