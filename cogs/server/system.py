@@ -76,7 +76,8 @@ class ServerSystem(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup(self, interaction: discord.Interaction,
                     action: str,
-                    channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel | discord.CategoryChannel] = None,
+                    # [수정] discord.CategoryChannel, discord.ForumChannel 제거
+                    channel: Optional[discord.TextChannel | discord.VoiceChannel] = None,
                     role: Optional[discord.Role] = None,
                     stat_type: Optional[str] = None,
                     template: Optional[str] = None):
@@ -93,8 +94,7 @@ class ServerSystem(commands.Cog):
             error_msg = None
             if not channel:
                 error_msg = f"❌ このタスクを実行するには、「channel」オプションに**{required_channel_type}チャンネル**を指定する必要があります。"
-            elif (required_channel_type == "text" and not isinstance(channel, discord.TextChannel)) or \
-                 (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)) or \
+           elif (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)):
                  (required_channel_type == "forum" and not isinstance(channel, discord.ForumChannel)) or \
                  (required_channel_type == "category" and not isinstance(channel, discord.CategoryChannel)):
                 error_msg = f"❌ このタスクには**{required_channel_type}チャンネル**が必要です。正しいタイプのチャンネルを選択してください。"
