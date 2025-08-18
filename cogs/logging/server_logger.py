@@ -24,22 +24,28 @@ class ServerLogger(commands.Cog):
         if not self.log_channel_id: return None
         return self.bot.get_channel(self.log_channel_id)
         
-    async def get_audit_log_user(self, guild: discord.Guild, action: discord.AuditLogAction, target_id: int):
+    async def get_audit_log_user(self, guild: discord.Guild, action: discord.AuditLogAction, target) -> discord.Member | None:
+        # [수정] 봇이 수행한 작업이면 None을 반환하도록 로직 강화
         await asyncio.sleep(1.5)
         try:
             async for entry in guild.audit_logs(action=action, limit=1):
-                if entry.target.id == target_id and not entry.user.bot:
-                    return entry.user
-        except discord.Forbidden: return "권한 부족"
-        except Exception: return "알 수 없음"
-        return "알 수 없음"
+                if entry.target.id == target.id:
+                    if not entry.user.bot:
+                        return entry.user
+                    else: # 봇이 한 행동이면 None 반환
+                        return None
+        except discord.Forbidden:
+            logger.warning(f"감사 로그 읽기 권한이 없습니다: {guild.name}")
+        except Exception as e:
+            logger.error(f"{action} 감사 로그 확인 중 오류: {e}")
+        return None
 
     @commands.Cog.listener()
     async def on_guild_role_create(self, role: discord.Role):
         log_channel = await self.get_log_channel()
         if not log_channel: return
-        user = await self.get_audit_log_user(role.guild, discord.AuditLogAction.role_create, role.id)
-        if not isinstance(user, discord.Member): return
+        user = await self.get_audit_log_user(role.guild, discord.AuditLogAction.role_create, role)
+        if not user: return
 
         embed = discord.Embed(title="역할 생성됨 (役職作成)", color=discord.Color.green(), timestamp=datetime.now(timezone.utc))
         embed.add_field(name="역할 (役職)", value=f"{role.mention} (`{role.name}`)", inline=False)
@@ -50,8 +56,8 @@ class ServerLogger(commands.Cog):
     async def on_guild_role_delete(self, role: discord.Role):
         log_channel = await self.get_log_channel()
         if not log_channel: return
-        user = await self.get_audit_log_user(role.guild, discord.AuditLogAction.role_delete, role.id)
-        if not isinstance(user, discord.Member): return
+        user = await self.get_audit_log_user(role.guild, discord.AuditLogAction.role_delete, role)
+        if not user: return
 
         embed = discord.Embed(title="역할 삭제됨 (役職削除)", color=discord.Color.dark_red(), timestamp=datetime.now(timezone.utc))
         embed.add_field(name="역할 이름 (役職名)", value=f"`{role.name}`", inline=False)
@@ -62,8 +68,8 @@ class ServerLogger(commands.Cog):
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role):
         log_channel = await self.get_log_channel()
         if not log_channel: return
-        user = await self.get_audit_log_user(after.guild, discord.AuditLogAction.role_update, after.id)
-        if not isinstance(user, discord.Member): return
+        user = await self.get_audit_log_user(after.guild, discord.AuditLogAction.role_update, after)
+        if not user: return
         
         embed = discord.Embed(title="역할 업데이트됨 (役職更新)", color=discord.Color.blue(), timestamp=datetime.now(timezone.utc))
         embed.add_field(name="역할 (役職)", value=f"{after.mention}", inline=False)
@@ -83,8 +89,8 @@ class ServerLogger(commands.Cog):
     async def on_guild_update(self, before: discord.Guild, after: discord.Guild):
         log_channel = await self.get_log_channel()
         if not log_channel: return
-        user = await self.get_audit_log_user(after, discord.AuditLogAction.guild_update, after.id)
-        if not isinstance(user, discord.Member): return
+        user = await self.get_audit_log_user(after, discord.AuditLogAction.guild_update, after)
+        if not user: return
 
         embed = discord.Embed(title="서버 설정 업데이트됨 (サーバー設定更新)", color=discord.Color.purple(), timestamp=datetime.now(timezone.utc))
         
