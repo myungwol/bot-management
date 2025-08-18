@@ -1,190 +1,201 @@
-# cogs/server/system.py
-"""
-서버 관리와 관련된 모든 통합 명령어를 단일 /setup 명령어로 담당하는 Cog입니다.
-"""
+# cogs/features/ticket_system.py
 import discord
+from discord import app_commands, ui
 from discord.ext import commands
-from discord import app_commands
 import logging
-from typing import Optional, List
+from typing import Dict, Any, List, Optional
+import asyncio
 
-from utils.database import (
-    get_config, save_id_to_db, save_config_to_db,
-    get_all_stats_channels, add_stats_channel, remove_stats_channel
-)
-from utils.ui_defaults import UI_ROLE_KEY_MAP
+from utils.database import get_id, add_ticket, remove_ticket, get_all_tickets, remove_multiple_tickets
+from utils.ui_defaults import TICKET_INQUIRY_ROLES, TICKET_REPORT_ROLES
 
 logger = logging.getLogger(__name__)
 
-class ServerSystem(commands.Cog):
+# ... (InquiryModal, ReportModal, ExcludeAdminSelect 등 UI 클래스는 이전과 동일) ...
+class ExcludeAdminSelect(ui.RoleSelect):
+    def __init__(self, allowed_roles: List[discord.Role]):
+        super().__init__(placeholder="この管理者を相談から除外します...", min_values=0, max_values=len(allowed_roles))
+        # 옵션을 직접 설정하지 않고 RoleSelect의 기본 기능을 사용
+class InquiryModal(ui.Modal, title="お問い合わせ・ご提案"):
+    title_input = ui.TextInput(label="件名", placeholder="お問い合わせの件名を入力してください。", max_length=100)
+    content_input = ui.TextInput(label="内容", placeholder="お問い合わせ内容を詳しく入力してください。", style=discord.TextStyle.paragraph, max_length=1000)
+    def __init__(self, cog: 'TicketSystem'):
+        super().__init__(timeout=None)
+        self.cog = cog
+        inquiry_roles = [role for role_id in self.cog.inquiry_role_ids if (role := self.cog.bot.get_guild(self.cog.guild_id).get_role(role_id))]
+        if inquiry_roles:
+            self.exclude_select = ExcludeAdminSelect(inquiry_roles)
+            self.add_item(self.exclude_select)
+    async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
+class ReportModal(ui.Modal, title="通報"):
+    target_user = ui.TextInput(label="対象者", placeholder="通報する相手の名前を正確に入力してください。")
+    content_input = ui.TextInput(label="内容", placeholder="通報内容を詳しく入力してください。(証拠SSなど)", style=discord.TextStyle.paragraph, max_length=1000)
+    async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
+
+class TicketControlView(ui.View):
+    def __init__(self, cog: 'TicketSystem', ticket_type: str):
+        super().__init__(timeout=None)
+        self.cog = cog; self.ticket_type = ticket_type
+    async def _check_master_permission(self, interaction: discord.Interaction) -> bool:
+        return any(role.id in self.cog.master_role_ids for role in interaction.user.roles)
+    async def _check_handler_permission(self, interaction: discord.Interaction, ticket_type: str) -> bool:
+        role_ids_to_check = self.cog.report_role_ids if ticket_type == "report" else self.cog.inquiry_role_ids
+        return any(role.id in role_ids_to_check for role in interaction.user.roles)
+    @ui.button(label="ロック", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="ticket_lock")
+    async def lock(self, interaction: discord.Interaction, button: ui.Button):
+        is_master = await self._check_master_permission(interaction)
+        is_handler = await self._check_handler_permission(interaction, self.ticket_type)
+        can_lock = is_master or (self.ticket_type == "report" and is_handler)
+        if not can_lock: return await interaction.response.send_message("❌ このチケットをロックする権限がありません。", ephemeral=True)
+        thread = interaction.channel
+        await interaction.response.send_message(f"✅ {interaction.user.mention}さんがこのチケットをロックしました。")
+        await thread.edit(locked=True, archived=True, reason=f"{interaction.user.display_name}によるロック")
+    @ui.button(label="削除", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="ticket_delete")
+    async def delete(self, interaction: discord.Interaction, button: ui.Button):
+        if not await self._check_master_permission(interaction):
+            return await interaction.response.send_message("❌ `村長`、`副村長`のみがこのボタンを使用できます。", ephemeral=True)
+        thread_id = interaction.channel.id
+        await interaction.response.send_message(f"✅ 5秒後にこのチケットを削除します。")
+        await asyncio.sleep(5)
+        try: await interaction.channel.delete(reason=f"{interaction.user.display_name}による削除")
+        except discord.NotFound: pass
+
+# --- [수정] 패널 View를 2개로 분리 ---
+class InquiryPanelView(ui.View):
+    def __init__(self, cog: 'TicketSystem'):
+        super().__init__(timeout=None)
+        self.cog = cog
+    @ui.button(label="お問い合わせ・ご提案", style=discord.ButtonStyle.primary, emoji="📨", custom_id="ticket_inquiry")
+    async def inquiry(self, interaction: discord.Interaction, button: ui.Button):
+        modal = InquiryModal(self.cog)
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        if modal.is_submitted():
+            excluded_role_ids = [int(role.id) for role in modal.exclude_select.values]
+            await self.cog.create_ticket(interaction, "inquiry", modal.title_input.value, modal.content_input.value, excluded_role_ids=excluded_role_ids)
+
+class ReportPanelView(ui.View):
+    def __init__(self, cog: 'TicketSystem'):
+        super().__init__(timeout=None)
+        self.cog = cog
+    @ui.button(label="通報", style=discord.ButtonStyle.danger, emoji="🚨", custom_id="ticket_report")
+    async def report(self, interaction: discord.Interaction, button: ui.Button):
+        modal = ReportModal()
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        if modal.is_submitted():
+            title = f"通報: {modal.target_user.value}"
+            content = f"**通報対象者:** {modal.target_user.value}\n\n**内容:**\n{modal.content_input.value}"
+            await self.cog.create_ticket(interaction, "report", title, content)
+
+# --- 메인 Cog ---
+class TicketSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
+        self.tickets: Dict[int, Dict] = {}
+        self.master_role_ids: List[int] = []
+        self.inquiry_role_ids: List[int] = []
+        self.report_role_ids: List[int] = []
+        self.guild_id: Optional[int] = None
+        logger.info("TicketSystem Cog가 성공적으로 초기화되었습니다.")
 
-    async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message(f"❌ このコマンドを使用するには、次の権限が必要です: `{', '.join(error.missing_permissions)}`", ephemeral=True)
-        else:
-            logger.error(f"'{interaction.command.qualified_name}'コマンドの処理中にエラーが発生しました: {error}", exc_info=True)
-            if interaction.response.is_done():
-                await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
-            else:
-                await interaction.response.send_message("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
+    async def cog_load(self):
+        # [수정] 2개의 패널 View를 등록
+        self.bot.add_view(InquiryPanelView(self))
+        self.bot.add_view(ReportPanelView(self))
+        await self.load_configs()
+        self.bot.loop.create_task(self.sync_tickets_from_db())
 
-    async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        setup_map = get_config("SETUP_COMMAND_MAP", {})
-        choices = []
-        for key, info in setup_map.items():
-            type_prefix = "[채널/패널]"
-            if info.get('channel_type') == 'voice': type_prefix = "[음성채널]"
-            elif info.get('channel_type') == 'forum': type_prefix = "[포럼]"
-            elif info.get('channel_type') == 'category': type_prefix = "[카테고리]"
-
-            choice_name = f"{type_prefix} {info.get('friendly_name', key)} 설정"
-            if current.lower() in choice_name.lower():
-                choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
-
-        role_actions = { "roles_sync": "[역할] 모든 역할 DB와 동기화" }
-        for key, name in role_actions.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
+    async def load_configs(self):
+        # [수정] 두 패널 중 하나라도 설정되어 있으면 Guild ID를 가져옴
+        inquiry_channel_id = get_id("inquiry_panel_channel_id")
+        report_channel_id = get_id("report_panel_channel_id")
+        panel_channel_id = inquiry_channel_id or report_channel_id
+        if panel_channel_id and (channel := self.bot.get_channel(panel_channel_id)):
+            self.guild_id = channel.guild.id
         
-        stats_actions = { "stats_set": "[통계] 통계 채널 설정/제거", "stats_refresh": "[통계] 모든 통계 채널 새로고침", "stats_list": "[통계] 설정된 통계 채널 목록 보기",}
-        for key, name in stats_actions.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
+        self.master_role_ids = [r_id for key in ["role_staff_village_chief", "role_staff_deputy_chief"] if (r_id := get_id(key))]
+        self.inquiry_role_ids = [r_id for key in TICKET_INQUIRY_ROLES if (r_id := get_id(key))]
+        self.report_role_ids = [r_id for key in TICKET_REPORT_ROLES if (r_id := get_id(key))]
+        logger.info(f"[TicketSystem] {len(self.master_role_ids)}개의 마스터 역할을, {len(self.inquiry_role_ids)}개의 문의 역할을, {len(self.report_role_ids)}개의 신고 역할을 로드했습니다.")
+    
+    async def sync_tickets_from_db(self):
+        await self.bot.wait_until_ready()
+        db_tickets = await get_all_tickets()
+        if not db_tickets: return
+        zombie_ids = []
+        for ticket_data in db_tickets:
+            thread_id, guild_id = ticket_data.get("thread_id"), ticket_data.get("guild_id")
+            guild = self.bot.get_guild(guild_id)
+            if guild and self.bot.get_channel(thread_id):
+                self.tickets[thread_id] = ticket_data
+                self.bot.add_view(TicketControlView(self, ticket_data.get("ticket_type")))
+            else: zombie_ids.append(thread_id)
+        if zombie_ids: await remove_multiple_tickets(zombie_ids)
 
-        return sorted(choices, key=lambda c: c.name)[:25]
-
-    @app_commands.command(name="setup", description="[管理者] ボットのチャンネル、役割、統計など、すべての設定を管理します。")
-    @app_commands.describe(
-        action="実行するタスクを選択してください。",
-        channel="[チャンネル/統計] タスクに必要なチャンネルを選択してください。",
-        role="[統計] '特定の役割の人数'を選択した場合に必要な役割です。",
-        stat_type="[統計] 表示する統計の種類を選択してください。",
-        template="[統計] チャンネル名の形式を指定します (例: 👤 ユーザー: {count}人)"
-    )
-    @app_commands.autocomplete(action=setup_action_autocomplete)
-    @app_commands.choices(stat_type=[
-        app_commands.Choice(name="[設定] 全メンバー数 (ボット含む)", value="total"),
-        app_commands.Choice(name="[設定] ユーザー数 (ボット除く)", value="humans"),
-        app_commands.Choice(name="[設定] ボット数", value="bots"),
-        app_commands.Choice(name="[設定] サーバーブースト数", value="boosters"),
-        app_commands.Choice(name="[設定] 特定の役割の人数", value="role"),
-        app_commands.Choice(name="[削除] このチャンネルの統計設定を削除", value="remove"),
-    ])
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def setup(self, interaction: discord.Interaction,
-                    action: str,
-                    # [수정] discord.CategoryChannel, discord.ForumChannel 제거
-                    channel: Optional[discord.TextChannel | discord.VoiceChannel] = None,
-                    role: Optional[discord.Role] = None,
-                    stat_type: Optional[str] = None,
-                    template: Optional[str] = None):
-        
-        await interaction.response.defer(ephemeral=True)
-
-        if action.startswith("channel_setup:"):
-            setting_key = action.split(":", 1)[1]
-            setup_map = get_config("SETUP_COMMAND_MAP", {})
-            config = setup_map.get(setting_key)
-            if not config: return await interaction.followup.send("❌ 無効な設定キーです。", ephemeral=True)
-
-            required_channel_type = config.get("channel_type", "text")
-            error_msg = None
-            if not channel:
-                error_msg = f"❌ このタスクを実行するには、「channel」オプションに**{required_channel_type}チャンネル**を指定する必要があります。"
-           elif (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)):
-                 (required_channel_type == "forum" and not isinstance(channel, discord.ForumChannel)) or \
-                 (required_channel_type == "category" and not isinstance(channel, discord.CategoryChannel)):
-                error_msg = f"❌ このタスクには**{required_channel_type}チャンネル**が必要です。正しいタイプのチャンネルを選択してください。"
+    async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, title: str, content: str, excluded_role_ids: List[int] = []):
+        try:
+            category = interaction.channel.category
+            if not category: return await interaction.followup.send("❌ チケットを作成するカテゴリーが見つかりません。", ephemeral=True)
             
-            if error_msg: return await interaction.followup.send(error_msg, ephemeral=True)
-
-            db_key, friendly_name = config['key'], config['friendly_name']
-            await save_id_to_db(db_key, channel.id)
+            forum_name = f"문의-{interaction.user.name}" if ticket_type == "inquiry" else f"신고-{interaction.user.name}"
+            role_ids_to_add = self.inquiry_role_ids if ticket_type == "inquiry" else self.report_role_ids
+            final_role_ids = [r_id for r_id in role_ids_to_add if r_id not in excluded_role_ids]
             
-            cog_to_reload = self.bot.get_cog(config["cog_name"])
-            if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
-                await cog_to_reload.load_configs()
+            overwrites = {
+                interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                interaction.user: discord.PermissionOverwrite(view_channel=True),
+            }
+            roles_to_add = [interaction.guild.get_role(r_id) for r_id in final_role_ids]
+            for role in roles_to_add:
+                if role: overwrites[role] = discord.PermissionOverwrite(view_channel=True)
 
-            if config["type"] == "panel" and hasattr(cog_to_reload, 'regenerate_panel'):
-                await cog_to_reload.regenerate_panel(channel)
-                await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
-            else:
-                await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
-
-        elif action == "roles_sync":
-            role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
-            await save_config_to_db("ROLE_KEY_MAP", role_name_map)
-            synced_roles, missing_roles, error_roles = [], [], []
-            server_roles_by_name = {r.name: r.id for r in interaction.guild.roles}
-            for db_key, role_info in UI_ROLE_KEY_MAP.items():
-                role_name = role_info.get('name')
-                if not role_name: continue
-                if role_id := server_roles_by_name.get(role_name):
-                    try:
-                        await save_id_to_db(db_key, role_id)
-                        synced_roles.append(f"・**{role_name}** (`{db_key}`)")
-                    except Exception as e: error_roles.append(f"・**{role_name}**: `{e}`")
-                else: missing_roles.append(f"・**{role_name}** (`{db_key}`)")
+            forum = await category.create_forum(name=forum_name, overwrites=overwrites, reason=f"{ticket_type} 티켓 생성")
             
-            embed = discord.Embed(title="⚙️ 役割データベースの完全同期結果", color=0x2ECC71)
-            embed.set_footer(text=f"合計 {len(UI_ROLE_KEY_MAP)}個中 成功: {len(synced_roles)} / 失敗: {len(missing_roles) + len(error_roles)}")
-            if synced_roles:
-                full_text = "\n".join(synced_roles)
-                for i in range(0, len(full_text), 1024):
-                    chunk = full_text[i:i+1024]
-                    embed.add_field(name=f"✅ 同期成功 (部分 {i//1024 + 1})", value=chunk, inline=False)
-            if missing_roles:
-                embed.color = 0xFEE75C
-                embed.add_field(name=f"⚠️ サーバーに該当の役割なし ({len(missing_roles)}個)", value="\n".join(missing_roles)[:1024], inline=False)
-            if error_roles:
-                embed.color = 0xED4245
-                embed.add_field(name=f"❌ DB保存エラー ({len(error_roles)}個)", value="\n".join(error_roles)[:1024], inline=False)
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            thread = await forum.create_thread(name=title, content=f"**作成者:** {interaction.user.mention}\n\n**内容:**\n{content}")
+            
+            await add_ticket(thread.id, interaction.user.id, interaction.guild.id, ticket_type)
+            self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type}
+            
+            control_view = TicketControlView(self, ticket_type)
+            mention_string = ' '.join(role.mention for role in roles_to_add if role)
+            await thread.send(f"**[チケット管理パネル]**\n{mention_string}", view=control_view, allowed_mentions=discord.AllowedMentions(roles=True))
+            
+            await interaction.followup.send(f"✅ 非公開のチケットを作成しました: {forum.mention}", ephemeral=True)
+            
+        except Exception as e:
+            logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
+            await interaction.followup.send("❌ チケットの作成中にエラーが発生しました。", ephemeral=True)
 
-        elif action == "stats_set":
-            if not channel or not isinstance(channel, discord.VoiceChannel):
-                return await interaction.followup.send("❌ このタスクを実行するには、「channel」オプションにボイスチャンネルを指定する必要があります。", ephemeral=True)
-            if not stat_type:
-                return await interaction.followup.send("❌ このタスクを実行するには、「stat_type」オプションを選択する必要があります。", ephemeral=True)
-            if stat_type == "remove":
-                await remove_stats_channel(channel.id)
-                await interaction.followup.send(f"✅ `{channel.name}` チャンネルの統計設定を削除しました。", ephemeral=True)
-            else:
-                current_template = template or f"名前: {{count}}"
-                if "{count}" not in current_template:
-                    return await interaction.followup.send("❌ 名前形式(`template`)には必ず`{count}`を含める必要があります。", ephemeral=True)
-                if stat_type == "role" and not role:
-                    return await interaction.followup.send("❌ '特定の役割の人数'を選択した場合は、「role」オプションを指定する必要があります。", ephemeral=True)
-                role_id = role.id if role else None
-                await add_stats_channel(channel.id, interaction.guild_id, stat_type, current_template, role_id)
-                stats_cog = self.bot.get_cog("StatsUpdater")
-                if stats_cog and hasattr(stats_cog.update_stats_loop, 'restart'): stats_cog.update_stats_loop.restart()
-                await interaction.followup.send(f"✅ `{channel.name}` チャンネルに統計設定を追加/修正しました。", ephemeral=True)
+    async def _cleanup_ticket_data(self, thread_id: int):
+        self.tickets.pop(thread_id, None); await remove_ticket(thread_id)
 
-        elif action == "stats_refresh":
-            stats_cog = self.bot.get_cog("StatsUpdater")
-            if stats_cog and hasattr(stats_cog.update_stats_loop, 'restart'):
-                stats_cog.update_stats_loop.restart()
-                await interaction.followup.send("✅ すべての統計チャンネルの更新を要求しました。", ephemeral=True)
-            else: await interaction.followup.send("❌ 統計更新機能が見つかりません。", ephemeral=True)
+    @commands.Cog.listener()
+    async def on_thread_delete(self, thread):
+        if thread.id in self.tickets:
+            await self._cleanup_ticket_data(thread.id)
+            if isinstance(thread.parent, discord.ForumChannel):
+                try: await thread.parent.delete(reason="チケットのスレッドが削除されたため")
+                except discord.NotFound: pass
 
-        elif action == "stats_list":
-            configs = await get_all_stats_channels()
-            guild_configs = [c for c in configs if c.get('guild_id') == interaction.guild_id]
-            if not guild_configs: return await interaction.followup.send("ℹ️ 設定された統計チャンネルはありません。", ephemeral=True)
-            embed = discord.Embed(title="📊 設定された統計チャンネル一覧", color=0x3498DB)
-            description = []
-            for config in guild_configs:
-                ch = self.bot.get_channel(config['channel_id'])
-                ch_mention = f"<#{ch.id}>" if ch else f"削除されたチャンネル({config['channel_id']})"
-                description.append(f"**チャンネル:** {ch_mention}\n**種類:** `{config['stat_type']}`\n**名前形式:** `{config['channel_name_template']}`")
-            embed.description = "\n\n".join(description)
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        
-        else: await interaction.followup.send("❌ 不明なタスクです。リストから正しいタスクを選択してください。", ephemeral=True)
+    # [수정] regenerate_panel 함수를 패널 타입에 따라 분리
+    async def regenerate_panel(self, channel: discord.TextChannel):
+        panel_key = None
+        if channel.id == get_id("inquiry_panel_channel_id"):
+            panel_key = "inquiry"
+        elif channel.id == get_id("report_panel_channel_id"):
+            panel_key = "report"
+            
+        if panel_key == "inquiry":
+            embed = discord.Embed(title="サーバーへのお問い合わせ・ご提案", description="下のボタンを押して、サーバー運営へのご意見をお聞かせください。")
+            view = InquiryPanelView(self)
+            await channel.send(embed=embed, view=view)
+            logger.info(f"✅ 문의/건의 패널을 #{channel.name} 채널에 생성했습니다.")
+        elif panel_key == "report":
+            embed = discord.Embed(title="ユーザーへの通報", description="サーバー内での迷惑行為や問題を発見した場合、下のボタンで通報してください。")
+            view = ReportPanelView(self)
+            await channel.send(embed=embed, view=view)
+            logger.info(f"✅ 유저 신고 패널을 #{channel.name} 채널에 생성했습니다.")
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(ServerSystem(bot))
+async def setup(bot):
+    await bot.add_cog(TicketSystem(bot))
