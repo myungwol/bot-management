@@ -6,13 +6,11 @@ import logging
 from typing import Dict, Any, List, Optional, Set
 import asyncio
 
-# [수정] update_ticket_lock_status 함수 임포트
 from utils.database import get_id, add_ticket, remove_ticket, get_all_tickets, remove_multiple_tickets, update_ticket_lock_status
 from utils.ui_defaults import TICKET_MASTER_ROLES, TICKET_STAFF_GENERAL_ROLES, TICKET_STAFF_SPECIFIC_ROLES, TICKET_REPORT_ROLES
 
 logger = logging.getLogger(__name__)
 
-# ... (Modal, SelectView 등 다른 UI 클래스는 이전과 동일) ...
 class TicketModal(ui.Modal):
     title_input = ui.TextInput(label="件名", placeholder="チケットの件名を入力してください。", max_length=100)
     content_input = ui.TextInput(label="内容", placeholder="詳細な内容を入力してください。", style=discord.TextStyle.paragraph, max_length=1000)
@@ -28,10 +26,12 @@ class TicketModal(ui.Modal):
         except Exception as e:
             logger.error(f"TicketModal on_submit에서 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ チケットの作成中にエラーが発生しました。", ephemeral=True)
+
 class ReportModal(TicketModal):
     def __init__(self, cog: 'TicketSystem', selected_roles: Set[discord.Role]):
         super().__init__(cog, "report", selected_roles)
         self.title = "通報 内容入力"; self.children[0].label = "対象者"; self.children[0].placeholder = "通報する相手の名前を正確に入力してください。"
+
 class InquiryTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
@@ -58,6 +58,7 @@ class InquiryTargetSelectView(ui.View):
         elif self.target_type == "general": selected_roles.update(self.cog.staff_general_roles)
         elif self.target_type == "specific": selected_roles.update(self.specific_roles)
         await interaction.response.send_modal(TicketModal(self.cog, "inquiry", selected_roles)); await interaction.delete_original_response()
+
 class ReportTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180); self.cog = cog
@@ -67,10 +68,6 @@ class ReportTargetSelectView(ui.View):
     @ui.button(label="❌ 交番さんを除外する", style=discord.ButtonStyle.danger)
     async def exclude_police(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReportModal(self.cog, set())); await interaction.delete_original_response()
-
-# cogs/features/ticket_system.py 파일에서 TicketControlView 클래스를 찾아 이 코드로 교체하세요.
-
-# cogs/features/ticket_system.py 파일에서 TicketControlView 클래스를 찾아 이 코드로 교체하세요.
 
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str, is_locked: bool = False):
@@ -127,7 +124,6 @@ class TicketControlView(ui.View):
                 all_admin_roles = self.cog.master_roles + self.cog.staff_general_roles + self.cog.staff_specific_roles + self.cog.report_roles
                 all_admin_role_ids = {role.id for role in all_admin_roles}
                 
-                # [수정] await로 fetch_members()를 먼저 실행한 후, for 루프로 반복
                 members_to_remove = []
                 thread_members = await thread.fetch_members()
                 for m in thread_members:
@@ -159,9 +155,9 @@ class TicketControlView(ui.View):
         await asyncio.sleep(5)
         try: await interaction.channel.delete(reason=f"{interaction.user.display_name}による削除")
         except discord.NotFound: pass
+
 class TicketSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        # ... (이전과 동일)
         self.bot = bot; self.tickets: Dict[int, Dict] = {}; self.master_roles: List[discord.Role] = []
         self.staff_general_roles: List[discord.Role] = []; self.staff_specific_roles: List[discord.Role] = []
         self.report_roles: List[discord.Role] = []; self.guild: Optional[discord.Guild] = None
@@ -172,7 +168,6 @@ class TicketSystem(commands.Cog):
         await self.load_configs(); await self.sync_tickets_from_db()
 
     async def load_configs(self):
-        # ... (이전과 동일)
         self.bot.add_view(self.create_panel_view("inquiry")); self.bot.add_view(self.create_panel_view("report"))
         panel_channel_id = get_id("inquiry_panel_channel_id") or get_id("report_panel_channel_id")
         if panel_channel_id and (channel := self.bot.get_channel(panel_channel_id)): self.guild = channel.guild
@@ -184,7 +179,7 @@ class TicketSystem(commands.Cog):
             logger.info(f"[TicketSystem] 역할 로드 완료.")
         else: logger.warning("[TicketSystem] 티켓 패널 채널이 설정되지 않아 길드 정보를 불러올 수 없습니다.")
     
-    def create_panel_view(self, panel_type: str): # ... (이전과 동일)
+    def create_panel_view(self, panel_type: str):
         view = ui.View(timeout=None)
         if panel_type == "inquiry":
             button = ui.Button(label="お問い合わせ・ご提案", style=discord.ButtonStyle.primary, emoji="📨", custom_id="ticket_inquiry_panel")
@@ -200,7 +195,7 @@ class TicketSystem(commands.Cog):
             button.callback = callback; view.add_item(button)
         return view
 
-    def has_open_ticket(self, user: discord.Member, ticket_type: str): # ... (이전과 동일)
+    def has_open_ticket(self, user: discord.Member, ticket_type: str):
         for thread_id, ticket_info in self.tickets.items():
             if ticket_info.get("owner_id") == user.id and ticket_info.get("ticket_type") == ticket_type:
                 if self.guild and self.guild.get_thread(thread_id): return True
@@ -214,20 +209,20 @@ class TicketSystem(commands.Cog):
             thread_id = ticket_data.get("thread_id")
             if self.guild and self.guild.get_thread(thread_id):
                 self.tickets[thread_id] = ticket_data
-                # [수정] 봇 재시작 시 DB의 is_locked 상태를 기반으로 올바른 View를 등록
                 self.bot.add_view(TicketControlView(self, ticket_data.get("ticket_type"), ticket_data.get("is_locked", False)))
             else:
                 zombie_ids.append(thread_id)
         if zombie_ids: await remove_multiple_tickets(zombie_ids)
 
     async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, title: str, content: str, selected_roles: Set[discord.Role]):
+        thread: Optional[discord.Thread] = None
         try:
             panel_channel = interaction.channel
             thread_name = f"[{'お問い合わせ' if ticket_type == 'inquiry' else '通報'}] {title}"
             thread = await panel_channel.create_thread(name=thread_name, type=discord.ChannelType.private_thread)
             
-            # [수정] DB에 is_locked=False 상태를 명시적으로 저장
             await add_ticket(thread.id, interaction.user.id, interaction.guild.id, ticket_type)
+            
             self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type, "is_locked": False}
             
             embed = discord.Embed(title=title, description=content, color=discord.Color.blue() if ticket_type == "inquiry" else discord.Color.red())
@@ -236,7 +231,6 @@ class TicketSystem(commands.Cog):
             
             final_roles_to_mention = set(self.master_roles) | selected_roles
             mention_string = ' '.join(role.mention for role in final_roles_to_mention)
-            # [수정] is_locked=False 상태의 View를 생성
             control_view = TicketControlView(self, ticket_type, is_locked=False)
             await thread.send(f"{interaction.user.mention} {mention_string}\n**[チケット管理パネル]**", view=control_view, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
             
@@ -245,16 +239,28 @@ class TicketSystem(commands.Cog):
             await message.delete()
         except Exception as e:
             logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
-            try: await interaction.followup.send("❌ チケットの作成中にエラーが発生しました。", ephemeral=True)
-            except discord.NotFound: pass
+            if thread:
+                logger.warning(f"오류로 인해 방금 생성된 티켓 스레드 '{thread.name}'(ID: {thread.id})을(를) 삭제합니다.")
+                try:
+                    await thread.delete(reason="생성 과정 오류로 인한 자동 삭제")
+                except (discord.NotFound, discord.Forbidden):
+                    pass
+            
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send("❌ チケットの作成中にエラーが発生しました。しばらくしてからもう一度お試しください。", ephemeral=True)
+                else:
+                    await interaction.response.send_message("❌ チケットの作成中にエラーが発生しました。しばらくしてからもう一度お試しください。", ephemeral=True)
+            except discord.NotFound:
+                pass
 
     @commands.Cog.listener()
-    async def on_thread_delete(self, thread): # ... (이전과 동일)
+    async def on_thread_delete(self, thread):
         if thread.id in self.tickets:
             await self._cleanup_ticket_data(thread.id)
-    async def _cleanup_ticket_data(self, thread_id: int): # ... (이전과 동일)
+    async def _cleanup_ticket_data(self, thread_id: int):
         self.tickets.pop(thread_id, None); await remove_ticket(thread_id)
-    async def regenerate_panel(self, channel: discord.TextChannel, panel_type: str) -> bool: # ... (이전과 동일)
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_type: str) -> bool:
         if not isinstance(channel, discord.TextChannel): return False
         view = self.create_panel_view(panel_type)
         embed = None
