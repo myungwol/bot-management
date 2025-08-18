@@ -103,27 +103,75 @@ class ReportTargetSelectView(ui.View):
         await interaction.response.send_modal(ReportModal(self.cog, selected_roles))
         await interaction.delete_original_response()
 
+# cogs/features/ticket_system.py 파일에서 TicketControlView 클래스를 찾아 이 코드로 교체하세요.
+
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str):
         super().__init__(timeout=None)
-        self.cog = cog; self.ticket_type = ticket_type
+        self.cog = cog
+        self.ticket_type = ticket_type
+        
     async def _check_master_permission(self, interaction: discord.Interaction) -> bool:
         if not isinstance(interaction.user, discord.Member): return False
         return any(role in interaction.user.roles for role in self.cog.master_roles)
+        
+    async def _check_handler_permission(self, interaction: discord.Interaction, ticket_type: str) -> bool:
+        if not isinstance(interaction.user, discord.Member): return False
+        roles_to_check = self.cog.report_roles if ticket_type == "report" else (self.cog.staff_general_roles + self.cog.staff_specific_roles)
+        return any(role in interaction.user.roles for role in roles_to_check)
+        
     @ui.button(label="ロック", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="ticket_lock")
     async def lock(self, interaction: discord.Interaction, button: ui.Button):
-        if not await self._check_master_permission(interaction):
-            return await interaction.response.send_message("❌ `村長`、`副村長`のみがこのボタンを使用できます。", ephemeral=True)
-        await interaction.response.send_message(f"✅ {interaction.user.mention}さんがこのチケットをロックしました。")
-        await interaction.channel.edit(locked=True, archived=True, reason=f"{interaction.user.display_name}によるロック")
+        is_master = await self._check_master_permission(interaction)
+        is_handler = await self._check_handler_permission(interaction, self.ticket_type)
+        can_lock = is_master or (self.ticket_type == "report" and is_handler)
+
+        if not can_lock:
+            return await interaction.response.send_message("❌ このチケットをロックする権限がありません。", ephemeral=True)
+
+        thread = interaction.channel
+        if not isinstance(thread, discord.Thread):
+            return
+
+        # [수정] 티켓 소유자(작성자)를 스레드에서 제거하는 로직
+        try:
+            # DB 또는 메모리 캐시에서 티켓 정보 가져오기
+            ticket_info = self.cog.tickets.get(thread.id)
+            if not ticket_info:
+                return await interaction.response.send_message("❌ このチケットの情報が見つかりませんでした。", ephemeral=True)
+
+            owner_id = ticket_info.get("owner_id")
+            owner = interaction.guild.get_member(owner_id)
+            
+            if owner:
+                await thread.remove_user(owner)
+                logger.info(f"'{thread.name}' 티켓에서 소유자 {owner.display_name} 님을 제외 처리했습니다.")
+                await interaction.response.send_message(f"✅ {owner.mention}さんをこのチケットから除外し、ロックしました。")
+            else:
+                # 소유자가 이미 서버를 나간 경우
+                await interaction.response.send_message(f"✅ チケット作成者はすでにサーバーにいません。チケットをロックします。")
+
+            # 추가적으로 스레드를 잠그고 보관 처리
+            await thread.edit(locked=True, archived=True, reason=f"{interaction.user.display_name}によるロック")
+
+        except discord.Forbidden:
+            logger.error(f"티켓 잠금 실패 (권한 부족): #{thread.name}")
+            await interaction.response.send_message("❌ ユーザーをスレッドから除外する権限がありません。", ephemeral=True)
+        except Exception as e:
+            logger.error(f"티켓 잠금 중 오류 발생: {e}", exc_info=True)
+            await interaction.response.send_message("❌ チケットのロック中にエラーが発生しました。", ephemeral=True)
+        
     @ui.button(label="削除", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="ticket_delete")
     async def delete(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_master_permission(interaction):
             return await interaction.response.send_message("❌ `村長`、`副村長`のみがこのボタンを使用できます。", ephemeral=True)
+        
         await interaction.response.send_message(f"✅ 5秒後にこのチケットを削除します。")
         await asyncio.sleep(5)
-        try: await interaction.channel.delete(reason=f"{interaction.user.display_name}による削除")
-        except discord.NotFound: pass
+        try:
+            await interaction.channel.delete(reason=f"{interaction.user.display_name}による削除")
+        except discord.NotFound:
+            pass
 
 class TicketSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
