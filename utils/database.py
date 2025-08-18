@@ -317,3 +317,44 @@ async def add_anonymous_message(guild_id: int, user_id: int, content: str):
         "user_id": user_id,
         "message_content": content
     }).execute()
+    
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 14. 알림 (reminders) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime):
+    """새로운 알림을 DB에 예약합니다."""
+    # 같은 타입의 활성 알림이 이미 있는지 확인하고, 있다면 비활성화 처리
+    await supabase.table('reminders') \
+        .update({"is_active": False}) \
+        .eq('guild_id', guild_id) \
+        .eq('reminder_type', reminder_type) \
+        .eq('is_active', True) \
+        .execute()
+    
+    # 새로운 알림 삽입
+    await supabase.table('reminders').insert({
+        "guild_id": guild_id,
+        "reminder_type": reminder_type,
+        "remind_at": remind_at.isoformat(),
+        "is_active": True
+    }).execute()
+
+@supabase_retry_handler()
+async def get_due_reminders() -> List[Dict[str, Any]]:
+    """현재 시간이 되어 알림을 보내야 하는 모든 활성 알림 목록을 가져옵니다."""
+    now = datetime.now(timezone.utc).isoformat()
+    response = await supabase.table('reminders') \
+        .select('*') \
+        .eq('is_active', True) \
+        .lte('remind_at', now) \
+        .execute()
+    return response.data if response.data else []
+
+@supabase_retry_handler()
+async def deactivate_reminder(reminder_id: int):
+    """알림 전송 완료 후 해당 알림을 비활성화합니다."""
+    await supabase.table('reminders') \
+        .update({"is_active": False}) \
+        .eq('id', reminder_id) \
+        .execute()
