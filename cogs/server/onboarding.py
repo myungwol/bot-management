@@ -178,6 +178,8 @@ class ApprovalView(ui.View):
         failed_tasks_messages = [res for res in results if isinstance(res, str)]
         return not failed_tasks_messages, failed_tasks_messages
 
+# cogs/server/onboarding.py 의 ApprovalView 클래스 내부
+
     async def _grant_roles(self, member: discord.Member) -> Optional[str]:
         try:
             guild = member.guild; roles_to_add: List[discord.Role] = []; failed_to_find_roles: List[str] = []
@@ -218,10 +220,14 @@ class ApprovalView(ui.View):
             if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="自己紹介の承認")
             if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="自己紹介の承認完了")
             
-            if failed_to_find_roles: return f"역할을 찾지 못함: `{', '.join(failed_to_find_roles)}`. `/setup-roles sync` 명령어를 실행해주세요。"
-        except discord.Forbidden: return "봇 권한 부족: 봇이 역할을 부여/제거할 권한이 없습니다。"
+            # [수정] 오류 메시지를 일본어로 변경
+            if failed_to_find_roles: 
+                return f"役割が見つかりません: `{', '.join(failed_to_find_roles)}`. `/setup`コマンドで役割を同期してください。"
+        except discord.Forbidden: 
+            return "ボットの権限不足: 役割を付与/削除する権限がありません。"
         except Exception as e:
-            logger.error(f"역할 부여 중 오류: {e}", exc_info=True); return f"역할 부여 중 알 수 없는 오류 발생。"
+            logger.error(f"역할 부여 중 오류: {e}", exc_info=True)
+            return "役割の付与中に不明なエラーが発生しました。"
         return None
         
     async def _update_nickname(self, member: discord.Member) -> Optional[str]:
