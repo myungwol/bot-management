@@ -5,6 +5,7 @@ from discord.ext import commands
 import logging
 import asyncio
 from datetime import datetime, timezone
+from typing import Optional # <--- 이 줄이 추가되었습니다.
 
 from utils.database import get_id, get_cooldown, set_cooldown, add_anonymous_message, get_embed_from_db, get_panel_id, save_panel_id, get_panel_components_from_db
 from utils.helpers import format_embed_from_db
