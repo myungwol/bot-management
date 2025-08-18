@@ -103,6 +103,8 @@ UI_EMBEDS = {
     "log_warning": {"title": "🚨 警告発行通知", "color": 15548997},
     "log_item_use": {"title": "🛒 アイテム使用通知", "color": 11027200}, # 0xA84300 (갈색)
     "panel_item_usage": {"title": "✅ 警告差引権使用", "description": "所持している<@&1406959582500225087>を使用するには、下のボタンを押してください。", "color": 11027200},
+    "dm_onboarding_approved": {"title": "✅ 住民登録完了のお知らせ", "description": "「{guild_name}」での住民登録が承認されました。\nこれからよろしくお願いします！", "color": 3066993},
+    "dm_onboarding_rejected": {"title": "❌ 住民登録拒否のお知らせ", "description": "申し訳ありませんが、「{guild_name}」での住民登録は拒否されました。", "color": 15548997}, # 0xED4245
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
