@@ -98,6 +98,9 @@ UI_EMBEDS = {
     "embed_onboarding_approval": {"title": "📝 新しい住民登録票", "description": "{member_mention}さんが住民登録票を提出しました。", "color": 0xE67E22},
     "embed_main_chat_welcome": {"description": "🎉 {member_mention}さんが新しい住民になりました！これからよろしくお願いします！", "color": 0x2ECC71},
     "embed_introduction_log": {"title": "📝 自己紹介", "description": "新しい住民がやってきました！みんなで歓迎しましょう！", "color": 0x2ECC71},
+        # --- 경고 시스템 ---
+    "panel_warning": {"title": "🚨 警告管理パネル", "description": "サーバーのルールに違反したユーザーに対して、下のボタンから警告を発行できます。\n\n**この機能は`交番さん`のみ使用可能です。**", "color": 15548997}, # 15548997은 0xED4245 입니다.
+    "log_warning": {"title": "🚨 警告発行通知", "color": 15548997},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
