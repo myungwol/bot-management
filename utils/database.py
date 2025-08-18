@@ -276,6 +276,11 @@ async def remove_ticket(thread_id: int):
     await supabase.table('tickets').delete().eq('thread_id', thread_id).execute()
 
 @supabase_retry_handler()
+async def update_ticket_lock_status(thread_id: int, is_locked: bool):
+    """티켓의 잠금 상태를 DB에서 업데이트합니다."""
+    await supabase.table('tickets').update({"is_locked": is_locked}).eq('thread_id', thread_id).execute()
+    
+@supabase_retry_handler()
 async def remove_multiple_tickets(thread_ids: List[int]):
     if not thread_ids: return
     await supabase.table('tickets').delete().in_('thread_id', thread_ids).execute()
