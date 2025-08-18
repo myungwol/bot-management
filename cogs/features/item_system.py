@@ -5,6 +5,7 @@ from discord.ext import commands
 import logging
 from typing import Optional, List
 from datetime import datetime, timezone
+import asyncio # [수정] asyncio 임포트
 
 from utils.database import get_id, add_warning, get_total_warning_count, get_embed_from_db, get_panel_id, save_panel_id, get_panel_components_from_db
 from utils.ui_defaults import USABLE_ITEMS
@@ -117,7 +118,10 @@ class ItemSystem(commands.Cog):
     async def use_warning_deduction_ticket(self, interaction: discord.Interaction, member: discord.Member, item_role: discord.Role, item_info: dict) -> bool:
         current_warnings = await get_total_warning_count(member.id, interaction.guild_id)
         if current_warnings <= 0:
-            await interaction.followup.send(f"✅ 累積警告が0回なので、「{item_info['name']}」を使用する必要はありません。", ephemeral=True)
+            # [수정] 메시지를 보낸 후 5초 뒤에 삭제
+            message = await interaction.followup.send(f"✅ 累積警告が0回なので、「{item_info['name']}」を使用する必要はありません。", ephemeral=True, wait=True)
+            await asyncio.sleep(5)
+            await message.delete()
             return False
             
         try:
@@ -134,8 +138,13 @@ class ItemSystem(commands.Cog):
                 await warning_cog.update_warning_roles(member, new_total)
             
             await self.send_log_message(member, item_info['name'], new_total)
-            await interaction.followup.send(f"✅ アイテム「{item_info['name']}」を使用しました！ (累積警告: {current_warnings}回 → {new_total}回)", ephemeral=True)
+            
+            # [수정] 메시지를 보낸 후 5초 뒤에 삭제
+            message = await interaction.followup.send(f"✅ アイテム「{item_info['name']}」を使用しました！ (累積警告: {current_warnings}回 → {new_total}回)", ephemeral=True, wait=True)
+            await asyncio.sleep(5)
+            await message.delete()
             return True
+            
         except discord.Forbidden:
             await interaction.followup.send("❌ 役割の変更中にエラーが発生しました。ボットの権限が不足している可能性があります。", ephemeral=True)
         except Exception as e:
