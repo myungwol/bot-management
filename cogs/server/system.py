@@ -56,6 +56,8 @@ class ServerSystem(commands.Cog):
 
         return sorted(choices, key=lambda c: c.name)[:25]
 
+# cogs/server/system.py 파일에서 setup 함수 전체를 이 코드로 교체하세요.
+
     @app_commands.command(name="setup", description="[管理者] ボットのチャンネル、役割、統計など、すべての設定を管理します。")
     @app_commands.describe(
         action="実行するタスクを選択してください。",
@@ -108,16 +110,24 @@ class ServerSystem(commands.Cog):
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
                 await cog_to_reload.load_configs()
 
-            if config["type"] == "panel" and hasattr(cog_to_reload, 'regenerate_panel'):
-                if isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
-                    await cog_to_reload.regenerate_panel(channel)
-                    await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
+            # --- [수정] 패널 생성 로직 ---
+            if config.get("type") == "panel":
+                if hasattr(cog_to_reload, 'regenerate_panel'):
+                    # 패널 생성을 해당 Cog에게 완전히 위임하고, 성공 여부를 기다림
+                    success = await cog_to_reload.regenerate_panel(channel)
+                    if success:
+                        await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
+                    else:
+                        await interaction.followup.send(f"❌ `{channel.mention}` チャンネルへのパネル設置中にエラーが発生しました。詳細はログを確認してください。", ephemeral=True)
                 else:
-                    await interaction.followup.send(f"❌ パネルはこのタイプのチャンネルには設置できません。", ephemeral=True)
+                    await interaction.followup.send(f"⚠️ **{friendly_name}** は設定されましたが、パネルを自動生成する機能が見つかりません。", ephemeral=True)
             else:
+                # 패널 생성이 필요 없는 일반 채널 설정
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
 
+        # ... (이하 roles_sync, stats_set 등 다른 elif 블록은 그대로 유지) ...
         elif action == "roles_sync":
+            from utils.ui_defaults import UI_ROLE_KEY_MAP
             role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
             await save_config_to_db("ROLE_KEY_MAP", role_name_map)
             synced_roles, missing_roles, error_roles = [], [], []
@@ -145,7 +155,6 @@ class ServerSystem(commands.Cog):
                 embed.color = 0xED4245
                 embed.add_field(name=f"❌ DB保存エラー ({len(error_roles)}個)", value="\n".join(error_roles)[:1024], inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
-
         elif action == "stats_set":
             if not channel or not isinstance(channel, discord.VoiceChannel):
                 return await interaction.followup.send("❌ このタスクを実行するには、「channel」オプションにボイスチャンネルを指定する必要があります。", ephemeral=True)
@@ -165,14 +174,12 @@ class ServerSystem(commands.Cog):
                 stats_cog = self.bot.get_cog("StatsUpdater")
                 if stats_cog and hasattr(stats_cog.update_stats_loop, 'restart'): stats_cog.update_stats_loop.restart()
                 await interaction.followup.send(f"✅ `{channel.name}` チャンネルに統計設定を追加/修正しました。", ephemeral=True)
-
         elif action == "stats_refresh":
             stats_cog = self.bot.get_cog("StatsUpdater")
             if stats_cog and hasattr(stats_cog.update_stats_loop, 'restart'):
                 stats_cog.update_stats_loop.restart()
                 await interaction.followup.send("✅ すべての統計チャンネルの更新を要求しました。", ephemeral=True)
             else: await interaction.followup.send("❌ 統計更新機能が見つかりません。", ephemeral=True)
-
         elif action == "stats_list":
             configs = await get_all_stats_channels()
             guild_configs = [c for c in configs if c.get('guild_id') == interaction.guild_id]
@@ -185,7 +192,6 @@ class ServerSystem(commands.Cog):
                 description.append(f"**チャンネル:** {ch_mention}\n**種類:** `{config['stat_type']}`\n**名前形式:** `{config['channel_name_template']}`")
             embed.description = "\n\n".join(description)
             await interaction.followup.send(embed=embed, ephemeral=True)
-        
         else: await interaction.followup.send("❌ 不明なタスクです。リストから正しいタスクを選択してください。", ephemeral=True)
 
 async def setup(bot: commands.Bot):
