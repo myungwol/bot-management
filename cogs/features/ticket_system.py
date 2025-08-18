@@ -70,13 +70,14 @@ class ReportTargetSelectView(ui.View):
 
 # cogs/features/ticket_system.py 파일에서 TicketControlView 클래스를 찾아 이 코드로 교체하세요.
 
+# cogs/features/ticket_system.py 파일에서 TicketControlView 클래스를 찾아 이 코드로 교체하세요.
+
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str, is_locked: bool = False):
         super().__init__(timeout=None)
         self.cog = cog
         self.ticket_type = ticket_type
         
-        # 버튼 콜백을 직접 할당
         if is_locked:
             lock_button = ui.Button(label="ロック解除", style=discord.ButtonStyle.success, emoji="🔓", custom_id="ticket_toggle_lock")
         else:
@@ -126,10 +127,10 @@ class TicketControlView(ui.View):
                 all_admin_roles = self.cog.master_roles + self.cog.staff_general_roles + self.cog.staff_specific_roles + self.cog.report_roles
                 all_admin_role_ids = {role.id for role in all_admin_roles}
                 
-                # [수정] ThreadMember를 완전한 Member 객체로 변환하여 확인
+                # [수정] await로 fetch_members()를 먼저 실행한 후, for 루프로 반복
                 members_to_remove = []
-                async for m in thread.fetch_members():
-                    # 서버에서 완전한 Member 객체를 가져옴
+                thread_members = await thread.fetch_members()
+                for m in thread_members:
                     member = interaction.guild.get_member(m.id)
                     if not member: continue
                     
@@ -144,7 +145,6 @@ class TicketControlView(ui.View):
                 await interaction.followup.send(f"✅ 管理者以外のメンバー ({removed_names}) を除外し、チケットをロックしました。", ephemeral=True)
                 new_view = TicketControlView(self.cog, self.ticket_type, is_locked=True)
 
-            # [수정] 응답 후 메시지를 수정하도록 변경
             message_to_edit = await interaction.original_response()
             await message_to_edit.edit(view=new_view)
             
@@ -159,7 +159,6 @@ class TicketControlView(ui.View):
         await asyncio.sleep(5)
         try: await interaction.channel.delete(reason=f"{interaction.user.display_name}による削除")
         except discord.NotFound: pass
-
 class TicketSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         # ... (이전과 동일)
