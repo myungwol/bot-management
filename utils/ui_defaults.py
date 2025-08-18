@@ -102,7 +102,7 @@ UI_EMBEDS = {
     "panel_warning": {"title": "🚨 警告管理パネル", "description": "サーバーのルールに違反したユーザーに対して、下のボタンから警告を発行できます。\n\n**この機能は`交番さん`のみ使用可能です。**", "color": 15548997}, # 15548997은 0xED4245 입니다.
     "log_warning": {"title": "🚨 警告発行通知", "color": 15548997},
     "log_item_use": {"title": "🛒 アイテム使用通知", "color": 11027200}, # 0xA84300 (갈색)
-
+    "panel_item_usage": {"title": "🛒 アイテム使用", "description": "所持しているアイテムを使用するには、下のボタンを押してください。", "color": 11027200},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -112,6 +112,7 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0},
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0},
     {"component_key": "issue_warning_button", "panel_key": "warning", "component_type": "button", "label": "警告を発行する", "style": "danger", "emoji": "🚨", "row": 0},
+    {"component_key": "use_item_button", "panel_key": "item_usage", "component_type": "button", "label": "アイテムを使用する", "style": "success", "emoji": "✨", "row": 0},
 
 ]
 
@@ -155,6 +156,8 @@ SETUP_COMMAND_MAP = {
 
     "panel_warning": {"type": "panel", "cog_name": "WarningSystem", "key": "warning_panel_channel_id", "friendly_name": "[패널] 경고 관리", "channel_type": "text"},
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
+
+    "panel_item_usage": {"type": "panel", "cog_name": "ItemSystem", "key": "item_usage_panel_channel_id", "friendly_name": "[패널] 아이템 사용", "channel_type": "text"},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
