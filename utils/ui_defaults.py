@@ -25,9 +25,9 @@ UI_ROLE_KEY_MAP = {
 
     # --- 주민 등급 역할 ---
     "role_resident_elder":      {"name": "長老", "is_prefix": True, "priority": 50},
-    "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": True, "priority": 40},
-    "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": True, "priority": 30},
-    "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": True, "priority": 20},
+    "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": False, "priority": 40},
+    "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": False, "priority": 30},
+    "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": False, "priority": 20},
     "role_resident":            {"name": "住民", "is_prefix": True, "priority": 10},
     "role_guest":               {"name": "旅の人", "is_prefix": True, "priority": 5},
 
