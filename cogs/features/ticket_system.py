@@ -183,34 +183,45 @@ class TicketSystem(commands.Cog):
             await self._cleanup_ticket_data(thread.id)
 
     async def regenerate_panel(self, channel: discord.ForumChannel, panel_type: str) -> bool:
-        if not isinstance(channel, discord.ForumChannel): return False
-        
+        if not isinstance(channel, discord.ForumChannel):
+            logger.error(f"regenerate_panel: 채널 타입이 포럼이 아닙니다: {type(channel)}")
+            return False
+
         view = self.create_panel_view(panel_type)
         embed_title = "サーバーへのお問い合わせ・ご提案" if panel_type == "inquiry" else "ユーザーへの通報"
         embed_desc = "下のボタンを押して新しいチケットを作成してください。"
         embed = discord.Embed(title=embed_title, description=embed_desc)
         
         try:
+            # [수정] 기존 패널용 게시물이 있는지 확인하고 있다면 삭제
+            # 이 로직은 ForumChannel 객체에서 스레드를 가져오므로 올바르게 작동합니다.
             all_threads = channel.threads
             try:
                 archived = [t async for t in channel.archived_threads(limit=None)]
                 all_threads.extend(archived)
-            except discord.Forbidden: pass
+            except discord.Forbidden:
+                logger.warning(f"보관된 스레드를 가져올 권한이 없습니다: #{channel.name}")
 
             for thread in all_threads:
                 if thread.owner == self.bot.user and "チケット作成はこちらから" in thread.name:
-                    try: await thread.delete(reason="古いパネルを削除")
-                    except discord.Forbidden: pass
+                    try:
+                        await thread.delete(reason="古いパネルを削除")
+                        logger.info(f"기존 패널 게시물 #{thread.name} 을(를) 삭제했습니다.")
+                    except discord.Forbidden:
+                        logger.error(f"기존 패널 게시물 #{thread.name} 을(를) 삭제할 권한이 없습니다.")
 
-            starter_message = await channel.send(embed=embed, view=view)
-            await starter_message.create_thread(name="チケット作成はこちらから", auto_archive_duration=10080)
+            # [수정] channel.send() 대신 channel.create_thread()를 사용하여 새 게시물을 직접 생성
+            post_title = "チケット作成はこちらから"
+            # create_thread의 content 파라미터는 스레드 본문의 첫 메시지가 됩니다.
+            # embed와 view는 첫 메시지에 자동으로 첨부됩니다.
+            await channel.create_thread(name=post_title, embed=embed, view=view)
             
             logger.info(f"✅ {panel_type} 패널을 포럼 #{channel.name}에 성공적으로 생성했습니다.")
             return True
         
         except Exception as e:
-            logger.error(f"❌ #{channel.name} 채널에 패널 생성 중 오류 발생: {e}", exc_info=True)
+            logger.error(f"❌ #{channel.name} 채널에 패널 생성 중 치명적인 오류 발생: {e}", exc_info=True)
             return False
-
+            
 async def setup(bot):
     await bot.add_cog(TicketSystem(bot))
