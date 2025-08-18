@@ -19,22 +19,23 @@ UI_ROLE_KEY_MAP = {
     "role_staff_secretary":     {"name": "書記", "is_prefix": True, "priority": 70},
     "role_staff_newbie_helper": {"name": "お世話係", "is_prefix": True, "priority": 70},
     "role_approval":            {"name": "役場の職員", "is_prefix": True, "priority": 60},
+    "role_premium_booster":     {"name": "支援者", "is_prefix": True, "priority": 55},
+    "role_personal_room_key":   {"name": "個人部屋の鍵", "is_prefix": False, "priority": 0},
+    "role_applicant":           {"name": "志願者", "is_prefix": False, "priority": 0},
 
     # --- 주민 등급 역할 ---
-    "role_premium_booster":     {"name": "支援者", "is_prefix": True, "priority": 55},
     "role_resident_elder":      {"name": "長老", "is_prefix": True, "priority": 50},
     "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": True, "priority": 40},
     "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": True, "priority": 30},
     "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": True, "priority": 20},
     "role_resident":            {"name": "住民", "is_prefix": True, "priority": 10},
     "role_guest":               {"name": "旅の人", "is_prefix": True, "priority": 5},
-    "role_personal_room_key":   {"name": "個人部屋の鍵", "is_prefix": False, "priority": 0},
 
     # --- 온보딩/역할 패널 구분선 역할 ---
     "role_onboarding_step_1":   {"name": "════════════ゲーム══════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_2":   {"name": "═════════════通知═══════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_3":   {"name": "═════════════情報═══════════", "is_prefix": False, "priority": 0},
-    "role_onboarding_step_4":   {"name": "═════════════住人═══════════", "is_prefix": False, "priority": 0},
+    "role_onboarding_step_4":   {"name": "═════════════等級═══════════", "is_prefix": False, "priority": 0},
 
     # --- 개인 정보 역할 (성별, 연령대) ---
     "role_info_male":           {"name": "男性", "is_prefix": False, "priority": 0},
@@ -68,19 +69,6 @@ UI_ROLE_KEY_MAP = {
     "role_platform_switch":     {"name": "スイッチ", "is_prefix": False, "priority": 0},
 }
 
-ADMIN_ROLE_KEYS = [
-    "role_admin_total",
-    "role_staff_village_chief",
-    "role_staff_deputy_chief",
-    "role_staff_police",
-    "role_staff_festival",
-    "role_staff_pr",
-    "role_staff_design",
-    "role_staff_secretary",
-    "role_staff_newbie_helper",
-    "role_approval",
-]
-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 2. 임베드(Embed) 기본값
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -110,10 +98,7 @@ UI_PANEL_COMPONENTS = [
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 4. /setup 명령어 설정 맵
-# - friendly_name: 명령어 선택지에 표시될 이름 (관리자 편의를 위해 한글로 작성)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 기존 SETUP_COMMAND_MAP 딕셔너리 전체를 아래 코드로 교체하세요.
-
 SETUP_COMMAND_MAP = {
     # --- [채널/패널 설정] ---
     "panel_roles":      {"type": "panel",   "cog_name": "RolePanel",    "key": "auto_role_channel_id",            "friendly_name": "역할 자동부여 패널", "channel_type": "text"},
@@ -127,14 +112,46 @@ SETUP_COMMAND_MAP = {
     "channel_onboarding_approval": {"type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id", "friendly_name": "자기소개 승인/거절 채널", "channel_type": "text"},
     "channel_nickname_approval":   {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_approval_channel_id",   "friendly_name": "닉네임 변경 승인 채널", "channel_type": "text"},
     
-    # [수정] 음성 채널 설정 추가
-    "channel_vc_creator_3p": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_3p", "friendly_name": "음성 채널 자동 생성 (최소 3인)", "channel_type": "voice"},
-    "channel_vc_creator_4p": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_4p", "friendly_name": "음성 채널 자동 생성 (최소 4인)", "channel_type": "voice"},
+    "channel_vc_creator_3p": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_3p", "friendly_name": "음성 채널 자동 생성 (게임)", "channel_type": "voice"},
+    "channel_vc_creator_4p": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_4p", "friendly_name": "음성 채널 자동 생성 (광장)", "channel_type": "voice"},
     "channel_vc_creator_newbie": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_newbie", "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"},
     "channel_vc_creator_vip":    {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_vip", "friendly_name": "[음성 채널] VIP 전용 생성기", "channel_type": "voice"},
+
+    # [신규] 티켓 패널 채널 설정 추가
+    "channel_ticket_panel": {"type": "channel", "cog_name": "TicketSystem", "key": "ticket_panel_channel_id", "friendly_name": "[티켓] 문의/신고 패널 채널", "channel_type": "text"},
 
     # --- [로그 채널 설정] ---
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
     "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "[로그] 자기소개 승인 기록", "channel_type": "text"},
     "log_intro_rejection":   {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",  "friendly_name": "[로그] 자기소개 거절 기록", "channel_type": "text"},
 }
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 5. 관리자 역할 키 목록
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+ADMIN_ROLE_KEYS = [
+    "role_admin_total",
+    "role_staff_village_chief",
+    "role_staff_deputy_chief",
+    "role_staff_police",
+    "role_staff_festival",
+    "role_staff_pr",
+    "role_staff_design",
+    "role_staff_secretary",
+    "role_staff_newbie_helper",
+    "role_approval",
+]
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 7. 티켓 시스템 설정 (이전 6번은 삭제됨)
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+# '문의' 티켓 생성 시 자동으로 초대될 역할 키 목록
+TICKET_INQUIRY_ROLES = [
+    "role_approval", # 役場の職員
+]
+
+# '신고' 티켓 생성 시 자동으로 초대될 역할 키 목록
+TICKET_REPORT_ROLES = [
+    "role_staff_police", # 交番さん
+]
