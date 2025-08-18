@@ -298,3 +298,22 @@ async def get_total_warning_count(user_id: int, guild_id: int) -> int:
     if response.data:
         return sum(item['amount'] for item in response.data)
     return 0
+
+@supabase_retry_handler()
+async def get_total_warning_count(user_id: int, guild_id: int) -> int:
+    response = await supabase.table('warnings').select('amount').eq('user_id', user_id).eq('guild_id', guild_id).execute()
+    if response.data:
+        return sum(item['amount'] for item in response.data)
+    return 0
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 13. 익명 게시판 (anonymous_messages) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def add_anonymous_message(guild_id: int, user_id: int, content: str):
+    """새로운 익명 메시지를 데이터베이스에 추가합니다."""
+    await supabase.table('anonymous_messages').insert({
+        "guild_id": guild_id,
+        "user_id": user_id,
+        "message_content": content
+    }).execute()
