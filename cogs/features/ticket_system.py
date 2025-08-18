@@ -25,15 +25,20 @@ class InquiryModal(ui.Modal, title="お問い合わせ・ご提案"):
                 self.add_item(self.exclude_select)
     
     async def on_submit(self, interaction: discord.Interaction):
-        # [수정] 즉시 defer()를 호출하여 3초 타임아웃을 회피합니다.
         await interaction.response.defer(ephemeral=True, thinking=True)
         
-        excluded_role_ids = []
-        if hasattr(self, 'exclude_select'):
-            excluded_role_ids = [int(role.id) for role in self.exclude_select.values]
+        try:
+            excluded_role_ids = []
+            if hasattr(self, 'exclude_select'):
+                excluded_role_ids = [int(role.id) for role in self.exclude_select.values]
+            
+            # [수정] create_ticket 함수 호출을 try 블록 안으로 이동
+            await self.cog.create_ticket(interaction, "inquiry", self.forum_channel, self.title_input.value, self.content_input.value, excluded_role_ids=excluded_role_ids)
         
-        # 시간이 걸리는 작업은 defer() 이후에 수행합니다.
-        await self.cog.create_ticket(interaction, "inquiry", self.forum_channel, self.title_input.value, self.content_input.value, excluded_role_ids=excluded_role_ids)
+        except Exception as e:
+            # [신규] create_ticket에서 어떤 오류가 발생하든 여기서 잡아서 사용자에게 알림
+            logger.error(f"InquiryModal on_submit에서 오류 발생: {e}", exc_info=True)
+            await interaction.followup.send("❌ チケットの作成中に予期せぬエラーが発生しました。", ephemeral=True)
 
 class ReportModal(ui.Modal, title="通報"):
     target_user = ui.TextInput(label="対象者", placeholder="通報する相手の名前を正確に入力してください。")
@@ -43,15 +48,20 @@ class ReportModal(ui.Modal, title="通報"):
         self.cog = cog; self.forum_channel = forum_channel
 
     async def on_submit(self, interaction: discord.Interaction):
-        # [수정] 즉시 defer()를 호출하여 3초 타임아웃을 회피합니다.
         await interaction.response.defer(ephemeral=True, thinking=True)
         
-        title = f"通報: {self.target_user.value}"
-        content = f"**通報対象者:** {self.target_user.value}\n\n**内容:**\n{self.content_input.value}"
+        try:
+            title = f"通報: {self.target_user.value}"
+            content = f"**通報対象者:** {self.target_user.value}\n\n**内容:**\n{self.content_input.value}"
+            
+            # [수정] create_ticket 함수 호출을 try 블록 안으로 이동
+            await self.cog.create_ticket(interaction, "report", self.forum_channel, title, content)
         
-        # 시간이 걸리는 작업은 defer() 이후에 수행합니다.
-        await self.cog.create_ticket(interaction, "report", self.forum_channel, title, content)
-
+        except Exception as e:
+            # [신규] create_ticket에서 어떤 오류가 발생하든 여기서 잡아서 사용자에게 알림
+            logger.error(f"ReportModal on_submit에서 오류 발생: {e}", exc_info=True)
+            await interaction.followup.send("❌ チケットの作成中に予期せぬエラーが発生しました。", ephemeral=True)
+            
 # --- 제어판 View (이전과 동일) ---
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str):
