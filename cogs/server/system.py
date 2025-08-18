@@ -113,8 +113,10 @@ class ServerSystem(commands.Cog):
             # --- [수정] 패널 생성 로직 ---
             if config.get("type") == "panel":
                 if hasattr(cog_to_reload, 'regenerate_panel'):
-                    # 패널 생성을 해당 Cog에게 완전히 위임하고, 성공 여부를 기다림
-                    success = await cog_to_reload.regenerate_panel(channel)
+                    # 설정 키(예: "panel_inquiry")에서 "panel_" 부분을 제거하여 패널 타입을 전달
+                    panel_type = setting_key.replace("panel_", "")
+                    success = await cog_to_reload.regenerate_panel(channel, panel_type)
+                    
                     if success:
                         await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
                     else:
