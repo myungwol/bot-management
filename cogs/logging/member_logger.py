@@ -30,68 +30,70 @@ class MemberLogger(commands.Cog):
         log_channel = await self.get_log_channel()
         if not log_channel: return
 
-        # --- 1. 역할 변경 감지 ---
+        # --- [진단] 이벤트 발생 로그 ---
+        logger.info(f"[진단] on_member_update: {after.name} | Nick: {before.nick != after.nick} | Roles: {before.roles != after.roles}")
+
+        # --- 역할 변경 감지 ---
         if before.roles != after.roles:
-            # 감사 로그를 확인하기 전에 충분히 대기
             await asyncio.sleep(2)
             moderator = None
             try:
                 async for entry in after.guild.audit_logs(limit=5, action=discord.AuditLogAction.member_role_update):
-                    if entry.target.id == after.id and not entry.user.bot:
-                        moderator = entry.user
-                        break
-            except discord.Forbidden: moderator = "권한 부족"
-            except Exception: pass
+                    if entry.target.id == after.id:
+                        logger.info(f"[진단/역할] 감사 로그 발견: 대상={entry.target}, 수행자={entry.user}, 봇={entry.user.bot}")
+                        if not entry.user.bot:
+                            moderator = entry.user
+                            break # 사람을 찾으면 바로 중지
+            except Exception as e:
+                logger.error(f"[진단/역할] 감사 로그 확인 중 오류: {e}")
 
-            # 봇이 한 행동이 아니라고 확신할 수 있을 때만 로그 기록
-            if isinstance(moderator, discord.Member):
+            if moderator:
                 before_roles, after_roles = set(before.roles), set(after.roles)
                 added_roles = after_roles - before_roles
                 removed_roles = before_roles - after_roles
-
                 if added_roles:
-                    for role in added_roles:
-                        embed = discord.Embed(title="역할 추가됨 (役割付与)", color=discord.Color.green(), timestamp=datetime.now(timezone.utc))
-                        embed.add_field(name="유저 (ユーザー)", value=after.mention, inline=False)
-                        embed.add_field(name="추가된 역할 (付与された役割)", value=role.mention, inline=False)
-                        embed.add_field(name="수행자 (実行者)", value=moderator.mention, inline=False)
-                        embed.set_author(name=f"{after.display_name} ({after.id})", icon_url=after.display_avatar.url if after.display_avatar else None)
-                        await log_channel.send(embed=embed)
-                
+                    # ... 로그 생성 로직 ...
+                    embed = discord.Embed(title="역할 추가됨 (役割付与)", color=discord.Color.green(), timestamp=datetime.now(timezone.utc))
+                    embed.add_field(name="유저 (ユーザー)", value=after.mention, inline=False)
+                    embed.add_field(name="추가된 역할 (付与された役割)", value=", ".join([r.mention for r in added_roles]), inline=False)
+                    embed.add_field(name="수행자 (実行者)", value=moderator.mention, inline=False)
+                    await log_channel.send(embed=embed)
                 if removed_roles:
-                    for role in removed_roles:
-                        embed = discord.Embed(title="역할 제거됨 (役割剥奪)", color=discord.Color.dark_red(), timestamp=datetime.now(timezone.utc))
-                        embed.add_field(name="유저 (ユーザー)", value=after.mention, inline=False)
-                        embed.add_field(name="제거된 역할 (剥奪された役割)", value=role.mention, inline=False)
-                        embed.add_field(name="수행자 (実行者)", value=moderator.mention, inline=False)
-                        embed.set_author(name=f"{after.display_name} ({after.id})", icon_url=after.display_avatar.url if after.display_avatar else None)
-                        await log_channel.send(embed=embed)
+                    # ... 로그 생성 로직 ...
+                    embed = discord.Embed(title="역할 제거됨 (役割剥奪)", color=discord.Color.dark_red(), timestamp=datetime.now(timezone.utc))
+                    embed.add_field(name="유저 (ユーザー)", value=after.mention, inline=False)
+                    embed.add_field(name="제거된 역할 (剥奪された役割)", value=", ".join([r.mention for r in removed_roles]), inline=False)
+                    embed.add_field(name="수행자 (実行者)", value=moderator.mention, inline=False)
+                    await log_channel.send(embed=embed)
+            else:
+                 logger.info(f"[진단/역할] 수행자를 찾지 못했거나 봇의 행동이므로 로그를 남기지 않습니다.")
 
-        # --- 2. 닉네임 변경 감지 ---
+
+        # --- 닉네임 변경 감지 ---
         elif before.nick != after.nick:
             await asyncio.sleep(2)
-            moderator = "본인 (本人)" # 기본값
+            moderator = "본인 (本人)"
             try:
-                async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_update):
-                    # 닉네임 변경 감사 로그는 target이 명확하므로 바로 사용 가능
+                async for entry in after.guild.audit_logs(limit=5, action=discord.AuditLogAction.member_update):
                     if entry.target.id == after.id and hasattr(entry.before, 'nick') and hasattr(entry.after, 'nick') and entry.before.nick != entry.after.nick:
-                        if not entry.user.bot: # 봇이 한 행동은 제외
-                            if entry.user.id != after.id: # 본인이 직접 바꾼게 아니라면
-                                moderator = entry.user
+                        logger.info(f"[진단/닉네임] 감사 로그 발견: 대상={entry.target}, 수행자={entry.user}, 봇={entry.user.bot}")
+                        if not entry.user.bot:
+                            if entry.user.id != after.id: moderator = entry.user
                         else:
-                            moderator = None # 봇이 한 행동이면 로그 안 남김
+                            moderator = None # 봇이 한 행동이면 None
                         break
-            except discord.Forbidden: moderator = "권한 부족"
-            except Exception: pass
-            
-            if moderator: # moderator가 None이 아닐 경우에만 (봇이 한 행동이 아닐 때)
+            except Exception as e:
+                logger.error(f"[진단/닉네임] 감사 로그 확인 중 오류: {e}")
+
+            if moderator:
                 embed = discord.Embed(title="닉네임 변경됨 (ニックネーム変更)", color=discord.Color.blue(), timestamp=datetime.now(timezone.utc))
                 embed.add_field(name="유저 (ユーザー)", value=after.mention, inline=False)
                 embed.add_field(name="변경 전 (変更前)", value=f"`{before.nick or before.name}`", inline=True)
                 embed.add_field(name="변경 후 (変更後)", value=f"`{after.nick or after.name}`", inline=True)
                 embed.add_field(name="수행자 (実行者)", value=moderator.mention if isinstance(moderator, discord.Member) else moderator, inline=False)
-                embed.set_author(name=f"{after.display_name} ({after.id})", icon_url=after.display_avatar.url if after.display_avatar else None)
                 await log_channel.send(embed=embed)
+            else:
+                logger.info(f"[진단/닉네임] 수행자를 찾지 못했거나 봇의 행동이므로 로그를 남기지 않습니다.")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemberLogger(bot))
