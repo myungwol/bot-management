@@ -36,39 +36,60 @@ class MessageLogger(commands.Cog):
         log_channel = await self.get_log_channel()
         if not log_channel: return
 
-        message = payload.cached_message
-        author = message.author if message else "알 수 없음"
-        content = message.content if message else "캐시되지 않음 (キャッシュされていません)"
-        attachments = message.attachments if message else []
-        author_id = message.author.id if message else "알 수 없음"
-
-        if message and message.author.bot: return
-
-        deleter = f"{author.mention if isinstance(author, discord.User) else '작성자'} 본인 (本人)"
-        deleter_found = False
+        # --- [수정] 정보 수집 및 삭제자 추적 로직 전체 변경 ---
+        author = None
+        author_id = None
+        deleter = None
+        
+        # 1. 감사 로그에서 정보 찾아보기 (가장 정확함)
         try:
             guild = self.bot.get_guild(payload.guild_id)
-            if guild.me.guild_permissions.view_audit_log:
-                await asyncio.sleep(1.5)
-                async for entry in guild.audit_logs(action=discord.AuditLogAction.message_delete, limit=5, after=datetime.now(timezone.utc) - timedelta(seconds=10)):
-                    if entry.target.id == author_id and entry.extra.count >= 1:
-                        if entry.user.id != author_id:
-                            deleter = entry.user.mention
-                        deleter_found = True
+            if guild and guild.me.guild_permissions.view_audit_log:
+                await asyncio.sleep(1.5) # 감사 로그 기록 대기
+                async for entry in guild.audit_logs(action=discord.AuditLogAction.message_delete, limit=1, after=datetime.now(timezone.utc) - timedelta(seconds=5)):
+                    # 감사 로그의 extra 정보에서 채널 ID가 일치하고, 대상이 멤버 객체일 때
+                    if entry.extra.channel.id == payload.channel_id and isinstance(entry.target, discord.Member):
+                        author = entry.target
+                        author_id = entry.target.id
+                        deleter = entry.user
                         break
         except discord.Forbidden:
-            deleter = "권한 부족 (権限不足)"
+            logger.warning(f"감사 로그 읽기 권한이 없어 삭제자를 추적할 수 없습니다: {guild.name}")
         except Exception as e:
-            logger.warning(f"메시지 삭제자 확인 중 오류: {e}")
-        
-        if not deleter_found and not isinstance(author, discord.User):
-            deleter = "알 수 없음 (不明)"
+            logger.error(f"메시지 삭제 감사 로그 확인 중 오류: {e}", exc_info=True)
 
-        # [수정] description에 줄넘김을 사용하여 정보를 명확하게 분리
+        # 2. 감사 로그에서 못 찾았을 경우, 캐시된 메시지 확인
+        message = payload.cached_message
+        if message:
+            # 감사 로그에서 작성자를 못 찾았을 때만 캐시 정보 사용
+            if not author:
+                author = message.author
+                author_id = message.author.id
+            # 봇 메시지는 무시
+            if author.bot: return
+            
+        # 3. 최종적으로 삭제자 판별
+        if deleter:
+            # 감사 로그에서 찾은 삭제자가 작성자와 같으면 '본인'으로 표시
+            if deleter.id == author_id:
+                final_deleter_str = f"{author.mention if author else '작성자'} 본인 (本人)"
+            else:
+                final_deleter_str = deleter.mention
+        elif author:
+            # 감사 로그에 기록이 없으면 대부분 본인이 삭제한 경우
+            final_deleter_str = f"{author.mention} 본인 (本人)"
+        else:
+            final_deleter_str = "알 수 없음 (不明)"
+
+        # --- 정보 조합 끝 ---
+
+        content = message.content if message else "캐시되지 않음 (キャッシュされていません)"
+        attachments = message.attachments if message else []
+        
         desc = (
-            f"**작성자 (作成者):** {author.mention if isinstance(author, discord.User) else '알 수 없음'}\n"
+            f"**작성자 (作成者):** {author.mention if author else '알 수 없음'}\n"
             f"**채널 (チャンネル):** <#{payload.channel_id}>\n"
-            f"**삭제한 사람 (削除者):** {deleter}\n"
+            f"**삭제한 사람 (削除者):** {final_deleter_str}\n"
             f"━━━━━━━━━━━━━━━━\n"
             f"**내용 (内容):**\n>>> {content if content else '내용 없음 (内容なし)'}"
         )
@@ -79,7 +100,7 @@ class MessageLogger(commands.Cog):
             color=discord.Color.red(),
             timestamp=datetime.now(timezone.utc)
         )
-        embed.set_footer(text=f"작성자 ID: {author_id}")
+        embed.set_footer(text=f"작성자 ID: {author_id if author_id else '알 수 없음'}")
 
         if attachments:
             files = "\n".join([f"[{att.filename}]({att.url})" for att in attachments])
@@ -95,7 +116,6 @@ class MessageLogger(commands.Cog):
         log_channel = await self.get_log_channel()
         if not log_channel: return
 
-        # [수정] description과 필드를 사용하여 정보를 명확하게 분리
         desc = (
             f"**작성자 (作成者):** {after.author.mention}\n"
             f"**채널 (チャンネル):** {after.channel.mention}\n"
@@ -108,7 +128,6 @@ class MessageLogger(commands.Cog):
             color=discord.Color.gold(),
             timestamp=datetime.now(timezone.utc)
         )
-        # 수정 전/후 내용은 필드로 분리하여 가독성 확보
         embed.add_field(name="수정 전 (編集前)", value=f"```\n{before.content}\n```" if before.content else "내용 없음", inline=False)
         embed.add_field(name="수정 후 (編集後)", value=f"```\n{after.content}\n```" if after.content else "내용 없음", inline=False)
         embed.set_footer(text=f"작성자 ID: {after.author.id}")
