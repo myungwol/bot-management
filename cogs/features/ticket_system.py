@@ -184,35 +184,40 @@ class TicketSystem(commands.Cog):
             view.add_item(button)
         return view
 
-    async def regenerate_panel(self, channel: discord.TextChannel | discord.ForumChannel) -> bool:
-        panel_type = None
-        if channel.id == get_id("inquiry_forum_channel_id"): panel_type = "inquiry"
-        elif channel.id == get_id("report_forum_channel_id"): panel_type = "report"
+    async def regenerate_panel(self, channel: discord.TextChannel | discord.ForumChannel, panel_type: str) -> bool:
+        view = None
+        embed = None
         
-        if panel_type:
-            view = self.create_panel_view(panel_type)
-            embed_title = "サーバーへのお問い合わせ・ご提案" if panel_type == "inquiry" else "ユーザーへの通報"
-            embed_desc = "下のボタンを押して新しいチケットを作成してください。"
-            embed = discord.Embed(title=embed_title, description=embed_desc)
+        if panel_type == "inquiry":
+            embed = discord.Embed(title="サーバーへのお問い合わせ・ご提案", description="下のボタンを押して、サーバー運営へのご意見をお聞かせください。")
+            view = self.create_panel_view("inquiry")
+        elif panel_type == "report":
+            embed = discord.Embed(title="ユーザーへの通報", description="サーバー内での迷惑行為や問題を発見した場合、下のボタンで通報してください。")
+            view = self.create_panel_view("report")
+        
+        if view and embed:
             try:
                 if isinstance(channel, discord.ForumChannel):
                     # 기존 패널용 게시물이 있는지 확인하고 있다면 삭제
+                    async for thread in channel.archived_threads(limit=100):
+                        if thread.owner == self.bot.user and "チケット作成はこちらから" in thread.name:
+                            await thread.delete()
                     for thread in channel.threads:
                         if thread.owner == self.bot.user and "チケット作成はこちらから" in thread.name:
                             await thread.delete()
-                    
+
                     post_title = "チケット作成はこちらから"
                     await channel.create_thread(name=post_title, embed=embed, view=view)
                     logger.info(f"✅ {panel_type} 패널을 포럼 #{channel.name}에 생성했습니다.")
-                    return True # 성공 반환
+                    return True
                 elif isinstance(channel, discord.TextChannel):
                     await channel.send(embed=embed, view=view)
                     logger.info(f"✅ {panel_type} 패널을 텍스트 채널 #{channel.name}에 생성했습니다.")
-                    return True # 성공 반환
+                    return True
             except Exception as e:
                 logger.error(f"❌ #{channel.name} 채널에 패널 생성 중 오류 발생: {e}", exc_info=True)
-                return False # 실패 반환
-        return False # 실패 반환
+                return False
+        return False
         
 async def setup(bot):
     await bot.add_cog(TicketSystem(bot))
