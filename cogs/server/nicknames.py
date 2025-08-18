@@ -14,6 +14,7 @@ from utils.database import (
     get_id, get_embed_from_db, get_panel_components_from_db,
     get_config
 )
+from utils.helpers import get_clean_display_name, format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ class NicknameApprovalView(ui.View):
         error_report = ""
         if is_approved:
             try:
-                await member.edit(nick=final_name, reason=f"관리자({interaction.user}) 승인")
+                await member.edit(nick=final_name, reason=f"管理者が承認 ({interaction.user})")
             except Exception as e: error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
         
         log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
@@ -80,7 +81,7 @@ class NicknameApprovalView(ui.View):
         
         status_text = "承認" if is_approved else "拒否"
         if error_report:
-            await interaction.followup.send(f"❌ **{status_text} 처리 중 일부 작업에 실패했습니다:**\n{error_report}", ephemeral=True)
+            await interaction.followup.send(f"❌ **{status_text}**処理中に一部作業に失敗しました:\n{error_report}", ephemeral=True)
         else:
             message = await interaction.followup.send(f"✅ {status_text} 処理が正常に完了しました。", ephemeral=True, wait=True)
             await asyncio.sleep(5)
@@ -89,7 +90,7 @@ class NicknameApprovalView(ui.View):
         try: await interaction.message.delete()
         except discord.NotFound: pass
 
-        await self.nicknames_cog.regenerate_panel()
+        await self.nicknames_cog.regenerate_panel(interaction.channel)
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
@@ -181,7 +182,7 @@ class NicknameChangerPanelView(ui.View):
                 cooldown_seconds = int(get_config("NICKNAME_CHANGE_COOLDOWN_SECONDS", 14400))
             except (ValueError, TypeError):
                 cooldown_seconds = 14400
-                logger.warning("NICKNAME_CHANGE_COOLDOWN_SECONDS 설정값이 숫자가 아니므로 기본값(14400)을 사용합니다.")
+                logger.warning("NICKNAME_CHANGE_COOLDOWN_SECONDS 설정값이 숫자가 아니므로 기본값(14400)을 사용합니다。")
             
             last_time = await get_cooldown(str(i.user.id), "nickname_change")
             utc_now = datetime.now(timezone.utc).timestamp()
@@ -198,12 +199,11 @@ class NicknameChangerPanelView(ui.View):
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.panel_channel_id: Optional[int] = None
         self.approval_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None
         self.nickname_log_channel_id: Optional[int] = None
         self.view_instance = None
-        logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
+        logger.info("Nicknames Cog가 성공적으로 초기화되었습니다。")
 
     async def register_persistent_views(self):
         self.view_instance = NicknameChangerPanelView(self)
@@ -214,11 +214,10 @@ class Nicknames(commands.Cog):
         await self.load_configs()
 
     async def load_configs(self):
-        self.panel_channel_id = get_id("nickname_panel_channel_id")
         self.approval_channel_id = get_id("nickname_approval_channel_id")
         self.nickname_log_channel_id = get_id("nickname_log_channel_id")
         self.approval_role_id = get_id("role_approval")
-        logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
+        logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다。")
 
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
         prefix_hierarchy = get_config("NICKNAME_PREFIX_HIERARCHY", [])
@@ -255,7 +254,7 @@ class Nicknames(commands.Cog):
             if member.nick != final_name:
                 await member.edit(nick=final_name, reason="온보딩 완료 또는 닉네임 승인")
         except discord.Forbidden:
-            logger.warning(f"닉네임 업데이트: {member.display_name}의 닉네임을 변경할 권한이 없습니다.")
+            logger.warning(f"닉네임 업데이트: {member.display_name}의 닉네임을 변경할 권한이 없습니다。")
         except Exception as e:
             logger.error(f"닉네임 업데이트: {member.display_name}의 닉네임 업데이트 중 오류 발생: {e}", exc_info=True)
 
@@ -270,40 +269,35 @@ class Nicknames(commands.Cog):
             except discord.Forbidden:
                 pass
 
-    async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None):
-        target_channel = channel
-        if target_channel is None:
-            channel_id = get_id("nickname_panel_channel_id")
-            if channel_id:
-                target_channel = self.bot.get_channel(channel_id)
-            else:
-                logger.info("ℹ️ 닉네임 패널 채널이 설정되지 않아, 자동 생성을 건너뜁니다.")
-                return
-        if not target_channel:
-            logger.warning("❌ Nickname panel channel could not be found.")
-            return
-
+    async def regenerate_panel(self, channel: discord.TextChannel) -> bool:
         panel_key = "nicknames"
-        panel_info = get_panel_id(panel_key)
-        if panel_info and (old_id := panel_info.get('message_id')):
-            try:
-                old_message = await target_channel.fetch_message(old_id)
-                await old_message.delete()
-            except (discord.NotFound, discord.Forbidden):
-                pass
-        
-        embed_data = await get_embed_from_db("panel_nicknames")
-        if not embed_data:
-            logger.warning("DB에서 'panel_nicknames' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
-            return
+        embed_key = "panel_nicknames"
+
+        try:
+            panel_info = get_panel_id(panel_key)
+            if panel_info and (old_id := panel_info.get('message_id')):
+                try:
+                    old_message = await channel.fetch_message(old_id)
+                    await old_message.delete()
+                except (discord.NotFound, discord.Forbidden): pass
             
-        embed = discord.Embed.from_dict(embed_data)
-        if self.view_instance is None:
-            self.view_instance = NicknameChangerPanelView(self)
-        await self.view_instance.setup_buttons()
-        new_message = await target_channel.send(embed=embed, view=self.view_instance)
-        await save_panel_id(panel_key, new_message.id, target_channel.id)
-        logger.info(f"✅ 닉네임 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
+            embed_data = await get_embed_from_db(embed_key)
+            if not embed_data:
+                logger.warning(f"DB에서 '{embed_key}' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다。")
+                return False
+                
+            embed = discord.Embed.from_dict(embed_data)
+            if self.view_instance is None:
+                await self.register_persistent_views()
+
+            await self.view_instance.setup_buttons()
+            new_message = await channel.send(embed=embed, view=self.view_instance)
+            await save_panel_id(panel_key, new_message.id, channel.id)
+            logger.info(f"✅ {panel_key} 패널을 성공적으로 새로 생성했습니다。 (채널: #{channel.name})")
+            return True
+        except Exception as e:
+            logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
+            return False
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Nicknames(bot))
