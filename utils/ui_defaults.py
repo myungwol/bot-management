@@ -247,15 +247,3 @@ USABLE_ITEMS = {
         "description": "累積警告を1回分減らします。" # 명령어 자동완성에 표시될 설명
     }
 }
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 13. 익명 게시판 (anonymous_messages) 관련 함수
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-@supabase_retry_handler()
-async def add_anonymous_message(guild_id: int, user_id: int, content: str):
-    """새로운 익명 메시지를 데이터베이스에 추가합니다."""
-    await supabase.table('anonymous_messages').insert({
-        "guild_id": guild_id,
-        "user_id": user_id,
-        "message_content": content
-    }).execute()
