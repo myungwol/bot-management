@@ -68,27 +68,32 @@ class ReportTargetSelectView(ui.View):
     async def exclude_police(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReportModal(self.cog, set())); await interaction.delete_original_response()
 
+# cogs/features/ticket_system.py 파일에서 TicketControlView 클래스를 찾아 이 코드로 교체하세요.
+
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str, is_locked: bool = False):
         super().__init__(timeout=None)
         self.cog = cog
         self.ticket_type = ticket_type
-        # [수정] 잠금/해제 버튼을 is_locked 상태에 따라 동적으로 추가
+        
+        # 버튼 콜백을 직접 할당
         if is_locked:
-            self.add_item(ui.Button(label="ロック解除", style=discord.ButtonStyle.success, emoji="🔓", custom_id="ticket_toggle_lock"))
+            lock_button = ui.Button(label="ロック解除", style=discord.ButtonStyle.success, emoji="🔓", custom_id="ticket_toggle_lock")
         else:
-            self.add_item(ui.Button(label="ロック", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="ticket_toggle_lock"))
-        self.add_item(ui.Button(label="削除", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="ticket_delete"))
+            lock_button = ui.Button(label="ロック", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="ticket_toggle_lock")
+        
+        delete_button = ui.Button(label="削除", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="ticket_delete")
 
-        # 모든 버튼에 콜백을 동적으로 할당
-        for item in self.children:
-            if item.custom_id == "ticket_toggle_lock": item.callback = self.toggle_lock
-            elif item.custom_id == "ticket_delete": item.callback = self.delete
+        lock_button.callback = self.toggle_lock
+        delete_button.callback = self.delete
+        
+        self.add_item(lock_button)
+        self.add_item(delete_button)
 
-    async def _check_master_permission(self, interaction: discord.Interaction) -> bool: # ... (이전과 동일)
+    async def _check_master_permission(self, interaction: discord.Interaction) -> bool:
         if not isinstance(interaction.user, discord.Member): return False
         return any(role in interaction.user.roles for role in self.cog.master_roles)
-    async def _check_handler_permission(self, interaction: discord.Interaction, ticket_type: str) -> bool: # ... (이전과 동일)
+    async def _check_handler_permission(self, interaction: discord.Interaction, ticket_type: str) -> bool:
         if not isinstance(interaction.user, discord.Member): return False
         roles_to_check = self.cog.report_roles if ticket_type == "report" else (self.cog.staff_general_roles + self.cog.staff_specific_roles)
         return any(role in interaction.user.roles for role in roles_to_check)
@@ -108,32 +113,46 @@ class TicketControlView(ui.View):
         owner = interaction.guild.get_member(ticket_info.get("owner_id"))
         is_currently_locked = ticket_info.get("is_locked", False)
         
+        await interaction.response.defer()
+        
         try:
-            await interaction.response.defer()
             if is_currently_locked:
                 if owner: await thread.add_user(owner)
                 await update_ticket_lock_status(thread.id, False)
                 self.cog.tickets[thread.id]['is_locked'] = False
-                await interaction.followup.send(f"✅ チケットのロックを解除しました。{owner.mention if owner else ''}さんを再度招待しました。")
+                await interaction.followup.send(f"✅ チケットのロックを解除しました。{owner.mention if owner else ''}さんを再度招待しました。", ephemeral=True)
                 new_view = TicketControlView(self.cog, self.ticket_type, is_locked=False)
             else:
                 all_admin_roles = self.cog.master_roles + self.cog.staff_general_roles + self.cog.staff_specific_roles + self.cog.report_roles
                 all_admin_role_ids = {role.id for role in all_admin_roles}
-                members_to_remove = [m for m in thread.members if not m.bot and not any(r.id in all_admin_role_ids for r in m.roles)]
+                
+                # [수정] ThreadMember를 완전한 Member 객체로 변환하여 확인
+                members_to_remove = []
+                async for m in thread.fetch_members():
+                    # 서버에서 완전한 Member 객체를 가져옴
+                    member = interaction.guild.get_member(m.id)
+                    if not member: continue
+                    
+                    if not member.bot and not any(r.id in all_admin_role_ids for r in member.roles):
+                        members_to_remove.append(member)
+                
                 for member in members_to_remove: await thread.remove_user(member)
                 
                 await update_ticket_lock_status(thread.id, True)
                 self.cog.tickets[thread.id]['is_locked'] = True
                 removed_names = ", ".join([m.display_name for m in members_to_remove])
-                await interaction.followup.send(f"✅ 管理者以外のメンバー ({removed_names}) を除外し、チケットをロックしました。")
+                await interaction.followup.send(f"✅ 管理者以外のメンバー ({removed_names}) を除外し、チケットをロックしました。", ephemeral=True)
                 new_view = TicketControlView(self.cog, self.ticket_type, is_locked=True)
 
-            await interaction.message.edit(view=new_view)
+            # [수정] 응답 후 메시지를 수정하도록 변경
+            message_to_edit = await interaction.original_response()
+            await message_to_edit.edit(view=new_view)
+            
         except Exception as e:
             logger.error(f"티켓 잠금/해제 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ チケットの処理中にエラーが発生しました。", ephemeral=True)
 
-    async def delete(self, interaction: discord.Interaction): # ... (이전과 동일)
+    async def delete(self, interaction: discord.Interaction):
         if not await self._check_master_permission(interaction):
             return await interaction.response.send_message("❌ `村長`、`副村長`のみがこのボタンを使用できます。", ephemeral=True)
         await interaction.response.send_message(f"✅ 5秒後にこのチケットを削除します。")
