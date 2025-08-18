@@ -179,7 +179,7 @@ class TicketSystem(commands.Cog):
                 except discord.NotFound: pass
 
     # [수정] regenerate_panel 함수를 패널 타입에 따라 분리
-    async def regenerate_panel(self, channel: discord.TextChannel):
+    async def regenerate_panel(self, channel: discord.TextChannel | discord.ForumChannel):
         panel_key = None
         if channel.id == get_id("inquiry_panel_channel_id"):
             panel_key = "inquiry"
