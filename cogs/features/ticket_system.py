@@ -42,34 +42,65 @@ class ReportModal(TicketModal):
 class InquiryTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
-        self.cog, self.target_type, self.specific_roles = cog, None, set()
-    @ui.select(placeholder="お問い合わせ先を選択してください...", options=[
-        discord.SelectOption(label="村長・副村長へ", value="master"),
-        discord.SelectOption(label="役場の職員全体へ", value="general"),
-        discord.SelectOption(label="特定の担当者へ", value="specific")
-    ])
-    async def select_target(self, interaction: discord.Interaction, select: ui.Select):
-        self.target_type = select.values[0]
-        self.children[0].disabled = True
+        self.cog = cog
+        self.target_type: Optional[str] = None
+        self.specific_roles: Set[discord.Role] = set()
+
+        # [수정] select 메뉴를 View의 속성으로 직접 추가하고 콜백을 지정
+        self.target_select = ui.Select(placeholder="お問い合わせ先を選択してください...", options=[
+            discord.SelectOption(label="村長・副村長へ", value="master"),
+            discord.SelectOption(label="役場の職員全体へ", value="general"),
+            discord.SelectOption(label="特定の担当者へ", value="specific")
+        ])
+        self.target_select.callback = self.select_target_callback
+        self.add_item(self.target_select)
+
+        # [수정] button도 View의 속성으로 직접 추가하고 콜백을 지정
+        self.proceed_button = ui.Button(label="内容入力へ進む", style=discord.ButtonStyle.success, row=2)
+        self.proceed_button.callback = self.proceed_callback
+        self.add_item(self.proceed_button)
+
+    async def select_target_callback(self, interaction: discord.Interaction):
+        # 콜백 함수에서 self는 View 자신을 가리킴
+        self.target_type = self.target_select.values[0]
+        self.target_select.disabled = True
+
+        # 특정 담당자를 선택했을 때의 로직
         if self.target_type == "specific":
             specific_roles = [role for key in TICKET_STAFF_SPECIFIC_ROLES if (role_id := get_id(key)) and (role := self.cog.guild.get_role(role_id))]
-            if specific_roles: self.add_item(self.SpecificRoleSelect(specific_roles))
+            if specific_roles:
+                self.specific_role_select = ui.Select(
+                    placeholder="担当者を選択してください (複数選択可)...", 
+                    min_values=1, 
+                    max_values=len(specific_roles), 
+                    options=[discord.SelectOption(label=role.name, value=str(role.id)) for role in specific_roles]
+                )
+                self.specific_role_select.callback = self.specific_role_callback
+                self.add_item(self.specific_role_select)
+        
         await interaction.response.edit_message(view=self)
-    class SpecificRoleSelect(ui.Select):
-        def __init__(self, roles: List[discord.Role]):
-            options = [discord.SelectOption(label=role.name, value=str(role.id)) for role in roles]
-            super().__init__(placeholder="担当者を選択してください (複数選択可)...", min_values=1, max_values=len(options), options=options)
-        async def callback(self, interaction: discord.Interaction):
-            self.view.specific_roles = {interaction.guild.get_role(int(role_id)) for role_id in self.values}
-            await interaction.response.defer()
-    @ui.button(label="内容入力へ進む", style=discord.ButtonStyle.success, row=2)
-    async def proceed(self, interaction: discord.Interaction, button: ui.Button):
-        if not self.target_type: return await interaction.response.send_message("お問い合わせ先を選択してください。", ephemeral=True)
-        if self.target_type == "specific" and not self.specific_roles: return await interaction.response.send_message("担当者を選択してください。", ephemeral=True)
+
+    async def specific_role_callback(self, interaction: discord.Interaction):
+        # 콜백 함수에서 self는 Select 자신, self.view는 View를 가리킴
+        self.view.specific_roles = {interaction.guild.get_role(int(role_id)) for role_id in self.values}
+        await interaction.response.defer()
+
+    async def proceed_callback(self, interaction: discord.Interaction):
+        # 콜백 함수에서 self는 Button 자신, self.view는 View를 가리킴
+        if not self.view.target_type:
+            return await interaction.response.send_message("お問い合わせ先を選択してください。", ephemeral=True)
+        if self.view.target_type == "specific" and not self.view.specific_roles:
+            return await interaction.response.send_message("担当者を選択してください。", ephemeral=True)
+        
         selected_roles: Set[discord.Role] = set()
-        if self.target_type == "master": selected_roles.update(self.cog.master_roles)
-        elif self.target_type == "general": selected_roles.update(self.cog.staff_general_roles)
-        elif self.target_type == "specific": selected_roles.update(self.specific_roles)
+        if self.view.target_type == "master":
+            selected_roles.update(self.view.cog.master_roles)
+        elif self.view.target_type == "general":
+            selected_roles.update(self.view.cog.staff_general_roles)
+        elif self.view.target_type == "specific":
+            selected_roles.update(self.view.specific_roles)
+
+        # [수정] self.view.cog를 사용하여 올바르게 Cog에 접근
         await interaction.response.send_modal(TicketModal(self.view.cog, "inquiry", selected_roles))
         await interaction.delete_original_response()
 
