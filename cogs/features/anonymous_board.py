@@ -1,4 +1,3 @@
-
 # cogs/features/anonymous_board.py
 import discord
 from discord import ui
