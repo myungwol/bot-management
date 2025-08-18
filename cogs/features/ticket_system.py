@@ -120,7 +120,6 @@ class TicketControlView(ui.View):
         roles_to_check = self.cog.report_roles if ticket_type == "report" else (self.cog.staff_general_roles + self.cog.staff_specific_roles)
         return any(role in interaction.user.roles for role in roles_to_check)
         
-    # [수정] 잠금/잠금해제 버튼을 하나로 통합하고, 콜백 로직을 완전히 변경
     @ui.button(label="ロック", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="ticket_toggle_lock")
     async def toggle_lock(self, interaction: discord.Interaction, button: ui.Button):
         is_master = await self._check_master_permission(interaction)
@@ -143,7 +142,7 @@ class TicketControlView(ui.View):
         is_currently_locked = owner and owner not in thread.members
 
         try:
-            if is_currently_locked: # --- 잠금 해제 로직 ---
+            if is_currently_locked:
                 if owner:
                     await thread.add_user(owner)
                     await interaction.response.send_message(f"✅ {owner.mention} さんを再度招待し、チケットのロックを解除しました。")
@@ -154,14 +153,12 @@ class TicketControlView(ui.View):
                 button.emoji = "🔒"
                 button.style = discord.ButtonStyle.secondary
             
-            else: # --- 잠금 로직 ---
-                # 관리자 역할을 제외한 모든 멤버를 찾아서 제외
+            else:
                 members_to_remove = []
                 all_admin_roles = self.cog.master_roles + self.cog.staff_general_roles + self.cog.staff_specific_roles + self.cog.report_roles
                 all_admin_role_ids = {role.id for role in all_admin_roles}
 
                 for member in thread.members:
-                    # 봇이거나, 관리자 역할이 하나라도 있으면 제외하지 않음
                     if member.bot or any(role.id in all_admin_role_ids for role in member.roles):
                         continue
                     members_to_remove.append(member)
@@ -240,7 +237,6 @@ class TicketSystem(commands.Cog):
         if panel_type == "inquiry":
             button = ui.Button(label="お問い合わせ・ご提案", style=discord.ButtonStyle.primary, emoji="📨", custom_id="ticket_inquiry_panel")
             async def callback(interaction: discord.Interaction):
-                # [수정] 티켓 생성 전, 이미 참여중인 문의 스레드가 있는지 확인
                 if self.has_open_ticket(interaction.user, "inquiry"):
                     return await interaction.response.send_message("❌ すでに参加中のお問い合わせチケットがあります。", ephemeral=True)
                 await interaction.response.send_message("お問い合わせ先を選択してください。", view=InquiryTargetSelectView(self), ephemeral=True)
@@ -249,7 +245,6 @@ class TicketSystem(commands.Cog):
         elif panel_type == "report":
             button = ui.Button(label="通報", style=discord.ButtonStyle.danger, emoji="🚨", custom_id="ticket_report_panel")
             async def callback(interaction: discord.Interaction):
-                # [수정] 티켓 생성 전, 이미 참여중인 신고 스레드가 있는지 확인
                 if self.has_open_ticket(interaction.user, "report"):
                     return await interaction.response.send_message("❌ すでに参加中の通報チケットがあります。", ephemeral=True)
                 await interaction.response.send_message("この通報に`交番さん`を含めますか？", view=ReportTargetSelectView(self), ephemeral=True)
@@ -257,11 +252,9 @@ class TicketSystem(commands.Cog):
             view.add_item(button)
         return view
 
-    # [신규] 유저가 특정 타입의 티켓에 이미 참여중인지 확인하는 함수
     def has_open_ticket(self, user: discord.Member, ticket_type: str) -> bool:
         for thread_id, ticket_info in self.tickets.items():
             if ticket_info.get("owner_id") == user.id and ticket_info.get("ticket_type") == ticket_type:
-                # 봇이 스레드 객체를 찾을 수 있는지 확인 (삭제되었을 수 있음)
                 if self.guild and self.guild.get_thread(thread_id):
                     return True
         return False
@@ -296,11 +289,14 @@ class TicketSystem(commands.Cog):
             control_view = TicketControlView(self, ticket_type)
             await thread.send(f"{interaction.user.mention} {mention_string}\n**[チケット管理パネル]**", view=control_view, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
             
-            await interaction.followup.send(f"✅ 非公開のチケットを作成しました: {thread.mention}", ephemeral=True, delete_after=5.0)
+            message = await interaction.followup.send(f"✅ 非公開のチケットを作成しました: {thread.mention}", ephemeral=True, wait=True)
+            await asyncio.sleep(5)
+            await message.delete()
             
         except Exception as e:
             logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
-            try: await interaction.followup.send("❌ チケットの作成中にエラーが発生しました。", ephemeral=True)
+            try: 
+                await interaction.followup.send("❌ チケットの作成中にエラーが発生しました。", ephemeral=True)
             except discord.NotFound: pass
 
     async def _cleanup_ticket_data(self, thread_id: int):
