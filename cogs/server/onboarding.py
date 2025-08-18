@@ -173,11 +173,20 @@ class ApprovalView(ui.View):
     async def _grant_roles(self, member: discord.Member) -> Optional[str]:
         try:
             guild = member.guild; roles_to_add: List[discord.Role] = []; failed_to_find_roles: List[str] = []
-            resident_role_key = "role_resident"; rookie_role_key = "role_resident_rookie"
-            if (rid := get_id(resident_role_key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
-            else: failed_to_find_roles.append(resident_role_key)
-            if (rid := get_id(rookie_role_key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
-            else: failed_to_find_roles.append(rookie_role_key)
+            
+            # [수정] 부여할 역할 키 목록 정의
+            role_keys_to_grant = [
+                "role_resident", 
+                "role_resident_rookie",
+                "role_warning_separator" # 경고 구분선 역할 추가
+            ]
+
+            for key in role_keys_to_grant:
+                if (rid := get_id(key)) and (r := guild.get_role(rid)):
+                    roles_to_add.append(r)
+                else:
+                    failed_to_find_roles.append(key)
+
             gender_role_mapping = get_config("GENDER_ROLE_MAPPING", [])
             if gender_field := self._get_field_value(self.original_embed, "性別"):
                 for rule in gender_role_mapping:
@@ -185,6 +194,7 @@ class ApprovalView(ui.View):
                         if (rid := get_id(rule["role_id_key"])) and (r := guild.get_role(rid)): roles_to_add.append(r)
                         else: failed_to_find_roles.append(rule["role_id_key"])
                         break
+            
             age_role_mapping = get_config("AGE_ROLE_MAPPING", [])
             if age_field := self._get_field_value(self.original_embed, "年齢"):
                 birth_year = self._parse_birth_year(age_field)
@@ -198,8 +208,10 @@ class ApprovalView(ui.View):
                             if (rid := get_id(mapping["key"])) and (r := guild.get_role(rid)): roles_to_add.append(r)
                             else: failed_to_find_roles.append(mapping["key"])
                             break
+            
             if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="自己紹介の承認")
             if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="自己紹介の承認完了")
+            
             if failed_to_find_roles: return f"역할을 찾지 못함: `{', '.join(failed_to_find_roles)}`. `/setup-roles sync` 명령어를 실행해주세요."
         except discord.Forbidden: return "봇 권한 부족: 봇이 역할을 부여/제거할 권한이 없습니다."
         except Exception as e:
