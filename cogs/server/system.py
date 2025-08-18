@@ -1,7 +1,4 @@
 # cogs/server/system.py
-"""
-서버 관리와 관련된 모든 통합 명령어를 단일 /setup 명령어로 담당하는 Cog입니다.
-"""
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -26,10 +23,8 @@ class ServerSystem(commands.Cog):
             await interaction.response.send_message(f"❌ このコマンドを使用するには、次の権限が必要です: `{', '.join(error.missing_permissions)}`", ephemeral=True)
         else:
             logger.error(f"'{interaction.command.qualified_name}'コマンドの処理中にエラーが発生しました: {error}", exc_info=True)
-            if interaction.response.is_done():
-                await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
-            else:
-                await interaction.response.send_message("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
+            if interaction.response.is_done(): await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
+            else: await interaction.response.send_message("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
 
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         setup_map = get_config("SETUP_COMMAND_MAP", {})
@@ -39,24 +34,19 @@ class ServerSystem(commands.Cog):
             if info.get('channel_type') == 'voice': type_prefix = "[음성채널]"
             elif info.get('channel_type') == 'forum': type_prefix = "[포럼]"
             elif info.get('channel_type') == 'category': type_prefix = "[카테고리]"
-
-            choice_name = f"{type_prefix} {info.get('friendly_name', key)} 설정"
+            choice_name = f"{type_prefix} {info.get('friendly_name', key)} 設定"
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
-
+        
         role_actions = { "roles_sync": "[역할] 모든 역할 DB와 동기화" }
         for key, name in role_actions.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
+            if current.lower() in name.lower(): choices.append(app_commands.Choice(name=name, value=key))
         
         stats_actions = { "stats_set": "[통계] 통계 채널 설정/제거", "stats_refresh": "[통계] 모든 통계 채널 새로고침", "stats_list": "[통계] 설정된 통계 채널 목록 보기",}
         for key, name in stats_actions.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
-
+            if current.lower() in name.lower(): choices.append(app_commands.Choice(name=name, value=key))
+        
         return sorted(choices, key=lambda c: c.name)[:25]
-
-# cogs/server/system.py 파일에서 setup 함수 전체를 이 코드로 교체하세요.
 
     @app_commands.command(name="setup", description="[管理者] ボットのチャンネル、役割、統計など、すべての設定を管理します。")
     @app_commands.describe(
@@ -90,7 +80,6 @@ class ServerSystem(commands.Cog):
             setup_map = get_config("SETUP_COMMAND_MAP", {})
             config = setup_map.get(setting_key)
             if not config: return await interaction.followup.send("❌ 無効な設定キーです。", ephemeral=True)
-
             required_channel_type = config.get("channel_type", "text")
             error_msg = None
             if not channel:
@@ -99,24 +88,16 @@ class ServerSystem(commands.Cog):
                  (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)) or \
                  (required_channel_type == "forum" and not isinstance(channel, discord.ForumChannel)):
                 error_msg = f"❌ このタスクには**{required_channel_type}チャンネル**が必要です。正しいタイプのチャンネルを選択してください。"
-            
-            if error_msg: 
-                return await interaction.followup.send(error_msg, ephemeral=True)
-
+            if error_msg: return await interaction.followup.send(error_msg, ephemeral=True)
             db_key, friendly_name = config['key'], config['friendly_name']
             await save_id_to_db(db_key, channel.id)
-            
             cog_to_reload = self.bot.get_cog(config["cog_name"])
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
                 await cog_to_reload.load_configs()
-
-            # --- [수정] 패널 생성 로직 ---
             if config.get("type") == "panel":
                 if hasattr(cog_to_reload, 'regenerate_panel'):
-                    # 설정 키(예: "panel_inquiry")에서 "panel_" 부분을 제거하여 패널 타입을 전달
                     panel_type = setting_key.replace("panel_", "")
                     success = await cog_to_reload.regenerate_panel(channel, panel_type)
-                    
                     if success:
                         await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
                     else:
@@ -124,12 +105,10 @@ class ServerSystem(commands.Cog):
                 else:
                     await interaction.followup.send(f"⚠️ **{friendly_name}** は設定されましたが、パネルを自動生成する機能が見つかりません。", ephemeral=True)
             else:
-                # 패널 생성이 필요 없는 일반 채널 설정
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
 
-        # ... (이하 roles_sync, stats_set 등 다른 elif 블록은 그대로 유지) ...
+        # --- [복구] 역할 동기화 로직 ---
         elif action == "roles_sync":
-            from utils.ui_defaults import UI_ROLE_KEY_MAP
             role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
             await save_config_to_db("ROLE_KEY_MAP", role_name_map)
             synced_roles, missing_roles, error_roles = [], [], []
@@ -157,6 +136,8 @@ class ServerSystem(commands.Cog):
                 embed.color = 0xED4245
                 embed.add_field(name=f"❌ DB保存エラー ({len(error_roles)}個)", value="\n".join(error_roles)[:1024], inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
+
+        # --- [복구] 통계 관련 로직 ---
         elif action == "stats_set":
             if not channel or not isinstance(channel, discord.VoiceChannel):
                 return await interaction.followup.send("❌ このタスクを実行するには、「channel」オプションにボイスチャンネルを指定する必要があります。", ephemeral=True)
@@ -176,12 +157,14 @@ class ServerSystem(commands.Cog):
                 stats_cog = self.bot.get_cog("StatsUpdater")
                 if stats_cog and hasattr(stats_cog.update_stats_loop, 'restart'): stats_cog.update_stats_loop.restart()
                 await interaction.followup.send(f"✅ `{channel.name}` チャンネルに統計設定を追加/修正しました。", ephemeral=True)
+
         elif action == "stats_refresh":
             stats_cog = self.bot.get_cog("StatsUpdater")
             if stats_cog and hasattr(stats_cog.update_stats_loop, 'restart'):
                 stats_cog.update_stats_loop.restart()
                 await interaction.followup.send("✅ すべての統計チャンネルの更新を要求しました。", ephemeral=True)
             else: await interaction.followup.send("❌ 統計更新機能が見つかりません。", ephemeral=True)
+
         elif action == "stats_list":
             configs = await get_all_stats_channels()
             guild_configs = [c for c in configs if c.get('guild_id') == interaction.guild_id]
@@ -194,6 +177,7 @@ class ServerSystem(commands.Cog):
                 description.append(f"**チャンネル:** {ch_mention}\n**種類:** `{config['stat_type']}`\n**名前形式:** `{config['channel_name_template']}`")
             embed.description = "\n\n".join(description)
             await interaction.followup.send(embed=embed, ephemeral=True)
+        
         else: await interaction.followup.send("❌ 不明なタスクです。リストから正しいタスクを選択してください。", ephemeral=True)
 
 async def setup(bot: commands.Bot):
