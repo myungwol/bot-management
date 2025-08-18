@@ -117,8 +117,9 @@ SETUP_COMMAND_MAP = {
     "channel_vc_creator_newbie": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_newbie", "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"},
     "channel_vc_creator_vip":    {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_vip", "friendly_name": "[음성 채널] VIP 전용 생성기", "channel_type": "voice"},
 
-    # [신규] 티켓 패널 채널 설정 추가
-    "channel_ticket_panel": {"type": "channel", "cog_name": "TicketSystem", "key": "ticket_panel_channel_id", "friendly_name": "[티켓] 문의/신고 패널 채널", "channel_type": "text"},
+    # [수정] 티켓 패널 설정을 2개로 분리
+    "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 서버 문의/건의 패널", "channel_type": "text"},
+    "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
 
     # --- [로그 채널 설정] ---
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
@@ -146,12 +147,12 @@ ADMIN_ROLE_KEYS = [
 # 7. 티켓 시스템 설정 (이전 6번은 삭제됨)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-# '문의' 티켓 생성 시 자동으로 초대될 역할 키 목록
+# '문의/건의' 티켓 생성 시 자동으로 초대될 역할 키 목록
 TICKET_INQUIRY_ROLES = [
     "role_approval", # 役場の職員
 ]
 
-# '신고' 티켓 생성 시 자동으로 초대될 역할 키 목록
+# '유저 신고' 티켓 생성 시 자동으로 초대될 역할 키 목록
 TICKET_REPORT_ROLES = [
     "role_staff_police", # 交番さん
 ]
