@@ -184,40 +184,52 @@ class TicketSystem(commands.Cog):
             view.add_item(button)
         return view
 
-    async def regenerate_panel(self, channel: discord.TextChannel | discord.ForumChannel, panel_type: str) -> bool:
-        view = None
-        embed = None
+    async def regenerate_panel(self, channel: discord.ForumChannel) -> bool:
+        panel_type = None
+        if channel.id == get_id("inquiry_forum_channel_id"):
+            panel_type = "inquiry"
+        elif channel.id == get_id("report_forum_channel_id"):
+            panel_type = "report"
         
-        if panel_type == "inquiry":
-            embed = discord.Embed(title="サーバーへのお問い合わせ・ご提案", description="下のボタンを押して、サーバー運営へのご意見をお聞かせください。")
-            view = self.create_panel_view("inquiry")
-        elif panel_type == "report":
-            embed = discord.Embed(title="ユーザーへの通報", description="サーバー内での迷惑行為や問題を発見した場合、下のボタンで通報してください。")
-            view = self.create_panel_view("report")
-        
-        if view and embed:
+        if panel_type:
+            view = self.create_panel_view(panel_type)
+            embed_title = "サーバーへのお問い合わせ・ご提案" if panel_type == "inquiry" else "ユーザーへの通報"
+            embed_desc = "下のボタンを押して新しいチケットを作成してください。"
+            embed = discord.Embed(title=embed_title, description=embed_desc)
+            
             try:
-                if isinstance(channel, discord.ForumChannel):
-                    # 기존 패널용 게시물이 있는지 확인하고 있다면 삭제
-                    async for thread in channel.archived_threads(limit=100):
-                        if thread.owner == self.bot.user and "チケット作成はこちらから" in thread.name:
-                            await thread.delete()
-                    for thread in channel.threads:
-                        if thread.owner == self.bot.user and "チケット作成はこちらから" in thread.name:
-                            await thread.delete()
+                # [수정] 기존 패널용 게시물이 있는지 확인하고 있다면 삭제 (아카이브된 스레드 포함)
+                # 공개 스레드와 봇이 접근 가능한 비공개 스레드를 모두 확인
+                all_threads = channel.threads
+                try:
+                    archived = [t async for t in channel.archived_threads(limit=None)]
+                    all_threads.extend(archived)
+                except discord.Forbidden:
+                    logger.warning(f"보관된 스레드를 가져올 권한이 없습니다: #{channel.name}")
 
-                    post_title = "チケット作成はこちらから"
-                    await channel.create_thread(name=post_title, embed=embed, view=view)
-                    logger.info(f"✅ {panel_type} 패널을 포럼 #{channel.name}에 생성했습니다.")
-                    return True
-                elif isinstance(channel, discord.TextChannel):
-                    await channel.send(embed=embed, view=view)
-                    logger.info(f"✅ {panel_type} 패널을 텍스트 채널 #{channel.name}에 생성했습니다.")
-                    return True
+                for thread in all_threads:
+                    if thread.owner == self.bot.user and "チケット作成はこちらから" in thread.name:
+                        try:
+                            await thread.delete(reason="古いパネルを削除")
+                            logger.info(f"기존 패널 게시물 #{thread.name} 을(를) 삭제했습니다.")
+                        except discord.Forbidden:
+                            logger.error(f"기존 패널 게시물 #{thread.name} 을(를) 삭제할 권한이 없습니다.")
+
+                # [수정] 포럼 채널에 새 게시물(스레드)을 만드는 가장 안정적인 방법
+                # 1. 먼저 채널에 메시지(내용+버튼)를 보낸다.
+                starter_message = await channel.send(embed=embed, view=view)
+                
+                # 2. 방금 보낸 메시지로부터 스레드를 생성한다.
+                await starter_message.create_thread(name="チケット作成はこちらから", auto_archive_duration=10080)
+                
+                logger.info(f"✅ {panel_type} 패널을 포럼 #{channel.name}에 성공적으로 생성했습니다.")
+                return True # 성공 반환
+            
             except Exception as e:
-                logger.error(f"❌ #{channel.name} 채널에 패널 생성 중 오류 발생: {e}", exc_info=True)
-                return False
-        return False
+                logger.error(f"❌ #{channel.name} 채널에 패널 생성 중 치명적인 오류 발생: {e}", exc_info=True)
+                return False # 실패 반환
+        
+        return False # 일치하는 패널 타입이 없음
         
 async def setup(bot):
     await bot.add_cog(TicketSystem(bot))
