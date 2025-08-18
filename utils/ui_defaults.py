@@ -75,10 +75,10 @@ UI_ROLE_KEY_MAP = {
     "role_platform_switch":     {"name": "スイッチ", "is_prefix": False, "priority": 0},
 
     # --- 경고 역할 ---
-    "role_warning_level_1":     {"name": "警告1回", "is_prefix": False, "priority": 0},
-    "role_warning_level_2":     {"name": "警告2回", "is_prefix": False, "priority": 0},
-    "role_warning_level_3":     {"name": "警告3回", "is_prefix": False, "priority": 0},
-    "role_warning_level_4":     {"name": "警告4回", "is_prefix": False, "priority": 0},
+    "role_warning_level_1":     {"name": "警告1個", "is_prefix": False, "priority": 0},
+    "role_warning_level_2":     {"name": "警告2個", "is_prefix": False, "priority": 0},
+    "role_warning_level_3":     {"name": "警告3個", "is_prefix": False, "priority": 0},
+    "role_warning_level_4":     {"name": "警告4個", "is_prefix": False, "priority": 0},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
