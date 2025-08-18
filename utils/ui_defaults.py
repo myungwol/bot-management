@@ -130,6 +130,15 @@ SETUP_COMMAND_MAP = {
     "panel_roles":      {"type": "panel",   "cog_name": "RolePanel",    "key": "auto_role_channel_id",            "friendly_name": "역할 자동부여 패널", "channel_type": "text"},
     "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "서버 안내 패널", "channel_type": "text"},
     "panel_nicknames":  {"type": "panel",   "cog_name": "Nicknames",    "key": "nickname_panel_channel_id",       "friendly_name": "닉네임 변경 패널", "channel_type": "text"},
+    "panel_item_usage": {"type": "panel", "cog_name": "ItemSystem", "key": "item_usage_panel_channel_id", "friendly_name": "[패널] 아이템 사용", "channel_type": "text"},
+    "panel_anonymous_board": {"type": "panel", "cog_name": "AnonymousBoard", "key": "anonymous_board_channel_id", "friendly_name": "[패널] 익명 게시판", "channel_type": "text"},    
+    "panel_warning": {"type": "panel", "cog_name": "WarningSystem", "key": "warning_panel_channel_id", "friendly_name": "[패널] 경고 관리", "channel_type": "text"},
+    "panel_commerce": {"type": "channel", "cog_name": "Commerce", "key": "commerce_panel_channel_id", "friendly_name": "[게임] 상점 패널", "channel_type": "text"},
+    "panel_fishing":  {"type": "channel", "cog_name": "Fishing",  "key": "fishing_panel_channel_id",  "friendly_name": "[게임] 낚시터 패널", "channel_type": "text"},
+    "panel_profile":  {"type": "channel", "cog_name": "UserProfile", "key": "profile_panel_channel_id", "friendly_name": "[게임] 프로필 패널", "channel_type": "text"},
+    
+    "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"},
+    "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
     
     "channel_new_welcome": {"type": "channel", "cog_name": "MemberEvents", "key": "new_welcome_channel_id",      "friendly_name": "신규 멤버 환영 채널", "channel_type": "text"},
     "channel_farewell":    {"type": "channel", "cog_name": "MemberEvents", "key": "farewell_channel_id",         "friendly_name": "멤버 퇴장 안내 채널", "channel_type": "text"},
@@ -143,30 +152,17 @@ SETUP_COMMAND_MAP = {
     "channel_vc_creator_newbie": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_newbie", "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"},
     "channel_vc_creator_vip":    {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_vip", "friendly_name": "[음성 채널] VIP 전용 생성기", "channel_type": "voice"},
 
-    # [수정] channel_type을 "text"로 변경
-    "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"},
-    "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
-    
     # --- [로그 채널 설정] ---
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
     "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "[로그] 자기소개 승인 기록", "channel_type": "text"},
     "log_intro_rejection":   {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",  "friendly_name": "[로그] 자기소개 거절 기록", "channel_type": "text"},
     "log_item_usage": {"type": "channel", "cog_name": "ItemSystem", "key": "log_channel_item", "friendly_name": "[로그] 아이템 사용 기록", "channel_type": "text"},
-
-    # --- [신규] 아래 로그 채널 설정들을 추가 ---
     "log_message": {"type": "channel", "cog_name": "MessageLogger", "key": "log_channel_message", "friendly_name": "[로그] 메시지 (수정/삭제)", "channel_type": "text"},
     "log_voice":   {"type": "channel", "cog_name": "VoiceLogger",   "key": "log_channel_voice",   "friendly_name": "[로그] 음성 채널 (참여/이동/퇴장)", "channel_type": "text"},
     "log_member":  {"type": "channel", "cog_name": "MemberLogger",  "key": "log_channel_member",  "friendly_name": "[로그] 멤버 활동 (역할 부여/닉네임)", "channel_type": "text"},
     "log_channel": {"type": "channel", "cog_name": "ChannelLogger", "key": "log_channel_channel", "friendly_name": "[로그] 채널 관리 (생성/삭제/변경)", "channel_type": "text"},
     "log_server":  {"type": "channel", "cog_name": "ServerLogger",  "key": "log_channel_server",  "friendly_name": "[로그] 서버 및 역할 관리", "channel_type": "text"},
-
-    "panel_warning": {"type": "panel", "cog_name": "WarningSystem", "key": "warning_panel_channel_id", "friendly_name": "[패널] 경고 관리", "channel_type": "text"},
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
-
-    "panel_item_usage": {"type": "panel", "cog_name": "ItemSystem", "key": "item_usage_panel_channel_id", "friendly_name": "[패널] 아이템 사용", "channel_type": "text"},
-
-    "panel_anonymous_board": {"type": "panel", "cog_name": "AnonymousBoard", "key": "anonymous_board_channel_id", "friendly_name": "[패널] 익명 게시판", "channel_type": "text"},
-
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
