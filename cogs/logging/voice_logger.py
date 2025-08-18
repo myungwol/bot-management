@@ -13,13 +13,8 @@ class VoiceLogger(commands.Cog):
         self.bot = bot
         self.log_channel_id: int = None
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        """봇이 준비되면 설정을 로드합니다."""
-        await self.load_configs()
-
     async def load_configs(self):
-        """데이터베이스에서 로그 채널 ID를 불러옵니다."""
+        """[수정] main.py의 on_ready 루프에 의해 호출됩니다."""
         self.log_channel_id = get_id("log_channel_voice")
         if self.log_channel_id:
             logger.info(f"[VoiceLogger] 음성 로그 채널이 설정되었습니다: #{self.log_channel_id}")
@@ -27,9 +22,7 @@ class VoiceLogger(commands.Cog):
             logger.warning("[VoiceLogger] 음성 로그 채널이 설정되지 않았습니다.")
 
     async def get_log_channel(self) -> discord.TextChannel | None:
-        if not self.log_channel_id:
-            return None
-        
+        if not self.log_channel_id: return None
         channel = self.bot.get_channel(self.log_channel_id)
         if isinstance(channel, discord.TextChannel):
             return channel
@@ -39,13 +32,10 @@ class VoiceLogger(commands.Cog):
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot or not self.log_channel_id or before.channel == after.channel:
             return
-
         log_channel = await self.get_log_channel()
-        if not log_channel:
-            return
+        if not log_channel: return
 
         embed = None
-        # --- 1. 음성 채널에 참여했을 때 (Join) ---
         if before.channel is None and after.channel is not None:
             embed = discord.Embed(
                 title="음성 채널 참여 (ボイスチャンネル参加)",
@@ -55,8 +45,6 @@ class VoiceLogger(commands.Cog):
                 timestamp=datetime.now(timezone.utc)
             )
             embed.set_author(name=f"{member.display_name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
-
-        # --- 2. 음성 채널에서 나갔을 때 (Leave) ---
         elif before.channel is not None and after.channel is None:
             embed = discord.Embed(
                 title="음성 채널 퇴장 (ボイスチャンネル退出)",
@@ -66,8 +54,6 @@ class VoiceLogger(commands.Cog):
                 timestamp=datetime.now(timezone.utc)
             )
             embed.set_author(name=f"{member.display_name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
-
-        # --- 3. 다른 음성 채널로 이동했을 때 (Move) ---
         elif before.channel is not None and after.channel is not None:
             embed = discord.Embed(
                 title="음성 채널 이동 (ボイスチャンネル移動)",
