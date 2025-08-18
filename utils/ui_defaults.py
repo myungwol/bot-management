@@ -143,13 +143,31 @@ ADMIN_ROLE_KEYS = [
     "role_approval",
 ]
 
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 7. 티켓 시스템 설정 (이전 6번은 삭제됨)
+# 7. 티켓 시스템 설정
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-# '문의/건의' 티켓 생성 시 자동으로 초대될 역할 키 목록
-TICKET_INQUIRY_ROLES = [
+# [수정] '문의' 담당 역할을 세분화
+# 촌장/부촌장 (항상 초대됨)
+TICKET_MASTER_ROLES = [
+    "role_staff_village_chief",
+    "role_staff_deputy_chief",
+]
+
+# 역장 직원 전체 (선택지 1)
+TICKET_STAFF_GENERAL_ROLES = [
     "role_approval", # 役場の職員
+]
+
+# 특정 담당자 (선택지 2)
+TICKET_STAFF_SPECIFIC_ROLES = [
+    "role_staff_police",
+    "role_staff_festival",
+    "role_staff_pr",
+    "role_staff_design",
+    "role_staff_secretary",
+    "role_staff_newbie_helper",
 ]
 
 # '유저 신고' 티켓 생성 시 자동으로 초대될 역할 키 목록
