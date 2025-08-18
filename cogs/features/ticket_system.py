@@ -141,6 +141,8 @@ class TicketSystem(commands.Cog):
                 zombie_ids.append(thread_id)
         if zombie_ids: await remove_multiple_tickets(zombie_ids)
 
+# cogs/features/ticket_system.py 파일에서 create_ticket 함수를 찾아 이 코드로 교체하세요.
+
     async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, title: str, content: str, excluded_role_ids: List[int] = []):
         try:
             panel_channel = interaction.channel
@@ -151,30 +153,43 @@ class TicketSystem(commands.Cog):
             final_role_ids = [r_id for r_id in role_ids_to_add if r_id not in excluded_role_ids]
             roles_to_add = [interaction.guild.get_role(r_id) for r_id in final_role_ids if interaction.guild.get_role(r_id)]
             
-            thread_name = f"[{'お問い合わせ' if ticket_type == 'inquiry' else '通報'}] {title}"
-            # [수정] 비공개 스레드 생성
+            thread_name = f"[{'お問い合わせ' if ticket_type == 'inquiry' else '通報'}] - {interaction.user.name}"
+            
+            # [수정] 비공개 스레드 생성 시, 시작 메시지를 함께 보낼 수 있음
+            # 단, 이 메시지는 스레드 안에서만 보이므로, 먼저 스레드에 참여시켜야 함
+            thread_content = f"**作成者:** {interaction.user.mention}\n\n**内容:**\n{content}"
+            embed = discord.Embed(title=title, description=thread_content, color=discord.Color.blue() if ticket_type == "inquiry" else discord.Color.red())
+            embed.set_author(name=f"{interaction.user.display_name} さんの{ticket_type}", icon_url=interaction.user.display_avatar.url)
+            
+            # 1. 비공개 스레드를 먼저 생성
             thread = await panel_channel.create_thread(name=thread_name, type=discord.ChannelType.private_thread, auto_archive_duration=10080)
             
+            # 2. DB에 기록
             await add_ticket(thread.id, interaction.user.id, interaction.guild.id, ticket_type)
             self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type}
             
-            # 스레드에 첫 메시지 전송
-            embed = discord.Embed(title=title, description=content, color=discord.Color.blue() if ticket_type == "inquiry" else discord.Color.red())
-            embed.set_author(name=f"{interaction.user.display_name} さんの{ticket_type}", icon_url=interaction.user.display_avatar.url)
-            await thread.send(embed=embed)
-            
-            # 관리자들을 스레드에 초대
-            mention_string = ' '.join(role.mention for role in roles_to_add)
+            # 3. 스레드에 참여할 모든 멤버 목록을 구성
+            members_to_add = {interaction.user}
             for role in roles_to_add:
                 for member in role.members:
-                    # 제외된 역할이 없는지 최종 확인
-                    if not any(ex_id in [r.id for r in member.roles] for ex_id in excluded_role_ids):
-                        try: await thread.add_user(member)
-                        except: pass
+                    is_excluded = any(ex_id in [r.id for r in member.roles] for ex_id in excluded_role_ids)
+                    if not is_excluded:
+                        members_to_add.add(member)
             
+            # 4. 구성된 멤버들을 스레드에 추가
+            for member in members_to_add:
+                try:
+                    await thread.add_user(member)
+                except Exception:
+                    pass # 이미 있거나 권한 없으면 무시
+
+            # 5. 스레드에 첫 메시지와 제어판, 멘션 전송
+            mention_string = ' '.join(role.mention for role in roles_to_add)
             control_view = TicketControlView(self, ticket_type)
+            await thread.send(embed=embed)
             await thread.send(f"**[チケット管理パネル]**\n担当者: {mention_string}", view=control_view, allowed_mentions=discord.AllowedMentions(roles=True))
             
+            # 6. 최종 응답
             await interaction.followup.send(f"✅ 非公開のチケットを作成しました: {thread.mention}", ephemeral=True)
             
         except discord.Forbidden:
