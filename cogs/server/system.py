@@ -76,8 +76,8 @@ class ServerSystem(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup(self, interaction: discord.Interaction,
                     action: str,
-                    # [수정] 타입 힌트를 원래대로 되돌림
-                    channel: Optional[discord.TextChannel | discord.VoiceChannel] = None,
+                    # [수정] discord.ForumChannel을 타입 힌트에 추가
+                    channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None,
                     role: Optional[discord.Role] = None,
                     stat_type: Optional[str] = None,
                     template: Optional[str] = None):
@@ -94,12 +94,14 @@ class ServerSystem(commands.Cog):
             error_msg = None
             if not channel:
                 error_msg = f"❌ このタスクを実行するには、「channel」オプションに**{required_channel_type}チャンネル**を指定する必要があります。"
-            # [수정] 문법 오류가 있던 부분을 올바르게 수정
+            # [수정] elif 조건문에 ForumChannel 검증 로직 추가
             elif (required_channel_type == "text" and not isinstance(channel, discord.TextChannel)) or \
-                 (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)):
+                 (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)) or \
+                 (required_channel_type == "forum" and not isinstance(channel, discord.ForumChannel)):
                 error_msg = f"❌ このタスクには**{required_channel_type}チャンネル**が必要です。正しいタイプのチャンネルを選択してください。"
             
-            if error_msg: return await interaction.followup.send(error_msg, ephemeral=True)
+            if error_msg: 
+                return await interaction.followup.send(error_msg, ephemeral=True)
 
             db_key, friendly_name = config['key'], config['friendly_name']
             await save_id_to_db(db_key, channel.id)
