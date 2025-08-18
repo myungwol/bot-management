@@ -76,7 +76,6 @@ class ServerSystem(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup(self, interaction: discord.Interaction,
                     action: str,
-                    # [수정] discord.ForumChannel을 타입 힌트에 추가
                     channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None,
                     role: Optional[discord.Role] = None,
                     stat_type: Optional[str] = None,
@@ -94,7 +93,6 @@ class ServerSystem(commands.Cog):
             error_msg = None
             if not channel:
                 error_msg = f"❌ このタスクを実行するには、「channel」オプションに**{required_channel_type}チャンネル**を指定する必要があります。"
-            # [수정] elif 조건문에 ForumChannel 검증 로직 추가
             elif (required_channel_type == "text" and not isinstance(channel, discord.TextChannel)) or \
                  (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)) or \
                  (required_channel_type == "forum" and not isinstance(channel, discord.ForumChannel)):
@@ -110,12 +108,16 @@ class ServerSystem(commands.Cog):
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
                 await cog_to_reload.load_configs()
 
+            # [수정] 패널 생성 시, 채널이 메시지를 보낼 수 있는 타입인지 확인
             if config["type"] == "panel" and hasattr(cog_to_reload, 'regenerate_panel'):
-                await cog_to_reload.regenerate_panel(channel)
-                await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
+                if isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
+                    await cog_to_reload.regenerate_panel(channel)
+                    await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
+                else:
+                    await interaction.followup.send(f"❌ パネルはこのタイプのチャンネルには設置できません。", ephemeral=True)
             else:
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
-
+                
         elif action == "roles_sync":
             role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
             await save_config_to_db("ROLE_KEY_MAP", role_name_map)
