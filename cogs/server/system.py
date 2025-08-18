@@ -6,7 +6,7 @@ import logging
 from typing import Optional, List
 
 from utils.database import (
-    get_config, save_id_to_db, save_config_to_db,
+    get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel
 )
 from utils.ui_defaults import UI_ROLE_KEY_MAP
@@ -42,6 +42,12 @@ class ServerSystem(commands.Cog):
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
+        # [수정] 패널 일괄 재설치 기능 추가
+        panel_actions = {"panels_regenerate_all": "[패널] 모든 패널 재설치"}
+        for key, name in panel_actions.items():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
+
         # 역할 관련 기능 자동완성
         role_actions = {"roles_sync": "[역할] 모든 역할 DB와 동기화"}
         for key, name in role_actions.items():
@@ -110,18 +116,20 @@ class ServerSystem(commands.Cog):
             db_key, friendly_name = config['key'], config['friendly_name']
             await save_id_to_db(db_key, channel.id)
 
-            # [수정] Cog의 설정을 실시간으로 다시 로드하는 로직 개선
             cog_to_reload = self.bot.get_cog(config["cog_name"])
-            # cog_load 메서드가 있는지 확인하여 호출 (이전 답변에서 모든 로거에 cog_load를 추가했음)
             if cog_to_reload and hasattr(cog_to_reload, 'cog_load'):
                 await cog_to_reload.cog_load()
                 logger.info(f"/{interaction.command.name} 명령어로 인해 '{config['cog_name']}' Cog의 설정이 새로고침되었습니다.")
             
-            # 패널 타입일 경우, 패널을 새로 생성
             if config.get("type") == "panel":
                 if hasattr(cog_to_reload, 'regenerate_panel'):
-                    panel_type = setting_key.replace("panel_", "")
-                    success = await cog_to_reload.regenerate_panel(channel, panel_type)
+                    # TicketSystem Cog는 panel_type 인수가 필요함
+                    if config["cog_name"] == "TicketSystem":
+                        panel_type = setting_key.replace("panel_", "")
+                        success = await cog_to_reload.regenerate_panel(channel, panel_type)
+                    else:
+                        success = await cog_to_reload.regenerate_panel(channel)
+                        
                     if success:
                         await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
                     else:
@@ -130,6 +138,64 @@ class ServerSystem(commands.Cog):
                     await interaction.followup.send(f"⚠️ **{friendly_name}** は設定されましたが、パネルを自動生成する機能が見つかりません。", ephemeral=True)
             else:
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
+
+        # --- [신규] 모든 패널 재설치 로직 ---
+        elif action == "panels_regenerate_all":
+            setup_map = get_config("SETUP_COMMAND_MAP", {})
+            success_list = []
+            failure_list = []
+
+            await interaction.followup.send("⏳ すべてのパネルの再設置を開始します...", ephemeral=True)
+
+            for key, info in setup_map.items():
+                if info.get("type") == "panel":
+                    friendly_name = info.get("friendly_name", key)
+                    try:
+                        cog_name = info.get("cog_name")
+                        channel_db_key = info.get("key")
+                        if not all([cog_name, channel_db_key]):
+                            failure_list.append(f"・`{friendly_name}`: 設定情報が不完全です。")
+                            continue
+
+                        cog = self.bot.get_cog(cog_name)
+                        if not cog or not hasattr(cog, 'regenerate_panel'):
+                            failure_list.append(f"・`{friendly_name}`: Cogが見つからないか、再生成機能がありません。")
+                            continue
+                        
+                        channel_id = get_id(channel_db_key)
+                        if not channel_id:
+                            failure_list.append(f"・`{friendly_name}`: チャンネルが設定されていません。")
+                            continue
+                        
+                        target_channel = self.bot.get_channel(channel_id)
+                        if not target_channel:
+                             failure_list.append(f"・`{friendly_name}`: チャンネル(ID: {channel_id})が見つかりません。")
+                             continue
+                        
+                        # TicketSystem Cog는 panel_type 인수가 필요함
+                        if cog_name == "TicketSystem":
+                            panel_type = key.replace("panel_", "")
+                            success = await cog.regenerate_panel(target_channel, panel_type)
+                        else:
+                            success = await cog.regenerate_panel(target_channel)
+                        
+                        if success:
+                            success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
+                        else:
+                            failure_list.append(f"・`{friendly_name}`: 再生成中に不明なエラーが発生しました。")
+
+                    except Exception as e:
+                        logger.error(f"'{friendly_name}' 패널 일괄 재설치 중 오류: {e}", exc_info=True)
+                        failure_list.append(f"・`{friendly_name}`: スクリプトエラー発生。")
+
+            embed = discord.Embed(title="⚙️ すべてのパネルの再設置結果", color=0x3498DB, timestamp=discord.utils.utcnow())
+            if success_list:
+                embed.add_field(name="✅ 成功", value="\n".join(success_list), inline=False)
+            if failure_list:
+                embed.color = 0xED4245 # 실패 시 빨간색
+                embed.add_field(name="❌ 失敗", value="\n".join(failure_list), inline=False)
+            
+            await interaction.edit_original_response(content="すべてのパネルの再設置が完了しました。", embed=embed)
 
         # --- 역할 동기화 로직 ---
         elif action == "roles_sync":
@@ -157,15 +223,14 @@ class ServerSystem(commands.Cog):
 
             if synced_roles:
                 full_text = "\n".join(synced_roles)
-                # 1024자 제한을 넘지 않도록 분할 전송
                 for i in range(0, len(full_text), 1024):
                     chunk = full_text[i:i+1024]
                     embed.add_field(name=f"✅ 同期成功 ({len(synced_roles)}個)", value=chunk, inline=False)
             if missing_roles:
-                embed.color = 0xFEE75C # 경고색
+                embed.color = 0xFEE75C
                 embed.add_field(name=f"⚠️ サーバーに該当の役割なし ({len(missing_roles)}個)", value="\n".join(missing_roles)[:1024], inline=False)
             if error_roles:
-                embed.color = 0xED4245 # 오류색
+                embed.color = 0xED4245
                 embed.add_field(name=f"❌ DB保存エラー ({len(error_roles)}個)", value="\n".join(error_roles)[:1024], inline=False)
             
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -181,7 +246,7 @@ class ServerSystem(commands.Cog):
                 await remove_stats_channel(channel.id)
                 await interaction.followup.send(f"✅ `{channel.name}` チャンネルの統計設定を削除しました。", ephemeral=True)
             else:
-                current_template = template or f"정보: {{count}}" # 기본 템플릿
+                current_template = template or f"정보: {{count}}"
                 if "{count}" not in current_template:
                     return await interaction.followup.send("❌ 名前形式(`template`)には必ず`{count}`を含める必要があります。", ephemeral=True)
                 if stat_type == "role" and not role:
