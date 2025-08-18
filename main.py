@@ -40,7 +40,7 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.voice_states = True
-BOT_VERSION = "v1.8-ticket-system" # 버전 업데이트
+BOT_VERSION = "v1.9-logging-system" # 버전 업데이트
 
 # --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
@@ -67,22 +67,29 @@ class MyBot(commands.Bot):
         logger.info("------ [ Cog 로드 시작 ] ------")
         cogs_dir = './cogs'
         if not os.path.exists(cogs_dir):
-            logger.critical(f"❌ Cogs 디렉토리를 찾을 수 없습니다: {cogs_dir}."); return
-        
-        loaded_count = 0
+            logger.critical(f"❌ Cogs 디렉토리를 찾을 수 없습니다: {cogs_dir}.")
+            return
+
+        extensions_to_load = []
         for folder in sorted(os.listdir(cogs_dir)):
             folder_path = os.path.join(cogs_dir, folder)
             if os.path.isdir(folder_path):
-                for filename in os.listdir(folder_path):
+                for filename in sorted(os.listdir(folder_path)):
                     if filename.endswith('.py') and not filename.startswith('__'):
-                        try:
-                            extension_path = f'cogs.{folder}.{filename[:-3]}'
-                            await self.load_extension(extension_path)
-                            logger.info(f'✅ Cog 로드 성공: {extension_path}')
-                            loaded_count += 1
-                        except Exception as e:
-                            logger.error(f'❌ Cog 로드 실패: {extension_path} | {e}', exc_info=True)
-        logger.info(f"------ [ {loaded_count}개의 Cog 로드 완료 ] ------")
+                        extensions_to_load.append(f'cogs.{folder}.{filename[:-3]}')
+
+        loaded_count = 0
+        failed_count = 0
+        for extension_path in extensions_to_load:
+            try:
+                await self.load_extension(extension_path)
+                logger.info(f'✅ Cog 로드 성공: {extension_path}')
+                loaded_count += 1
+            except Exception as e:
+                logger.error(f'❌ Cog 로드 실패: {extension_path} | {e}', exc_info=True)
+                failed_count += 1
+        
+        logger.info(f"------ [ Cog 로드 완료 | 성공: {loaded_count} / 실패: {failed_count} ] ------")
 
 bot = MyBot(command_prefix="/", intents=intents)
 
