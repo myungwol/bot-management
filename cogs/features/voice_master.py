@@ -255,30 +255,46 @@ class VoiceMaster(commands.Cog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot: return
+
+        # --- 채널 생성 로직 ---
         if after.channel and after.channel.id in self.creator_channel_configs:
             config = self.creator_channel_configs[after.channel.id]
             channel_type_to_create = config.get("type")
-            if any(info.get('owner_id') == member.id and info.get('type') == channel_type_to_create for info in self.temp_channels.values()):
+
+            # [수정] 1. 유저가 촌장 또는 부촌장인지 가장 먼저 확인
+            member_role_ids = {r.id for r in member.roles}
+            is_master = any(role_id in member_role_ids for role_id in [get_id("role_staff_village_chief"), get_id("role_staff_deputy_chief")])
+
+            # [수정] 2. 촌장/부촌장이 아니고, 채널 타입별로 이미 소유한 채널이 있는지 확인
+            if not is_master and any(info.get('owner_id') == member.id and info.get('type') == channel_type_to_create for info in self.temp_channels.values()):
                 try: await member.send(f"❌ 「{CHANNEL_TYPE_INFO[channel_type_to_create]['default_name']}」タイプのチャンネルはすでに所有しています。")
                 except discord.Forbidden: pass
                 await member.move_to(None, reason="같은 종류의 채널을 이미 소유 중")
                 return
-            if channel_type_to_create == 'newbie':
-                member_role_ids = {r.id for r in member.roles}
-                required_role_id = get_id(config.get("required_role_key"))
-                if required_role_id not in member_role_ids and not any(admin_id in member_role_ids for admin_id in self.admin_role_ids):
-                    try: await member.send(f"❌ 「{after.channel.name}」チャンネルに入るには「かけだし住民」の役割が必要です。")
-                    except discord.Forbidden: pass
-                    await member.move_to(None, reason="뉴비 채널 입장 권한 없음")
-                    return
-            elif required_role_key := config.get("required_role_key"):
-                required_role_id = get_id(required_role_key)
-                if not required_role_id or required_role_id not in [r.id for r in member.roles]:
-                    try: await member.send(f"❌ 「{after.channel.name}」チャンネルに入るには特別な役割が必要です。")
-                    except discord.Forbidden: pass
-                    await member.move_to(None, reason="요구 역할 없음")
-                    return
+
+            # [수정] 3. 촌장/부촌장이 아닐 경우에만, 각 채널에 필요한 역할이 있는지 확인
+            if not is_master:
+                if channel_type_to_create == 'newbie':
+                    required_role_id = get_id(config.get("required_role_key"))
+                    # 뉴비 역할도 없고, 관리자 역할도 하나도 없으면 입장 불가
+                    if required_role_id not in member_role_ids and not any(admin_id in member_role_ids for admin_id in self.admin_role_ids):
+                        try: await member.send(f"❌ 「{after.channel.name}」チャンネルに入るには「かけだし住民」の役割が必要です。")
+                        except discord.Forbidden: pass
+                        await member.move_to(None, reason="뉴비 채널 입장 권한 없음")
+                        return
+                
+                elif required_role_key := config.get("required_role_key"): # VIP 채널 등
+                    required_role_id = get_id(required_role_key)
+                    if not required_role_id or required_role_id not in member_role_ids:
+                        try: await member.send(f"❌ 「{after.channel.name}」チャンネルに入るには特別な役割が必要です。")
+                        except discord.Forbidden: pass
+                        await member.move_to(None, reason="요구 역할 없음")
+                        return
+
+            # 모든 권한 검사를 통과했으면 채널 생성
             await self._create_temp_channel(member, config)
+
+        # --- 채널 삭제 로직 ---
         if before.channel and before.channel.id in self.temp_channels:
             self.bot.loop.create_task(self.schedule_channel_check_and_delete(before.channel))
 
