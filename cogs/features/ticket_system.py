@@ -186,16 +186,44 @@ class TicketSystem(commands.Cog):
         elif channel.id == get_id("report_panel_channel_id"):
             panel_key = "report"
             
+        view = None
+        embed = None
+        post_title = ""
+
         if panel_key == "inquiry":
-            embed = discord.Embed(title="サーバーへのお問い合わせ・ご提案", description="下のボタンを押して、サーバー運営へのご意見をお聞かせください。")
+            post_title = "📨｜サーバーへのお問い合わせ・ご提案"
+            embed = discord.Embed(
+                title="サーバーへのお問い合わせ・ご提案", 
+                description="下のボタンを押して、サーバー運営へのご意見をお聞かせください。\n\n作成されたチケットは、あなたと`役場の職員`だけが見ることができます。",
+                color=discord.Color.blue()
+            )
             view = InquiryPanelView(self)
-            await channel.send(embed=embed, view=view)
-            logger.info(f"✅ 문의/건의 패널을 #{channel.name} 채널에 생성했습니다.")
+        
         elif panel_key == "report":
-            embed = discord.Embed(title="ユーザーへの通報", description="サーバー内での迷惑行為や問題を発見した場合、下のボタンで通報してください。")
+            post_title = "🚨｜ユーザーへの通報"
+            embed = discord.Embed(
+                title="ユーザーへの通報", 
+                description="サーバー内での迷惑行為や問題を発見した場合、下のボタンで通報してください。\n\n作成されたチケットは、あなたと`交番さん`だけが見ることができます。",
+                color=discord.Color.red()
+            )
             view = ReportPanelView(self)
-            await channel.send(embed=embed, view=view)
-            logger.info(f"✅ 유저 신고 패널을 #{channel.name} 채널에 생성했습니다.")
+        
+        if view and embed and post_title:
+            try:
+                # 채널이 포럼 채널일 경우, 봇이 직접 새 스레드(게시물)를 생성
+                if isinstance(channel, discord.ForumChannel):
+                    await channel.create_thread(name=post_title, embed=embed, view=view)
+                    logger.info(f"✅ {panel_key} 패널을 포럼 #{channel.name}에 새 게시물로 생성했습니다.")
+                
+                # 채널이 일반 텍스트 채널일 경우, 그냥 메시지를 보냄
+                elif isinstance(channel, discord.TextChannel):
+                    await channel.send(embed=embed, view=view)
+                    logger.info(f"✅ {panel_key} 패널을 텍스트 채널 #{channel.name}에 생성했습니다.")
+            
+            except discord.Forbidden:
+                logger.error(f"❌ #{channel.name} 채널에 패널을 생성할 권한이 없습니다. (메시지 보내기 또는 스레드 만들기)")
+            except Exception as e:
+                logger.error(f"❌ #{channel.name} 채널에 패널 생성 중 오류 발생: {e}", exc_info=True)
 
 async def setup(bot):
     await bot.add_cog(TicketSystem(bot))
