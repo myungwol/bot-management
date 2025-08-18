@@ -82,12 +82,13 @@ class NicknameApprovalView(ui.View):
         if error_report:
             await interaction.followup.send(f"❌ **{status_text} 처리 중 일부 작업에 실패했습니다:**\n{error_report}", ephemeral=True)
         else:
-            await interaction.followup.send(f"✅ {status_text} 処理が正常に完了しました。", ephemeral=True)
+            message = await interaction.followup.send(f"✅ {status_text} 処理が正常に完了しました。", ephemeral=True, wait=True)
+            await asyncio.sleep(5)
+            await message.delete()
         
         try: await interaction.message.delete()
         except discord.NotFound: pass
 
-        # [수정] 패널이 묻히지 않도록 승인/거절 처리 후 패널을 자동으로 재생성합니다.
         await self.nicknames_cog.regenerate_panel()
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
@@ -143,7 +144,10 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         embed.add_field(name="申請者", value=i.user.mention, inline=False).add_field(name="現在の名前", value=i.user.display_name, inline=False).add_field(name="希望の名前", value=name, inline=False)
         view = NicknameApprovalView(i.user, name, self.nicknames_cog)
         await ch.send(f"<@&{self.nicknames_cog.approval_role_id}> 新しい名前変更の申請があります。", embed=embed, view=view, allowed_mentions=discord.AllowedMentions(roles=True))
-        await i.followup.send("名前の変更申請を提出しました。", ephemeral=True)
+        
+        message = await i.followup.send("名前の変更申請を提出しました。", ephemeral=True, wait=True)
+        await asyncio.sleep(5)
+        await message.delete()
 
 class NicknameChangerPanelView(ui.View):
     def __init__(self, cog_instance: 'Nicknames'):
