@@ -68,6 +68,19 @@ UI_ROLE_KEY_MAP = {
     "role_platform_switch":     {"name": "スイッチ", "is_prefix": False, "priority": 0},
 }
 
+ADMIN_ROLE_KEYS = [
+    "role_admin_total",
+    "role_staff_village_chief",
+    "role_staff_deputy_chief",
+    "role_staff_police",
+    "role_staff_festival",
+    "role_staff_pr",
+    "role_staff_design",
+    "role_staff_secretary",
+    "role_staff_newbie_helper",
+    "role_approval",
+]
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 2. 임베드(Embed) 기본값
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
