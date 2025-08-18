@@ -1,9 +1,10 @@
-# cogs/server/system.py
+# bot-management/cogs/server/system.py
 import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
 from typing import Optional, List
+from datetime import datetime, timezone # [추가]
 
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
@@ -42,8 +43,18 @@ class ServerSystem(commands.Cog):
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
-        # [수정] 패널 일괄 재설치 기능 추가
-        panel_actions = {"panels_regenerate_all": "[패널] 모든 패널 재설치"}
+        # [수정] 게임 봇 패널 재설치 요청 추가
+        game_panel_actions = {
+            "request_regenerate:commerce": "[게임-패널] 상점 패널 재설치 요청",
+            "request_regenerate:fishing": "[게임-패널] 낚시터 패널 재설치 요청",
+            "request_regenerate:profile": "[게임-패널] 프로필 패널 재설치 요청",
+        }
+        for key, name in game_panel_actions.items():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
+
+        # [수정] 관리 봇 패널 재설치 기능 이름 명확화
+        panel_actions = {"panels_regenerate_all": "[패널] 모든 관리 패널 재설치"}
         for key, name in panel_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
@@ -93,6 +104,18 @@ class ServerSystem(commands.Cog):
         
         await interaction.response.defer(ephemeral=True)
 
+        # [추가] 게임 봇 패널 재생성 요청 로직
+        if action.startswith("request_regenerate:"):
+            panel_key = action.split(":", 1)[1]
+            db_key = f"panel_regenerate_request_{panel_key}"
+            # 현재 UTC 타임스탬프를 값으로 저장하여 "요청" 플래그를 남김
+            await save_config_to_db(db_key, datetime.now(timezone.utc).timestamp())
+            return await interaction.followup.send(
+                f"✅ ゲームボットに `{panel_key}` パネルの再設置を要請しました。\n"
+                "ゲームボットがオンラインの場合、約10秒以内にパネルが更新されます。",
+                ephemeral=True
+            )
+
         # --- 채널 설정 로직 ---
         if action.startswith("channel_setup:"):
             setting_key = action.split(":", 1)[1]
@@ -117,13 +140,12 @@ class ServerSystem(commands.Cog):
             await save_id_to_db(db_key, channel.id)
 
             cog_to_reload = self.bot.get_cog(config["cog_name"])
-            if cog_to_reload and hasattr(cog_to_reload, 'cog_load'):
-                await cog_to_reload.cog_load()
+            if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
+                await cog_to_reload.load_configs()
                 logger.info(f"/{interaction.command.name} 명령어로 인해 '{config['cog_name']}' Cog의 설정이 새로고침되었습니다.")
             
             if config.get("type") == "panel":
                 if hasattr(cog_to_reload, 'regenerate_panel'):
-                    # TicketSystem Cog는 panel_type 인수가 필요함
                     if config["cog_name"] == "TicketSystem":
                         panel_type = setting_key.replace("panel_", "")
                         success = await cog_to_reload.regenerate_panel(channel, panel_type)
