@@ -7,7 +7,7 @@ import asyncio
 import logging
 import logging.handlers
 from datetime import datetime, timezone
-from typing import Optional # [추가] 타입 힌트
+from typing import Optional
 
 from utils.database import load_all_data_from_db, sync_defaults_to_db
 
@@ -40,7 +40,7 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.voice_states = True
-BOT_VERSION = "v1.7-stats-feature" # 버전 업데이트
+BOT_VERSION = "v1.8-ticket-system" # 버전 업데이트
 
 # --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
@@ -50,7 +50,7 @@ class MyBot(commands.Bot):
     async def setup_hook(self):
         await self.load_all_extensions()
         
-        cogs_with_persistent_views = ["RolePanel", "Onboarding", "Nicknames"]
+        cogs_with_persistent_views = ["RolePanel", "Onboarding", "Nicknames", "TicketSystem"]
         registered_views_count = 0
         for cog_name in cogs_with_persistent_views:
             cog = self.get_cog(cog_name)
@@ -119,14 +119,6 @@ async def on_ready():
             logger.info(f'✅ {len(synced)}개의 슬래시 명령어를 전체 서버에 동기화했습니다.')
     except Exception as e: 
         logger.error(f'❌ 명령어 동기화 중 오류가 발생했습니다: {e}', exc_info=True)
-    
-    # 패널 자동 재생성 기능 (주석 처리하여 비활성화, 필요 시 주석 해제)
-    # logger.info("------ [ 패널 자동 재생성 (비활성화됨) ] ------")
-    # panel_cogs = ["RolePanel", "Onboarding", "Nicknames"] 
-    # for cog_name in panel_cogs:
-    #     cog = bot.get_cog(cog_name)
-    #     if cog and hasattr(cog, 'regenerate_panel'):
-    #         await cog.regenerate_panel(channel=None) 
 
 async def main():
     async with bot:
