@@ -1,4 +1,4 @@
-# cogs/features/voice_master.py
+-# cogs/features/voice_master.py
 """
 음성 채널 자동 생성 및 제어판(Voice Master) 기능을 담당하는 Cog입니다.
 하이브리드 방식으로 메모리와 DB를 함께 사용하여 안정성과 성능을 모두 확보합니다.
@@ -329,24 +329,40 @@ class VoiceMaster(commands.Cog):
                 if next_number > 1: base_name = f"{base_name}-{next_number}"
             
             vc_name = f"・ {type_info['emoji']} ꒱ {base_name}"
-            overwrites = { member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True) }
             
-            # [수정] 모든 채널에 촌장/부촌장 마스터키 권한 부여
-            chief_role = guild.get_role(get_id("role_staff_village_chief"))
-            if chief_role: overwrites[chief_role] = discord.PermissionOverwrite(connect=True)
-            deputy_role = guild.get_role(get_id("role_staff_deputy_chief"))
-            if deputy_role: overwrites[deputy_role] = discord.PermissionOverwrite(connect=True)
-
-            if channel_type == 'vip':
+            # --- [수정] 권한 설정 로직을 명확하게 재구성 ---
+            overwrites = {
+                # 기본적으로 채널 소유자는 모든 권한을 가짐
+                member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True)
+            }
+            
+            # 1. @everyone 역할의 기본 권한 설정
+            if channel_type in ['vip', 'newbie']:
                 overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
-            elif channel_type == 'newbie':
-                overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
-                newbie_role = guild.get_role(get_id(config.get("required_role_key")))
-                if newbie_role: overwrites[newbie_role] = discord.PermissionOverwrite(connect=True)
-                # 관리자 역할들은 이미 self.admin_role_ids로 체크하므로, 여기서 모든 관리자 역할을 추가해줄 필요는 없음.
-                # 단, 마스터키인 촌장/부촌장은 모든 채널에 들어가야 하므로 위에서 이미 추가됨.
             else:
-                overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True)
+                overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=True)
+
+            # 2. 뉴비 채널일 경우, 허용된 역할에 connect 권한 부여
+            if channel_type == 'newbie':
+                newbie_role = guild.get_role(get_id(config.get("required_role_key")))
+                if newbie_role:
+                    overwrites[newbie_role] = discord.PermissionOverwrite(connect=True)
+                
+                # 모든 관리자 역할에 connect 권한 부여
+                for admin_role_id in self.admin_role_ids:
+                    admin_role = guild.get_role(admin_role_id)
+                    if admin_role:
+                        overwrites[admin_role] = discord.PermissionOverwrite(connect=True)
+            
+            # 3. 모든 채널에 촌장/부촌장 마스터키 권한 부여 (이미 관리자 역할에 포함되어 있어도 확실하게 하기 위해 추가)
+            chief_role = guild.get_role(get_id("role_staff_village_chief"))
+            if chief_role:
+                overwrites[chief_role] = discord.PermissionOverwrite(connect=True)
+            
+            deputy_role = guild.get_role(get_id("role_staff_deputy_chief"))
+            if deputy_role:
+                overwrites[deputy_role] = discord.PermissionOverwrite(connect=True)
+            # --- 권한 설정 로직 끝 ---
 
             vc = await guild.create_voice_channel(name=vc_name, category=creator_channel.category, overwrites=overwrites, user_limit=user_limit, reason=f"{member.display_name}の要請")
             embed = discord.Embed(title=f"ようこそ、{get_clean_display_name(member)}さん！", color=0x7289DA).add_field(name="チャンネルタイプ", value=f"`{channel_type.upper()}`", inline=False)
