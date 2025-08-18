@@ -117,10 +117,10 @@ SETUP_COMMAND_MAP = {
     "channel_vc_creator_newbie": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_newbie", "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"},
     "channel_vc_creator_vip":    {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_vip", "friendly_name": "[음성 채널] VIP 전용 생성기", "channel_type": "voice"},
 
-    # [수정] 티켓 패널 설정의 "type"을 "panel"로, key를 "panel_inquiry" 등으로 변경
-    "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_forum_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "forum"},
-    "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_forum_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "forum"},
-
+    # [수정] channel_type을 "text"로 변경
+    "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"},
+    "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
+    
     # --- [로그 채널 설정] ---
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
     "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "[로그] 자기소개 승인 기록", "channel_type": "text"},
