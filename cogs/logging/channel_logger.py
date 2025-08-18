@@ -14,32 +14,21 @@ class ChannelLogger(commands.Cog):
         self.bot = bot
         self.log_channel_id: int = None
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        # [수정] cog_load로 분리
-        await self.cog_load()
-
-    async def cog_load(self):
-        """설정을 로드하는 헬퍼 함수입니다."""
+    async def load_configs(self):
+        """[수정] main.py의 on_ready 루프에 의해 호출됩니다."""
         self.log_channel_id = get_id("log_channel_channel")
         if self.log_channel_id:
             logger.info(f"[ChannelLogger] 채널 관리 로그 채널이 설정되었습니다: #{self.log_channel_id}")
         else:
             logger.warning("[ChannelLogger] 채널 관리 로그 채널이 설정되지 않았습니다.")
 
-
     async def get_log_channel(self) -> discord.TextChannel | None:
         if not self.log_channel_id: return None
         return self.bot.get_channel(self.log_channel_id)
         
     async def get_audit_log_user(self, guild: discord.Guild, action: discord.AuditLogAction, target) -> discord.Member | None:
-        """
-        [개선] 감사 로그 조회 로직을 안정적으로 변경합니다.
-        시간 범위와 limit를 사용하여 정확도를 높입니다.
-        """
-        await asyncio.sleep(1.5) # API 전파 시간 대기
+        await asyncio.sleep(1.5)
         try:
-            # 5초 이내의 로그 5개를 가져와서 확인
             async for entry in guild.audit_logs(action=action, limit=5, after=datetime.now(timezone.utc) - timedelta(seconds=5)):
                 if entry.target and entry.target.id == target.id and not entry.user.bot:
                     return entry.user
@@ -84,25 +73,17 @@ class ChannelLogger(commands.Cog):
         if not user or user.bot: return
 
         embed = discord.Embed(title="채널 업데이트됨 (チャンネル更新)", color=discord.Color.blue(), timestamp=datetime.now(timezone.utc))
-        
         changes = []
         if before.name != after.name:
             changes.append(f"**이름 (名前):** `{before.name}` → `{after.name}`")
         if before.overwrites != after.overwrites:
             changes.append("**권한이 변경되었습니다. (権限が変更されました。)**")
-        
-        # 텍스트 채널에만 있는 속성 확인
         if isinstance(before, discord.TextChannel) and isinstance(after, discord.TextChannel):
             if before.topic != after.topic:
-                # 토픽 내용은 길 수 있으므로 변경 사실만 알림
                 changes.append(f"**주제 (トピック):** 주제가 변경되었습니다.")
-        
-        # 음성 채널에만 있는 속성 확인
         if isinstance(before, discord.VoiceChannel) and isinstance(after, discord.VoiceChannel):
              if before.user_limit != after.user_limit:
                  changes.append(f"**인원 제한 (人数制限):** `{before.user_limit}` → `{after.user_limit}`")
-
-
         if changes:
             embed.description = "\n".join(changes)
             embed.add_field(name="채널 (チャンネル)", value=after.mention, inline=False)
