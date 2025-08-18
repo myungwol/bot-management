@@ -8,7 +8,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
-import copy # ApprovalView._create_log_embed에서 deepcopy 사용을 위해 import 추가
+import copy
 
 from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
@@ -62,7 +62,6 @@ class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
         self.author_id = author.id
-        # 깊은 복사를 사용하여 원본 임베드 데이터를 안전하게 저장
         self.original_embed = copy.deepcopy(original_embed)
         self.onboarding_cog = cog_instance
         self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
@@ -183,13 +182,11 @@ class ApprovalView(ui.View):
         try:
             guild = member.guild; roles_to_add: List[discord.Role] = []; failed_to_find_roles: List[str] = []
             
-            # [수정] 부여할 역할 키 목록 정의
             role_keys_to_grant = [
                 "role_resident", 
                 "role_resident_rookie",
-                "role_warning_separator" # 경고 구분선 역할 추가
+                "role_warning_separator"
             ]
-
             for key in role_keys_to_grant:
                 if (rid := get_id(key)) and (r := guild.get_role(rid)):
                     roles_to_add.append(r)
@@ -264,12 +261,19 @@ class ApprovalView(ui.View):
     async def _send_dm_notification(self, member: discord.Member, is_approved: bool, reason: str = "") -> None:
         try:
             guild_name = member.guild.name
-            if is_approved: await member.send(f"✅ お知らせ：「{guild_name}」での住人登録が承認されました。")
+            if is_approved:
+                embed_data = await get_embed_from_db("dm_onboarding_approved")
+                if not embed_data: return
+                embed = format_embed_from_db(embed_data, guild_name=guild_name)
             else:
+                embed_data = await get_embed_from_db("dm_onboarding_rejected")
+                if not embed_data: return
+                embed = format_embed_from_db(embed_data, guild_name=guild_name)
+                embed.add_field(name="理由 (理由)", value=reason, inline=False)
                 panel_channel_id = self.onboarding_cog.panel_channel_id
-                message = f"❌ お知らせ：「{guild_name}」での住人登録が拒否されました。\n理由: 「{reason}」"
-                if panel_channel_id: message += f"\n<#{panel_channel_id}> からやり直してください。"
-                await member.send(message)
+                if panel_channel_id:
+                    embed.add_field(name="再申請 (再申請)", value=f"<#{panel_channel_id}> からやり直してください。", inline=False)
+            await member.send(embed=embed)
         except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다 (DM 차단됨)。")
         except Exception as e: logger.error(f"DM 알림 전송 실패: {e}", exc_info=True)
         return None
