@@ -142,11 +142,7 @@ SETUP_COMMAND_MAP = {
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
     "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "[로그] 자기소개 승인 기록", "channel_type": "text"},
     "log_intro_rejection":   {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",  "friendly_name": "[로그] 자기소개 거절 기록", "channel_type": "text"},
-    
-    # --- [로그 채널 설정] ---
-    "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
-    "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "[로그] 자기소개 승인 기록", "channel_type": "text"},
-    "log_intro_rejection":   {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",  "friendly_name": "[로그] 자기소개 거절 기록", "channel_type": "text"},
+    "log_item_usage": {"type": "channel", "cog_name": "ItemSystem", "key": "log_channel_item", "friendly_name": "[로그] 아이템 사용 기록", "channel_type": "text"},
 
     # --- [신규] 아래 로그 채널 설정들을 추가 ---
     "log_message": {"type": "channel", "cog_name": "MessageLogger", "key": "log_channel_message", "friendly_name": "[로그] 메시지 (수정/삭제)", "channel_type": "text"},
