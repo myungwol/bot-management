@@ -194,6 +194,8 @@ class TicketSystem(commands.Cog):
                 zombie_ids.append(thread_id)
         if zombie_ids: await remove_multiple_tickets(zombie_ids)
 
+# cogs/features/ticket_system.py 파일에서 create_ticket 함수를 찾아 이 코드로 교체하세요.
+
     async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, title: str, content: str, selected_roles: Set[discord.Role]):
         try:
             panel_channel = interaction.channel
@@ -212,15 +214,17 @@ class TicketSystem(commands.Cog):
             control_view = TicketControlView(self, ticket_type)
             await thread.send(f"{interaction.user.mention} {mention_string}\n**[チケット管理パネル]**", view=control_view, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
             
-            # [수정] delete_after=5.0 추가
-            await interaction.followup.send(f"✅ 非公開のチケットを作成しました: {thread.mention}", ephemeral=True, delete_after=5.0)
+            # [수정] 메시지를 보낸 후, 5초 뒤에 삭제하도록 로직 변경
+            message = await interaction.followup.send(f"✅ 非公開のチケットを作成しました: {thread.mention}", ephemeral=True, wait=True)
+            await asyncio.sleep(5)
+            await message.delete()
             
         except Exception as e:
             logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
-            try: 
-                # [수정] 오류 메시지는 삭제하지 않음
+            try:
                 await interaction.followup.send("❌ チケットの作成中にエラーが発生しました。", ephemeral=True)
-            except discord.NotFound: pass
+            except discord.NotFound:
+                pass
 
     async def _cleanup_ticket_data(self, thread_id: int):
         self.tickets.pop(thread_id, None); await remove_ticket(thread_id)
