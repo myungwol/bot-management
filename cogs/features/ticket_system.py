@@ -1,4 +1,4 @@
-# cogs/features/ticket_system.py
+ㅍ# cogs/features/ticket_system.py
 import discord
 from discord import app_commands, ui
 from discord.ext import commands
@@ -11,7 +11,7 @@ from utils.ui_defaults import TICKET_INQUIRY_ROLES, TICKET_REPORT_ROLES
 
 logger = logging.getLogger(__name__)
 
-# ... (ExcludeAdminSelect, ReportModal 등 다른 UI 클래스는 이전과 동일) ...
+# --- 모달 클래스들 (on_submit 로직 변경) ---
 class ExcludeAdminSelect(ui.RoleSelect):
     def __init__(self, allowed_roles: List[discord.Role]):
         super().__init__(placeholder="この管理者を相談から除外します...", min_values=0, max_values=len(allowed_roles), role_ids=[r.id for r in allowed_roles])
@@ -22,24 +22,36 @@ class InquiryModal(ui.Modal, title="お問い合わせ・ご提案"):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=None)
         self.cog = cog
-        # [수정] guild_id가 없을 경우를 대비한 예외 처리
         if self.cog.guild_id and (guild := self.cog.bot.get_guild(self.cog.guild_id)):
             inquiry_roles = [role for role_id in self.cog.inquiry_role_ids if (role := guild.get_role(role_id))]
             if inquiry_roles:
                 self.exclude_select = ExcludeAdminSelect(inquiry_roles)
                 self.add_item(self.exclude_select)
-        else:
-            self.exclude_select = None
+    
     async def on_submit(self, interaction: discord.Interaction):
-        # [수정] 여기서 즉시 응답하지 않고, is_submitted()로 상태만 확인
-        pass
+        # [수정] on_submit 안에서 즉시 응답하고 모든 작업을 처리
+        await interaction.response.send_message("⏳ チケットを作成しています...", ephemeral=True)
+        excluded_role_ids = []
+        if hasattr(self, 'exclude_select'):
+            excluded_role_ids = [int(role.id) for role in self.exclude_select.values]
+        await self.cog.create_ticket(interaction, "inquiry", self.title_input.value, self.content_input.value, excluded_role_ids=excluded_role_ids)
 
 class ReportModal(ui.Modal, title="通報"):
     target_user = ui.TextInput(label="対象者", placeholder="通報する相手の名前を正確に入力してください。")
     content_input = ui.TextInput(label="内容", placeholder="通報内容を詳しく入力してください。(証拠SSなど)", style=discord.TextStyle.paragraph, max_length=1000)
-    async def on_submit(self, interaction: discord.Interaction):
-        pass # 마찬가지로 상태만 확인
+    
+    def __init__(self, cog: 'TicketSystem'):
+        super().__init__(timeout=None)
+        self.cog = cog
 
+    async def on_submit(self, interaction: discord.Interaction):
+        # [수정] on_submit 안에서 즉시 응답하고 모든 작업을 처리
+        await interaction.response.send_message("⏳ チケットを作成しています...", ephemeral=True)
+        title = f"通報: {self.target_user.value}"
+        content = f"**通報対象者:** {self.target_user.value}\n\n**内容:**\n{self.content_input.value}"
+        await self.cog.create_ticket(interaction, "report", title, content)
+
+# --- (TicketControlView 클래스는 이전과 동일) ---
 class TicketControlView(ui.View):
     def __init__(self, cog: 'TicketSystem', ticket_type: str):
         super().__init__(timeout=None)
@@ -68,23 +80,15 @@ class TicketControlView(ui.View):
         try: await interaction.channel.delete(reason=f"{interaction.user.display_name}による削除")
         except discord.NotFound: pass
 
+# --- 패널 View (on_submit 로직 제거) ---
 class InquiryPanelView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=None)
         self.cog = cog
     @ui.button(label="お問い合わせ・ご提案", style=discord.ButtonStyle.primary, emoji="📨", custom_id="ticket_inquiry")
     async def inquiry(self, interaction: discord.Interaction, button: ui.Button):
-        modal = InquiryModal(self.cog)
-        await interaction.response.send_modal(modal)
-        # [수정] modal.wait() 이후에 상호작용 응답 로직 추가
-        submitted = await modal.wait()
-        if not submitted and not modal.is_submitted():
-            # [수정] '처리 중' 메시지를 먼저 보냄
-            await interaction.followup.send("⏳ チケットを作成しています...", ephemeral=True)
-            excluded_role_ids = []
-            if modal.exclude_select:
-                excluded_role_ids = [int(role.id) for role in modal.exclude_select.values]
-            await self.cog.create_ticket(interaction, "inquiry", modal.title_input.value, modal.content_input.value, excluded_role_ids=excluded_role_ids)
+        # [수정] modal.wait() 로직 제거
+        await interaction.response.send_modal(InquiryModal(self.cog))
 
 class ReportPanelView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
@@ -92,18 +96,10 @@ class ReportPanelView(ui.View):
         self.cog = cog
     @ui.button(label="通報", style=discord.ButtonStyle.danger, emoji="🚨", custom_id="ticket_report")
     async def report(self, interaction: discord.Interaction, button: ui.Button):
-        modal = ReportModal()
-        await interaction.response.send_modal(modal)
-        # [수정] modal.wait() 이후에 상호작용 응답 로직 추가
-        submitted = await modal.wait()
-        if not submitted and not modal.is_submitted():
-            # [수정] '처리 중' 메시지를 먼저 보냄
-            await interaction.followup.send("⏳ チケットを作成しています...", ephemeral=True)
-            title = f"通報: {modal.target_user.value}"
-            content = f"**通報対象者:** {modal.target_user.value}\n\n**内容:**\n{modal.content_input.value}"
-            await self.cog.create_ticket(interaction, "report", title, content)
+        # [수정] modal.wait() 로직 제거
+        await interaction.response.send_modal(ReportModal(self.cog))
 
-# --- 메인 Cog ---
+# --- 메인 Cog (create_ticket 로직 수정) ---
 class TicketSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -126,7 +122,6 @@ class TicketSystem(commands.Cog):
         panel_channel_id = inquiry_channel_id or report_channel_id
         if panel_channel_id and (channel := self.bot.get_channel(panel_channel_id)):
             self.guild_id = channel.guild.id
-        
         self.master_role_ids = [r_id for key in ["role_staff_village_chief", "role_staff_deputy_chief"] if (r_id := get_id(key))]
         self.inquiry_role_ids = [r_id for key in TICKET_INQUIRY_ROLES if (r_id := get_id(key))]
         self.report_role_ids = [r_id for key in TICKET_REPORT_ROLES if (r_id := get_id(key))]
@@ -151,7 +146,6 @@ class TicketSystem(commands.Cog):
         try:
             category = interaction.channel.category
             if not category:
-                # [수정] '처리 중' 메시지를 오류 메시지로 수정
                 await interaction.edit_original_response(content="❌ チケットを作成するカテゴリーが見つかりません。")
                 return
             
@@ -169,7 +163,9 @@ class TicketSystem(commands.Cog):
 
             forum = await category.create_forum(name=forum_name, overwrites=overwrites, reason=f"{ticket_type} 티켓 생성")
             
-            thread = await forum.create_thread(name=title, content=f"**作成者:** {interaction.user.mention}\n\n**内容:**\n{content}")
+            thread_content = f"**作成者:** {interaction.user.mention}\n\n**内容:**\n{content}"
+            # Discord API는 스레드 생성 시 2000자 제한이 있으므로 content를 자름
+            thread = await forum.create_thread(name=title, content=thread_content[:2000])
             
             await add_ticket(thread.id, interaction.user.id, interaction.guild.id, ticket_type)
             self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type}
@@ -178,16 +174,14 @@ class TicketSystem(commands.Cog):
             mention_string = ' '.join(role.mention for role in roles_to_add if role)
             await thread.send(f"**[チケット管理パネル]**\n{mention_string}", view=control_view, allowed_mentions=discord.AllowedMentions(roles=True))
             
-            # [수정] '처리 중' 메시지를 최종 성공 메시지로 수정
             await interaction.edit_original_response(content=f"✅ 非公開のチケットを作成しました: {forum.mention}")
             
         except Exception as e:
             logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
-            # [수정] '처리 중' 메시지를 오류 메시지로 수정
             try:
                 await interaction.edit_original_response(content="❌ チケットの作成中にエラーが発生しました。")
             except discord.NotFound:
-                pass # 이미 상호작용이 끝난 경우
+                pass
 
     async def _cleanup_ticket_data(self, thread_id: int):
         self.tickets.pop(thread_id, None); await remove_ticket(thread_id)
