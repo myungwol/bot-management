@@ -1,4 +1,4 @@
--# cogs/features/voice_master.py
+# cogs/features/voice_master.py
 """
 음성 채널 자동 생성 및 제어판(Voice Master) 기능을 담당하는 Cog입니다.
 하이브리드 방식으로 메모리와 DB를 함께 사용하여 안정성과 성능을 모두 확보합니다.
@@ -12,7 +12,6 @@ import asyncio
 
 from utils.database import get_id, get_all_temp_channels, add_temp_channel, update_temp_channel_owner, remove_temp_channel, remove_multiple_temp_channels
 from utils.helpers import get_clean_display_name
-# [신규] 관리자 역할 키 목록을 불러옵니다.
 from utils.ui_defaults import ADMIN_ROLE_KEYS
 
 logger = logging.getLogger(__name__)
@@ -25,7 +24,7 @@ CHANNEL_TYPE_INFO = {
     "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}の部屋"} # Fallback
 }
 
-# ... (VCEditModal 및 Select UI 클래스들은 이전과 동일) ...
+# ... (VCEditModal 및 Select UI 클래스들은 이전 답변과 동일) ...
 class VCEditModal(ui.Modal, title="🔊 ボイスチャンネル設定"):
     def __init__(self, name_editable: bool, limit_editable: bool, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -120,7 +119,6 @@ class VCOwnerSelect(ui.UserSelect):
         try: await interaction.delete_original_response()
         except discord.NotFound: pass
 
-# --- 메인 제어판 View ---
 class ControlPanelView(ui.View):
     def __init__(self, cog: 'VoiceMaster', owner_id: int, vc_id: int, channel_type: str):
         super().__init__(timeout=None)
@@ -206,13 +204,12 @@ class ControlPanelView(ui.View):
         if not blacklisted_members: return await interaction.response.send_message("ℹ️ ブラックリストに登録されているメンバーはいません。", ephemeral=True)
         view = ui.View(timeout=180).add_item(VCRemoveBlacklistSelect(self, blacklisted_members)); await interaction.response.send_message("ブラックリストから解除するメンバーを選んでください。", view=view, ephemeral=True)
 
-# --- VoiceMaster Cog ---
 class VoiceMaster(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.creator_channel_configs: Dict[int, Dict] = {}
         self.temp_channels: Dict[int, Dict[str, Any]] = {}
-        self.admin_role_ids: List[int] = [] # [신규] 관리자 역할 ID 목록
+        self.admin_role_ids: List[int] = []
         logger.info("VoiceMaster Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
@@ -227,10 +224,7 @@ class VoiceMaster(commands.Cog):
             get_id("vc_creator_channel_id_vip"): {"type": "vip", "required_role_key": "role_personal_room_key"},
         }
         self.creator_channel_configs = {k: v for k, v in self.creator_channel_configs.items() if k is not None}
-        
-        # [신규] 관리자 역할 ID 목록을 불러와서 저장
         self.admin_role_ids = [role_id for key in ADMIN_ROLE_KEYS if (role_id := get_id(key)) is not None]
-        
         logger.info(f"[VoiceMaster] 생성 채널 설정을 로드했습니다: {self.creator_channel_configs}")
         logger.info(f"[VoiceMaster] {len(self.admin_role_ids)}개의 관리자 역할을 로드했습니다.")
 
@@ -269,19 +263,14 @@ class VoiceMaster(commands.Cog):
                 except discord.Forbidden: pass
                 await member.move_to(None, reason="같은 종류의 채널을 이미 소유 중")
                 return
-            
-            # [수정] 뉴비 채널 권한 확인 로직 변경
             if channel_type_to_create == 'newbie':
                 member_role_ids = {r.id for r in member.roles}
                 required_role_id = get_id(config.get("required_role_key"))
-                
-                # 뉴비 역할도 없고, 관리자 역할도 하나도 없으면 입장 불가
                 if required_role_id not in member_role_ids and not any(admin_id in member_role_ids for admin_id in self.admin_role_ids):
                     try: await member.send(f"❌ 「{after.channel.name}」チャンネルに入るには「かけだし住民」の役割が必要です。")
                     except discord.Forbidden: pass
                     await member.move_to(None, reason="뉴비 채널 입장 권한 없음")
                     return
-            
             elif required_role_key := config.get("required_role_key"):
                 required_role_id = get_id(required_role_key)
                 if not required_role_id or required_role_id not in [r.id for r in member.roles]:
@@ -327,43 +316,22 @@ class VoiceMaster(commands.Cog):
                 next_number = 1
                 while next_number in used_numbers: next_number += 1
                 if next_number > 1: base_name = f"{base_name}-{next_number}"
-            
             vc_name = f"・ {type_info['emoji']} ꒱ {base_name}"
-            
-            # --- [수정] 권한 설정 로직을 명확하게 재구성 ---
-            overwrites = {
-                # 기본적으로 채널 소유자는 모든 권한을 가짐
-                member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True)
-            }
-            
-            # 1. @everyone 역할의 기본 권한 설정
+            overwrites = { member: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True) }
             if channel_type in ['vip', 'newbie']:
                 overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
             else:
                 overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=True)
-
-            # 2. 뉴비 채널일 경우, 허용된 역할에 connect 권한 부여
             if channel_type == 'newbie':
                 newbie_role = guild.get_role(get_id(config.get("required_role_key")))
-                if newbie_role:
-                    overwrites[newbie_role] = discord.PermissionOverwrite(connect=True)
-                
-                # 모든 관리자 역할에 connect 권한 부여
+                if newbie_role: overwrites[newbie_role] = discord.PermissionOverwrite(connect=True)
                 for admin_role_id in self.admin_role_ids:
                     admin_role = guild.get_role(admin_role_id)
-                    if admin_role:
-                        overwrites[admin_role] = discord.PermissionOverwrite(connect=True)
-            
-            # 3. 모든 채널에 촌장/부촌장 마스터키 권한 부여 (이미 관리자 역할에 포함되어 있어도 확실하게 하기 위해 추가)
+                    if admin_role: overwrites[admin_role] = discord.PermissionOverwrite(connect=True)
             chief_role = guild.get_role(get_id("role_staff_village_chief"))
-            if chief_role:
-                overwrites[chief_role] = discord.PermissionOverwrite(connect=True)
-            
+            if chief_role: overwrites[chief_role] = discord.PermissionOverwrite(connect=True)
             deputy_role = guild.get_role(get_id("role_staff_deputy_chief"))
-            if deputy_role:
-                overwrites[deputy_role] = discord.PermissionOverwrite(connect=True)
-            # --- 권한 설정 로직 끝 ---
-
+            if deputy_role: overwrites[deputy_role] = discord.PermissionOverwrite(connect=True)
             vc = await guild.create_voice_channel(name=vc_name, category=creator_channel.category, overwrites=overwrites, user_limit=user_limit, reason=f"{member.display_name}の要請")
             embed = discord.Embed(title=f"ようこそ、{get_clean_display_name(member)}さん！", color=0x7289DA).add_field(name="チャンネルタイプ", value=f"`{channel_type.upper()}`", inline=False)
             embed.description = "ここはあなたのプライベートチャンネルです。\n下のボタンでチャンネルを管理できます。"
@@ -382,9 +350,12 @@ class VoiceMaster(commands.Cog):
         try:
             await vc.delete(reason="채널이 비어서 자동 삭제")
             logger.info(f"임시 채널 '{vc.name}'을 자동 삭제했습니다.")
-        except discord.NotFound: logger.warning(f"임시 채널 '{vc.name}'은 이미 삭제되었습니다.")
-        except Exception as e: logger.error(f"임시 채널 '{vc.name}' 삭제 중 오류 발생: {e}", exc_info=True)
-        finally: await self._cleanup_channel_data(vc_id)
+        except discord.NotFound:
+            logger.warning(f"임시 채널 '{vc.name}'은 이미 삭제되었습니다.")
+        except Exception as e:
+            logger.error(f"임시 채널 '{vc.name}' 삭제 중 오류 발생: {e}", exc_info=True)
+        finally:
+            await self._cleanup_channel_data(vc_id)
 
     async def _transfer_ownership(self, interaction: discord.Interaction, vc: discord.VoiceChannel, new_owner: discord.Member):
         info = self.temp_channels.get(vc.id)
