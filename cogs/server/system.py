@@ -69,11 +69,9 @@ class ServerSystem(commands.Cog):
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
         
-        game_panel_keys = [key for key, info in SETUP_COMMAND_MAP.items() if "[게임]" in info.get("friendly_name", "")]
-        for key in game_panel_keys:
-            name = f"{SETUP_COMMAND_MAP[key]['friendly_name']} 재설치 요청"
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=f"request_regenerate:{key}"))
+        # [🔴 핵심 변경] 개별 게임 패널 재설치 요청 자동완성 부분 삭제
+        # game_panel_keys = [key for key, info in ...
+        # ... (관련 코드 블록 전체 삭제) ...
 
         return sorted(choices, key=lambda c: c.name)[:25]
 
@@ -123,17 +121,9 @@ class ServerSystem(commands.Cog):
                 ephemeral=True
             )
 
-        elif action.startswith("request_regenerate:"):
-            panel_key = action.split(":", 1)[1]
-            db_key = f"panel_regenerate_request_{panel_key}"
-            await save_config_to_db(db_key, datetime.now(timezone.utc).timestamp())
-            
-            friendly_name = SETUP_COMMAND_MAP.get(panel_key, {}).get("friendly_name", panel_key)
-            return await interaction.followup.send(
-                f"✅ ゲームボットに **{friendly_name}** の再設置を要請しました。\n"
-                "ゲームボットがオンラインの場合、約10秒以内にパネルが更新されます。",
-                ephemeral=True
-            )
+        # [🔴 핵심 변경] 개별 게임 패널 재설치 요청(elif action.startswith("request_regenerate:")) 부분 삭제
+        # elif action.startswith("request_regenerate:"):
+        # ... (관련 코드 블록 전체 삭제) ...
 
         elif action.startswith("channel_setup:"):
             setting_key = action.split(":", 1)[1]
