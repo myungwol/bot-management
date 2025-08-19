@@ -1,13 +1,11 @@
-# bot-management/cogs/server/system.py (게임 봇 패널 재설치 요청 기능 통합 최종본)
-
 import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
 from typing import Optional, List
 from datetime import datetime, timezone
+import asyncio
 
-# utils 폴더에서 필요한 함수와 데이터를 가져옵니다.
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel
@@ -34,13 +32,11 @@ class ServerSystem(commands.Cog):
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         
-        # 1. SETUP_COMMAND_MAP에서 채널/패널 설정 동적으로 가져오기
         for key, info in SETUP_COMMAND_MAP.items():
             choice_name = f"{info.get('friendly_name', key)} 설정"
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
-        # 2. 역할 설정
         role_setup_actions = {
             "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정",
             "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정",
@@ -49,19 +45,21 @@ class ServerSystem(commands.Cog):
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
 
-        # 3. 모든 관리봇 패널 재설치
         panel_actions = {"panels_regenerate_all": "[패널] 모든 관리 패널 재설치"}
         for key, name in panel_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
+        
+        game_panel_actions = {"request_regenerate_all_game_panels": "[ゲーム] 全パネルの一括再設置要請"}
+        for key, name in game_panel_actions.items():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
 
-        # 4. 역할 동기화
         role_actions = {"roles_sync": "[역할] 모든 역할 DB와 동기화"}
         for key, name in role_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
         
-        # 5. 통계 기능
         stats_actions = {
             "stats_set": "[통계] 통계 채널 설정/제거",
             "stats_refresh": "[통계] 모든 통계 채널 새로고침",
@@ -71,7 +69,6 @@ class ServerSystem(commands.Cog):
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
         
-        # 6. 게임 봇 패널 개별 재설치 요청
         game_panel_keys = [key for key, info in SETUP_COMMAND_MAP.items() if "[게임]" in info.get("friendly_name", "")]
         for key in game_panel_keys:
             name = f"{SETUP_COMMAND_MAP[key]['friendly_name']} 재설치 요청"
@@ -107,7 +104,26 @@ class ServerSystem(commands.Cog):
         
         await interaction.response.defer(ephemeral=True)
 
-        if action.startswith("request_regenerate:"):
+        if action == "request_regenerate_all_game_panels":
+            game_panel_keys = [key for key, info in SETUP_COMMAND_MAP.items() if "[게임]" in info.get("friendly_name", "")]
+            if not game_panel_keys:
+                return await interaction.followup.send("❌ 設定ファイルにゲームパネルが見つかりません。", ephemeral=True)
+            
+            timestamp = datetime.now(timezone.utc).timestamp()
+            tasks = []
+            for panel_key in game_panel_keys:
+                db_key = f"panel_regenerate_request_{panel_key}"
+                tasks.append(save_config_to_db(db_key, timestamp))
+            
+            await asyncio.gather(*tasks)
+            
+            return await interaction.followup.send(
+                f"✅ {len(game_panel_keys)}個のゲームパネルに一括で再設置を要請しました。\n"
+                "ゲームボットがオンラインの場合、約10秒以内にパネルが更新されます。",
+                ephemeral=True
+            )
+
+        elif action.startswith("request_regenerate:"):
             panel_key = action.split(":", 1)[1]
             db_key = f"panel_regenerate_request_{panel_key}"
             await save_config_to_db(db_key, datetime.now(timezone.utc).timestamp())
@@ -263,7 +279,6 @@ class ServerSystem(commands.Cog):
 
             if synced_roles:
                 full_text = "\n".join(synced_roles)
-                # 메시지 길이 제한(1024자)을 넘지 않도록 분할
                 for i in range(0, len(full_text), 1024):
                     chunk = full_text[i:i+1024]
                     embed.add_field(name=f"✅ 同期成功 ({len(synced_roles)}個)", value=chunk, inline=False)
