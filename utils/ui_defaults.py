@@ -108,6 +108,26 @@ UI_EMBEDS = {
     # --- 익명 게시판 ---
     "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。", "color": 4342323}, # 0x424242 (어두운 회색)
     "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215}, # 0xFFFFFF (흰색)
+    "panel_commerce": {
+        "title": "🏪 Dico森商店＆買取ボックス",
+        "description": "アイテムを買ったり、釣った魚などを売ったりできます。",
+        "color": 0x5865F2
+    },
+    "panel_profile": {
+        "title": "📦 持ち物",
+        "description": "自分の所持金やアイテム、装備などを確認できます。",
+        "color": 0x5865F2
+    },
+    "panel_fishing_river": {
+        "title": "🏞️ 川の釣り場",
+        "description": "川辺でのんびり釣りを楽しみましょう。\n下のボタンを押して釣りを開始します。",
+        "color": 0x5865F2
+    },
+    "panel_fishing_sea": {
+        "title": "🌊 海の釣り場",
+        "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。",
+        "color": 0x3498DB
+    },
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
