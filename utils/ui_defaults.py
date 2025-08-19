@@ -1,3 +1,4 @@
+
 """
 봇이 사용하는 모든 UI 요소 및 핵심 매핑 데이터의 기본값을 정의하는 파일입니다.
 봇이 시작될 때 이 파일의 데이터가 Supabase 데이터베이스에 동기화됩니다.
@@ -107,14 +108,30 @@ UI_EMBEDS = {
     # --- [게임 봇] ---
     "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
     "panel_profile": {"title": "📦 持ち物", "description": "自分の所持金やアイテム、装備などを確認できます。", "color": 0x5865F2},
-    "embed_transfer_confirmation": {"title": "💸 送金確認", "description": "本当に {recipient_mention}さんへ `{amount}`{currency_icon} を送金しますか？", "color": 0xE67E22},
-    "log_coin_gain": {"title": "🪙 コイン獲得のお知らせ","description": "{user_mention}さんが活動報酬でコインを獲得しました。","color": 0x2ECC71,"fields": [{"name": "獲得者","value": "{user_mention}","inline": True},{"name": "獲得コイン","value": "+{amount}{currency_icon}","inline": True}],"footer": {"text": "おめでとうございます！"},
-    "log_coin_transfer": {"description": "💸 {sender_mention}さんが{recipient_mention}さんへ`{amount}`{currency_icon}を送金しました。", "color": 0x3498DB},
-    "log_coin_admin": {"description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB},
     "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "川辺でのんびり釣りを楽しみましょう。\n下のボタンを押して釣りを開始します。", "color": 0x5865F2},
     "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。", "color": 0x3498DB},
     "panel_atm": {"title": "🏧 Dico森 ATM", "description": "下のボタンから、他の住民にコインを送金できます。", "color": 0x2ECC71},
-    "log_coin_transfer": {"title": "💸 送金完了のお知らせ","description": ("**送金した人:** {sender_mention}\n""**受け取った人:** {recipient_mention}\n\n""**金額:** `{amount}`{currency_icon}"),"color": 0x3498DB}
+    
+    # [🔴 핵심 수정] 중복된 키를 삭제하고, 최신 버전만 남깁니다.
+    "log_coin_gain": {
+        "title": "🪙 コイン獲得のお知らせ",
+        "description": "{user_mention}さんが活動報酬でコインを獲得しました。",
+        "color": 0x2ECC71,
+        "fields": [
+            {"name": "獲得者", "value": "{user_mention}", "inline": True},
+            {"name": "獲得コイン", "value": "+{amount}{currency_icon}", "inline": True}
+        ],
+        "footer": {"text": "おめでとうございます！"}
+    },
+    "log_coin_transfer": {
+        "title": "💸 送金完了のお知らせ",
+        "description": "**送金した人:** {sender_mention}\n**受け取った人:** {recipient_mention}\n\n**金額:** `{amount}`{currency_icon}",
+        "color": 0x3498DB
+    },
+    "log_coin_admin": {
+        "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。",
+        "color": 0x3498DB
+    }
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -152,6 +169,7 @@ SETUP_COMMAND_MAP = {
     "panel_fishing_river":   {"type": "panel", "cog_name": "Fishing",     "key": "river_fishing_panel_channel_id",   "friendly_name": "[게임] 강 낚시터 패널", "channel_type": "text"},
     "panel_fishing_sea":     {"type": "panel", "cog_name": "Fishing",     "key": "sea_fishing_panel_channel_id",     "friendly_name": "[게임] 바다 낚시터 패널", "channel_type": "text"},
     "panel_profile":         {"type": "panel", "cog_name": "UserProfile", "key": "profile_panel_channel_id",         "friendly_name": "[게임] 프로필 패널", "channel_type": "text"},
+    "panel_atm":             {"type": "panel", "cog_name": "Atm", "key": "atm_panel_channel_id",             "friendly_name": "[게임] ATM 패널", "channel_type": "text"},
     
     "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"},
     "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
@@ -181,7 +199,6 @@ SETUP_COMMAND_MAP = {
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
-    "panel_atm":             {"type": "panel", "cog_name": "Atm", "key": "atm_panel_channel_id",             "friendly_name": "[게임] ATM 패널", "channel_type": "text"},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
