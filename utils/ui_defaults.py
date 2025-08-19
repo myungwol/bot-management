@@ -1,4 +1,3 @@
-# bot-management/utils/ui_defaults.py
 """
 봇이 사용하는 모든 UI 요소 및 핵심 매핑 데이터의 기본값을 정의하는 파일입니다.
 봇이 시작될 때 이 파일의 데이터가 Supabase 데이터베이스에 동기화됩니다.
@@ -85,71 +84,55 @@ UI_ROLE_KEY_MAP = {
 # 2. 임베드(Embed) 기본값
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_EMBEDS = {
-    # --- 서버 입장/퇴장 ---
+    # --- [서버 관리 봇] ---
     "welcome_embed": {"title": "🎉 {guild_name}へようこそ！", "description": "{member_mention}さん、はじめまして！\n\nまずは、サーバーの案内を読んで、自己紹介の作成をお願いします。", "color": 0x3498DB},
     "farewell_embed": {"title": "👋 また会いましょう", "description": "{member_name}さんが村から旅立ちました。", "color": 0x99AAB5},
-    # --- 패널 ---
     "panel_roles": {"title": "📖 役割付与", "description": "下のメニューからカテゴリーを選択して、自分に必要な役割を受け取ってください。", "color": 0x5865F2},
     "panel_onboarding": {"title": "📝 村役場・案内所", "description": "初めての方は、まず「案内を読む」ボタンを押して、サーバーでの過ごし方を確認してください。", "color": 0x5865F2},
     "panel_nicknames": {"title": "✒️ 名前変更", "description": "村で使う名前を変更したい場合は、下のボタンから申請してください。", "color": 0x5865F2},
-    # --- 온보딩 프로세스 ---
     "embed_onboarding_info_roles": {"title": "📖 役割付与 (情報)", "description": "次に、ご自身の情報を表す役割を選択してください。\n\nこの情報は、他の住民があなたをよりよく知るのに役立ちます。（非公開も可能です）", "color": 0x5865F2},
     "embed_onboarding_final_rules": {"title": "📝 最終確認", "description": "ありがとうございます！\n\n最後に、村のルールをもう一度確認してください。\n\n- 他の住民を尊重し、迷惑をかけないこと。\n- 問題が発生した場合は、すぐに村役場（管理者）に報告すること。\n\n下のボタンを押すと、住民登録票の作成に進みます。", "color": 0x3498DB},
     "embed_onboarding_approval": {"title": "📝 新しい住民登録票", "description": "{member_mention}さんが住民登録票を提出しました。", "color": 0xE67E22},
     "embed_main_chat_welcome": {"description": "🎉 {member_mention}さんが新しい住民になりました！これからよろしくお願いします！", "color": 0x2ECC71},
     "embed_introduction_log": {"title": "📝 自己紹介", "description": "新しい住民がやってきました！みんなで歓迎しましょう！", "color": 0x2ECC71},
-    # --- 경고 시스템 ---
-    "panel_warning": {"title": "🚨 警告管理パネル", "description": "サーバーのルールに違反したユーザーに対して、下のボタンから警告を発行できます。\n\n**この機能は`交番さん`のみ使用可能です。**", "color": 15548997}, # 15548997은 0xED4245 입니다.
+    "panel_warning": {"title": "🚨 警告管理パネル", "description": "サーバーのルールに違反したユーザーに対して、下のボタンから警告を発行できます。\n\n**この機能は`交番さん`のみ使用可能です。**", "color": 15548997},
     "log_warning": {"title": "🚨 警告発行通知", "color": 15548997},
-    "log_item_use": {"title": "🛒 アイテム使用通知", "color": 11027200}, # 0xA84300 (갈색)
+    "log_item_use": {"title": "🛒 アイテム使用通知", "color": 11027200},
     "panel_item_usage": {"title": "✅ 警告差引権使用", "description": "所持している<@&1406959582500225087>を使用するには、下のボタンを押してください。", "color": 11027200},
     "dm_onboarding_approved": {"title": "✅ 住民登録完了のお知らせ", "description": "「{guild_name}」での住民登録が承認されました。\nこれからよろしくお願いします！", "color": 3066993},
-    "dm_onboarding_rejected": {"title": "❌ 住民登録拒否のお知らせ", "description": "申し訳ありませんが、「{guild_name}」での住民登録は拒否されました。", "color": 15548997}, # 0xED4245
-    # --- 익명 게시판 ---
-    "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。", "color": 4342323}, # 0x424242 (어두운 회색)
-    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215}, # 0xFFFFFF (흰색)
-        "panel_commerce": {
-        "title": "🏪 Dico森商店＆買取ボックス",
-        "description": "アイテムを買ったり、釣った魚などを売ったりできます。",
-        "color": 0x5865F2
-    },
-    "panel_profile": {
-        "title": "📦 持ち物",
-        "description": "自分の所持金やアイテム、装備などを確認できます。",
-        "color": 0x5865F2
-    },
-    "panel_fishing_river": {
-        "title": "🏞️ 川の釣り場",
-        "description": "川辺でのんびり釣りを楽しみましょう。\n下のボタンを押して釣りを開始します。",
-        "color": 0x5865F2
-    },
-    "panel_fishing_sea": {
-        "title": "🌊 海の釣り場",
-        "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。",
-        "color": 0x3498DB
-    },
-    # ... (향후 게임 봇에 추가될 다른 패널 임베드도 여기에 추가) ...
-}
+    "dm_onboarding_rejected": {"title": "❌ 住民登録拒否のお知らせ", "description": "申し訳ありませんが、「{guild_name}」での住民登録は拒否されました。", "color": 15548997},
+    "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。", "color": 4342323},
+    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
+    
+    # --- [게임 봇] ---
+    "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
+    "panel_profile": {"title": "📦 持ち物", "description": "自分の所持金やアイテム、装備などを確認できます。", "color": 0x5865F2},
+    "embed_transfer_confirmation": {"title": "💸 送金確認", "description": "本当に {recipient_mention}さんへ `{amount}`{currency_icon} を送金しますか？", "color": 0xE67E22},
+    "log_coin_gain": {"description": "{user_mention}さんが**{reason}**で`{amount}`{currency_icon}を獲得しました。", "color": 0x2ECC71},
+    "log_coin_transfer": {"description": "💸 {sender_mention}さんが{recipient_mention}さんへ`{amount}`{currency_icon}を送金しました。", "color": 0x3498DB},
+    "log_coin_admin": {"description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB},
+    "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "川辺でのんびり釣りを楽しみましょう。\n下のボタンを押して釣りを開始します。", "color": 0x5865F2},
+    "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。", "color": 0x3498DB},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 3. 패널 컴포넌트(Panel Components) 기본값
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_PANEL_COMPONENTS = [
+    # --- [서버 관리 봇] ---
     {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0},
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0},
     {"component_key": "issue_warning_button", "panel_key": "warning", "component_type": "button", "label": "警告を発行する", "style": "danger", "emoji": "🚨", "row": 0},
     {"component_key": "use_item_button", "panel_key": "item_usage", "component_type": "button", "label": "アイテムを使用する", "style": "success", "emoji": "✨", "row": 0},
     {"component_key": "post_anonymous_message_button", "panel_key": "anonymous_board", "component_type": "button", "label": "匿名で投稿する", "style": "secondary", "emoji": "✍️", "row": 0},
+    
+    # --- [게임 봇] ---
     {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "primary", "emoji": "🏪", "row": 0},
     {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "secondary", "emoji": "📦", "row": 0},
-    # --- 프로필 패널 ---
     {"component_key": "open_inventory", "panel_key": "profile", "component_type": "button", "label": "持ち物を見る", "style": "primary", "emoji": "📦", "row": 0},
-    # --- 낚시 패널 ---
     {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "primary", "emoji": "🏞️", "row": 0},
     {"component_key": "start_fishing_sea", "panel_key": "panel_fishing_sea", "component_type": "button", "label": "海で釣りをする", "style": "secondary", "emoji": "🌊", "row": 0},
 ]
-
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 4. /setup 명령어 설정 맵
@@ -193,7 +176,6 @@ SETUP_COMMAND_MAP = {
     "log_channel": {"type": "channel", "cog_name": "ChannelLogger", "key": "log_channel_channel", "friendly_name": "[로그] 채널 관리 (생성/삭제/변경)", "channel_type": "text"},
     "log_server":  {"type": "channel", "cog_name": "ServerLogger",  "key": "log_channel_server",  "friendly_name": "[로그] 서버 및 역할 관리", "channel_type": "text"},
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
-    # [추가] 알림 채널 설정 추가
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
 }
@@ -218,20 +200,13 @@ ADMIN_ROLE_KEYS = [
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 7. 티켓 시스템 설정
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-# [수정] '문의' 담당 역할을 세분화
-# 촌장/부촌장 (항상 초대됨)
 TICKET_MASTER_ROLES = [
     "role_staff_village_chief",
     "role_staff_deputy_chief",
 ]
-
-# 역장 직원 전체 (선택지 1)
 TICKET_STAFF_GENERAL_ROLES = [
-    "role_approval", # 役場の職員
+    "role_approval",
 ]
-
-# 특정 담당자 (선택지 2)
 TICKET_STAFF_SPECIFIC_ROLES = [
     "role_staff_police",
     "role_staff_festival",
@@ -240,21 +215,14 @@ TICKET_STAFF_SPECIFIC_ROLES = [
     "role_staff_secretary",
     "role_staff_newbie_helper",
 ]
-
-# '유저 신고' 티켓 생성 시 자동으로 초대될 역할 키 목록
 TICKET_REPORT_ROLES = [
-    "role_staff_police", # 交番さん
+    "role_staff_police",
 ]
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 8. 경고 시스템 설정
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 경고 발행 권한을 가진 역할의 키
 POLICE_ROLE_KEY = "role_staff_police"
-
-# 누적 경고 횟수에 따라 부여될 역할 목록
-# count: 이 횟수에 '도달하면' 해당 역할을 부여합니다.
-# 봇은 이 목록에 있는 모든 역할 중, 유저의 경고 횟수에 맞는 가장 높은 단계의 역할 '하나만'을 부여합니다.
 WARNING_THRESHOLDS = [
     {"count": 1, "role_key": "role_warning_level_1"},
     {"count": 2, "role_key": "role_warning_level_2"},
@@ -262,17 +230,14 @@ WARNING_THRESHOLDS = [
     {"count": 4, "role_key": "role_warning_level_4"},
 ]
 
-# utils/ui_defaults.py 파일의 맨 아래에 새로운 섹션으로 추가
-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 9. 아이템 시스템 설정
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 USABLE_ITEMS = {
-    # 아이템 역할 키: { 아이템 정보 }
     "role_item_warning_deduct": {
         "name": "警告1個差引権",
-        "type": "warning_deduction", # 아이템 종류를 식별하는 타입
-        "value": -1, # 차감할 값 (음수)
-        "description": "累積警告を1回分減らします。" # 명령어 자동완성에 표시될 설명
+        "type": "warning_deduction",
+        "value": -1,
+        "description": "累積警告を1回分減らします。"
     }
 }
