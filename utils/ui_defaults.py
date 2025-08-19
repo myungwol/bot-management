@@ -108,7 +108,7 @@ UI_EMBEDS = {
     # --- 익명 게시판 ---
     "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。", "color": 4342323}, # 0x424242 (어두운 회색)
     "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215}, # 0xFFFFFF (흰색)
-    "panel_commerce": {
+        "panel_commerce": {
         "title": "🏪 Dico森商店＆買取ボックス",
         "description": "アイテムを買ったり、釣った魚などを売ったりできます。",
         "color": 0x5865F2
@@ -128,6 +128,8 @@ UI_EMBEDS = {
         "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。",
         "color": 0x3498DB
     },
+    # ... (향후 게임 봇에 추가될 다른 패널 임베드도 여기에 추가) ...
+}
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -139,8 +141,15 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "issue_warning_button", "panel_key": "warning", "component_type": "button", "label": "警告を発行する", "style": "danger", "emoji": "🚨", "row": 0},
     {"component_key": "use_item_button", "panel_key": "item_usage", "component_type": "button", "label": "アイテムを使用する", "style": "success", "emoji": "✨", "row": 0},
     {"component_key": "post_anonymous_message_button", "panel_key": "anonymous_board", "component_type": "button", "label": "匿名で投稿する", "style": "secondary", "emoji": "✍️", "row": 0},
-
+    {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "primary", "emoji": "🏪", "row": 0},
+    {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "secondary", "emoji": "📦", "row": 0},
+    # --- 프로필 패널 ---
+    {"component_key": "open_inventory", "panel_key": "profile", "component_type": "button", "label": "持ち物を見る", "style": "primary", "emoji": "📦", "row": 0},
+    # --- 낚시 패널 ---
+    {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "primary", "emoji": "🏞️", "row": 0},
+    {"component_key": "start_fishing_sea", "panel_key": "panel_fishing_sea", "component_type": "button", "label": "海で釣りをする", "style": "secondary", "emoji": "🌊", "row": 0},
 ]
+
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 4. /setup 명령어 설정 맵
