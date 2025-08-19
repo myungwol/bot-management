@@ -113,6 +113,7 @@ UI_EMBEDS = {
     "log_coin_admin": {"description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB},
     "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "川辺でのんびり釣りを楽しみましょう。\n下のボタンを押して釣りを開始します。", "color": 0x5865F2},
     "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。", "color": 0x3498DB},
+    "panel_atm": {"title": "🏧 Dico森 ATM", "description": "下のボタンから、他の住民にコインを送金できます。", "color": 0x2ECC71},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -132,6 +133,7 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "open_inventory", "panel_key": "profile", "component_type": "button", "label": "持ち物を見る", "style": "primary", "emoji": "📦", "row": 0},
     {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "primary", "emoji": "🏞️", "row": 0},
     {"component_key": "start_fishing_sea", "panel_key": "panel_fishing_sea", "component_type": "button", "label": "海で釣りをする", "style": "secondary", "emoji": "🌊", "row": 0},
+    {"component_key": "start_transfer", "panel_key": "atm", "component_type": "button", "label": "コインを送る", "style": "success", "emoji": "💸", "row": 0},
 ]
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -178,6 +180,7 @@ SETUP_COMMAND_MAP = {
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
+    "panel_atm":             {"type": "panel", "cog_name": "Atm", "key": "atm_panel_channel_id",             "friendly_name": "[게임] ATM 패널", "channel_type": "text"},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
