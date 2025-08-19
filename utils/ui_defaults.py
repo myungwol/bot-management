@@ -133,9 +133,10 @@ SETUP_COMMAND_MAP = {
     "panel_item_usage": {"type": "panel", "cog_name": "ItemSystem", "key": "item_usage_panel_channel_id", "friendly_name": "[패널] 아이템 사용", "channel_type": "text"},
     "panel_anonymous_board": {"type": "panel", "cog_name": "AnonymousBoard", "key": "anonymous_board_channel_id", "friendly_name": "[패널] 익명 게시판", "channel_type": "text"},    
     "panel_warning": {"type": "panel", "cog_name": "WarningSystem", "key": "warning_panel_channel_id", "friendly_name": "[패널] 경고 관리", "channel_type": "text"},
-    "panel_commerce": {"type": "channel", "cog_name": "Commerce", "key": "commerce_panel_channel_id", "friendly_name": "[게임] 상점 패널", "channel_type": "text"},
-    "panel_fishing":  {"type": "channel", "cog_name": "Fishing",  "key": "fishing_panel_channel_id",  "friendly_name": "[게임] 낚시터 패널", "channel_type": "text"},
-    "panel_profile":  {"type": "channel", "cog_name": "UserProfile", "key": "profile_panel_channel_id", "friendly_name": "[게임] 프로필 패널", "channel_type": "text"},
+    "panel_commerce":        {"type": "panel", "cog_name": "Commerce",    "key": "commerce_panel_channel_id",        "friendly_name": "[게임] 상점 패널", "channel_type": "text"},
+    "panel_fishing_river":   {"type": "panel", "cog_name": "Fishing",     "key": "river_fishing_panel_channel_id",   "friendly_name": "[게임] 강 낚시터 패널", "channel_type": "text"},
+    "panel_fishing_sea":     {"type": "panel", "cog_name": "Fishing",     "key": "sea_fishing_panel_channel_id",     "friendly_name": "[게임] 바다 낚시터 패널", "channel_type": "text"},
+    "panel_profile":         {"type": "panel", "cog_name": "UserProfile", "key": "profile_panel_channel_id",         "friendly_name": "[게임] 프로필 패널", "channel_type": "text"},
     
     "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"},
     "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
