@@ -1,4 +1,5 @@
-# bot-management/cogs/server/system.py
+# bot-management/cogs/server/system.py (게임 봇 패널 재설치 요청 기능 통합 최종본)
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -6,11 +7,12 @@ import logging
 from typing import Optional, List
 from datetime import datetime, timezone
 
+# utils 폴더에서 필요한 함수와 데이터를 가져옵니다.
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel
 )
-from utils.ui_defaults import UI_ROLE_KEY_MAP
+from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -30,18 +32,15 @@ class ServerSystem(commands.Cog):
                 await interaction.response.send_message("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
 
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        setup_map = get_config("SETUP_COMMAND_MAP", {})
         choices = []
         
-        for key, info in setup_map.items():
-            type_prefix = "[채널]"
-            if "log" in key: type_prefix = "[로그]"
-            elif "panel" in key: type_prefix = "[패널]"
-            elif "reminder" in key: type_prefix = "[알림]"
-            choice_name = f"{type_prefix} {info.get('friendly_name', key)} 설정"
+        # 1. SETUP_COMMAND_MAP에서 채널/패널 설정 동적으로 가져오기
+        for key, info in SETUP_COMMAND_MAP.items():
+            choice_name = f"{info.get('friendly_name', key)} 설정"
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
+        # 2. 역할 설정
         role_setup_actions = {
             "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정",
             "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정",
@@ -50,25 +49,19 @@ class ServerSystem(commands.Cog):
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
 
-        game_panel_actions = {
-            "request_regenerate:commerce": "[게임-패널] 상점 패널 재설치 요청",
-            "request_regenerate:fishing": "[게임-패널] 낚시터 패널 재설치 요청",
-            "request_regenerate:profile": "[게임-패널] 프로필 패널 재설치 요청",
-        }
-        for key, name in game_panel_actions.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
-
+        # 3. 모든 관리봇 패널 재설치
         panel_actions = {"panels_regenerate_all": "[패널] 모든 관리 패널 재설치"}
         for key, name in panel_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
 
+        # 4. 역할 동기화
         role_actions = {"roles_sync": "[역할] 모든 역할 DB와 동기화"}
         for key, name in role_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
         
+        # 5. 통계 기능
         stats_actions = {
             "stats_set": "[통계] 통계 채널 설정/제거",
             "stats_refresh": "[통계] 모든 통계 채널 새로고침",
@@ -78,6 +71,13 @@ class ServerSystem(commands.Cog):
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
         
+        # 6. 게임 봇 패널 개별 재설치 요청
+        game_panel_keys = [key for key, info in SETUP_COMMAND_MAP.items() if "[게임]" in info.get("friendly_name", "")]
+        for key in game_panel_keys:
+            name = f"{SETUP_COMMAND_MAP[key]['friendly_name']} 재설치 요청"
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=f"request_regenerate:{key}"))
+
         return sorted(choices, key=lambda c: c.name)[:25]
 
     @app_commands.command(name="setup", description="[管理者] ボットのチャンネル、役割、統計など、すべての設定を管理します。")
@@ -111,16 +111,17 @@ class ServerSystem(commands.Cog):
             panel_key = action.split(":", 1)[1]
             db_key = f"panel_regenerate_request_{panel_key}"
             await save_config_to_db(db_key, datetime.now(timezone.utc).timestamp())
+            
+            friendly_name = SETUP_COMMAND_MAP.get(panel_key, {}).get("friendly_name", panel_key)
             return await interaction.followup.send(
-                f"✅ ゲームボットに `{panel_key}` パネルの再設置を要請しました。\n"
+                f"✅ ゲームボットに **{friendly_name}** の再設置を要請しました。\n"
                 "ゲームボットがオンラインの場合、約10秒以内にパネルが更新されます。",
                 ephemeral=True
             )
 
         elif action.startswith("channel_setup:"):
             setting_key = action.split(":", 1)[1]
-            setup_map = get_config("SETUP_COMMAND_MAP", {})
-            config = setup_map.get(setting_key)
+            config = SETUP_COMMAND_MAP.get(setting_key)
             if not config:
                 return await interaction.followup.send("❌ 無効な設定キーです。", ephemeral=True)
             
@@ -146,6 +147,7 @@ class ServerSystem(commands.Cog):
             
             if config.get("type") == "panel":
                 if hasattr(cog_to_reload, 'regenerate_panel'):
+                    success = False
                     if config["cog_name"] == "TicketSystem":
                         panel_type = setting_key.replace("panel_", "")
                         success = await cog_to_reload.regenerate_panel(channel, panel_type)
@@ -211,6 +213,7 @@ class ServerSystem(commands.Cog):
                              failure_list.append(f"・`{friendly_name}`: チャンネル(ID: {channel_id})が見つかりません。")
                              continue
                         
+                        success = False
                         if cog_name == "TicketSystem":
                             panel_type = key.replace("panel_", "")
                             success = await cog.regenerate_panel(target_channel, panel_type)
@@ -260,6 +263,7 @@ class ServerSystem(commands.Cog):
 
             if synced_roles:
                 full_text = "\n".join(synced_roles)
+                # 메시지 길이 제한(1024자)을 넘지 않도록 분할
                 for i in range(0, len(full_text), 1024):
                     chunk = full_text[i:i+1024]
                     embed.add_field(name=f"✅ 同期成功 ({len(synced_roles)}個)", value=chunk, inline=False)
