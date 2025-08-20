@@ -198,9 +198,10 @@ async def get_onboarding_steps() -> List[dict]:
 async def save_panel_component_to_db(component_data: dict):
     await supabase.table('panel_components').upsert(component_data, on_conflict='component_key').execute()
 @supabase_retry_handler()
-async def get_panel_components_from_db(panel_key: str) -> List[dict]:
-    response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).execute()
-    return response.data if response.data else []
+async def get_panel_components_from_db(panel_key: str) -> list:
+    # [✅ 수정] row로 정렬한 뒤, 새로운 정렬 기준인 order_in_row로 한 번 더 정렬합니다.
+    response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).order('order_in_row', desc=False).execute()
+    return response.data if response and response.data else []
 # 7. 쿨다운 (cooldowns) 관련 함수
 @supabase_retry_handler()
 async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
