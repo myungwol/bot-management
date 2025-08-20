@@ -158,11 +158,26 @@ async def load_channel_ids_from_db():
         logger.info(f"✅ {len(_channel_id_cache)}개의 유효한 채널/역할 ID를 DB에서 캐시로 로드했습니다.")
 
 @supabase_retry_handler()
-async def save_id_to_db(key: str, object_id: int):
+async def save_id_to_db(key: str, object_id: int) -> bool: # [✅ 수정] bool 반환 타입을 명시
     global _channel_id_cache
-    await supabase.table('channel_configs').upsert({"channel_key": key, "channel_id": str(object_id)}, on_conflict="channel_key").execute()
-    _channel_id_cache[key] = object_id
-    logger.info(f"✅ '{key}' ID({object_id})를 DB와 캐시에 저장했습니다.")
+    try:
+        # [✅ 수정] DB 응답을 response 변수에 저장
+        response = await supabase.table('channel_configs').upsert(
+            {"channel_key": key, "channel_id": str(object_id)}, 
+            on_conflict="channel_key"
+        ).execute()
+        
+        # [✅ 수정] 응답 데이터가 있는지 확인하여 실제 성공 여부 판단
+        if response.data:
+            _channel_id_cache[key] = object_id
+            logger.info(f"✅ '{key}' ID({object_id})를 DB와 캐시에 저장했습니다.")
+            return True
+        else:
+            logger.error(f"❌ '{key}' ID({object_id})를 DB에 저장하려 했으나, DB가 성공 응답을 반환하지 않았습니다. (RLS 정책 확인 필요)")
+            return False
+    except Exception as e:
+        logger.error(f"❌ '{key}' ID 저장 중 예외 발생: {e}", exc_info=True)
+        return False
 
 def get_id(key: str) -> Optional[int]:
     config_id = _channel_id_cache.get(key)
