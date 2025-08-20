@@ -138,7 +138,6 @@ UI_EMBEDS = {
 # 3. 패널 컴포넌트(Panel Components) 기본값
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_PANEL_COMPONENTS = [
-UI_PANEL_COMPONENTS = [
     # --- [서버 관리 봇] ---
     {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0},
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0},
