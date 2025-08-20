@@ -132,7 +132,25 @@ UI_EMBEDS = {
             {"name": "選んだ数字 / 結果", "value": "`{chosen_number}` / `🎲 {dice_result}`", "inline": True}
         ]
     },    
-    
+    "panel_slot_machine": {"title": "🎰 スロットマシン", "description": "今日の運勢を試してみましょう！\n下のボタンでゲームを開始し、100コイン単位でベットできます。", "color": 0xFF9800},
+    "log_slot_machine_win": {
+        "title": "🎉 スロットマシン大当たり！ 🎉",
+        "description": "{user_mention}さんが見事に絵柄を揃え、**{payout_amount:,}**{currency_icon}を獲得しました！",
+        "color": 0x4CAF50,
+        "fields": [
+            {"name": "ベット額", "value": "`{bet_amount:,}`{currency_icon}", "inline": True},
+            {"name": "結果 / 役", "value": "**{result_text}** / `{payout_name}` (`x{payout_rate}`) ", "inline": True}
+        ]
+    },
+    "log_slot_machine_lose": {
+        "title": "💧 スロットマシン 惜しい！ 💧",
+        "description": "{user_mention}さんは**{bet_amount:,}**{currency_icon}を失いました。次の幸運を祈ります！",
+        "color": 0xF44336,
+        "fields": [
+            {"name": "ベット額", "value": "`{bet_amount:,}`{currency_icon}", "inline": True},
+            {"name": "結果", "value": "**{result_text}**", "inline": True}
+        ]
+    },
     "log_coin_gain": {
         "title": "🪙 コイン獲得のお知らせ",
         "description": "{user_mention}さんが活動報酬でコインを獲得しました。",
@@ -175,6 +193,7 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "start_fishing_sea", "panel_key": "panel_fishing_sea", "component_type": "button", "label": "海で釣りをする", "style": "secondary", "emoji": "🌊", "row": 0},
     {"component_key": "start_transfer", "panel_key": "atm", "component_type": "button", "label": "コインを送る", "style": "success", "emoji": "💸", "row": 0},
     {"component_key": "start_dice_game", "panel_key": "panel_dice_game", "component_type": "button", "label": "サイコロゲーム開始", "style": "primary", "emoji": "🎲", "row": 0, "order_in_row": 0},
+    {"component_key": "start_slot_machine", "panel_key": "panel_slot_machine", "component_type": "button", "label": "スロットをプレイ", "style": "success", "emoji": "🎰", "row": 0, "order_in_row": 0},
 ]
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -223,6 +242,8 @@ SETUP_COMMAND_MAP = {
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
     "panel_dice_game":       {"type": "panel", "cog_name": "DiceGame",    "key": "dice_game_panel_channel_id",       "friendly_name": "[게임] 주사위 게임 패널", "channel_type": "text"},
+    "panel_slot_machine":    {"type": "panel", "cog_name": "SlotMachine", "key": "slot_machine_panel_channel_id",  "friendly_name": "[게임] 슬롯머신 패널", "channel_type": "text"},
+
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
