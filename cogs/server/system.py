@@ -68,10 +68,6 @@ class ServerSystem(commands.Cog):
         for key, name in stats_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
-        
-        # [🔴 핵심 변경] 개별 게임 패널 재설치 요청 자동완성 부분 삭제
-        # game_panel_keys = [key for key, info in ...
-        # ... (관련 코드 블록 전체 삭제) ...
 
         return sorted(choices, key=lambda c: c.name)[:25]
 
@@ -121,10 +117,6 @@ class ServerSystem(commands.Cog):
                 ephemeral=True
             )
 
-        # [🔴 핵심 변경] 개별 게임 패널 재설치 요청(elif action.startswith("request_regenerate:")) 부분 삭제
-        # elif action.startswith("request_regenerate:"):
-        # ... (관련 코드 블록 전체 삭제) ...
-
         elif action.startswith("channel_setup:"):
             setting_key = action.split(":", 1)[1]
             config = SETUP_COMMAND_MAP.get(setting_key)
@@ -144,7 +136,12 @@ class ServerSystem(commands.Cog):
                 return await interaction.followup.send(error_msg, ephemeral=True)
 
             db_key, friendly_name = config['key'], config['friendly_name']
-            await save_id_to_db(db_key, channel.id)
+            
+            # [✅ 수정] save_id_to_db의 반환값을 확인하여 분기 처리
+            save_success = await save_id_to_db(db_key, channel.id)
+            
+            if not save_success:
+                return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요.", ephemeral=True)
 
             cog_to_reload = self.bot.get_cog(config["cog_name"])
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
@@ -179,8 +176,10 @@ class ServerSystem(commands.Cog):
                 if choice.value == action:
                     friendly_name = choice.name.replace(" 설정", "")
             
-            await save_id_to_db(db_key, role.id)
-            
+            save_success = await save_id_to_db(db_key, role.id)
+            if not save_success:
+                 return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요.", ephemeral=True)
+
             cog_to_reload = self.bot.get_cog("Reminder")
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
                 await cog_to_reload.load_configs()
