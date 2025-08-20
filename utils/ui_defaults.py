@@ -116,8 +116,7 @@ UI_EMBEDS = {
     "log_daily_check": {"title": "✅ 出席チェック完了", "description": "{user_mention}さんが出席し、**`{reward}`**{currency_icon}を受け取りました。", "color": 0x8BC34A},
     "panel_quests": {"title": "📜 クエストボード", "description": "> 下のボタンを押して、デイリー・ウィークリークエストを確認できます。", "color": 0x795548},
     "panel_farm_creation": {"title": "🌾 自分だけの農場を作ろう！", "description": "> 下のボタンを押して、あなただけの農場(プライベートスレッド)を作成します。\n> 自分だけの空間で、作物を育ててみましょう！", "color": 0x8BC34A},
-    "farm_thread_welcome": {"title": "{user_name}さんの農場", "description": "ようこそ！ここはあなただけの農場です。\n\n**始め方:**\n1. まずは商店で「낡은 괭이」と「씨앗」を購入します。\n2. 下のボタンから畑を耕し、種を植えましょう！", "color": 0x4CAF50},
-    # [🎨 UI 수정] 주사위 게임 패널 및 로그
+    "farm_thread_welcome": {"title": "{user_name}さんの農場", "description": "ようこそ！ここはあなただけの農場です。\n\n**始め方:**\n1. まずは商店で「古いクワ」と「種」を購入します。\n2. 下のボタンから畑を耕し、種を植えましょう！", "color": 0x4CAF50},    # [🎨 UI 수정] 주사위 게임 패널 및 로그
     "panel_dice_game": {
         "title": "🎲 サイコロゲーム", 
         "description": "> 運を試してみませんか？\n> 下のボタンでゲームを開始し、10コイン単位でベットできます。", 
