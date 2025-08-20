@@ -115,7 +115,8 @@ UI_EMBEDS = {
     "panel_daily_check": {"title": "✅ 出席チェック", "description": "> 下のボタンを押して、毎日の出席報酬を受け取りましょう！", "color": 0x4CAF50},
     "log_daily_check": {"title": "✅ 出席チェック完了", "description": "{user_mention}さんが出席し、**`{reward}`**{currency_icon}を受け取りました。", "color": 0x8BC34A},
     "panel_quests": {"title": "📜 クエストボード", "description": "> 下のボタンを押して、デイリー・ウィークリークエストを確認できます。", "color": 0x795548},
-    
+    "panel_farm_creation": {"title": "🌾 自分だけの農場を作ろう！", "description": "> 下のボタンを押して、あなただけの農場(プライベートスレッド)を作成します。\n> 自分だけの空間で、作物を育ててみましょう！", "color": 0x8BC34A},
+    "farm_thread_welcome": {"title": "{user_name}さんの農場", "description": "ようこそ！ここはあなただけの農場です。\n\n**始め方:**\n1. まずは商店で「낡은 괭이」と「씨앗」を購入します。\n2. 下のボタンから畑を耕し、種を植えましょう！", "color": 0x4CAF50},
     # [🎨 UI 수정] 주사위 게임 패널 및 로그
     "panel_dice_game": {
         "title": "🎲 サイコロゲーム", 
@@ -228,6 +229,7 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "create_rps_room", "panel_key": "panel_rps_game", "component_type": "button", "label": "部屋を作る", "style": "secondary", "emoji": "✊", "row": 0, "order_in_row": 0},
     {"component_key": "do_daily_check", "panel_key": "panel_daily_check", "component_type": "button", "label": "出席チェック", "style": "success", "emoji": "✅", "row": 0, "order_in_row": 0},
     {"component_key": "open_quests", "panel_key": "panel_quests", "component_type": "button", "label": "クエスト確認", "style": "primary", "emoji": "📜", "row": 0, "order_in_row": 0},
+    {"component_key": "create_farm", "panel_key": "panel_farm_creation", "component_type": "button", "label": "農場を作る", "style": "success", "emoji": "🌱", "row": 0, "order_in_row": 0},
 
 ]
 
@@ -281,6 +283,7 @@ SETUP_COMMAND_MAP = {
     "panel_rps_game":        {"type": "panel", "cog_name": "RPSGame",     "key": "rps_game_panel_channel_id",        "friendly_name": "[게임] 가위바위보 패널", "channel_type": "text"},
     "panel_daily_check":   {"type": "panel", "cog_name": "DailyCheck",  "key": "daily_check_panel_channel_id", "friendly_name": "[게임] 출석체크 패널", "channel_type": "text"},
     "panel_quests":        {"type": "panel", "cog_name": "Quests",      "key": "quests_panel_channel_id",      "friendly_name": "[게임] 퀘스트 패널", "channel_type": "text"},
+    "panel_farm_creation": {"type": "panel", "cog_name": "Farm",        "key": "farm_creation_panel_channel_id", "friendly_name": "[게임] 농장 생성 패널", "channel_type": "text"},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
