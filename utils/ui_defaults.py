@@ -148,7 +148,7 @@ UI_PANEL_COMPONENTS = [
     # --- [게임 봇] ---
     # [✅✅✅ 핵심 수정 ✅✅✅] 구매(open_shop) 버튼을 판매(open_market) 버튼보다 위로 옮겼습니다.
     {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0},
-    {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 0},
+    {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 1},
     
     {"component_key": "open_inventory", "panel_key": "profile", "component_type": "button", "label": "持ち物を見る", "style": "primary", "emoji": "📦", "row": 0},
     {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "secondary", "emoji": "🏞️", "row": 0},
