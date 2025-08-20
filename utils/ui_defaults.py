@@ -107,58 +107,76 @@ UI_EMBEDS = {
     "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     
     # --- [게임 봇] ---
-    "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
-    "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "川辺でのんびり釣りを楽しみましょう。\n下のボタンを押して釣りを開始します。", "color": 0x5865F2},
-    "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。", "color": 0x3498DB},
-    "panel_atm": {"title": "🏧 Dico森 ATM", "description": "下のボタンから、他の住民にコインを送金できます。", "color": 0x2ECC71},
-    "panel_profile": {"title": "📦 持ち物", "description": "自分の所持金やアイテム、装備などを確認できます。", "color": 0x5865F2},
+    "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "> アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
+    "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "> 川辺でのんびり釣りを楽しみましょう。\n> 下のボタンを押して釣りを開始します。", "color": 0x5865F2},
+    "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "> 広い海で大物の夢を追いかけましょう！\n> 下のボタンを押して釣りを開始します。", "color": 0x3498DB},
+    "panel_atm": {"title": "🏧 Dico森 ATM", "description": "> 下のボタンから、他の住民にコインを送金できます。", "color": 0x2ECC71},
+    "panel_profile": {"title": "📦 持ち物", "description": "> 自分の所持金やアイテム、装備などを確認できます。", "color": 0x5865F2},
     
-    "panel_dice_game": {"title": "🎲 サイコロゲーム", "description": "運を試してみませんか？\n下のボタンを押してゲームを開始し、10コイン単位でベットできます。", "color": 0xE91E63},
+    # [🎨 UI 수정] 주사위 게임 패널 및 로그
+    "panel_dice_game": {
+        "title": "🎲 サイコロゲーム", 
+        "description": "> 運を試してみませんか？\n> 下のボタンでゲームを開始し、10コイン単位でベットできます。", 
+        "color": 0xE91E63
+    },
     "log_dice_game_win": {
-        "title": "🎉 サイコロゲーム勝利！ 🎉",
-        "description": "{user_mention}さんが予測に成功し、**{reward_amount:,}**{currency_icon}を獲得しました！",
+        "title": "🎉 **サイコロゲーム勝利！** 🎉",
+        "description": "**{user_mention}** さんが予測に成功！\n> ✨ **`+{reward_amount:,}`** {currency_icon} を獲得しました！",
         "color": 0x2ECC71,
         "fields": [
-            {"name": "ベット額", "value": "`{bet_amount:,}`{currency_icon}", "inline": True},
+            {"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
             {"name": "選んだ数字 / 結果", "value": "`{chosen_number}` / `🎲 {dice_result}`", "inline": True}
-        ]
-    },
-    "panel_rps_game": {"title": "✊✌️✋ じゃんけん部屋", "description": "他の村人とじゃんけん勝負！\n下のボタンを押して部屋を作成し、参加者と勝負できます。", "color": 0x9B59B6},
-    "log_rps_game_end": {
-        "title": "🏆 じゃんけん勝負終了！ 🏆",
-        "description": "**{winner_mention}**さんが最終勝者となり、賞金 **{total_pot:,}**{currency_icon}を獲得しました！",
-        "color": 0xFFD700,
-        "fields": [
-            {"name": "ベット額 (1人当たり)", "value": "`{bet_amount:,}`{currency_icon}", "inline": True},
-            {"name": "参加者", "value": "{participants_list}", "inline": False}
         ]
     },
     "log_dice_game_lose": {
-        "title": "💧 サイコロゲーム敗北 💧",
-        "description": "{user_mention}さんは予測に失敗し、**{bet_amount:,}**{currency_icon}を失いました。",
+        "title": "💧 **サイコロゲーム敗北** 💧",
+        "description": "**{user_mention}** さんは予測に失敗し、**`{bet_amount:,}`** {currency_icon} を失いました。",
         "color": 0xE74C3C,
         "fields": [
-            {"name": "ベット額", "value": "`{bet_amount:,}`{currency_icon}", "inline": True},
+            {"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
             {"name": "選んだ数字 / 結果", "value": "`{chosen_number}` / `🎲 {dice_result}`", "inline": True}
         ]
-    },    
-    "panel_slot_machine": {"title": "🎰 スロットマシン", "description": "今日の運勢を試してみましょう！\n下のボタンでゲームを開始し、100コイン単位でベットできます。", "color": 0xFF9800},
+    },
+
+    # [🎨 UI 수정] 슬롯머신 패널 및 로그
+    "panel_slot_machine": {
+        "title": "🎰 スロットマシン", 
+        "description": "> 今日の運勢を試してみましょう！\n> 下のボタンでゲームを開始し、100コイン単位でベットできます。", 
+        "color": 0xFF9800
+    },
     "log_slot_machine_win": {
-        "title": "🎉 スロットマシン大当たり！ 🎉",
-        "description": "{user_mention}さんが見事に絵柄を揃え、**{payout_amount:,}**{currency_icon}を獲得しました！",
+        "title": "🎉 **スロットマシン大当たり！** 🎉",
+        "description": "**{user_mention}** さんが見事に絵柄を揃えました！\n> 💰 **`+{payout_amount:,}`** {currency_icon} を獲得しました！",
         "color": 0x4CAF50,
         "fields": [
-            {"name": "ベット額", "value": "`{bet_amount:,}`{currency_icon}", "inline": True},
-            {"name": "結果 / 役", "value": "**{result_text}** / `{payout_name}` (`x{payout_rate}`) ", "inline": True}
+            {"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
+            {"name": "結果 / 役", "value": "**{result_text}**\n`{payout_name}` (`x{payout_rate}`)", "inline": True}
         ]
     },
     "log_slot_machine_lose": {
-        "title": "💧 スロットマシン 惜しい！ 💧",
-        "description": "{user_mention}さんは**{bet_amount:,}**{currency_icon}を失いました。次の幸運を祈ります！",
+        "title": "💧 **スロットマシン** 💧",
+        "description": "**{user_mention}** さんは **`{bet_amount:,}`** {currency_icon} を失いました。\n> 次の幸運を祈ります！",
         "color": 0xF44336,
         "fields": [
-            {"name": "ベット額", "value": "`{bet_amount:,}`{currency_icon}", "inline": True},
+            {"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
             {"name": "結果", "value": "**{result_text}**", "inline": True}
+        ]
+    },
+
+    # [🎨 UI 수정] 가위바위보 패널 및 로그
+    "panel_rps_game": {
+        "title": "✊✌️✋ じゃんけん部屋", 
+        "description": "> 他の村人とじゃんけん勝負！\n> 下のボタンを押して部屋を作成し、参加者と勝負できます。", 
+        "color": 0x9B59B6
+    },
+    "log_rps_game_end": {
+        "title": "🏆 **じゃんけん勝負終了！** 🏆",
+        "description": "**{winner_mention}** さんが最終勝者となりました！",
+        "color": 0xFFD700,
+        "fields": [
+            {"name": "💰 総賞金", "value": "> **`{total_pot:,}`** {currency_icon}", "inline": False},
+            {"name": "ベット額 (1人当たり)", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
+            {"name": "👥 参加者", "value": "{participants_list}", "inline": False}
         ]
     },
     "log_coin_gain": {
