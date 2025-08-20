@@ -154,6 +154,7 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "secondary", "emoji": "🏞️", "row": 0},
     {"component_key": "start_fishing_sea", "panel_key": "panel_fishing_sea", "component_type": "button", "label": "海で釣りをする", "style": "secondary", "emoji": "🌊", "row": 0},
     {"component_key": "start_transfer", "panel_key": "atm", "component_type": "button", "label": "コインを送る", "style": "success", "emoji": "💸", "row": 0},
+    {"component_key": "start_dice_game", "panel_key": "panel_dice_game", "component_type": "button", "label": "サイコロゲーム開始", "style": "primary", "emoji": "🎲", "row": 0, "order_in_row": 0},
 ]
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -201,6 +202,7 @@ SETUP_COMMAND_MAP = {
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
+    "panel_dice_game":       {"type": "panel", "cog_name": "DiceGame",    "key": "dice_game_panel_channel_id",       "friendly_name": "[게임] 주사위 게임 패널", "channel_type": "text"},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
