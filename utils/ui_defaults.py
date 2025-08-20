@@ -1,5 +1,3 @@
-# (서버 관리 봇)/utils/ui_defaults.py (최종 수정본)
-
 """
 봇이 사용하는 모든 UI 요소 및 핵심 매핑 데이터의 기본값을 정의하는 파일입니다.
 봇이 시작될 때 이 파일의 데이터가 Supabase 데이터베이스에 동기화됩니다.
@@ -112,95 +110,22 @@ UI_EMBEDS = {
     "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "> 広い海で大物の夢を追いかけましょう！\n> 下のボタンを押して釣りを開始します。", "color": 0x3498DB},
     "panel_atm": {"title": "🏧 Dico森 ATM", "description": "> 下のボタンから、他の住民にコインを送金できます。", "color": 0x2ECC71},
     "panel_profile": {"title": "📦 持ち物", "description": "> 自分の所持金やアイテム、装備などを確認できます。", "color": 0x5865F2},
+    "panel_dice_game": { "title": "🎲 サイコロゲーム", "description": "> 運を試してみませんか？\n> 下のボタンでゲームを開始し、10コイン単位でベットできます。", "color": 0xE91E63 },
+    "log_dice_game_win": { "title": "🎉 **サイコロゲーム勝利！** 🎉", "description": "**{user_mention}** さんが予測に成功！\n> ✨ **`+{reward_amount:,}`** {currency_icon} を獲得しました！", "color": 0x2ECC71, "fields": [{"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "選んだ数字 / 結果", "value": "`{chosen_number}` / `🎲 {dice_result}`", "inline": True}] },
+    "log_dice_game_lose": { "title": "💧 **サイコロゲーム敗北** 💧", "description": "**{user_mention}** さんは予測に失敗し、**`{bet_amount:,}`** {currency_icon} を失いました。", "color": 0xE74C3C, "fields": [{"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "選んだ数字 / 結果", "value": "`{chosen_number}` / `🎲 {dice_result}`", "inline": True}] },
+    "panel_slot_machine": { "title": "🎰 スロットマシン", "description": "> 今日の運勢を試してみましょう！\n> 下のボタンでゲームを開始し、100コイン単位でベットできます。", "color": 0xFF9800 },
+    "log_slot_machine_win": { "title": "🎉 **スロットマシン大当たり！** 🎉", "description": "**{user_mention}** さんが見事に絵柄を揃えました！\n> 💰 **`+{payout_amount:,}`** {currency_icon} を獲得しました！", "color": 0x4CAF50, "fields": [{"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "結果 / 役", "value": "**{result_text}**\n`{payout_name}` (`x{payout_rate}`)", "inline": True}] },
+    "log_slot_machine_lose": { "title": "💧 **スロットマシン** 💧", "description": "**{user_mention}** さんは **`{bet_amount:,}`** {currency_icon} を失いました。\n> 次の幸運を祈ります！", "color": 0xF44336, "fields": [{"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "結果", "value": "**{result_text}**", "inline": True}] },
+    "panel_rps_game": { "title": "✊✌️✋ じゃんけん部屋", "description": "> 他の村人とじゃんけん勝負！\n> 下のボタンを押して部屋を作成し、参加者と勝負できます。", "color": 0x9B59B6 },
+    "log_rps_game_end": { "title": "🏆 **じゃんけん勝負終了！** 🏆", "description": "**{winner_mention}** さんが最終勝者となりました！", "color": 0xFFD700, "fields": [{"name": "💰 総賞金", "value": "> **`{total_pot:,}`** {currency_icon}", "inline": False}, {"name": "ベット額 (1人当たり)", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "👥 参加者", "value": "{participants_list}", "inline": False}] },
     "panel_daily_check": {"title": "✅ 出席チェック", "description": "> 下のボタンを押して、毎日の出席報酬を受け取りましょう！", "color": 0x4CAF50},
     "log_daily_check": {"title": "✅ 出席チェック完了", "description": "{user_mention}さんが出席し、**`{reward}`**{currency_icon}を受け取りました。", "color": 0x8BC34A},
     "panel_quests": {"title": "📜 クエストボード", "description": "> 下のボタンを押して、デイリー・ウィークリークエストを確認できます。", "color": 0x795548},
     "panel_farm_creation": {"title": "🌾 自分だけの農場を作ろう！", "description": "> 下のボタンを押して、あなただけの農場(プライベートスレッド)を作成します。\n> 自分だけの空間で、作物を育ててみましょう！", "color": 0x8BC34A},
-    "farm_thread_welcome": {"title": "{user_name}さんの農場", "description": "ようこそ！ここはあなただけの農場です。\n\n**始め方:**\n1. まずは商店で「古いクワ」と「種」を購入します。\n2. 下のボタンから畑を耕し、種を植えましょう！", "color": 0x4CAF50},    # [🎨 UI 수정] 주사위 게임 패널 및 로그
-    "panel_dice_game": {
-        "title": "🎲 サイコロゲーム", 
-        "description": "> 運を試してみませんか？\n> 下のボタンでゲームを開始し、10コイン単位でベットできます。", 
-        "color": 0xE91E63
-    },
-    "log_dice_game_win": {
-        "title": "🎉 **サイコロゲーム勝利！** 🎉",
-        "description": "**{user_mention}** さんが予測に成功！\n> ✨ **`+{reward_amount:,}`** {currency_icon} を獲得しました！",
-        "color": 0x2ECC71,
-        "fields": [
-            {"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
-            {"name": "選んだ数字 / 結果", "value": "`{chosen_number}` / `🎲 {dice_result}`", "inline": True}
-        ]
-    },
-    "log_dice_game_lose": {
-        "title": "💧 **サイコロゲーム敗北** 💧",
-        "description": "**{user_mention}** さんは予測に失敗し、**`{bet_amount:,}`** {currency_icon} を失いました。",
-        "color": 0xE74C3C,
-        "fields": [
-            {"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
-            {"name": "選んだ数字 / 結果", "value": "`{chosen_number}` / `🎲 {dice_result}`", "inline": True}
-        ]
-    },
-
-    # [🎨 UI 수정] 슬롯머신 패널 및 로그
-    "panel_slot_machine": {
-        "title": "🎰 スロットマシン", 
-        "description": "> 今日の運勢を試してみましょう！\n> 下のボタンでゲームを開始し、100コイン単位でベットできます。", 
-        "color": 0xFF9800
-    },
-    "log_slot_machine_win": {
-        "title": "🎉 **スロットマシン大当たり！** 🎉",
-        "description": "**{user_mention}** さんが見事に絵柄を揃えました！\n> 💰 **`+{payout_amount:,}`** {currency_icon} を獲得しました！",
-        "color": 0x4CAF50,
-        "fields": [
-            {"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
-            {"name": "結果 / 役", "value": "**{result_text}**\n`{payout_name}` (`x{payout_rate}`)", "inline": True}
-        ]
-    },
-    "log_slot_machine_lose": {
-        "title": "💧 **スロットマシン** 💧",
-        "description": "**{user_mention}** さんは **`{bet_amount:,}`** {currency_icon} を失いました。\n> 次の幸運を祈ります！",
-        "color": 0xF44336,
-        "fields": [
-            {"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
-            {"name": "結果", "value": "**{result_text}**", "inline": True}
-        ]
-    },
-
-    # [🎨 UI 수정] 가위바위보 패널 및 로그
-    "panel_rps_game": {
-        "title": "✊✌️✋ じゃんけん部屋", 
-        "description": "> 他の村人とじゃんけん勝負！\n> 下のボタンを押して部屋を作成し、参加者と勝負できます。", 
-        "color": 0x9B59B6
-    },
-    "log_rps_game_end": {
-        "title": "🏆 **じゃんけん勝負終了！** 🏆",
-        "description": "**{winner_mention}** さんが最終勝者となりました！",
-        "color": 0xFFD700,
-        "fields": [
-            {"name": "💰 総賞金", "value": "> **`{total_pot:,}`** {currency_icon}", "inline": False},
-            {"name": "ベット額 (1人当たり)", "value": "`{bet_amount:,}` {currency_icon}", "inline": True},
-            {"name": "👥 参加者", "value": "{participants_list}", "inline": False}
-        ]
-    },
-    "log_coin_gain": {
-        "title": "🪙 コイン獲得のお知らせ",
-        "description": "{user_mention}さんが活動報酬でコインを獲得しました。",
-        "color": 0x2ECC71,
-        "fields": [
-            {"name": "獲得者", "value": "{user_mention}", "inline": True},
-            {"name": "獲得コイン", "value": "+{amount}{currency_icon}", "inline": True}
-        ],
-        "footer": {"text": "おめでとうございます！"}
-    },
-    "log_coin_transfer": {
-        "title": "💸 送金完了のお知らせ",
-        "description": "**送金した人:** {sender_mention}\n**受け取った人:** {recipient_mention}\n\n**金額:** `{amount}`{currency_icon}",
-        "color": 0x3498DB
-    },
-    "log_coin_admin": {
-        "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。",
-        "color": 0x3498DB
-    }
+    "farm_thread_welcome": {"title": "{user_name}さんの農場", "description": "ようこそ！ここはあなただけの農場です。\n\n**始め方:**\n1. まずは商店で「古いクワ」と「種」を購入します。\n2. 下のボタンから畑を耕し、種を植えましょう！", "color": 0x4CAF50},
+    "log_coin_gain": { "title": "🪙 コイン獲得のお知らせ", "description": "{user_mention}さんが活動報酬でコインを獲得しました。", "color": 0x2ECC71, "fields": [{"name": "獲得者", "value": "{user_mention}", "inline": True}, {"name": "獲得コイン", "value": "+{amount}{currency_icon}", "inline": True}], "footer": {"text": "おめでとうございます！"} },
+    "log_coin_transfer": { "title": "💸 送金完了のお知らせ", "description": "**送金した人:** {sender_mention}\n**受け取った人:** {recipient_mention}\n\n**金額:** `{amount}`{currency_icon}", "color": 0x3498DB },
+    "log_coin_admin": { "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB }
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -208,28 +133,25 @@ UI_EMBEDS = {
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_PANEL_COMPONENTS = [
     # --- [서버 관리 봇] ---
-    {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0},
-    {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0},
-    {"component_key": "issue_warning_button", "panel_key": "warning", "component_type": "button", "label": "警告を発行する", "style": "danger", "emoji": "🚨", "row": 0},
-    {"component_key": "use_item_button", "panel_key": "item_usage", "component_type": "button", "label": "アイテムを使用する", "style": "success", "emoji": "✨", "row": 0},
-    {"component_key": "post_anonymous_message_button", "panel_key": "anonymous_board", "component_type": "button", "label": "匿名で投稿する", "style": "secondary", "emoji": "✍️", "row": 0},
+    {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0, "order_in_row": 0},
+    {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0, "order_in_row": 0},
+    {"component_key": "issue_warning_button", "panel_key": "warning", "component_type": "button", "label": "警告を発行する", "style": "danger", "emoji": "🚨", "row": 0, "order_in_row": 0},
+    {"component_key": "use_item_button", "panel_key": "item_usage", "component_type": "button", "label": "アイテムを使用する", "style": "success", "emoji": "✨", "row": 0, "order_in_row": 0},
+    {"component_key": "post_anonymous_message_button", "panel_key": "anonymous_board", "component_type": "button", "label": "匿名で投稿する", "style": "secondary", "emoji": "✍️", "row": 0, "order_in_row": 0},
     
     # --- [게임 봇] ---
-    # [✅✅✅ 핵심 수정 ✅✅✅] 구매(open_shop) 버튼을 판매(open_market) 버튼보다 위로 옮겼습니다.
-    {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0},
-    {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 1},
-    
-    {"component_key": "open_inventory", "panel_key": "profile", "component_type": "button", "label": "持ち物を見る", "style": "primary", "emoji": "📦", "row": 0},
-    {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "secondary", "emoji": "🏞️", "row": 0},
-    {"component_key": "start_fishing_sea", "panel_key": "panel_fishing_sea", "component_type": "button", "label": "海で釣りをする", "style": "secondary", "emoji": "🌊", "row": 0},
-    {"component_key": "start_transfer", "panel_key": "atm", "component_type": "button", "label": "コインを送る", "style": "success", "emoji": "💸", "row": 0},
+    {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0, "order_in_row": 0},
+    {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 0, "order_in_row": 1},
+    {"component_key": "open_inventory", "panel_key": "profile", "component_type": "button", "label": "持ち物を見る", "style": "primary", "emoji": "📦", "row": 0, "order_in_row": 0},
+    {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "primary", "emoji": "🏞️", "row": 0, "order_in_row": 0},
+    {"component_key": "start_fishing_sea", "panel_key": "panel_fishing_sea", "component_type": "button", "label": "海で釣りをする", "style": "secondary", "emoji": "🌊", "row": 0, "order_in_row": 1},
+    {"component_key": "start_transfer", "panel_key": "atm", "component_type": "button", "label": "コインを送る", "style": "success", "emoji": "💸", "row": 0, "order_in_row": 0},
     {"component_key": "start_dice_game", "panel_key": "panel_dice_game", "component_type": "button", "label": "サイコロゲーム開始", "style": "primary", "emoji": "🎲", "row": 0, "order_in_row": 0},
     {"component_key": "start_slot_machine", "panel_key": "panel_slot_machine", "component_type": "button", "label": "スロットをプレイ", "style": "success", "emoji": "🎰", "row": 0, "order_in_row": 0},
     {"component_key": "create_rps_room", "panel_key": "panel_rps_game", "component_type": "button", "label": "部屋を作る", "style": "secondary", "emoji": "✊", "row": 0, "order_in_row": 0},
     {"component_key": "do_daily_check", "panel_key": "panel_daily_check", "component_type": "button", "label": "出席チェック", "style": "success", "emoji": "✅", "row": 0, "order_in_row": 0},
     {"component_key": "open_quests", "panel_key": "panel_quests", "component_type": "button", "label": "クエスト確認", "style": "primary", "emoji": "📜", "row": 0, "order_in_row": 0},
     {"component_key": "create_farm", "panel_key": "panel_farm_creation", "component_type": "button", "label": "農場を作る", "style": "success", "emoji": "🌱", "row": 0, "order_in_row": 0},
-
 ]
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -248,6 +170,12 @@ SETUP_COMMAND_MAP = {
     "panel_fishing_sea":     {"type": "panel", "cog_name": "Fishing",     "key": "sea_fishing_panel_channel_id",     "friendly_name": "[게임] 바다 낚시터 패널", "channel_type": "text"},
     "panel_profile":         {"type": "panel", "cog_name": "UserProfile", "key": "profile_panel_channel_id",         "friendly_name": "[게임] 프로필 패널", "channel_type": "text"},
     "panel_atm":             {"type": "panel", "cog_name": "Atm", "key": "atm_panel_channel_id",             "friendly_name": "[게임] ATM 패널", "channel_type": "text"},
+    "panel_dice_game":       {"type": "panel", "cog_name": "DiceGame",    "key": "dice_game_panel_channel_id",       "friendly_name": "[게임] 주사위 게임 패널", "channel_type": "text"},
+    "panel_slot_machine":    {"type": "panel", "cog_name": "SlotMachine", "key": "slot_machine_panel_channel_id",  "friendly_name": "[게임] 슬롯머신 패널", "channel_type": "text"},
+    "panel_rps_game":        {"type": "panel", "cog_name": "RPSGame",     "key": "rps_game_panel_channel_id",        "friendly_name": "[게임] 가위바위보 패널", "channel_type": "text"},
+    "panel_daily_check":   {"type": "panel", "cog_name": "DailyCheck",  "key": "daily_check_panel_channel_id", "friendly_name": "[게임] 출석체크 패널", "channel_type": "text"},
+    "panel_quests":        {"type": "panel", "cog_name": "Quests",      "key": "quests_panel_channel_id",      "friendly_name": "[게임] 퀘스트 패널", "channel_type": "text"},
+    "panel_farm_creation": {"type": "panel", "cog_name": "Farm",        "key": "farm_creation_panel_channel_id", "friendly_name": "[게임] 농장 생성 패널", "channel_type": "text"},
     
     "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"},
     "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
@@ -277,12 +205,6 @@ SETUP_COMMAND_MAP = {
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
-    "panel_dice_game":       {"type": "panel", "cog_name": "DiceGame",    "key": "dice_game_panel_channel_id",       "friendly_name": "[게임] 주사위 게임 패널", "channel_type": "text"},
-    "panel_slot_machine":    {"type": "panel", "cog_name": "SlotMachine", "key": "slot_machine_panel_channel_id",  "friendly_name": "[게임] 슬롯머신 패널", "channel_type": "text"},
-    "panel_rps_game":        {"type": "panel", "cog_name": "RPSGame",     "key": "rps_game_panel_channel_id",        "friendly_name": "[게임] 가위바위보 패널", "channel_type": "text"},
-    "panel_daily_check":   {"type": "panel", "cog_name": "DailyCheck",  "key": "daily_check_panel_channel_id", "friendly_name": "[게임] 출석체크 패널", "channel_type": "text"},
-    "panel_quests":        {"type": "panel", "cog_name": "Quests",      "key": "quests_panel_channel_id",      "friendly_name": "[게임] 퀘스트 패널", "channel_type": "text"},
-    "panel_farm_creation": {"type": "panel", "cog_name": "Farm",        "key": "farm_creation_panel_channel_id", "friendly_name": "[게임] 농장 생성 패널", "channel_type": "text"},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
