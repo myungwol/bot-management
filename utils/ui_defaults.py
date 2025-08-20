@@ -106,8 +106,8 @@ UI_EMBEDS = {
     "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     
     # --- [게임 봇] ---
-    {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0}, # primary -> success (초록색)
-    {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 0},   # secondary -> danger (빨간색)
+    "component_key": {"open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0}, # primary -> success (초록색)
+    "component_key": {"open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 0},   # secondary -> danger (빨간색)
     "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "川辺でのんびり釣りを楽しみましょう。\n下のボタンを押して釣りを開始します。", "color": 0x5865F2},
     "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。", "color": 0x3498DB},
     "panel_atm": {"title": "🏧 Dico森 ATM", "description": "下のボタンから、他の住民にコインを送金できます。", "color": 0x2ECC71},
