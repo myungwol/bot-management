@@ -137,32 +137,38 @@ class ServerSystem(commands.Cog):
 
             db_key, friendly_name = config['key'], config['friendly_name']
             
-            # [✅ 수정] save_id_to_db의 반환값을 확인하여 분기 처리
             save_success = await save_id_to_db(db_key, channel.id)
-            
             if not save_success:
                 return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요.", ephemeral=True)
 
             cog_to_reload = self.bot.get_cog(config["cog_name"])
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
                 await cog_to_reload.load_configs()
-                logger.info(f"/{interaction.command.name} 명령어로 인해 '{config['cog_name']}' Cog의 설정이 새로고침되었습니다.")
-            
+
             if config.get("type") == "panel":
-                if hasattr(cog_to_reload, 'regenerate_panel'):
-                    success = False
-                    if config["cog_name"] == "TicketSystem":
-                        panel_type = setting_key.replace("panel_", "")
-                        success = await cog_to_reload.regenerate_panel(channel, panel_type)
-                    else:
-                        success = await cog_to_reload.regenerate_panel(channel)
-                        
-                    if success:
-                        await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
-                    else:
-                        await interaction.followup.send(f"❌ `{channel.mention}` チャンネルへのパネル設置中にエラーが発生しました。詳細はログを確認してください。", ephemeral=True)
+                if "[게임]" in friendly_name:
+                    timestamp = datetime.now(timezone.utc).timestamp()
+                    request_key = f"panel_regenerate_request_{setting_key}"
+                    await save_config_to_db(request_key, timestamp)
+                    await interaction.followup.send(
+                        f"✅ **{friendly_name}** 채널을 `{channel.mention}`(으)로 설정하고, 게임 봇에게 패널 재설치를 요청했습니다.",
+                        ephemeral=True
+                    )
                 else:
-                    await interaction.followup.send(f"⚠️ **{friendly_name}** は設定されましたが、パネルを自動生成する機能が見つかりません。", ephemeral=True)
+                    if hasattr(cog_to_reload, 'regenerate_panel'):
+                        success = False
+                        if config["cog_name"] == "TicketSystem":
+                            panel_type = setting_key.replace("panel_", "")
+                            success = await cog_to_reload.regenerate_panel(channel, panel_type)
+                        else:
+                            success = await cog_to_reload.regenerate_panel(channel)
+                            
+                        if success:
+                            await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
+                        else:
+                            await interaction.followup.send(f"❌ `{channel.mention}` チャンネルへのパネル設置中にエラーが発生しました。", ephemeral=True)
+                    else:
+                        await interaction.followup.send(f"⚠️ **{friendly_name}** は設定されましたが、パネルを自動生成する機能が見つかりません。", ephemeral=True)
             else:
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
 
@@ -255,11 +261,11 @@ class ServerSystem(commands.Cog):
                 if not role_name: continue
                 
                 if role_id := server_roles_by_name.get(role_name):
-                    try:
-                        await save_id_to_db(db_key, role_id)
+                    save_success = await save_id_to_db(db_key, role_id)
+                    if save_success:
                         synced_roles.append(f"・`{role_name}`")
-                    except Exception as e:
-                        error_roles.append(f"・`{role_name}`: `{e}`")
+                    else:
+                        error_roles.append(f"・`{role_name}`: DB 저장 실패")
                 else:
                     missing_roles.append(f"・`{role_name}`")
             
