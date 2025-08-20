@@ -1,4 +1,4 @@
-# utils/ui_defaults.py
+# (서버 관리 봇)/utils/ui_defaults.py (최종 수정본)
 
 """
 봇이 사용하는 모든 UI 요소 및 핵심 매핑 데이터의 기본값을 정의하는 파일입니다.
@@ -107,12 +107,12 @@ UI_EMBEDS = {
     "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     
     # --- [게임 봇] ---
-    # [✅ 수정] 키가 없던 잘못된 항목들을 제거했습니다.
+    "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
     "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "川辺でのんびり釣りを楽しみましょう。\n下のボタンを押して釣りを開始します。", "color": 0x5865F2},
     "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "広い海で大物の夢を追いかけましょう！\n下のボタンを押して釣りを開始します。", "color": 0x3498DB},
     "panel_atm": {"title": "🏧 Dico森 ATM", "description": "下のボタンから、他の住民にコインを送金できます。", "color": 0x2ECC71},
+    "panel_profile": {"title": "📦 持ち物", "description": "自分の所持金やアイテム、装備などを確認できます。", "color": 0x5865F2},
     
-    # [✅ 수정] 중복된 키를 삭제하고, 최신 버전만 남깁니다.
     "log_coin_gain": {
         "title": "🪙 コイン獲得のお知らせ",
         "description": "{user_mention}さんが活動報酬でコインを獲得しました。",
@@ -146,10 +146,12 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "post_anonymous_message_button", "panel_key": "anonymous_board", "component_type": "button", "label": "匿名で投稿する", "style": "secondary", "emoji": "✍️", "row": 0},
     
     # --- [게임 봇] ---
-    {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0}, 
-    {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 0},  
+    # [✅✅✅ 핵심 수정 ✅✅✅] 구매(open_shop) 버튼을 판매(open_market) 버튼보다 위로 옮겼습니다.
+    {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0},
+    {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 0},
+    
     {"component_key": "open_inventory", "panel_key": "profile", "component_type": "button", "label": "持ち物を見る", "style": "primary", "emoji": "📦", "row": 0},
-    {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "secondary", "emoji": "🏞️", "row": 0},
+    {"component_key": "start_fishing_river", "panel_key": "panel_fishing_river", "component_type": "button", "label": "川で釣りをする", "style": "primary", "emoji": "🏞️", "row": 0},
     {"component_key": "start_fishing_sea", "panel_key": "panel_fishing_sea", "component_type": "button", "label": "海で釣りをする", "style": "secondary", "emoji": "🌊", "row": 0},
     {"component_key": "start_transfer", "panel_key": "atm", "component_type": "button", "label": "コインを送る", "style": "success", "emoji": "💸", "row": 0},
 ]
