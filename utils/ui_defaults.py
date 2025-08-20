@@ -123,6 +123,16 @@ UI_EMBEDS = {
             {"name": "選んだ数字 / 結果", "value": "`{chosen_number}` / `🎲 {dice_result}`", "inline": True}
         ]
     },
+    "panel_rps_game": {"title": "✊✌️✋ じゃんけん部屋", "description": "他の村人とじゃんけん勝負！\n下のボタンを押して部屋を作成し、参加者と勝負できます。", "color": 0x9B59B6},
+    "log_rps_game_end": {
+        "title": "🏆 じゃんけん勝負終了！ 🏆",
+        "description": "**{winner_mention}**さんが最終勝者となり、賞金 **{total_pot:,}**{currency_icon}を獲得しました！",
+        "color": 0xFFD700,
+        "fields": [
+            {"name": "ベット額 (1人当たり)", "value": "`{bet_amount:,}`{currency_icon}", "inline": True},
+            {"name": "参加者", "value": "{participants_list}", "inline": False}
+        ]
+    },
     "log_dice_game_lose": {
         "title": "💧 サイコロゲーム敗北 💧",
         "description": "{user_mention}さんは予測に失敗し、**{bet_amount:,}**{currency_icon}を失いました。",
@@ -194,6 +204,7 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "start_transfer", "panel_key": "atm", "component_type": "button", "label": "コインを送る", "style": "success", "emoji": "💸", "row": 0},
     {"component_key": "start_dice_game", "panel_key": "panel_dice_game", "component_type": "button", "label": "サイコロゲーム開始", "style": "primary", "emoji": "🎲", "row": 0, "order_in_row": 0},
     {"component_key": "start_slot_machine", "panel_key": "panel_slot_machine", "component_type": "button", "label": "スロットをプレイ", "style": "success", "emoji": "🎰", "row": 0, "order_in_row": 0},
+    {"component_key": "create_rps_room", "panel_key": "panel_rps_game", "component_type": "button", "label": "部屋を作る", "style": "secondary", "emoji": "✊", "row": 0, "order_in_row": 0},
 ]
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -243,7 +254,7 @@ SETUP_COMMAND_MAP = {
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
     "panel_dice_game":       {"type": "panel", "cog_name": "DiceGame",    "key": "dice_game_panel_channel_id",       "friendly_name": "[게임] 주사위 게임 패널", "channel_type": "text"},
     "panel_slot_machine":    {"type": "panel", "cog_name": "SlotMachine", "key": "slot_machine_panel_channel_id",  "friendly_name": "[게임] 슬롯머신 패널", "channel_type": "text"},
-
+    "panel_rps_game":        {"type": "panel", "cog_name": "RPSGame",     "key": "rps_game_panel_channel_id",        "friendly_name": "[게임] 가위바위보 패널", "channel_type": "text"},
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
