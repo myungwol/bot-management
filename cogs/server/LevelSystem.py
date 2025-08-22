@@ -54,7 +54,6 @@ class RankingView(ui.View):
         if res and res.data:
             for i, user_data in enumerate(res.data):
                 rank = offset + i + 1
-                # user_id가 문자열일 경우를 대비해 int로 변환
                 member = self.user.guild.get_member(int(user_data['user_id']))
                 name = member.display_name if member else f"ID: {user_data['user_id']}"
                 rank_list.append(f"`{rank}.` {name} - **Lv.{user_data['level']}** (`{user_data['xp']:,} XP`)")
@@ -109,7 +108,6 @@ class LevelPanelView(ui.View):
         try:
             await set_cooldown(user_id_str, cooldown_key)
             
-            # [UI 복원] xp_logs를 함께 조회하여 경험치 획득 내역을 가져옵니다.
             level_res, job_res, xp_logs_res = await asyncio.gather(
                 supabase.table('user_levels').select('*').eq('user_id', user.id).maybe_single().execute(),
                 supabase.table('user_jobs').select('jobs(*)').eq('user_id', user.id).maybe_single().execute(),
@@ -148,7 +146,6 @@ class LevelPanelView(ui.View):
                         tier_role_mention = f"<@&{role_id}>"
                         break
             
-            # [UI 복원] 경험치 획득 내역을 집계하는 로직
             source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業'}
             aggregated_xp = {v: 0 for v in source_map.values()}
             if xp_logs_res and xp_logs_res.data:
@@ -159,27 +156,29 @@ class LevelPanelView(ui.View):
             
             details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items()]
             xp_details_text = "\n".join(details) if details else "まだ経験値を獲得していません。"
+            xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
 
-            # [UI 복원] 상세한 정보가 포함된 Embed 메시지 구성
-            embed = discord.Embed(title=f"{user.mention}のステータス", color=user.color or discord.Color.blue())
+            # [✅ 수정] 제안해주신 아이디어를 반영하여 Embed 구성을 변경합니다.
+            # title을 비우고, description에 모든 내용을 Markdown으로 작성합니다.
+            embed = discord.Embed(color=user.color or discord.Color.blue())
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
-            
-            embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=False)
-            embed.add_field(name="等級", value=tier_role_mention or "`かけだし住民`", inline=True)
-            embed.add_field(name="職業", value=job_role_mention or "`なし`", inline=True)
-            
-            xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
-            embed.add_field(name="経験値", value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}`\n{xp_bar}", inline=False)
-            
-            embed.add_field(name="🏆 総獲得経験値", value=f"`{total_xp:,} XP`", inline=False)
-            embed.add_field(name="📊 経験値獲得の内訳", value=xp_details_text, inline=False)
+
+            description_parts = [
+                f"## {user.mention}のステータス\n",
+                f"**レベル**: **Lv. {current_level}**",
+                f"**等級**: {tier_role_mention or '`かけだし住民`'} | **職業**: {job_role_mention or '`なし`'}\n",
+                f"**経験値**\n`{xp_in_current_level:,} / {required_xp_for_this_level:,}`",
+                f"{xp_bar}\n",
+                f"**🏆 総獲得経験値**\n`{total_xp:,} XP`\n",
+                f"**📊 経験値獲得の内訳**\n{xp_details_text}"
+            ]
+            embed.description = "\n".join(description_parts)
             
             await interaction.followup.send(embed=embed)
             
             if isinstance(interaction.channel, discord.TextChannel):
                 await asyncio.sleep(1) 
-                # [호환성 수정] 작동하는 파일의 함수 시그니처에 맞게 panel_key 인자를 추가합니다.
                 await self.cog.regenerate_panel(interaction.channel, panel_key="panel_level_check")
 
         except Exception as e:
