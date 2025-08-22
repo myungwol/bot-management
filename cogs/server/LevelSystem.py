@@ -95,18 +95,21 @@ class LevelPanelView(ui.View):
         user = interaction.user
         user_id_str = str(user.id)
         cooldown_key = "level_check_cooldown"
-        cooldown_seconds = 10 # 쿨다운 (원래 값: 600)
+        # [✅ 수정] 쿨타임을 60초(1분)으로 변경합니다.
+        cooldown_seconds = 60
 
         last_used = await get_cooldown(user_id_str, cooldown_key)
+        # [✅ 수정] time.time()으로 현재 시간을 가져와 쿨타임을 정확히 계산합니다.
         if time.time() - last_used < cooldown_seconds:
             remaining = int(cooldown_seconds - (time.time() - last_used))
             await interaction.response.send_message(f"⏳ このボタンはクールダウン中です。あと`{remaining}`秒お待ちください。", ephemeral=True)
             return
             
-        # [✅ 수정] ephemeral=False로 응답하여, 모든 사용자에게 보이도록 합니다.
-        await interaction.response.defer(ephemeral=False)
+        # [✅ 수정] defer의 ephemeral 인자를 삭제하여 일반 메시지 전송을 준비합니다.
+        await interaction.response.defer()
         
         try:
+            # [✅ 수정] 쿨타임이 정상적으로 기록되도록 set_cooldown을 호출합니다.
             await set_cooldown(user_id_str, cooldown_key)
             
             level_res, job_res, xp_logs_res = await asyncio.gather(
@@ -172,11 +175,11 @@ class LevelPanelView(ui.View):
             embed.add_field(name="🏆 総獲得経験値", value=f"`{total_xp:,} XP`", inline=False)
             embed.add_field(name="📊 経験値獲得の内訳", value=xp_details_text, inline=False)
             
+            # [✅ 수정] followup.send로 일반 메시지를 전송합니다.
             await interaction.followup.send(embed=embed)
             
-            # [✅ 수정] 메시지 전송 후, 패널을 다시 생성하여 맨 아래에 위치시킵니다.
             if isinstance(interaction.channel, discord.TextChannel):
-                await asyncio.sleep(1) # 메시지가 확실히 전송될 시간을 줍니다.
+                await asyncio.sleep(1) 
                 await self.cog.regenerate_panel(interaction.channel)
 
         except Exception as e:
@@ -221,9 +224,6 @@ class LevelSystem(commands.Cog):
         panel_info = get_panel_id(self.PANEL_KEY)
         if panel_info:
             self.panel_channel_id = panel_info.get('channel_id')
-    
-    # [✅ 수정] on_message 리스너는 더 이상 필요 없으므로 삭제합니다.
-    # 패널 재설치 로직은 버튼 콜백 함수 안으로 이동하여 더 안정적으로 작동합니다.
 
     @tasks.loop(seconds=15.0)
     async def check_advancement_requests(self):
@@ -244,9 +244,6 @@ class LevelSystem(commands.Cog):
                 
                 if user_member:
                     logger.info(f"유저 {user_member.display_name}의 전직 요청(Lv.{req_level})을 감지하여 프로세스를 시작합니다.")
-                    # JobAdvancement 클래스는 제공되지 않았으므로 관련 코드는 주석 처리합니다.
-                    # process = JobAdvancement(self.bot, user_member, guild_found, req_level, self)
-                    # await process.start_process()
                 else:
                     logger.warning(f"전직 요청 유저(ID: {user_id})를 어느 서버에서도 찾을 수 없습니다.")
                 
@@ -311,7 +308,6 @@ class LevelSystem(commands.Cog):
 
     async def regenerate_panel(self, channel: discord.TextChannel, **kwargs):
         self.panel_channel_id = channel.id
-        # 기존 패널 메시지 삭제
         panel_info = get_panel_id(self.PANEL_KEY)
         if panel_info:
             if msg_id := panel_info.get('message_id'):
@@ -319,9 +315,8 @@ class LevelSystem(commands.Cog):
                     msg = await channel.fetch_message(msg_id)
                     await msg.delete()
                 except (discord.NotFound, discord.Forbidden):
-                    pass # 메시지를 찾을 수 없거나 권한이 없으면 그냥 넘어감
+                    pass
         
-        # 새 패널 메시지 생성
         embed = discord.Embed(title="📊 レベル＆転職", description="下のボタンでご自身のレベルを確認したり、ランキングを見ることができます。", color=0x5865F2)
         view = LevelPanelView(self)
         
