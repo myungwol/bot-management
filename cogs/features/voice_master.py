@@ -209,6 +209,8 @@ class VoiceMaster(commands.Cog):
         self.temp_channels: Dict[int, Dict[str, Any]] = {}
         self.admin_role_ids: List[int] = []
         self.default_category_id: Optional[int] = None
+        # [추가] 유저별 채널 생성 쿨다운을 위한 딕셔너리
+        self.vc_creation_cooldowns: Dict[int, float] = {}
         logger.info("VoiceMaster Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
@@ -269,6 +271,21 @@ class VoiceMaster(commands.Cog):
 
             # --- 채널 생성 로직 ---
             if after.channel and after.channel.id in self.creator_channel_configs:
+                # [추가] 쿨다운 체크 로직 (60초)
+                cooldown_seconds = 60
+                now = asyncio.get_event_loop().time()
+                last_creation_time = self.vc_creation_cooldowns.get(member.id, 0)
+                
+                if (now - last_creation_time) < cooldown_seconds:
+                    remaining = cooldown_seconds - (now - last_creation_time)
+                    try:
+                        await member.send(f"❌ ボイスチャンネルの作成は{cooldown_seconds}秒に一回だけ可能です。あと {int(remaining)}秒 お待ちください。")
+                    except discord.Forbidden:
+                        pass
+                    await member.move_to(None, reason="VC 생성 쿨타임")
+                    return
+
+                # ... 기존 생성 로직 시작 ...
                 config = self.creator_channel_configs[after.channel.id]
                 member_role_ids = {r.id for r in member.roles}
                 is_master = any(role_id in member_role_ids for role_id in [get_id("role_staff_village_chief"), get_id("role_staff_deputy_chief")])
