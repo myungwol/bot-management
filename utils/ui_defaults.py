@@ -101,8 +101,7 @@ UI_EMBEDS = {
     "panel_item_usage": {"title": "✅ 警告差引権使用", "description": "所持している<@&1406959582500225087>を使用するには、下のボタンを押してください。", "color": 11027200},
     "dm_onboarding_approved": {"title": "✅ 住民登録完了のお知らせ", "description": "「{guild_name}」での住民登録が承認されました。\nこれからよろしくお願いします！", "color": 3066993},
     "dm_onboarding_rejected": {"title": "❌ 住民登録拒否のお知らせ", "description": "申し訳ありませんが、「{guild_name}」での住民登録は拒否されました。", "color": 15548997},
-    "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。", "color": 4342323},
-    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
+    "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。\n\n**※すべてのメッセージはサーバー管理者が記録・確認しており、問題発生時には投稿者を特定し対処します。**", "color": 4342323},    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     "panel_custom_embed": {"title": "📢 カスタムメッセージ送信パネル", "description": "下のボタンを押して、指定したチャンネルにBotから埋め込みメッセージを送信します。\n\n**この機能は特定の役職を持つスタッフのみ使用可能です。**", "color": 0x34495E},
     
     # --- [게임 봇] ---
@@ -281,5 +280,5 @@ CUSTOM_EMBED_SENDER_ROLES = [
     "role_admin_total",
     "role_staff_village_chief",
     "role_staff_deputy_chief",
-    "role_staff_pr", # 홍보 담당 (ビラ配りさん)
+    # "role_staff_pr", # [보안] 악용 가능성을 줄이기 위해 홍보 담당은 주석 처리. 필요 시 주석 해제.
 ]
