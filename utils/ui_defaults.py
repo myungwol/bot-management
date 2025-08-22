@@ -131,6 +131,18 @@ UI_EMBEDS = {
     "log_coin_gain": { "title": "🪙 コイン獲得のお知らせ", "description": "{user_mention}さんが活動報酬でコインを獲得しました。", "color": 0x2ECC71, "fields": [{"name": "獲得者", "value": "{user_mention}", "inline": True}, {"name": "獲得コイン", "value": "+{amount}{currency_icon}", "inline": True}], "footer": {"text": "おめでとうございます！"} },
     "log_coin_transfer": { "title": "💸 送金完了のお知らせ", "description": "**送金した人:** {sender_mention}\n**受け取った人:** {recipient_mention}\n\n**金額:** `{amount}`{currency_icon}", "color": 0x3498DB },
     "log_coin_admin": { "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB }
+
+    "embed_weather_forecast": {
+        "title": "{emoji} Dico森の今日の天気予報",
+        "description": "今日の天気は「**{weather_name}**」です！\n\n> {description}",
+        "color": "{color}",
+        "fields": [
+            {"name": "💡 今日のヒント", "value": "> {tip}", "inline": False}
+        ],
+        "footer": {
+            "text": "天気は毎日午前0時に変わります。"
+        }
+    },
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
