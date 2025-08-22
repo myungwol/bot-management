@@ -26,6 +26,10 @@ UI_ROLE_KEY_MAP = {
     "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": False, "priority": 40},
     "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": False, "priority": 30},
     "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": False, "priority": 20},
+    "role_job_fisherman":       {"name": "釣り人", "is_prefix": False, "priority": 0},
+    "role_job_farmer":          {"name": "農家", "is_prefix": False, "priority": 0},
+    "role_job_master_angler":   {"name": "太公望", "is_prefix": False, "priority": 0},
+    "role_job_master_farmer":   {"name": "大農家", "is_prefix": False, "priority": 0},
     "role_resident":            {"name": "住民", "is_prefix": True, "priority": 10},
     "role_guest":               {"name": "旅の人", "is_prefix": True, "priority": 5},
 
@@ -289,3 +293,22 @@ CUSTOM_EMBED_SENDER_ROLES = [
     "role_staff_deputy_chief",
     # "role_staff_pr", # [보안] 악용 가능성을 줄이기 위해 홍보 담당은 주석 처리. 필요 시 주석 해제.
 ]
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# [✅ 신규 추가] 직업 및 레벨 시스템 설정
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+JOB_SYSTEM_CONFIG = {
+    # 직업 키와 역할 키를 매핑합니다.
+    "JOB_ROLE_MAP": {
+        "fisherman": "role_job_fisherman",
+        "farmer": "role_job_farmer",
+        "master_angler": "role_job_master_angler",
+        "master_farmer": "role_job_master_farmer",
+    },
+    # 레벨에 따라 부여될 주민 등급 역할입니다. 높은 레벨부터 순서대로 적어야 합니다.
+    "LEVEL_TIER_ROLES": [
+        {"level": 150, "role_key": "role_resident_elder"},
+        {"level": 100, "role_key": "role_resident_veteran"},
+        {"level": 50,  "role_key": "role_resident_regular"},
+        {"level": 1,   "role_key": "role_resident_rookie"}
+    ]
+}
