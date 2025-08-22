@@ -1,6 +1,4 @@
 # bot-management/ui_defaults.py
-
-# bot-management/ui_defaults.py
 """
 봇이 사용하는 모든 UI 요소 및 핵심 매핑 데이터의 기본값을 정의하는 파일입니다.
 봇이 시작될 때 이 파일의 데이터가 Supabase 데이터베이스에 동기화됩니다.
