@@ -103,6 +103,7 @@ UI_EMBEDS = {
     "dm_onboarding_rejected": {"title": "❌ 住民登録拒否のお知らせ", "description": "申し訳ありませんが、「{guild_name}」での住民登録は拒否されました。", "color": 15548997},
     "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。", "color": 4342323},
     "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
+    "panel_custom_embed": {"title": "📢 カスタムメッセージ送信パネル", "description": "下のボタンを押して、指定したチャンネルにBotから埋め込みメッセージを送信します。\n\n**この機能は特定の役職を持つスタッフのみ使用可能です。**", "color": 0x34495E},
     
     # --- [게임 봇] ---
     "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "> アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
@@ -138,6 +139,7 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "issue_warning_button", "panel_key": "warning", "component_type": "button", "label": "警告を発行する", "style": "danger", "emoji": "🚨", "row": 0, "order_in_row": 0},
     {"component_key": "use_item_button", "panel_key": "item_usage", "component_type": "button", "label": "アイテムを使用する", "style": "success", "emoji": "✨", "row": 0, "order_in_row": 0},
     {"component_key": "post_anonymous_message_button", "panel_key": "anonymous_board", "component_type": "button", "label": "匿名で投稿する", "style": "secondary", "emoji": "✍️", "row": 0, "order_in_row": 0},
+    {"component_key": "create_custom_embed", "panel_key": "custom_embed", "component_type": "button", "label": "埋め込みメッセージ作成", "style": "primary", "emoji": "✉️", "row": 0, "order_in_row": 0},
     
     # --- [게임 봇] ---
     {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0, "order_in_row": 0},
@@ -165,6 +167,7 @@ SETUP_COMMAND_MAP = {
     "panel_item_usage": {"type": "panel", "cog_name": "ItemSystem", "key": "item_usage_panel_channel_id", "friendly_name": "[패널] 아이템 사용", "channel_type": "text"},
     "panel_anonymous_board": {"type": "panel", "cog_name": "AnonymousBoard", "key": "anonymous_board_channel_id", "friendly_name": "[패널] 익명 게시판", "channel_type": "text"},    
     "panel_warning": {"type": "panel", "cog_name": "WarningSystem", "key": "warning_panel_channel_id", "friendly_name": "[패널] 경고 관리", "channel_type": "text"},
+    "panel_custom_embed": {"type": "panel", "cog_name": "CustomEmbed", "key": "custom_embed_panel_channel_id", "friendly_name": "[패널] 커스텀 임베드 전송", "channel_type": "text"},
     "panel_commerce":        {"type": "panel", "cog_name": "Commerce",    "key": "commerce_panel_channel_id",        "friendly_name": "[게임] 상점 패널", "channel_type": "text"},
     "panel_fishing_river":   {"type": "panel", "cog_name": "Fishing",     "key": "river_fishing_panel_channel_id",   "friendly_name": "[게임] 강 낚시터 패널", "channel_type": "text"},
     "panel_fishing_sea":     {"type": "panel", "cog_name": "Fishing",     "key": "sea_fishing_panel_channel_id",     "friendly_name": "[게임] 바다 낚시터 패널", "channel_type": "text"},
