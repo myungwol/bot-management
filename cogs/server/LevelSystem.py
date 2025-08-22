@@ -102,7 +102,6 @@ class LevelPanelView(ui.View):
             await interaction.response.send_message(f"⏳ このボタンはクールダウン中です。あと`{remaining}`秒お待ちください。", ephemeral=True)
             return
             
-        # [✅ 복원] ephemeral=False를 위해 defer()를 수정합니다.
         await interaction.response.defer()
         
         try:
@@ -143,24 +142,27 @@ class LevelPanelView(ui.View):
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
             
+            # [✅ UI 복원] 기존 UI와 동일하게 필드를 구성합니다.
             embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=True)
             embed.add_field(name="等級", value=tier_role_mention, inline=True)
             embed.add_field(name="職業", value=f"`{job_name}`", inline=True)
             
             xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
-            embed.add_field(name=f"経験値 (XP: {total_xp:,})", value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}`\n{xp_bar}", inline=False)
+            # [✅ UI 복원] 경험치 필드에 총 경험치를 함께 표시합니다.
+            embed.add_field(
+                name="経験値", 
+                value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}` (総XP: `{total_xp:,}`)\n{xp_bar}", 
+                inline=False
+            )
             
-            # [✅ 복원] ephemeral=False로 모두가 볼 수 있는 일반 메시지로 전송합니다.
             await interaction.followup.send(embed=embed)
             
-            # [✅ 복원] 패널을 재설치하여 항상 최신 상태를 유지합니다.
             if isinstance(interaction.channel, discord.TextChannel):
                 await asyncio.sleep(1) 
                 await self.cog.regenerate_panel(interaction.channel, panel_key="panel_level_check")
 
         except Exception as e:
             logger.error(f"레벨 확인 중 오류 발생 (유저: {user.id}): {e}", exc_info=True)
-            # followup은 이미 defer된 상호작용에 대한 것이므로, ephemeral 옵션을 사용해야 합니다.
             await interaction.followup.send("❌ ステータス情報の読み込み中にエラーが発生しました。", ephemeral=True)
 
     @ui.button(label="ランキング確認", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="show_ranking_button")
