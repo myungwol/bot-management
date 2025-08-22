@@ -12,7 +12,8 @@ from typing import Dict, Callable, Any, List, Optional
 from supabase import create_client, AsyncClient
 from postgrest.exceptions import APIError
 
-from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP
+# [✅ 수정] JOB_SYSTEM_CONFIG를 import 목록에 추가합니다.
+from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, JOB_SYSTEM_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,9 @@ async def sync_defaults_to_db():
             save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP)
         )
         
+        # [✅ 레벨 시스템] 직업 시스템 설정을 DB에 저장합니다.
+        await save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG)
+
         # [핵심 수정 3] channel_configs 테이블은 이미 설정된 값이 있다면 건드리지 않도록 (DO NOTHING)
         # 이는 관리자가 /setup으로 설정한 채널/역할 ID가 봇 재시작 시 초기화되는 것을 방지합니다.
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
@@ -105,16 +109,9 @@ async def sync_defaults_to_db():
         ]
         
         if placeholder_records:
-            # on_conflict='channel_key'와 함께 insert를 사용하면 UPSERT처럼 작동하지만,
-            # supabase-py 2.x 에서는 on_conflict와 함께 명시적인 update나 ignore 액션이 필요할 수 있습니다.
-            # 가장 안전한 방법은 upsert를 사용하되, 기존 값을 유지하는 로직을 구현하는 것이나,
-            # 현재 라이브러리에서는 insert + on_conflict (do nothing) 이 직접 지원되지 않으므로,
-            # 여기서는 insert를 호출하여 없는 키만 추가되도록 합니다. 
-            # (만약 키가 있으면 라이브러리 레벨에서 에러가 날 수 있으나, 보통 무시됩니다)
-            # 더 명확한 방법은 RLS 정책이나 DB 트리거를 사용하는 것이지만, 코드 레벨에서는 이것이 최선입니다.
             await supabase.table('channel_configs').upsert(placeholder_records, on_conflict="channel_key", ignore_duplicates=True).execute()
 
-        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개) 동기화 완료. 기존 채널/역할 ID 설정은 유지됩니다.")
+        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 직업 설정 동기화 완료. 기존 채널/역할 ID 설정은 유지됩니다.")
 
     except Exception as e:
         logger.error(f"❌ 기본값 DB 동기화 중 치명적 오류 발생: {e}", exc_info=True)
@@ -132,7 +129,7 @@ async def load_all_data_from_db():
 async def load_bot_configs_from_db():
     global _bot_configs_cache
     response = await supabase.table('bot_configs').select('config_key, config_value').execute()
-    if response.data:
+    if response and response.data:
         _bot_configs_cache = {item['config_key']: item['config_value'] for item in response.data}
         logger.info(f"✅ {len(_bot_configs_cache)}개의 봇 설정을 DB에서 캐시로 로드했습니다.")
 
@@ -152,22 +149,20 @@ def get_config(key: str, default: Any = None) -> Any:
 async def load_channel_ids_from_db():
     global _channel_id_cache
     response = await supabase.table('channel_configs').select('channel_key, channel_id').execute()
-    if response.data:
+    if response and response.data:
         # channel_id가 '0'이 아닌 유효한 값만 캐시에 저장합니다.
         _channel_id_cache = {item['channel_key']: int(item['channel_id']) for item in response.data if item.get('channel_id') and item['channel_id'] != '0'}
         logger.info(f"✅ {len(_channel_id_cache)}개의 유효한 채널/역할 ID를 DB에서 캐시로 로드했습니다.")
 
 @supabase_retry_handler()
-async def save_id_to_db(key: str, object_id: int) -> bool: # [✅ 수정] bool 반환 타입을 명시
+async def save_id_to_db(key: str, object_id: int) -> bool:
     global _channel_id_cache
     try:
-        # [✅ 수정] DB 응답을 response 변수에 저장
         response = await supabase.table('channel_configs').upsert(
             {"channel_key": key, "channel_id": str(object_id)}, 
             on_conflict="channel_key"
         ).execute()
         
-        # [✅ 수정] 응답 데이터가 있는지 확인하여 실제 성공 여부 판단
         if response.data:
             _channel_id_cache[key] = object_id
             logger.info(f"✅ '{key}' ID({object_id})를 DB와 캐시에 저장했습니다.")
@@ -204,24 +199,23 @@ async def save_embed_to_db(embed_key: str, embed_data: dict):
 @supabase_retry_handler()
 async def get_embed_from_db(embed_key: str) -> Optional[dict]:
     response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
-    return response.data[0]['embed_data'] if response.data else None
+    return response.data[0]['embed_data'] if response and response.data else None
 @supabase_retry_handler()
 async def get_onboarding_steps() -> List[dict]:
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
-    return response.data if response.data else []
+    return response.data if response and response.data else []
 @supabase_retry_handler()
 async def save_panel_component_to_db(component_data: dict):
     await supabase.table('panel_components').upsert(component_data, on_conflict='component_key').execute()
 @supabase_retry_handler()
 async def get_panel_components_from_db(panel_key: str) -> list:
-    # [✅ 수정] row로 정렬한 뒤, 새로운 정렬 기준인 order_in_row로 한 번 더 정렬합니다.
     response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).order('order_in_row', desc=False).execute()
     return response.data if response and response.data else []
 # 7. 쿨다운 (cooldowns) 관련 함수
 @supabase_retry_handler()
 async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
     response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
-    if response.data and (timestamp_str := response.data[0].get('last_cooldown_timestamp')) is not None:
+    if response and response.data and (timestamp_str := response.data[0].get('last_cooldown_timestamp')) is not None:
         try:
             if timestamp_str.endswith('Z'):
                 timestamp_str = timestamp_str[:-1] + '+00:00'
@@ -237,7 +231,7 @@ async def set_cooldown(user_id_str: str, cooldown_key: str):
 @supabase_retry_handler()
 async def get_all_stats_channels() -> List[Dict[str, Any]]:
     response = await supabase.table('stats_channels').select('*').execute()
-    return response.data if response.data else []
+    return response.data if response and response.data else []
 @supabase_retry_handler()
 async def add_stats_channel(channel_id: int, guild_id: int, stat_type: str, template: str, role_id: Optional[int] = None):
     await supabase.table('stats_channels').upsert({
@@ -254,7 +248,7 @@ async def remove_stats_channel(channel_id: int):
 @supabase_retry_handler()
 async def get_all_temp_channels() -> List[Dict[str, Any]]:
     response = await supabase.table('temp_voice_channels').select('*').execute()
-    return response.data if response.data else []
+    return response.data if response and response.data else []
 @supabase_retry_handler()
 async def add_temp_channel(channel_id: int, owner_id: int, guild_id: int, message_id: int, channel_type: str):
     await supabase.table('temp_voice_channels').insert({
@@ -278,7 +272,7 @@ async def remove_multiple_temp_channels(channel_ids: List[int]):
 @supabase_retry_handler()
 async def get_all_tickets() -> List[Dict[str, Any]]:
     response = await supabase.table('tickets').select('*').execute()
-    return response.data if response.data else []
+    return response.data if response and response.data else []
 @supabase_retry_handler()
 async def add_ticket(thread_id: int, owner_id: int, guild_id: int, ticket_type: str):
     await supabase.table('tickets').insert({
@@ -306,19 +300,12 @@ async def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: st
         "moderator_id": moderator_id,
         "reason": reason,
         "amount": amount
-    }).execute()
-    return response.data[0] if response.data else None
+    }).select().execute()
+    return response.data[0] if response and response.data else None
 @supabase_retry_handler()
 async def get_total_warning_count(user_id: int, guild_id: int) -> int:
     response = await supabase.table('warnings').select('amount').eq('user_id', user_id).eq('guild_id', guild_id).execute()
-    if response.data:
-        return sum(item['amount'] for item in response.data)
-    return 0
-
-@supabase_retry_handler()
-async def get_total_warning_count(user_id: int, guild_id: int) -> int:
-    response = await supabase.table('warnings').select('amount').eq('user_id', user_id).eq('guild_id', guild_id).execute()
-    if response.data:
+    if response and response.data:
         return sum(item['amount'] for item in response.data)
     return 0
 
@@ -340,7 +327,6 @@ async def add_anonymous_message(guild_id: int, user_id: int, content: str):
 @supabase_retry_handler()
 async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime):
     """새로운 알림을 DB에 예약합니다."""
-    # 같은 타입의 활성 알림이 이미 있는지 확인하고, 있다면 비활성화 처리
     await supabase.table('reminders') \
         .update({"is_active": False}) \
         .eq('guild_id', guild_id) \
@@ -348,7 +334,6 @@ async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: dateti
         .eq('is_active', True) \
         .execute()
     
-    # 새로운 알림 삽입
     await supabase.table('reminders').insert({
         "guild_id": guild_id,
         "reminder_type": reminder_type,
@@ -365,7 +350,7 @@ async def get_due_reminders() -> List[Dict[str, Any]]:
         .eq('is_active', True) \
         .lte('remind_at', now) \
         .execute()
-    return response.data if response.data else []
+    return response.data if response and response.data else []
 
 @supabase_retry_handler()
 async def deactivate_reminder(reminder_id: int):
