@@ -1,3 +1,4 @@
+# cogs/system/system.py
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -10,9 +11,30 @@ from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel
 )
-from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP
+# [수정] ui_defaults에서 ADMIN_ROLE_KEYS를 직접 불러옵니다.
+from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS
 
 logger = logging.getLogger(__name__)
+
+# [추가] 관리자 역할 확인을 위한 커스텀 체크 함수
+async def is_admin(interaction: discord.Interaction) -> bool:
+    """이 명령어를 사용하는 유저가 관리자 역할 그룹에 속하는지 확인하는 커스텀 체크"""
+    if not isinstance(interaction.user, discord.Member):
+        return False
+    
+    # DB 캐시에서 관리자 역할 ID 목록을 가져옵니다.
+    admin_role_ids = {get_id(key) for key in ADMIN_ROLE_KEYS}
+    
+    # 유저의 역할 중 하나라도 관리자 역할 목록에 포함되는지 확인합니다.
+    user_role_ids = {role.id for role in interaction.user.roles}
+    
+    if not user_role_ids.intersection(admin_role_ids):
+        # 만약 관리자 역할이 없다면, 서버 소유자인지 확인합니다.
+        if interaction.user.id == interaction.guild.owner_id:
+            return True
+        raise app_commands.CheckFailure("このコマンドを実行するための管理者権限がありません。")
+    return True
+
 
 class ServerSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -20,15 +42,19 @@ class ServerSystem(commands.Cog):
         logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.MissingPermissions):
+        # [수정] 커스텀 체크 실패 시 메시지를 포함하도록 수정
+        if isinstance(error, app_commands.CheckFailure):
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+        elif isinstance(error, app_commands.MissingPermissions):
             await interaction.response.send_message(f"❌ このコマンドを使用するには、次の権限が必要です: `{', '.join(error.missing_permissions)}`", ephemeral=True)
         else:
             logger.error(f"'{interaction.command.qualified_name}'コマンドの処理中にエラーが発生しました: {error}", exc_info=True)
-            if interaction.response.is_done():
-                await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
-            else:
+            if not interaction.response.is_done():
                 await interaction.response.send_message("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
 
+    # ... (autocomplete 함수는 변경 없음) ...
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         
@@ -70,8 +96,14 @@ class ServerSystem(commands.Cog):
                 choices.append(app_commands.Choice(name=name, value=key))
 
         return sorted(choices, key=lambda c: c.name)[:25]
-
-    @app_commands.command(name="setup", description="[管理者] ボットのチャンネル、役割、統計など、すべての設定を管理します。")
+    
+    # [수정] 명령어 데코레이터 수정
+    @app_commands.command(
+        name="setup", 
+        description="[管理者] ボットのチャンネル、役割、統計など、すべての設定を管理します。",
+        # [추가] default_permissions: '서버 관리' 권한이 있는 사람에게만 명령어가 보이도록 설정
+        default_permissions=discord.Permissions(manage_guild=True)
+    )
     @app_commands.describe(
         action="実行するタスクを選択してください。",
         channel="[チャンネル/統計] タスクに必要なチャンネルを選択してください。",
@@ -88,7 +120,8 @@ class ServerSystem(commands.Cog):
         app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"),
         app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove"),
     ])
-    @app_commands.checks.has_permissions(manage_guild=True)
+    # [변경] 기존 has_permissions 체크를 우리가 만든 is_admin 체크로 변경
+    @app_commands.check(is_admin)
     async def setup(self, interaction: discord.Interaction,
                     action: str,
                     channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None,
@@ -96,6 +129,7 @@ class ServerSystem(commands.Cog):
                     stat_type: Optional[str] = None,
                     template: Optional[str] = None):
         
+        # 이하 setup 함수의 내용은 변경 없습니다.
         await interaction.response.defer(ephemeral=True)
 
         if action == "request_regenerate_all_game_panels":
@@ -343,6 +377,7 @@ class ServerSystem(commands.Cog):
         
         else:
             await interaction.followup.send("❌ 不明なタスクです。リストから正しいタスクを選択してください。", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
