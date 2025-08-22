@@ -1,4 +1,4 @@
-#bot-management/cogs/server/system.py
+# bot-management/cogs/server/system.py
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -10,7 +10,8 @@ import asyncio
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel,
-    _channel_id_cache, _bot_configs_cache
+    _channel_id_cache,
+    update_wallet 
 )
 from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS
 
@@ -176,7 +177,7 @@ class ServerSystem(commands.Cog):
                     request_key = f"panel_regenerate_request_{setting_key}"
                     await save_config_to_db(request_key, timestamp)
                     await interaction.followup.send(
-                        f"✅ **{friendly_name}** 채널을 `{channel.mention}`(으)로 설정하고, 게임 봇에게 패널 재설치를 요청했습니다.",
+                        f"✅ **{friendly_name}** 채널을 `{channel.mention}`(으)로 설정하고, 게임 봇에게 패널 재설치를 요청했습니다。",
                         ephemeral=True
                     )
                 else:
@@ -341,7 +342,6 @@ class ServerSystem(commands.Cog):
         else:
             await interaction.followup.send("❌ 不明なタスクです。リストから正しいタスクを選択してください。", ephemeral=True)
 
-    # [✅ 신규 기능] 관리자용 대시보드 명령어 추가
     @admin_group.command(name="status", description="ボットの現在の設定状態を一覧で表示します。")
     @app_commands.check(is_admin)
     async def status(self, interaction: discord.Interaction):
@@ -350,7 +350,6 @@ class ServerSystem(commands.Cog):
         embed = discord.Embed(title="⚙️ サーバー設定 現況ダッシュボード", color=0x3498DB)
         embed.set_footer(text=f"最終確認: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
 
-        # 1. 채널 설정
         channel_lines = []
         for key, info in sorted(SETUP_COMMAND_MAP.items(), key=lambda item: item[1]['friendly_name']):
             channel_id = _channel_id_cache.get(info['key'])
@@ -358,7 +357,6 @@ class ServerSystem(commands.Cog):
             channel_mention = f"<#{channel_id}>" if channel_id else "未設定"
             channel_lines.append(f"{status_emoji} **{info['friendly_name']}**: {channel_mention}")
         
-        # 텍스트가 1024자를 초과할 경우 여러 필드로 나눔
         full_channel_text = "\n".join(channel_lines)
         chunk_size = 1024
         for i in range(0, len(full_channel_text), chunk_size):
@@ -366,11 +364,9 @@ class ServerSystem(commands.Cog):
             field_name = "チャンネル設定" if i == 0 else "チャンネル設定 (続き)"
             embed.add_field(name=f"**{field_name}**", value=chunk, inline=False)
 
-        # 2. 역할 설정
         role_lines = []
-        # UI_ROLE_KEY_MAP에서 is_prefix가 True인 주요 역할들만 표시
         for key, info in sorted(UI_ROLE_KEY_MAP.items(), key=lambda item: item[1]['priority'], reverse=True):
-            if info.get('priority', 0) > 0: # 우선순위가 있는 역할만 표시
+            if info.get('priority', 0) > 0:
                 role_id = _channel_id_cache.get(key)
                 status_emoji = "✅" if role_id else "❌"
                 role_mention = f"<@&{role_id}>" if role_id else f"`{info['name']}` (未設定)"
@@ -381,6 +377,52 @@ class ServerSystem(commands.Cog):
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    async def log_coin_admin_action(self, admin: discord.Member, target: discord.Member, amount: int, action: str):
+        log_channel_id = get_id("coin_log_channel_id")
+        if not log_channel_id or not (log_channel := self.bot.get_channel(log_channel_id)):
+            logger.warning("コイン管理ログチャンネルが設定されていないか、見つかりません。")
+            return
+
+        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+        action_color = 0x3498DB if amount > 0 else 0xE74C3C
+        amount_str = f"+{amount:,}" if amount > 0 else f"{amount:,}"
+        
+        embed = discord.Embed(
+            description=f"⚙️ {admin.mention}さんが{target.mention}さんのコインを`{amount_str}`{currency_icon}だけ**{action}**しました。",
+            color=action_color
+        )
+        try:
+            await log_channel.send(embed=embed)
+        except Exception as e:
+            logger.error(f"管理者のコイン操作ログ送信に失敗しました: {e}", exc_info=True)
+
+    @admin_group.command(name="コイン付与", description="[管理者専用] 特定のユーザーにコインを付与します。")
+    @app_commands.describe(user="コインを付与するユーザー", amount="付与するコインの量")
+    @app_commands.check(is_admin)
+    async def give_coin(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
+        await interaction.response.defer(ephemeral=True)
+        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+        
+        result = await update_wallet(user, amount)
+        if result:
+            await self.log_coin_admin_action(interaction.user, user, amount, "付与")
+            await interaction.followup.send(f"✅ {user.mention}さんへ `{amount:,}`{currency_icon}を付与しました。")
+        else:
+            await interaction.followup.send("❌ コイン付与中にエラーが発生しました。")
+    
+    @admin_group.command(name="コイン削減", description="[管理者専用] 特定のユーザーのコインを削減します。")
+    @app_commands.describe(user="コインを削減するユーザー", amount="削減するコインの量")
+    @app_commands.check(is_admin)
+    async def take_coin(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
+        await interaction.response.defer(ephemeral=True)
+        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+
+        result = await update_wallet(user, -amount)
+        if result:
+            await self.log_coin_admin_action(interaction.user, user, -amount, "削減")
+            await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{currency_icon}を削減しました。")
+        else:
+            await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
