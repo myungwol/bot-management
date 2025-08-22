@@ -23,7 +23,6 @@ def create_xp_bar(current_xp: int, required_xp: int, length: int = 10) -> str:
 
 # --- UI Views ---
 
-# [✅ 랭킹 시스템] 랭킹을 보여주는 View
 class RankingView(ui.View):
     def __init__(self, user: discord.Member, total_users: int):
         super().__init__(timeout=180)
@@ -39,14 +38,11 @@ class RankingView(ui.View):
         await interaction.edit_original_response(embed=embed, view=self)
         
     def update_buttons(self):
-        # 자식 컴포넌트 순회 및 ID로 버튼 찾기
         prev_button = next((child for child in self.children if isinstance(child, ui.Button) and child.custom_id == "prev_page"), None)
         next_button = next((child for child in self.children if isinstance(child, ui.Button) and child.custom_id == "next_page"), None)
         
-        if prev_button:
-            prev_button.disabled = self.current_page == 0
-        if next_button:
-            next_button.disabled = self.current_page >= self.total_pages - 1
+        if prev_button: prev_button.disabled = self.current_page == 0
+        if next_button: next_button.disabled = self.current_page >= self.total_pages - 1
 
     async def build_embed(self) -> discord.Embed:
         offset = self.current_page * self.users_per_page
@@ -112,18 +108,17 @@ class LevelPanelView(ui.View):
         try:
             await set_cooldown(user_id_str, cooldown_key)
             
-            res = await asyncio.gather(
+            level_res, job_res, xp_logs_res = await asyncio.gather(
                 supabase.table('user_levels').select('*').eq('user_id', user.id).maybe_single().execute(),
                 supabase.table('user_jobs').select('jobs(*)').eq('user_id', user.id).maybe_single().execute(),
                 supabase.table('xp_logs').select('source, xp_amount').eq('user_id', user.id).execute()
             )
-            level_res, job_res, xp_logs_res = res
 
             user_level_data = level_res.data if level_res and level_res.data else {'level': 1, 'xp': 0}
             current_level, total_xp = user_level_data['level'], user_level_data['xp']
 
             xp_for_next_level_res = await supabase.rpc('get_xp_for_level', {'target_level': current_level + 1}).execute()
-            xp_for_next_level = xp_for_next_level_res.data if xp_for_next_level_res.data is not None else total_xp + 1
+            xp_for_next_level = xp_for_next_level_res.data if xp_for_next_level_res and xp_for_next_level_res.data is not None else total_xp + 1
 
             xp_at_level_start_res = await supabase.rpc('get_xp_for_level', {'target_level': current_level}).execute()
             xp_at_level_start = xp_at_level_start_res.data if xp_at_level_start_res.data is not None else 0
@@ -131,9 +126,12 @@ class LevelPanelView(ui.View):
             xp_in_current_level = total_xp - xp_at_level_start
             required_xp_for_this_level = xp_for_next_level - xp_at_level_start
 
-            job_name = "一般住民"
-            job_role_mention = ""
+            # [✅ 수정] 직업 및 등급 역할 로직 개선
             job_system_config = get_config("JOB_SYSTEM_CONFIG", {})
+            
+            # 직업 처리
+            job_name = "なし"
+            job_role_mention = ""
             job_role_map = job_system_config.get("JOB_ROLE_MAP", {})
             if job_res and job_res.data and job_res.data.get('jobs'):
                 job_data = job_res.data['jobs']
@@ -142,6 +140,15 @@ class LevelPanelView(ui.View):
                     if role_id := get_id(role_key):
                         job_role_mention = f"<@&{role_id}>"
 
+            # 등급 처리
+            level_tier_roles = job_system_config.get("LEVEL_TIER_ROLES", [])
+            tier_role_mention = ""
+            for tier in sorted(level_tier_roles, key=lambda x: x['level'], reverse=True):
+                if current_level >= tier['level']:
+                    if role_id := get_id(tier['role_key']):
+                        tier_role_mention = f"<@&{role_id}>"
+                        break
+            
             source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業'}
             aggregated_xp = {v: 0 for v in source_map.values()}
             if xp_logs_res and xp_logs_res.data:
@@ -153,16 +160,19 @@ class LevelPanelView(ui.View):
             details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items()]
             xp_details_text = "\n".join(details)
 
+            # [✅ 수정] 타이틀에 user.mention 사용
             embed = discord.Embed(title=f"{user.mention}のステータス", color=user.color or discord.Color.blue())
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
             
-            embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=True)
-            embed.add_field(name="職業", value=f"**{job_name}** {job_role_mention}", inline=True)
+            embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=False)
+            # [✅ 수정] 등급과 직업 필드 분리 및 역할 멘션
+            embed.add_field(name="等級", value=tier_role_mention or "`かけだし住民`", inline=True)
+            embed.add_field(name="職業", value=job_role_mention or "`なし`", inline=True)
+            
             xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
             embed.add_field(name="経験値", value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}`\n{xp_bar}", inline=False)
             
-            # [✅ 수정] 필드 순서 변경
             embed.add_field(name="🏆 総獲得経験値", value=f"`{total_xp:,} XP`", inline=False)
             embed.add_field(name="📊 経験値獲得の内訳", value=xp_details_text, inline=False)
             
@@ -177,7 +187,7 @@ class LevelPanelView(ui.View):
         await interaction.response.defer(ephemeral=True)
         try:
             count_res = await supabase.table('user_levels').select('user_id', count='exact').execute()
-            total_users = count_res.count if count_res else 0
+            total_users = count_res.count if count_res and count_res.count is not None else 0
 
             if total_users == 0:
                 await interaction.followup.send("まだランキング情報がありません。", ephemeral=True)
@@ -314,7 +324,7 @@ class LevelSystem(commands.Cog):
                     pass
         
         embed = discord.Embed(title="📊 レベル＆転職", description="下のボタンでご自身のレベルを確認したり、ランキングを見ることができます。", color=0x5865F2)
-        # [✅ 수정] 패널에 버튼이 포함된 LevelPanelView를 전달합니다.
+        # [✅ 수정] 패널에 LevelPanelView를 다시 전달합니다.
         view = LevelPanelView(self)
         
         message = await channel.send(embed=embed, view=view)
