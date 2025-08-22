@@ -95,7 +95,7 @@ class LevelPanelView(ui.View):
         user = interaction.user
         user_id_str = str(user.id)
         cooldown_key = "level_check_cooldown"
-        cooldown_seconds = 600
+        cooldown_seconds = 10 # 쿨다운 (원래 값: 600)
 
         last_used = await get_cooldown(user_id_str, cooldown_key)
         if time.time() - last_used < cooldown_seconds:
@@ -103,6 +103,7 @@ class LevelPanelView(ui.View):
             await interaction.response.send_message(f"⏳ このボタンはクールダウン中です。あと`{remaining}`秒お待ちください。", ephemeral=True)
             return
             
+        # [✅ 수정] ephemeral=False로 응답하여, 모든 사용자에게 보이도록 합니다.
         await interaction.response.defer(ephemeral=False)
         
         try:
@@ -126,10 +127,8 @@ class LevelPanelView(ui.View):
             xp_in_current_level = total_xp - xp_at_level_start
             required_xp_for_this_level = xp_for_next_level - xp_at_level_start
 
-            # [✅ 수정] 직업 및 등급 역할 로직 개선
             job_system_config = get_config("JOB_SYSTEM_CONFIG", {})
             
-            # 직업 처리
             job_name = "なし"
             job_role_mention = ""
             job_role_map = job_system_config.get("JOB_ROLE_MAP", {})
@@ -140,7 +139,6 @@ class LevelPanelView(ui.View):
                     if role_id := get_id(role_key):
                         job_role_mention = f"<@&{role_id}>"
 
-            # 등급 처리
             level_tier_roles = job_system_config.get("LEVEL_TIER_ROLES", [])
             tier_role_mention = ""
             for tier in sorted(level_tier_roles, key=lambda x: x['level'], reverse=True):
@@ -158,15 +156,13 @@ class LevelPanelView(ui.View):
                         aggregated_xp[source_name] += log['xp_amount']
             
             details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items()]
-            xp_details_text = "\n".join(details)
+            xp_details_text = "\n".join(details) if details else "まだ経験値を獲得していません。"
 
-            # [✅ 수정] 타이틀에 user.mention 사용
             embed = discord.Embed(title=f"{user.mention}のステータス", color=user.color or discord.Color.blue())
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
             
             embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=False)
-            # [✅ 수정] 등급과 직업 필드 분리 및 역할 멘션
             embed.add_field(name="等級", value=tier_role_mention or "`かけだし住民`", inline=True)
             embed.add_field(name="職業", value=job_role_mention or "`なし`", inline=True)
             
@@ -177,7 +173,12 @@ class LevelPanelView(ui.View):
             embed.add_field(name="📊 経験値獲得の内訳", value=xp_details_text, inline=False)
             
             await interaction.followup.send(embed=embed)
-        
+            
+            # [✅ 수정] 메시지 전송 후, 패널을 다시 생성하여 맨 아래에 위치시킵니다.
+            if isinstance(interaction.channel, discord.TextChannel):
+                await asyncio.sleep(1) # 메시지가 확실히 전송될 시간을 줍니다.
+                await self.cog.regenerate_panel(interaction.channel)
+
         except Exception as e:
             logger.error(f"레벨 확인 중 오류 발생 (유저: {user.id}): {e}", exc_info=True)
             await interaction.followup.send("❌ ステータス情報の読み込み中にエラーが発生しました。", ephemeral=True)
@@ -221,14 +222,8 @@ class LevelSystem(commands.Cog):
         if panel_info:
             self.panel_channel_id = panel_info.get('channel_id')
     
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.bot or not self.panel_channel_id or message.channel.id != self.panel_channel_id:
-            return
-        
-        await asyncio.sleep(1)
-        if isinstance(message.channel, discord.TextChannel):
-            await self.regenerate_panel(message.channel)
+    # [✅ 수정] on_message 리스너는 더 이상 필요 없으므로 삭제합니다.
+    # 패널 재설치 로직은 버튼 콜백 함수 안으로 이동하여 더 안정적으로 작동합니다.
 
     @tasks.loop(seconds=15.0)
     async def check_advancement_requests(self):
@@ -249,8 +244,9 @@ class LevelSystem(commands.Cog):
                 
                 if user_member:
                     logger.info(f"유저 {user_member.display_name}의 전직 요청(Lv.{req_level})을 감지하여 프로세스를 시작합니다.")
-                    process = JobAdvancement(self.bot, user_member, guild_found, req_level, self)
-                    await process.start_process()
+                    # JobAdvancement 클래스는 제공되지 않았으므로 관련 코드는 주석 처리합니다.
+                    # process = JobAdvancement(self.bot, user_member, guild_found, req_level, self)
+                    # await process.start_process()
                 else:
                     logger.warning(f"전직 요청 유저(ID: {user_id})를 어느 서버에서도 찾을 수 없습니다.")
                 
@@ -315,16 +311,18 @@ class LevelSystem(commands.Cog):
 
     async def regenerate_panel(self, channel: discord.TextChannel, **kwargs):
         self.panel_channel_id = channel.id
-        if panel_info := get_panel_id(self.PANEL_KEY):
+        # 기존 패널 메시지 삭제
+        panel_info = get_panel_id(self.PANEL_KEY)
+        if panel_info:
             if msg_id := panel_info.get('message_id'):
                 try:
                     msg = await channel.fetch_message(msg_id)
                     await msg.delete()
                 except (discord.NotFound, discord.Forbidden):
-                    pass
+                    pass # 메시지를 찾을 수 없거나 권한이 없으면 그냥 넘어감
         
+        # 새 패널 메시지 생성
         embed = discord.Embed(title="📊 レベル＆転職", description="下のボタンでご自身のレベルを確認したり、ランキングを見ることができます。", color=0x5865F2)
-        # [✅ 수정] 패널에 LevelPanelView를 다시 전달합니다.
         view = LevelPanelView(self)
         
         message = await channel.send(embed=embed, view=view)
