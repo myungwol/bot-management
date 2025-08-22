@@ -102,7 +102,8 @@ class LevelPanelView(ui.View):
             await interaction.response.send_message(f"⏳ このボタンはクールダウン中です。あと`{remaining}`秒お待ちください。", ephemeral=True)
             return
             
-        await interaction.response.defer(ephemeral=True)
+        # [✅ 복원] ephemeral=False를 위해 defer()를 수정합니다.
+        await interaction.response.defer()
         
         try:
             await set_cooldown(str(user.id), cooldown_key)
@@ -149,10 +150,17 @@ class LevelPanelView(ui.View):
             xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
             embed.add_field(name=f"経験値 (XP: {total_xp:,})", value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}`\n{xp_bar}", inline=False)
             
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            # [✅ 복원] ephemeral=False로 모두가 볼 수 있는 일반 메시지로 전송합니다.
+            await interaction.followup.send(embed=embed)
+            
+            # [✅ 복원] 패널을 재설치하여 항상 최신 상태를 유지합니다.
+            if isinstance(interaction.channel, discord.TextChannel):
+                await asyncio.sleep(1) 
+                await self.cog.regenerate_panel(interaction.channel, panel_key="panel_level_check")
 
         except Exception as e:
             logger.error(f"레벨 확인 중 오류 발생 (유저: {user.id}): {e}", exc_info=True)
+            # followup은 이미 defer된 상호작용에 대한 것이므로, ephemeral 옵션을 사용해야 합니다.
             await interaction.followup.send("❌ ステータス情報の読み込み中にエラーが発生しました。", ephemeral=True)
 
     @ui.button(label="ランキング確認", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="show_ranking_button")
@@ -187,7 +195,6 @@ class LevelSystem(commands.Cog):
         self.check_level_tier_updates.cancel()
         
     async def load_configs(self):
-        # 이 코그는 동적으로 채널 ID를 불러올 필요가 없으므로 이 함수는 비워둡니다.
         pass
 
     @tasks.loop(seconds=15.0)
@@ -198,8 +205,6 @@ class LevelSystem(commands.Cog):
 
             keys_to_delete = [req['config_key'] for req in res.data]
             
-            # 실제 작업은 여기에 추가 (예: 관리자에게 알림 보내기)
-
             if keys_to_delete:
                 await supabase.table('bot_configs').delete().in_('config_key', keys_to_delete).execute()
         except Exception as e:
@@ -263,18 +268,16 @@ class LevelSystem(commands.Cog):
                 await user.add_roles(new_role, reason="レベル等級の変更")
                 logger.info(f"{user.display_name}さんの等級役割を「{new_role.name}」に更新しました。")
 
-    # [✅ 버그 수정] panel_key 인자를 받도록 함수 시그니처를 수정합니다.
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_level_check") -> bool:
         try:
             panel_info = get_panel_id(panel_key)
             if panel_info and panel_info.get('message_id'):
                 try:
-                    # 패널이 설치된 원래 채널을 가져옵니다.
                     original_channel = self.bot.get_channel(panel_info.get('channel_id')) or channel
                     msg = await original_channel.fetch_message(panel_info['message_id'])
                     await msg.delete()
                 except (discord.NotFound, discord.Forbidden):
-                    pass # 메시지가 이미 삭제되었거나 권한이 없는 경우 무시
+                    pass
             
             embed = discord.Embed(title="📊 レベル＆ランキング", description="下のボタンでご自身のレベルを確認したり、サーバーのランキングを見ることができます。", color=0x5865F2)
             view = LevelPanelView(self)
