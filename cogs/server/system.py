@@ -9,7 +9,8 @@ import asyncio
 
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
-    get_all_stats_channels, add_stats_channel, remove_stats_channel
+    get_all_stats_channels, add_stats_channel, remove_stats_channel,
+    _channel_id_cache, _bot_configs_cache
 )
 from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS
 
@@ -19,7 +20,7 @@ async def is_admin(interaction: discord.Interaction) -> bool:
     if not isinstance(interaction.user, discord.Member):
         return False
     
-    admin_role_ids = {get_id(key) for key in ADMIN_ROLE_KEYS}
+    admin_role_ids = {get_id(key) for key in ADMIN_ROLE_KEYS if get_id(key)}
     user_role_ids = {role.id for role in interaction.user.roles}
     
     if not user_role_ids.intersection(admin_role_ids):
@@ -29,7 +30,6 @@ async def is_admin(interaction: discord.Interaction) -> bool:
     return True
 
 class ServerSystem(commands.Cog):
-    # [수정] 관리자용 명령어 그룹을 생성하고 여기에 권한을 설정합니다.
     admin_group = app_commands.Group(
         name="admin",
         description="サーバー管理用のコマンドです。",
@@ -38,7 +38,7 @@ class ServerSystem(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
+        logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다。")
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.CheckFailure):
@@ -58,6 +58,7 @@ class ServerSystem(commands.Cog):
             choice_name = f"{info.get('friendly_name', key)} 설정"
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
+        
         role_setup_actions = {
             "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정",
             "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정",
@@ -65,18 +66,22 @@ class ServerSystem(commands.Cog):
         for key, name in role_setup_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
+
         panel_actions = {"panels_regenerate_all": "[패널] 모든 관리 패널 재설치"}
         for key, name in panel_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
+
         game_panel_actions = {"request_regenerate_all_game_panels": "[ゲーム] 全パネルの一括再設置要請"}
         for key, name in game_panel_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
+
         role_actions = {"roles_sync": "[역할] 모든 역할 DB와 동기화"}
         for key, name in role_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
+
         stats_actions = {
             "stats_set": "[통계] 통계 채널 설정/제거",
             "stats_refresh": "[통계] 모든 통계 채널 새로고침",
@@ -85,10 +90,9 @@ class ServerSystem(commands.Cog):
         for key, name in stats_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
+        
         return sorted(choices, key=lambda c: c.name)[:25]
 
-    # [수정] @app_commands.command -> @admin_group.command 로 변경
-    # 이렇게 하면 이 명령어는 /admin setup 으로 호출됩니다.
     @admin_group.command(
         name="setup",
         description="ボットのチャンネル、役割、統計など、すべての設定を管理します。"
@@ -117,7 +121,6 @@ class ServerSystem(commands.Cog):
                     stat_type: Optional[str] = None,
                     template: Optional[str] = None):
         
-        # 이하 setup 함수의 내용은 변경 없습니다.
         await interaction.response.defer(ephemeral=True)
 
         if action == "request_regenerate_all_game_panels":
@@ -161,7 +164,7 @@ class ServerSystem(commands.Cog):
             
             save_success = await save_id_to_db(db_key, channel.id)
             if not save_success:
-                return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요.", ephemeral=True)
+                return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요。", ephemeral=True)
 
             cog_to_reload = self.bot.get_cog(config["cog_name"])
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
@@ -206,7 +209,7 @@ class ServerSystem(commands.Cog):
             
             save_success = await save_id_to_db(db_key, role.id)
             if not save_success:
-                 return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요.", ephemeral=True)
+                 return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요。", ephemeral=True)
 
             cog_to_reload = self.bot.get_cog("Reminder")
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
@@ -216,35 +219,26 @@ class ServerSystem(commands.Cog):
 
         elif action == "panels_regenerate_all":
             setup_map = get_config("SETUP_COMMAND_MAP", {})
-            success_list = []
-            failure_list = []
+            success_list, failure_list = [], []
 
             await interaction.followup.send("⏳ すべてのパネルの再設置を開始します...", ephemeral=True)
 
             for key, info in setup_map.items():
-                if info.get("type") == "panel":
+                if info.get("type") == "panel" and "[게임]" not in info.get("friendly_name", ""):
                     friendly_name = info.get("friendly_name", key)
                     try:
-                        cog_name = info.get("cog_name")
-                        channel_db_key = info.get("key")
+                        cog_name, channel_db_key = info.get("cog_name"), info.get("key")
                         if not all([cog_name, channel_db_key]):
                             failure_list.append(f"・`{friendly_name}`: 設定情報が不完全です。")
                             continue
-
                         cog = self.bot.get_cog(cog_name)
                         if not cog or not hasattr(cog, 'regenerate_panel'):
                             failure_list.append(f"・`{friendly_name}`: Cogが見つからないか、再生成機能がありません。")
                             continue
-                        
                         channel_id = get_id(channel_db_key)
-                        if not channel_id:
-                            failure_list.append(f"・`{friendly_name}`: チャンネルが設定されていません。")
+                        if not channel_id or not (target_channel := self.bot.get_channel(channel_id)):
+                            failure_list.append(f"・`{friendly_name}`: チャンネルが設定されていないか、見つかりません。")
                             continue
-                        
-                        target_channel = self.bot.get_channel(channel_id)
-                        if not target_channel:
-                             failure_list.append(f"・`{friendly_name}`: チャンネル(ID: {channel_id})が見つかりません。")
-                             continue
                         
                         success = False
                         if cog_name == "TicketSystem":
@@ -253,18 +247,15 @@ class ServerSystem(commands.Cog):
                         else:
                             success = await cog.regenerate_panel(target_channel)
                         
-                        if success:
-                            success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
-                        else:
-                            failure_list.append(f"・`{friendly_name}`: 再生成中に不明なエラーが発生しました。")
+                        if success: success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
+                        else: failure_list.append(f"・`{friendly_name}`: 再生成中に不明なエラーが発生しました。")
 
                     except Exception as e:
                         logger.error(f"'{friendly_name}' 패널 일괄 재설치 중 오류: {e}", exc_info=True)
                         failure_list.append(f"・`{friendly_name}`: スクリプトエラー発生。")
 
             embed = discord.Embed(title="⚙️ すべてのパネルの再設置結果", color=0x3498DB, timestamp=discord.utils.utcnow())
-            if success_list:
-                embed.add_field(name="✅ 成功", value="\n".join(success_list), inline=False)
+            if success_list: embed.add_field(name="✅ 成功", value="\n".join(success_list), inline=False)
             if failure_list:
                 embed.color = 0xED4245
                 embed.add_field(name="❌ 失敗", value="\n".join(failure_list), inline=False)
@@ -279,26 +270,16 @@ class ServerSystem(commands.Cog):
             server_roles_by_name = {r.name: r.id for r in interaction.guild.roles}
             
             for db_key, role_info in UI_ROLE_KEY_MAP.items():
-                role_name = role_info.get('name')
-                if not role_name: continue
-                
+                if not (role_name := role_info.get('name')): continue
                 if role_id := server_roles_by_name.get(role_name):
-                    save_success = await save_id_to_db(db_key, role_id)
-                    if save_success:
-                        synced_roles.append(f"・`{role_name}`")
-                    else:
-                        error_roles.append(f"・`{role_name}`: DB 저장 실패")
-                else:
-                    missing_roles.append(f"・`{role_name}`")
+                    if await save_id_to_db(db_key, role_id): synced_roles.append(f"・`{role_name}`")
+                    else: error_roles.append(f"・`{role_name}`: DB 저장 실패")
+                else: missing_roles.append(f"・`{role_name}`")
             
             embed = discord.Embed(title="⚙️ 役割データベースの完全同期結果", color=0x2ECC71)
             embed.set_footer(text=f"合計 {len(UI_ROLE_KEY_MAP)}個中 | 成功: {len(synced_roles)} / 失敗: {len(missing_roles) + len(error_roles)}")
 
-            if synced_roles:
-                full_text = "\n".join(synced_roles)
-                for i in range(0, len(full_text), 1024):
-                    chunk = full_text[i:i+1024]
-                    embed.add_field(name=f"✅ 同期成功 ({len(synced_roles)}個)", value=chunk, inline=False)
+            if synced_roles: embed.add_field(name=f"✅ 同期成功 ({len(synced_roles)}個)", value="\n".join(synced_roles)[:1024], inline=False)
             if missing_roles:
                 embed.color = 0xFEE75C
                 embed.add_field(name=f"⚠️ サーバーに該当の役割なし ({len(missing_roles)}個)", value="\n".join(missing_roles)[:1024], inline=False)
@@ -324,18 +305,15 @@ class ServerSystem(commands.Cog):
                 if stat_type == "role" and not role:
                     return await interaction.followup.send("❌ '特定の役割の人数'を選択した場合は、「role」オプションを指定する必要があります。", ephemeral=True)
                 
-                role_id = role.id if role else None
-                await add_stats_channel(channel.id, interaction.guild_id, stat_type, current_template, role_id)
+                await add_stats_channel(channel.id, interaction.guild_id, stat_type, current_template, role.id if role else None)
                 
-                stats_cog = self.bot.get_cog("StatsUpdater")
-                if stats_cog and hasattr(stats_cog, 'update_stats_loop') and stats_cog.update_stats_loop.is_running():
+                if (stats_cog := self.bot.get_cog("StatsUpdater")) and hasattr(stats_cog, 'update_stats_loop') and stats_cog.update_stats_loop.is_running():
                     stats_cog.update_stats_loop.restart()
                 
                 await interaction.followup.send(f"✅ `{channel.name}` チャンネルに統計設定を追加/修正しました。まもなく更新されます。", ephemeral=True)
 
         elif action == "stats_refresh":
-            stats_cog = self.bot.get_cog("StatsUpdater")
-            if stats_cog and hasattr(stats_cog, 'update_stats_loop') and stats_cog.update_stats_loop.is_running():
+            if (stats_cog := self.bot.get_cog("StatsUpdater")) and hasattr(stats_cog, 'update_stats_loop') and stats_cog.update_stats_loop.is_running():
                 stats_cog.update_stats_loop.restart()
                 await interaction.followup.send("✅ すべての統計チャンネルの更新を要求しました。", ephemeral=True)
             else:
@@ -350,14 +328,11 @@ class ServerSystem(commands.Cog):
             embed = discord.Embed(title="📊 設定された統計チャンネル一覧", color=0x3498DB)
             description = []
             for config in guild_configs:
-                ch = self.bot.get_channel(config['channel_id'])
-                ch_mention = f"<#{ch.id}>" if ch else f"削除されたチャンネル({config['channel_id']})"
-                
+                ch_mention = f"<#{config['channel_id']}>" if self.bot.get_channel(config['channel_id']) else f"削除されたチャンネル({config['channel_id']})"
                 role_info = ""
                 if config['stat_type'] == 'role' and config.get('role_id'):
                     role_obj = interaction.guild.get_role(config['role_id'])
                     role_info = f"\n**対象役割:** {role_obj.mention if role_obj else '不明な役割'}"
-                
                 description.append(f"**チャンネル:** {ch_mention}\n**種類:** `{config['stat_type']}`{role_info}\n**名前形式:** `{config['channel_name_template']}`")
             
             embed.description = "\n\n".join(description)
@@ -365,6 +340,47 @@ class ServerSystem(commands.Cog):
         
         else:
             await interaction.followup.send("❌ 不明なタスクです。リストから正しいタスクを選択してください。", ephemeral=True)
+
+    # [✅ 신규 기능] 관리자용 대시보드 명령어 추가
+    @admin_group.command(name="status", description="ボットの現在の設定状態を一覧で表示します。")
+    @app_commands.check(is_admin)
+    async def status(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        embed = discord.Embed(title="⚙️ サーバー設定 現況ダッシュボード", color=0x3498DB)
+        embed.set_footer(text=f"最終確認: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
+
+        # 1. 채널 설정
+        channel_lines = []
+        for key, info in sorted(SETUP_COMMAND_MAP.items(), key=lambda item: item[1]['friendly_name']):
+            channel_id = _channel_id_cache.get(info['key'])
+            status_emoji = "✅" if channel_id else "❌"
+            channel_mention = f"<#{channel_id}>" if channel_id else "未設定"
+            channel_lines.append(f"{status_emoji} **{info['friendly_name']}**: {channel_mention}")
+        
+        # 텍스트가 1024자를 초과할 경우 여러 필드로 나눔
+        full_channel_text = "\n".join(channel_lines)
+        chunk_size = 1024
+        for i in range(0, len(full_channel_text), chunk_size):
+            chunk = full_channel_text[i:i+chunk_size]
+            field_name = "チャンネル設定" if i == 0 else "チャンネル設定 (続き)"
+            embed.add_field(name=f"**{field_name}**", value=chunk, inline=False)
+
+        # 2. 역할 설정
+        role_lines = []
+        # UI_ROLE_KEY_MAP에서 is_prefix가 True인 주요 역할들만 표시
+        for key, info in sorted(UI_ROLE_KEY_MAP.items(), key=lambda item: item[1]['priority'], reverse=True):
+            if info.get('priority', 0) > 0: # 우선순위가 있는 역할만 표시
+                role_id = _channel_id_cache.get(key)
+                status_emoji = "✅" if role_id else "❌"
+                role_mention = f"<@&{role_id}>" if role_id else f"`{info['name']}` (未設定)"
+                role_lines.append(f"{status_emoji} **{info['name']}**: {role_mention if role_id else '未設定'}")
+        
+        if role_lines:
+            embed.add_field(name="**主要な役割設定**", value="\n".join(role_lines)[:1024], inline=False)
+
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
