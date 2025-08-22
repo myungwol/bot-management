@@ -50,7 +50,7 @@ class MyBot(commands.Bot):
     async def setup_hook(self):
         await self.load_all_extensions()
         
-        cogs_with_persistent_views = ["RolePanel", "Onboarding", "Nicknames", "TicketSystem"]
+        cogs_with_persistent_views = ["RolePanel", "Onboarding", "Nicknames", "TicketSystem", "CustomEmbed"]
         registered_views_count = 0
         for cog_name in cogs_with_persistent_views:
             cog = self.get_cog(cog_name)
