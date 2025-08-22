@@ -142,13 +142,12 @@ class LevelPanelView(ui.View):
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
             
-            # [✅ UI 복원] 기존 UI와 동일하게 필드를 구성합니다.
+            # [✅ UI 복원] 제공해주신 코드와 동일하게 필드를 구성합니다.
             embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=True)
             embed.add_field(name="等級", value=tier_role_mention, inline=True)
             embed.add_field(name="職業", value=f"`{job_name}`", inline=True)
             
             xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
-            # [✅ UI 복원] 경험치 필드에 총 경험치를 함께 표시합니다.
             embed.add_field(
                 name="経験値", 
                 value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}` (総XP: `{total_xp:,}`)\n{xp_bar}", 
