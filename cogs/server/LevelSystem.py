@@ -54,7 +54,7 @@ class RankingView(ui.View):
         if res and res.data:
             for i, user_data in enumerate(res.data):
                 rank = offset + i + 1
-                member = self.user.guild.get_member(user_data['user_id'])
+                member = self.user.guild.get_member(int(user_data['user_id']))
                 name = member.display_name if member else f"ID: {user_data['user_id']}"
                 rank_list.append(f"`{rank}.` {name} - **Lv.{user_data['level']}** (`{user_data['xp']:,} XP`)")
         
@@ -93,94 +93,63 @@ class LevelPanelView(ui.View):
     @ui.button(label="ステータス確認", style=discord.ButtonStyle.primary, emoji="📊", custom_id="level_check_button")
     async def check_level_button(self, interaction: discord.Interaction, button: ui.Button):
         user = interaction.user
-        user_id_str = str(user.id)
         cooldown_key = "level_check_cooldown"
-        # [✅ 수정] 쿨타임을 60초(1분)으로 변경합니다.
         cooldown_seconds = 60
 
-        last_used = await get_cooldown(user_id_str, cooldown_key)
-        # [✅ 수정] time.time()으로 현재 시간을 가져와 쿨타임을 정확히 계산합니다.
+        last_used = await get_cooldown(str(user.id), cooldown_key)
         if time.time() - last_used < cooldown_seconds:
             remaining = int(cooldown_seconds - (time.time() - last_used))
             await interaction.response.send_message(f"⏳ このボタンはクールダウン中です。あと`{remaining}`秒お待ちください。", ephemeral=True)
             return
             
-        # [✅ 수정] defer의 ephemeral 인자를 삭제하여 일반 메시지 전송을 준비합니다.
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         
         try:
-            # [✅ 수정] 쿨타임이 정상적으로 기록되도록 set_cooldown을 호출합니다.
-            await set_cooldown(user_id_str, cooldown_key)
+            await set_cooldown(str(user.id), cooldown_key)
             
-            level_res, job_res, xp_logs_res = await asyncio.gather(
+            level_res, job_res = await asyncio.gather(
                 supabase.table('user_levels').select('*').eq('user_id', user.id).maybe_single().execute(),
-                supabase.table('user_jobs').select('jobs(*)').eq('user_id', user.id).maybe_single().execute(),
-                supabase.table('xp_logs').select('source, xp_amount').eq('user_id', user.id).execute()
+                supabase.table('user_jobs').select('jobs(*)').eq('user_id', user.id).maybe_single().execute()
             )
 
             user_level_data = level_res.data if level_res and level_res.data else {'level': 1, 'xp': 0}
             current_level, total_xp = user_level_data['level'], user_level_data['xp']
 
-            xp_for_next_level_res = await supabase.rpc('get_xp_for_level', {'target_level': current_level + 1}).execute()
-            xp_for_next_level = xp_for_next_level_res.data if xp_for_next_level_res and xp_for_next_level_res.data is not None else total_xp + 1
-
-            xp_at_level_start_res = await supabase.rpc('get_xp_for_level', {'target_level': current_level}).execute()
+            xp_for_next_level_res, xp_at_level_start_res = await asyncio.gather(
+                supabase.rpc('get_xp_for_level', {'target_level': current_level + 1}).execute(),
+                supabase.rpc('get_xp_for_level', {'target_level': current_level}).execute()
+            )
+            xp_for_next_level = xp_for_next_level_res.data if xp_for_next_level_res.data is not None else total_xp + 1
             xp_at_level_start = xp_at_level_start_res.data if xp_at_level_start_res.data is not None else 0
             
             xp_in_current_level = total_xp - xp_at_level_start
             required_xp_for_this_level = xp_for_next_level - xp_at_level_start
 
             job_system_config = get_config("JOB_SYSTEM_CONFIG", {})
-            
             job_name = "なし"
-            job_role_mention = ""
-            job_role_map = job_system_config.get("JOB_ROLE_MAP", {})
             if job_res and job_res.data and job_res.data.get('jobs'):
-                job_data = job_res.data['jobs']
-                job_name = job_data['job_name']
-                if role_key := job_role_map.get(job_data['job_key']):
-                    if role_id := get_id(role_key):
-                        job_role_mention = f"<@&{role_id}>"
-
+                job_name = job_res.data['jobs']['job_name']
+            
             level_tier_roles = job_system_config.get("LEVEL_TIER_ROLES", [])
-            tier_role_mention = ""
+            tier_role_mention = "`かけだし住民`"
             for tier in sorted(level_tier_roles, key=lambda x: x['level'], reverse=True):
                 if current_level >= tier['level']:
                     if role_id := get_id(tier['role_key']):
                         tier_role_mention = f"<@&{role_id}>"
                         break
-            
-            source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業'}
-            aggregated_xp = {v: 0 for v in source_map.values()}
-            if xp_logs_res and xp_logs_res.data:
-                for log in xp_logs_res.data:
-                    source_name = source_map.get(log['source'], log['source'])
-                    if source_name in aggregated_xp:
-                        aggregated_xp[source_name] += log['xp_amount']
-            
-            details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items()]
-            xp_details_text = "\n".join(details) if details else "まだ経験値を獲得していません。"
 
-            embed = discord.Embed(title=f"{user.mention}のステータス", color=user.color or discord.Color.blue())
+            embed = discord.Embed(title=f"{user.display_name}のステータス", color=user.color or discord.Color.blue())
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
             
-            embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=False)
-            embed.add_field(name="等級", value=tier_role_mention or "`かけだし住民`", inline=True)
-            embed.add_field(name="職業", value=job_role_mention or "`なし`", inline=True)
+            embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=True)
+            embed.add_field(name="等級", value=tier_role_mention, inline=True)
+            embed.add_field(name="職業", value=f"`{job_name}`", inline=True)
             
             xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
-            embed.add_field(name="経験値", value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}`\n{xp_bar}", inline=False)
+            embed.add_field(name=f"経験値 (XP: {total_xp:,})", value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}`\n{xp_bar}", inline=False)
             
-            embed.add_field(name="🏆 総獲得経験値", value=f"`{total_xp:,} XP`", inline=False)
-            embed.add_field(name="📊 経験値獲得の内訳", value=xp_details_text, inline=False)
-            
-            # [✅ 수정] followup.send로 일반 메시지를 전송합니다.
-            await interaction.followup.send(embed=embed)
-            
-            if isinstance(interaction.channel, discord.TextChannel):
-                await asyncio.sleep(1) 
-                await self.cog.regenerate_panel(interaction.channel)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
         except Exception as e:
             logger.error(f"레벨 확인 중 오류 발생 (유저: {user.id}): {e}", exc_info=True)
@@ -206,11 +175,8 @@ class LevelPanelView(ui.View):
             await interaction.followup.send("❌ ランキング情報の読み込み中にエラーが発生しました。", ephemeral=True)
 
 class LevelSystem(commands.Cog):
-    PANEL_KEY = "panel_level_check"
-
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.panel_channel_id: Optional[int] = None
         self.bot.add_view(LevelPanelView(self))
         self.check_advancement_requests.start()
         self.check_level_tier_updates.start()
@@ -221,33 +187,21 @@ class LevelSystem(commands.Cog):
         self.check_level_tier_updates.cancel()
         
     async def load_configs(self):
-        panel_info = get_panel_id(self.PANEL_KEY)
-        if panel_info:
-            self.panel_channel_id = panel_info.get('channel_id')
+        # 이 코그는 동적으로 채널 ID를 불러올 필요가 없으므로 이 함수는 비워둡니다.
+        pass
 
     @tasks.loop(seconds=15.0)
     async def check_advancement_requests(self):
         try:
             res = await supabase.table('bot_configs').select('config_key, config_value').like('config_key', 'job_advancement_request_%').execute()
-            if not res or not res.data:
-                return
+            if not res or not res.data: return
 
-            for req in res.data:
-                user_id = int(req['config_key'].split('_')[-1])
-                req_level = req['config_value'].get('level', 0)
-                
-                guild_found, user_member = None, None
-                for guild in self.bot.guilds:
-                    if member := guild.get_member(user_id):
-                        guild_found, user_member = guild, member
-                        break
-                
-                if user_member:
-                    logger.info(f"유저 {user_member.display_name}의 전직 요청(Lv.{req_level})을 감지하여 프로세스를 시작합니다.")
-                else:
-                    logger.warning(f"전직 요청 유저(ID: {user_id})를 어느 서버에서도 찾을 수 없습니다.")
-                
-                await supabase.table('bot_configs').delete().eq('config_key', req['config_key']).execute()
+            keys_to_delete = [req['config_key'] for req in res.data]
+            
+            # 실제 작업은 여기에 추가 (예: 관리자에게 알림 보내기)
+
+            if keys_to_delete:
+                await supabase.table('bot_configs').delete().in_('config_key', keys_to_delete).execute()
         except Exception as e:
             logger.error(f"전직 요청 확인 중 오류: {e}", exc_info=True)
 
@@ -261,6 +215,8 @@ class LevelSystem(commands.Cog):
             res = await supabase.table('bot_configs').select('config_key, config_value').like('config_key', 'level_tier_update_request_%').execute()
             if not res or not res.data: return
 
+            keys_to_delete = [req['config_key'] for req in res.data]
+            
             for req in res.data:
                 user_id = int(req['config_key'].split('_')[-1])
                 new_level = req['config_value'].get('level', 0)
@@ -272,8 +228,9 @@ class LevelSystem(commands.Cog):
                 
                 if user_member:
                     await self.update_level_tier_role(user_member, new_level)
-                
-                await supabase.table('bot_configs').delete().eq('config_key', req['config_key']).execute()
+            
+            if keys_to_delete:
+                await supabase.table('bot_configs').delete().in_('config_key', keys_to_delete).execute()
         except Exception as e:
             logger.error(f"레벨 등급 업데이트 확인 중 오류: {e}", exc_info=True)
             
@@ -306,23 +263,29 @@ class LevelSystem(commands.Cog):
                 await user.add_roles(new_role, reason="レベル等級の変更")
                 logger.info(f"{user.display_name}さんの等級役割を「{new_role.name}」に更新しました。")
 
-    async def regenerate_panel(self, channel: discord.TextChannel, **kwargs):
-        self.panel_channel_id = channel.id
-        panel_info = get_panel_id(self.PANEL_KEY)
-        if panel_info:
-            if msg_id := panel_info.get('message_id'):
+    # [✅ 버그 수정] panel_key 인자를 받도록 함수 시그니처를 수정합니다.
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_level_check") -> bool:
+        try:
+            panel_info = get_panel_id(panel_key)
+            if panel_info and panel_info.get('message_id'):
                 try:
-                    msg = await channel.fetch_message(msg_id)
+                    # 패널이 설치된 원래 채널을 가져옵니다.
+                    original_channel = self.bot.get_channel(panel_info.get('channel_id')) or channel
+                    msg = await original_channel.fetch_message(panel_info['message_id'])
                     await msg.delete()
                 except (discord.NotFound, discord.Forbidden):
-                    pass
-        
-        embed = discord.Embed(title="📊 レベル＆転職", description="下のボタンでご自身のレベルを確認したり、ランキングを見ることができます。", color=0x5865F2)
-        view = LevelPanelView(self)
-        
-        message = await channel.send(embed=embed, view=view)
-        await save_panel_id(self.PANEL_KEY, message.id, channel.id)
-        logger.info(f"✅ レベル確認パネルを #{channel.name} に再設置しました。")
+                    pass # 메시지가 이미 삭제되었거나 권한이 없는 경우 무시
+            
+            embed = discord.Embed(title="📊 レベル＆ランキング", description="下のボタンでご自身のレベルを確認したり、サーバーのランキングを見ることができます。", color=0x5865F2)
+            view = LevelPanelView(self)
+            
+            message = await channel.send(embed=embed, view=view)
+            await save_panel_id(panel_key, message.id, channel.id)
+            logger.info(f"✅ 「{panel_key}」パネルを #{channel.name} に再設置しました。")
+            return True
+        except Exception as e:
+            logger.error(f"「{panel_key}」パネルの再設置中にエラー: {e}", exc_info=True)
+            return False
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(LevelSystem(bot))
