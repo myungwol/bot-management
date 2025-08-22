@@ -164,6 +164,15 @@ async def save_id_to_db(key: str, object_id: int) -> bool:
 def get_id(key: str) -> Optional[int]:
     return _channel_id_cache.get(key)
 
+async def save_panel_id(panel_name: str, message_id: int, channel_id: int):
+    await save_id_to_db(f"panel_{panel_name}_message_id", message_id)
+    await save_id_to_db(f"panel_{panel_name}_channel_id", channel_id)
+
+def get_panel_id(panel_name: str) -> Optional[Dict[str, int]]:
+    message_id = get_id(f"panel_{panel_name}_message_id")
+    channel_id = get_id(f"panel_{panel_name}_channel_id")
+    return {"message_id": message_id, "channel_id": channel_id} if message_id and channel_id else None
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 6. 임베드 및 UI 컴포넌트 관련 함수
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -177,9 +186,29 @@ async def get_embed_from_db(embed_key: str) -> Optional[dict]:
 @supabase_retry_handler()
 async def save_panel_component_to_db(component_data: dict):
     await supabase.table('panel_components').upsert(component_data, on_conflict='component_key').execute()
+@supabase_retry_handler()
+async def get_panel_components_from_db(panel_key: str) -> list:
+    response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).order('order_in_row', desc=False).execute()
+    return response.data if response and response.data else []
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 7. 통계 채널 (stats_channels) 관련 함수
+# 7. 쿨다운 (cooldowns) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
+    response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
+    if response and response.data and (timestamp_str := response.data[0].get('last_cooldown_timestamp')) is not None:
+        try:
+            if timestamp_str.endswith('Z'): timestamp_str = timestamp_str[:-1] + '+00:00'
+            return datetime.fromisoformat(timestamp_str).timestamp()
+        except (ValueError, TypeError): return 0.0
+    return 0.0
+@supabase_retry_handler()
+async def set_cooldown(user_id_str: str, cooldown_key: str):
+    await supabase.table('cooldowns').upsert({ "user_id": user_id_str, "cooldown_key": cooldown_key, "last_cooldown_timestamp": datetime.now(timezone.utc).isoformat() }, on_conflict='user_id, cooldown_key').execute()
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 8. 통계 채널 (stats_channels) 관련 함수
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def get_all_stats_channels() -> List[Dict[str, Any]]:
@@ -193,7 +222,84 @@ async def remove_stats_channel(channel_id: int):
     await supabase.table('stats_channels').delete().eq('channel_id', channel_id).execute()
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 8. [✅ 신규] 게임 경제 관련 함수
+# 9. 임시 음성 채널 (temp_voice_channels) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def get_all_temp_channels() -> List[Dict[str, Any]]:
+    response = await supabase.table('temp_voice_channels').select('*').execute()
+    return response.data if response and response.data else []
+@supabase_retry_handler()
+async def add_temp_channel(channel_id: int, owner_id: int, guild_id: int, message_id: int, channel_type: str):
+    await supabase.table('temp_voice_channels').insert({"channel_id": channel_id, "owner_id": owner_id, "guild_id": guild_id, "message_id": message_id, "channel_type": channel_type}).execute()
+@supabase_retry_handler()
+async def update_temp_channel_owner(channel_id: int, new_owner_id: int):
+    await supabase.table('temp_voice_channels').update({"owner_id": new_owner_id}).eq('channel_id', channel_id).execute()
+@supabase_retry_handler()
+async def remove_temp_channel(channel_id: int):
+    await supabase.table('temp_voice_channels').delete().eq('channel_id', channel_id).execute()
+@supabase_retry_handler()
+async def remove_multiple_temp_channels(channel_ids: List[int]):
+    if not channel_ids: return
+    await supabase.table('temp_voice_channels').delete().in_('channel_id', channel_ids).execute()
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 11. 티켓 시스템 (tickets) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def get_all_tickets() -> List[Dict[str, Any]]:
+    response = await supabase.table('tickets').select('*').execute()
+    return response.data if response and response.data else []
+@supabase_retry_handler()
+async def add_ticket(thread_id: int, owner_id: int, guild_id: int, ticket_type: str):
+    await supabase.table('tickets').insert({"thread_id": thread_id, "owner_id": owner_id, "guild_id": guild_id, "ticket_type": ticket_type}).execute()
+@supabase_retry_handler()
+async def remove_ticket(thread_id: int):
+    await supabase.table('tickets').delete().eq('thread_id', thread_id).execute()
+@supabase_retry_handler()
+async def update_ticket_lock_status(thread_id: int, is_locked: bool):
+    await supabase.table('tickets').update({"is_locked": is_locked}).eq('thread_id', thread_id).execute()
+@supabase_retry_handler()
+async def remove_multiple_tickets(thread_ids: List[int]):
+    if not thread_ids: return
+    await supabase.table('tickets').delete().in_('thread_id', thread_ids).execute()
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 12. 경고 시스템 (warnings) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: str, amount: int) -> Optional[dict]:
+    response = await supabase.table('warnings').insert({"guild_id": guild_id, "user_id": user_id, "moderator_id": moderator_id, "reason": reason, "amount": amount}).select().execute()
+    return response.data[0] if response and response.data else None
+@supabase_retry_handler()
+async def get_total_warning_count(user_id: int, guild_id: int) -> int:
+    response = await supabase.table('warnings').select('amount').eq('user_id', user_id).eq('guild_id', guild_id).execute()
+    return sum(item['amount'] for item in response.data) if response and response.data else 0
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 13. 익명 게시판 (anonymous_messages) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def add_anonymous_message(guild_id: int, user_id: int, content: str):
+    await supabase.table('anonymous_messages').insert({"guild_id": guild_id, "user_id": user_id, "message_content": content}).execute()
+    
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 14. 알림 (reminders) 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime):
+    await supabase.table('reminders').update({"is_active": False}).eq('guild_id', guild_id).eq('reminder_type', reminder_type).eq('is_active', True).execute()
+    await supabase.table('reminders').insert({"guild_id": guild_id, "reminder_type": reminder_type, "remind_at": remind_at.isoformat(), "is_active": True}).execute()
+@supabase_retry_handler()
+async def get_due_reminders() -> List[Dict[str, Any]]:
+    now = datetime.now(timezone.utc).isoformat()
+    response = await supabase.table('reminders').select('*').eq('is_active', True).lte('remind_at', now).execute()
+    return response.data if response and response.data else []
+@supabase_retry_handler()
+async def deactivate_reminder(reminder_id: int):
+    await supabase.table('reminders').update({"is_active": False}).eq('id', reminder_id).execute()
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 15. 게임 경제 관련 함수 (관리 봇용)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def update_wallet(user: discord.User, amount: int) -> Optional[dict]:
