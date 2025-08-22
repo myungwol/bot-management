@@ -54,6 +54,7 @@ class RankingView(ui.View):
         if res and res.data:
             for i, user_data in enumerate(res.data):
                 rank = offset + i + 1
+                # user_id가 문자열일 경우를 대비해 int로 변환
                 member = self.user.guild.get_member(int(user_data['user_id']))
                 name = member.display_name if member else f"ID: {user_data['user_id']}"
                 rank_list.append(f"`{rank}.` {name} - **Lv.{user_data['level']}** (`{user_data['xp']:,} XP`)")
@@ -93,10 +94,11 @@ class LevelPanelView(ui.View):
     @ui.button(label="ステータス確認", style=discord.ButtonStyle.primary, emoji="📊", custom_id="level_check_button")
     async def check_level_button(self, interaction: discord.Interaction, button: ui.Button):
         user = interaction.user
+        user_id_str = str(user.id)
         cooldown_key = "level_check_cooldown"
         cooldown_seconds = 60
 
-        last_used = await get_cooldown(str(user.id), cooldown_key)
+        last_used = await get_cooldown(user_id_str, cooldown_key)
         if time.time() - last_used < cooldown_seconds:
             remaining = int(cooldown_seconds - (time.time() - last_used))
             await interaction.response.send_message(f"⏳ このボタンはクールダウン中です。あと`{remaining}`秒お待ちください。", ephemeral=True)
@@ -105,59 +107,79 @@ class LevelPanelView(ui.View):
         await interaction.response.defer()
         
         try:
-            await set_cooldown(str(user.id), cooldown_key)
+            await set_cooldown(user_id_str, cooldown_key)
             
-            level_res, job_res = await asyncio.gather(
+            # [UI 복원] xp_logs를 함께 조회하여 경험치 획득 내역을 가져옵니다.
+            level_res, job_res, xp_logs_res = await asyncio.gather(
                 supabase.table('user_levels').select('*').eq('user_id', user.id).maybe_single().execute(),
-                supabase.table('user_jobs').select('jobs(*)').eq('user_id', user.id).maybe_single().execute()
+                supabase.table('user_jobs').select('jobs(*)').eq('user_id', user.id).maybe_single().execute(),
+                supabase.table('xp_logs').select('source, xp_amount').eq('user_id', user.id).execute()
             )
 
             user_level_data = level_res.data if level_res and level_res.data else {'level': 1, 'xp': 0}
             current_level, total_xp = user_level_data['level'], user_level_data['xp']
 
-            xp_for_next_level_res, xp_at_level_start_res = await asyncio.gather(
-                supabase.rpc('get_xp_for_level', {'target_level': current_level + 1}).execute(),
-                supabase.rpc('get_xp_for_level', {'target_level': current_level}).execute()
-            )
+            xp_for_next_level_res = await supabase.rpc('get_xp_for_level', {'target_level': current_level + 1}).execute()
             xp_for_next_level = xp_for_next_level_res.data if xp_for_next_level_res.data is not None else total_xp + 1
+
+            xp_at_level_start_res = await supabase.rpc('get_xp_for_level', {'target_level': current_level}).execute()
             xp_at_level_start = xp_at_level_start_res.data if xp_at_level_start_res.data is not None else 0
             
             xp_in_current_level = total_xp - xp_at_level_start
             required_xp_for_this_level = xp_for_next_level - xp_at_level_start
 
             job_system_config = get_config("JOB_SYSTEM_CONFIG", {})
-            job_name = "なし"
-            if job_res and job_res.data and job_res.data.get('jobs'):
-                job_name = job_res.data['jobs']['job_name']
             
+            job_name = "なし"
+            job_role_mention = ""
+            job_role_map = job_system_config.get("JOB_ROLE_MAP", {})
+            if job_res and job_res.data and job_res.data.get('jobs'):
+                job_data = job_res.data['jobs']
+                job_name = job_data['job_name']
+                if role_key := job_role_map.get(job_data['job_key']):
+                    if role_id := get_id(role_key):
+                        job_role_mention = f"<@&{role_id}>"
+
             level_tier_roles = job_system_config.get("LEVEL_TIER_ROLES", [])
-            tier_role_mention = "`かけだし住民`"
+            tier_role_mention = ""
             for tier in sorted(level_tier_roles, key=lambda x: x['level'], reverse=True):
                 if current_level >= tier['level']:
                     if role_id := get_id(tier['role_key']):
                         tier_role_mention = f"<@&{role_id}>"
                         break
+            
+            # [UI 복원] 경험치 획득 내역을 집계하는 로직
+            source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業'}
+            aggregated_xp = {v: 0 for v in source_map.values()}
+            if xp_logs_res and xp_logs_res.data:
+                for log in xp_logs_res.data:
+                    source_name = source_map.get(log['source'], log['source'])
+                    if source_name in aggregated_xp:
+                        aggregated_xp[source_name] += log['xp_amount']
+            
+            details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items()]
+            xp_details_text = "\n".join(details) if details else "まだ経験値を獲得していません。"
 
-            embed = discord.Embed(title=f"{user.display_name}のステータス", color=user.color or discord.Color.blue())
+            # [UI 복원] 상세한 정보가 포함된 Embed 메시지 구성
+            embed = discord.Embed(title=f"{user.mention}のステータス", color=user.color or discord.Color.blue())
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
             
-            # [✅ UI 복원] 제공해주신 코드와 동일하게 필드를 구성합니다.
-            embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=True)
-            embed.add_field(name="等級", value=tier_role_mention, inline=True)
-            embed.add_field(name="職業", value=f"`{job_name}`", inline=True)
+            embed.add_field(name="レベル", value=f"**Lv. {current_level}**", inline=False)
+            embed.add_field(name="等級", value=tier_role_mention or "`かけだし住民`", inline=True)
+            embed.add_field(name="職業", value=job_role_mention or "`なし`", inline=True)
             
             xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
-            embed.add_field(
-                name="経験値", 
-                value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}` (総XP: `{total_xp:,}`)\n{xp_bar}", 
-                inline=False
-            )
+            embed.add_field(name="経験値", value=f"`{xp_in_current_level:,} / {required_xp_for_this_level:,}`\n{xp_bar}", inline=False)
+            
+            embed.add_field(name="🏆 総獲得経験値", value=f"`{total_xp:,} XP`", inline=False)
+            embed.add_field(name="📊 経験値獲得の内訳", value=xp_details_text, inline=False)
             
             await interaction.followup.send(embed=embed)
             
             if isinstance(interaction.channel, discord.TextChannel):
                 await asyncio.sleep(1) 
+                # [호환성 수정] 작동하는 파일의 함수 시그니처에 맞게 panel_key 인자를 추가합니다.
                 await self.cog.regenerate_panel(interaction.channel, panel_key="panel_level_check")
 
         except Exception as e:
