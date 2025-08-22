@@ -1,4 +1,4 @@
-# cogs/server/system.py
+#bot-management/cogs/server/system.py
 import discord
 from discord.ext import commands
 from discord import app_commands
