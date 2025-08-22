@@ -1,4 +1,4 @@
-# cogs/system/system.py
+# cogs/server/system.py
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -11,38 +11,36 @@ from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel
 )
-# [수정] ui_defaults에서 ADMIN_ROLE_KEYS를 직접 불러옵니다.
 from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS
 
 logger = logging.getLogger(__name__)
 
-# [추가] 관리자 역할 확인을 위한 커스텀 체크 함수
 async def is_admin(interaction: discord.Interaction) -> bool:
-    """이 명령어를 사용하는 유저가 관리자 역할 그룹에 속하는지 확인하는 커스텀 체크"""
     if not isinstance(interaction.user, discord.Member):
         return False
     
-    # DB 캐시에서 관리자 역할 ID 목록을 가져옵니다.
     admin_role_ids = {get_id(key) for key in ADMIN_ROLE_KEYS}
-    
-    # 유저의 역할 중 하나라도 관리자 역할 목록에 포함되는지 확인합니다.
     user_role_ids = {role.id for role in interaction.user.roles}
     
     if not user_role_ids.intersection(admin_role_ids):
-        # 만약 관리자 역할이 없다면, 서버 소유자인지 확인합니다.
         if interaction.user.id == interaction.guild.owner_id:
             return True
         raise app_commands.CheckFailure("このコマンドを実行するための管理者権限がありません。")
     return True
 
-
 class ServerSystem(commands.Cog):
+    # [수정] 관리자용 명령어 그룹을 생성하고 여기에 권한을 설정합니다.
+    admin_group = app_commands.Group(
+        name="admin",
+        description="サーバー管理用のコマンドです。",
+        default_permissions=discord.Permissions(manage_guild=True)
+    )
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        # [수정] 커스텀 체크 실패 시 메시지를 포함하도록 수정
         if isinstance(error, app_commands.CheckFailure):
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
         elif isinstance(error, app_commands.MissingPermissions):
@@ -54,15 +52,12 @@ class ServerSystem(commands.Cog):
             else:
                 await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
 
-    # ... (autocomplete 함수는 변경 없음) ...
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
-        
         for key, info in SETUP_COMMAND_MAP.items():
             choice_name = f"{info.get('friendly_name', key)} 설정"
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
-        
         role_setup_actions = {
             "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정",
             "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정",
@@ -70,22 +65,18 @@ class ServerSystem(commands.Cog):
         for key, name in role_setup_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
-
         panel_actions = {"panels_regenerate_all": "[패널] 모든 관리 패널 재설치"}
         for key, name in panel_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
-        
         game_panel_actions = {"request_regenerate_all_game_panels": "[ゲーム] 全パネルの一括再設置要請"}
         for key, name in game_panel_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
-
         role_actions = {"roles_sync": "[역할] 모든 역할 DB와 동기화"}
         for key, name in role_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
-        
         stats_actions = {
             "stats_set": "[통계] 통계 채널 설정/제거",
             "stats_refresh": "[통계] 모든 통계 채널 새로고침",
@@ -94,15 +85,13 @@ class ServerSystem(commands.Cog):
         for key, name in stats_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
-
         return sorted(choices, key=lambda c: c.name)[:25]
-    
-    # [수정] 명령어 데코레이터 수정
-    @app_commands.command(
-        name="setup", 
-        description="[管理者] ボットのチャンネル、役割、統計など、すべての設定を管理します。",
-        # [추가] default_permissions: '서버 관리' 권한이 있는 사람에게만 명령어가 보이도록 설정
-        default_permissions=discord.Permissions(manage_guild=True)
+
+    # [수정] @app_commands.command -> @admin_group.command 로 변경
+    # 이렇게 하면 이 명령어는 /admin setup 으로 호출됩니다.
+    @admin_group.command(
+        name="setup",
+        description="ボットのチャンネル、役割、統計など、すべての設定を管理します。"
     )
     @app_commands.describe(
         action="実行するタスクを選択してください。",
@@ -120,7 +109,6 @@ class ServerSystem(commands.Cog):
         app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"),
         app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove"),
     ])
-    # [변경] 기존 has_permissions 체크를 우리가 만든 is_admin 체크로 변경
     @app_commands.check(is_admin)
     async def setup(self, interaction: discord.Interaction,
                     action: str,
@@ -377,7 +365,6 @@ class ServerSystem(commands.Cog):
         
         else:
             await interaction.followup.send("❌ 不明なタスクです。リストから正しいタスクを選択してください。", ephemeral=True)
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
