@@ -130,7 +130,7 @@ UI_EMBEDS = {
     "farm_thread_welcome": {"title": "{user_name}さんの農場", "description": "ようこそ！ここはあなただけの農場です。\n\n**始め方:**\n1. まずは商店で「古いクワ」と「種」を購入します。\n2. 下のボタンから畑を耕し、種を植えましょう！", "color": 0x4CAF50},
     "log_coin_gain": { "title": "🪙 コイン獲得のお知らせ", "description": "{user_mention}さんが活動報酬でコインを獲得しました。", "color": 0x2ECC71, "fields": [{"name": "獲得者", "value": "{user_mention}", "inline": True}, {"name": "獲得コイン", "value": "+{amount}{currency_icon}", "inline": True}], "footer": {"text": "おめでとうございます！"} },
     "log_coin_transfer": { "title": "💸 送金完了のお知らせ", "description": "**送金した人:** {sender_mention}\n**受け取った人:** {recipient_mention}\n\n**金額:** `{amount}`{currency_icon}", "color": 0x3498DB },
-    "log_coin_admin": { "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB }
+    "log_coin_admin": { "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB },
     # [✅ 버그 수정] 이 줄 끝에 쉼표(,)를 추가합니다.
     "embed_weather_forecast": {
         "title": "{emoji} Dico森の今日の天気予報",
