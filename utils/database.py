@@ -184,6 +184,10 @@ async def get_embed_from_db(embed_key: str) -> Optional[dict]:
     response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
     return response.data[0]['embed_data'] if response and response.data else None
 @supabase_retry_handler()
+async def get_onboarding_steps() -> List[dict]:
+    response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
+    return response.data if response and response.data else []
+@supabase_retry_handler()
 async def save_panel_component_to_db(component_data: dict):
     await supabase.table('panel_components').upsert(component_data, on_conflict='component_key').execute()
 @supabase_retry_handler()
