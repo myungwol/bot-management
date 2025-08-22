@@ -14,8 +14,7 @@ logger = logging.getLogger(__name__)
 
 # --- Helper Functions ---
 def create_xp_bar(current_xp: int, required_xp: int, length: int = 10) -> str:
-    if required_xp <= 0:
-        return "▓" * length
+    if required_xp <= 0: return "▓" * length
     progress = min(current_xp / required_xp, 1.0)
     filled_length = int(length * progress)
     bar = '▓' * filled_length + '░' * (length - filled_length)
@@ -37,10 +36,9 @@ class JobAdvancement:
     async def start_process(self):
         try:
             panel_info = get_panel_id("panel_level_check")
-            # [수정] channel 타입 힌트 추가
-            channel: Optional[discord.TextChannel] = self.guild.get_channel(panel_info['channel_id']) if panel_info else self.guild.system_channel
+            channel: Optional[discord.TextChannel] = self.guild.get_channel(panel_info['channel_id']) if panel_info and panel_info.get('channel_id') else self.guild.system_channel
             if not channel or not isinstance(channel, discord.TextChannel):
-                logger.error("전직 스레드를 생성할 적절한 채널을 찾지 못했습니다.")
+                logger.error(f"전직 스레드를 생성할 적절한 채널을 찾지 못했습니다. (서버: {self.guild.name})")
                 return
 
             self.thread = await channel.create_thread(
@@ -128,7 +126,8 @@ class JobAdvancement:
             await self.thread.delete()
         except Exception as e:
             logger.error(f"전직 최종 처리 중 오류: {e}", exc_info=True)
-            await self.current_message.edit(content="❌ 転職処理の最終段階でエラーが発生しました。管理者に報告してください。", embed=None, view=None)
+            if self.current_message and not self.current_message.is_deleted():
+                await self.current_message.edit(content="❌ 転職処理の最終段階でエラーが発生しました。管理者に報告してください。", embed=None, view=None)
 
 # --- UI Views ---
 class JobSelectView(ui.View):
@@ -187,7 +186,6 @@ class LevelPanelView(ui.View):
         
         try:
             await set_cooldown(user_id_str, cooldown_key)
-            # [수정] job_role_map을 직접 참조하는 대신, jobs 테이블에 role_key를 조인하도록 쿼리 변경 고려 (현재는 유지)
             level_res, job_res, xp_logs_res = await asyncio.gather(
                 supabase.table('user_levels').select('*').eq('user_id', user.id).maybe_single().execute(),
                 supabase.table('user_jobs').select('jobs(*)').eq('user_id', user.id).maybe_single().execute(),
@@ -198,17 +196,17 @@ class LevelPanelView(ui.View):
             current_level, total_xp = user_level_data['level'], user_level_data['xp']
 
             xp_for_next_level_res = await supabase.rpc('get_xp_for_level', {'target_level': current_level + 1}).execute()
-            xp_for_next_level = xp_for_next_level_res.data if xp_for_next_level_res else total_xp + 1
+            xp_for_next_level = xp_for_next_level_res.data if xp_for_next_level_res and xp_for_next_level_res.data is not None else total_xp + 1
 
             xp_at_level_start_res = await supabase.rpc('get_xp_for_level', {'target_level': current_level}).execute()
-            xp_at_level_start = xp_at_level_start_res.data if xp_at_level_start_res else 0
+            xp_at_level_start = xp_at_level_start_res.data if xp_at_level_start_res and xp_at_level_start_res.data is not None else 0
             
             xp_in_current_level = total_xp - xp_at_level_start
             required_xp_for_this_level = xp_for_next_level - xp_at_level_start
 
             job_name = "一般住民"
             job_role_mention = ""
-            if job_res and job_res.data:
+            if job_res and job_res.data and job_res.data.get('jobs'):
                 job_data = job_res.data['jobs']
                 job_name = job_data['job_name']
                 job_system_config = get_config("JOB_SYSTEM_CONFIG", {})
@@ -254,7 +252,7 @@ class LevelPanelView(ui.View):
         try:
             user_id = interaction.user.id
             my_rank_res = await supabase.rpc('get_user_rank', {'p_user_id': user_id}).execute()
-            my_rank = my_rank_res.data if my_rank_res and my_rank_res.data else "N/A"
+            my_rank = my_rank_res.data if my_rank_res and my_rank_res.data is not None else "N/A"
 
             top_10_res = await supabase.table('user_levels').select('user_id, level, xp').order('xp', desc=True).limit(10).execute()
             
@@ -290,8 +288,8 @@ class LevelSystem(commands.Cog):
         self.check_advancement_requests.cancel()
         self.check_level_tier_updates.cancel()
         
-    async def cog_load(self):
-        await self.bot.wait_until_ready()
+    # [✅ 오류 수정] cog_load를 삭제하고, on_ready 이후에 호출될 load_configs를 만듭니다.
+    async def load_configs(self):
         panel_info = get_panel_id(self.PANEL_KEY)
         if panel_info:
             self.panel_channel_id = panel_info.get('channel_id')
@@ -322,12 +320,12 @@ class LevelSystem(commands.Cog):
                         guild_found, user_member = guild, member
                         break
                 
-                if not user_member:
-                    logger.warning(f"전직 요청 유저(ID: {user_id})를 어느 서버에서도 찾을 수 없습니다.")
-                else:
+                if user_member:
                     logger.info(f"유저 {user_member.display_name}의 전직 요청(Lv.{req_level})을 감지하여 프로세스를 시작합니다.")
                     process = JobAdvancement(self.bot, user_member, guild_found, req_level, self)
                     await process.start_process()
+                else:
+                    logger.warning(f"전직 요청 유저(ID: {user_id})를 어느 서버에서도 찾을 수 없습니다.")
                 
                 await supabase.table('bot_configs').delete().eq('config_key', req['config_key']).execute()
         except Exception as e:
@@ -384,8 +382,9 @@ class LevelSystem(commands.Cog):
         
         new_role_id = get_id(role_key_to_add)
         if new_role_id and (new_role := user.guild.get_role(new_role_id)):
-            await user.add_roles(new_role, reason="レベル等級の変更")
-            logger.info(f"{user.display_name}さんの等級役割を「{new_role.name}」に更新しました。")
+            if new_role not in user.roles:
+                await user.add_roles(new_role, reason="レベル等級の変更")
+                logger.info(f"{user.display_name}さんの等級役割を「{new_role.name}」に更新しました。")
 
     async def regenerate_panel(self, channel: discord.TextChannel, **kwargs):
         self.panel_channel_id = channel.id
@@ -404,6 +403,5 @@ class LevelSystem(commands.Cog):
         await save_panel_id(self.PANEL_KEY, message.id, channel.id)
         logger.info(f"✅ レベル確認パネルを #{channel.name} に再設置しました。")
 
-# [✅ 오류 수정] 파일 마지막에 setup 함수를 추가합니다.
 async def setup(bot: commands.Bot):
     await bot.add_cog(LevelSystem(bot))
