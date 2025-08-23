@@ -10,7 +10,6 @@ import math
 from typing import Optional, Dict, List, Any
 
 from utils.database import supabase, get_panel_id, save_panel_id, get_id, get_config, get_cooldown, set_cooldown
-# [✅ 수정] 새로운 헬퍼 함수 import
 from utils.helpers import format_embed_from_db, calculate_xp_for_level
 
 logger = logging.getLogger(__name__)
@@ -115,7 +114,6 @@ class LevelPanelView(ui.View):
             user_level_data = level_res.data if level_res and level_res.data else {'level': 1, 'xp': 0}
             current_level, total_xp = user_level_data['level'], user_level_data['xp']
 
-            # [✅ 수정] RPC 호출 대신 Python 헬퍼 함수 사용
             xp_for_next_level = calculate_xp_for_level(current_level + 1)
             xp_at_level_start = calculate_xp_for_level(current_level)
             
@@ -140,7 +138,7 @@ class LevelPanelView(ui.View):
                         tier_role_mention = f"<@&{role_id}>"
                         break
             
-            source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業', 'admin': '⚙️ 管理者'}
+            source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業'}
             aggregated_xp = {v: 0 for v in source_map.values()}
             if xp_logs_res and xp_logs_res.data:
                 for log in xp_logs_res.data:
@@ -148,8 +146,10 @@ class LevelPanelView(ui.View):
                     if source_name in aggregated_xp:
                         aggregated_xp[source_name] += log['xp_amount']
             
-            details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items() if amount > 0]
-            xp_details_text = "\n".join(details) if details else "まだ経験値を獲得していません。"
+            # [✅ 수정] 획득 경험치가 0이어도 항상 표시되도록 변경
+            details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items()]
+            xp_details_text = "\n".join(details)
+            
             xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
             embed = discord.Embed(color=user.color or discord.Color.blue())
             if user.display_avatar:
@@ -157,12 +157,15 @@ class LevelPanelView(ui.View):
 
             description_parts = [ f"## {user.mention}のステータス\n", f"**レベル**: **Lv. {current_level}**", f"**等級**: {tier_role_mention or '`かけだし住民`'}\n**職業**: {job_role_mention or '`なし`'}\n", f"**経験値**\n`{xp_in_current_level:,} / {required_xp_for_this_level:,}`", f"{xp_bar}\n", f"**🏆 総獲得経験値**\n`{total_xp:,} XP`\n", f"**📊 経験値獲得の内訳**\n{xp_details_text}" ]
             embed.description = "\n".join(description_parts)
+            
             await interaction.followup.send(embed=embed)
+
+            # [✅ 수정] 상태 메시지 전송 후, 패널을 다시 생성하여 맨 아래로 이동
+            await self.cog.regenerate_panel(interaction.channel)
+
         except Exception as e:
             logger.error(f"레벨 확인 중 오류 발생 (유저: {user.id}): {e}", exc_info=True)
             await interaction.followup.send("❌ ステータス情報の読み込み中にエラーが発生しました。", ephemeral=True)
-            
-# --- 이하 코드는 원본과 동일 ---
 
     @ui.button(label="ランキング確認", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="show_ranking_button")
     async def show_ranking_button(self, interaction: discord.Interaction, button: ui.Button):
@@ -180,6 +183,7 @@ class LevelPanelView(ui.View):
             logger.error(f"랭킹 표시 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ ランキング情報の読み込み中にエラーが発生しました。", ephemeral=True)
 
+# --- 이하 코드는 원본과 동일 ---
 class JobSelectionView(ui.View):
     def __init__(self, cog: 'LevelSystem', user: discord.Member, level: int, thread: discord.Thread):
         super().__init__(timeout=86400)
