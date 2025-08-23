@@ -60,7 +60,7 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
                 if isinstance(field, dict):
                     if field.get('name') and isinstance(field['name'], str):
                         field['name'] = field['name'].format_map(safe_kwargs)
-                    if field.get('value') and isinstance(field['value'], str):
+                    if field.get('value') and isinstance(field.get('value'), str):
                         field['value'] = field['value'].format_map(safe_kwargs)
                         
         return discord.Embed.from_dict(formatted_data)
@@ -78,7 +78,6 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
             )
             return fatal_error_embed
 
-# --- [신규] 아래 함수가 이전 단계에서 추가된 부분입니다 ---
 def get_clean_display_name(member: discord.Member) -> str:
     """
     멤버의 display_name에서 역할 접두사(예: 『칭호』)를 제거한 순수한 이름을 반환합니다.
@@ -92,16 +91,24 @@ def get_clean_display_name(member: discord.Member) -> str:
     display_name = member.display_name
     prefix_hierarchy = get_config("NICKNAME_PREFIX_HIERARCHY", [])
     
-    # 설정된 모든 접두사를 순회하며 확인
     for prefix_name in prefix_hierarchy:
-        # 『 칭호 』 형식의 전체 접두사 문자열 생성
         prefix_to_check = f"『 {prefix_name} 』"
-        
-        # 만약 display_name이 해당 접두사로 시작한다면
         if display_name.startswith(prefix_to_check):
-            # 정규표현식을 사용하여 접두사와 뒤따르는 공백을 제거하고 반환
-            # re.escape를 사용하여 접두사 이름에 특수문자가 있어도 안전하게 처리
             return re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", display_name).strip()
-            
-    # 일치하는 접두사가 없으면 원래 display_name을 그대로 반환
     return display_name
+
+# --- [✅ 신규 추가] ---
+def calculate_xp_for_level(level: int) -> int:
+    """
+    특정 레벨에 도달하기 위해 필요한 *총* 경험치를 계산합니다.
+    (예: level=1 -> 0 XP, level=2 -> 155 XP)
+    공식: 5 * (L^2) + 50 * L + 100 (다음 레벨까지 필요한 양)
+    """
+    if level <= 1:
+        return 0
+    
+    # 1부터 (L-1)까지 각 레벨업에 필요한 경험치를 합산
+    total_xp = 0
+    for l in range(1, level):
+        total_xp += 5 * (l ** 2) + (50 * l) + 100
+    return total_xp
