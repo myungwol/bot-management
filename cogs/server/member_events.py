@@ -7,10 +7,10 @@
 import discord
 from discord.ext import commands
 import logging
-from typing import Optional
+from typing import Optional, List
 
 from utils.helpers import format_embed_from_db
-from utils.database import get_id, get_embed_from_db, supabase
+from utils.database import get_id, get_embed_from_db, supabase, get_config
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,8 @@ class MemberEvents(commands.Cog):
         self.bot = bot
         self.welcome_channel_id: Optional[int] = None
         self.farewell_channel_id: Optional[int] = None
-        self.guest_role_id: Optional[int] = None
+        # [수정] guest_role_id는 더 이상 단독으로 사용하지 않으므로 삭제해도 무방하지만, 일단 둡니다.
+        self.guest_role_id: Optional[int] = None 
         logger.info("MemberEvents (입장/퇴장) Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
@@ -49,18 +50,43 @@ class MemberEvents(commands.Cog):
         except Exception as e:
             logger.error(f"'{member.display_name}'님의 초기 레벨 데이터 생성 중 오류 발생: {e}", exc_info=True)
 
-        if self.guest_role_id:
-            guest_role = member.guild.get_role(self.guest_role_id)
-            if guest_role:
-                try:
-                    await member.add_roles(guest_role, reason="서버 참여 시 초기 역할 부여")
-                except discord.Forbidden:
-                    logger.error(f"'{member.display_name}'님에게 '손님' 역할을 부여하지 못했습니다. 봇의 역할이 '손님' 역할보다 낮거나 권한이 부족합니다.")
-                except Exception as e:
-                    logger.error(f"'{self.guest_role_id}' 역할 부여 중 예기치 않은 오류 발생: {e}", exc_info=True)
-            else:
-                logger.warning(f"DB에 설정된 '손님' 역할 ID({self.guest_role_id})를 서버에서 찾을 수 없습니다.")
+        # --- [✅✅✅ 핵심 수정] 여러 초기 역할을 한 번에 부여하는 로직 ---
+        initial_role_keys = [
+            "role_guest",
+            "role_shop_separator",
+            "role_warning_separator"
+        ]
+        
+        roles_to_add: List[discord.Role] = []
+        missing_role_names: List[str] = []
+        role_key_map = get_config("ROLE_KEY_MAP", {})
 
+        for key in initial_role_keys:
+            role_id = get_id(key)
+            if role_id:
+                role = member.guild.get_role(role_id)
+                if role:
+                    roles_to_add.append(role)
+                else:
+                    role_name = role_key_map.get(key, key)
+                    missing_role_names.append(role_name)
+            else:
+                role_name = role_key_map.get(key, key)
+                missing_role_names.append(role_name)
+
+        if roles_to_add:
+            try:
+                await member.add_roles(*roles_to_add, reason="서버 참여 시 초기 역할 부여")
+            except discord.Forbidden:
+                logger.error(f"'{member.display_name}'님에게 초기 역할을 부여하지 못했습니다. (권한 부족)")
+            except Exception as e:
+                logger.error(f"초기 역할 부여 중 예기치 않은 오류 발생: {e}", exc_info=True)
+        
+        if missing_role_names:
+            logger.warning(f"DB에 설정된 초기 역할 중 일부를 서버에서 찾을 수 없습니다: {', '.join(missing_role_names)}")
+        # --- [수정 끝] ---
+
+        # 환영 메시지 전송
         if not self.welcome_channel_id:
             return
 
@@ -92,7 +118,6 @@ class MemberEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
-        """멤버가 서버를 떠났을 때 호출되는 이벤트 리스너입니다."""
         if member.bot:
             return
             
@@ -120,10 +145,8 @@ class MemberEvents(commands.Cog):
         except Exception as e:
             logger.error(f"퇴장 메시지 전송 중 예기치 않은 오류 발생: {e}", exc_info=True)
 
-
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
-        """멤버의 상태(역할, 닉네임, 부스트 등)가 변경될 때 호출됩니다."""
         if before.premium_since == after.premium_since:
             return
 
