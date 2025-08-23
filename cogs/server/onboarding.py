@@ -34,7 +34,6 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         self.gender = gender
         self.birth_year = birth_year
     
-    # [✅✅✅ 핵심 수정]
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
@@ -52,15 +51,10 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             
-            # [✅ 수정] ApprovalView(승인/거절 버튼 View)를 다시 추가합니다.
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
-            
             approval_role_id = self.onboarding_cog.approval_role_id
             content = f"<@&{approval_role_id}> 新しい住人登録票が提出されました。" if approval_role_id else "新しい住人登録票が提出されました。"
-            
-            # [✅ 수정] 메시지를 보낼 때 view=view 파라미터를 추가합니다.
             await approval_channel.send(content=content, embed=embed, view=view, allowed_mentions=discord.AllowedMentions(roles=True))
-            
             await interaction.followup.send("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
         except Exception as e: 
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
@@ -158,6 +152,13 @@ class ApprovalView(ui.View):
         self.onboarding_cog = cog_instance
         self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
     
+    # [✅✅✅ 핵심 수정] 누락되었던 버튼들을 다시 추가합니다.
+    @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
+    async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
+    
+    @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
+    async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
+    
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         approval_role_id = self.onboarding_cog.approval_role_id
         if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(role.id == approval_role_id for role in interaction.user.roles):
@@ -203,7 +204,6 @@ class ApprovalView(ui.View):
 
             status_text = "承認" if is_approved else "拒否"
             if success:
-                # [수정] ephemeral 메시지는 edit이 안될 수 있으므로 followup으로 통일
                 await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
             else:
                 error_report = f"❌ **{status_text}**処理中にエラーが発生しました:\n" + "\n".join(f"- {res}" for res in results)
