@@ -190,19 +190,28 @@ class JobSelectionView(ui.View):
 
     async def initialize(self):
         await self.load_data(); self.build_components()
+        
     async def load_data(self):
         res = await supabase.table('jobs').select('*, abilities(*)').eq('required_level', self.level).execute()
-        if res.data: self.jobs_at_level = res.data
+        if res.data: 
+            # [✅✅✅ 핵심 수정] abilities가 비어있지 않은 직업만 필터링합니다.
+            self.jobs_at_level = [job for job in res.data if job.get('abilities')]
+
     def build_components(self):
         self.clear_items()
-        if not self.jobs_at_level: self.add_item(ui.Button(label="選択可能な職業がありません。", disabled=True)); return
+        if not self.jobs_at_level: 
+            self.add_item(ui.Button(label="選択可能な職業がありません。", disabled=True))
+            return
+
         job_options = [discord.SelectOption(label=j['job_name'], value=str(j['id']), description=j['description']) for j in self.jobs_at_level]
         job_select = ui.Select(placeholder="新しい職業を選択してください...", options=job_options, custom_id="job_select")
         job_select.callback = self.on_job_select
         self.add_item(job_select)
-        ability_select = ui.Select(placeholder="まず職業を選択してください。", disabled=True, custom_id="ability_select")
+        
+        ability_select = ui.Select(placeholder="まず職業を選択してください。", disabled=True, custom_id="ability_select", options=[discord.SelectOption(label="placeholder", value="placeholder")]) # [✅ 수정] 옵션이 비어있으면 안되므로 임시 플레이스홀더 추가
         ability_select.callback = self.on_ability_select
         self.add_item(ability_select)
+        
         confirm_button = ui.Button(label="転職確定", style=discord.ButtonStyle.success, disabled=True, custom_id="confirm_advancement")
         confirm_button.callback = self.on_confirm
         self.add_item(confirm_button)
@@ -214,12 +223,20 @@ class JobSelectionView(ui.View):
         if not selected_job_data: return
         self.selected_job_name, self.abilities_for_job = selected_job_data['job_name'], selected_job_data.get('abilities', [])
         self.selected_ability_id, self.selected_ability_name = None, None
+        
         ability_select = discord.utils.get(self.children, custom_id="ability_select")
         if isinstance(ability_select, ui.Select):
-            ability_select.placeholder, ability_select.disabled = "能力を選択してください...", False
-            ability_select.options = [discord.SelectOption(label=a['ability_name'], value=str(a['id']), description=a['description']) for a in self.abilities_for_job]
+            ability_options = [discord.SelectOption(label=a['ability_name'], value=str(a['id']), description=a['description']) for a in self.abilities_for_job]
+            if ability_options:
+                ability_select.placeholder, ability_select.disabled = "能力を選択してください...", False
+                ability_select.options = ability_options
+            else:
+                ability_select.placeholder, ability_select.disabled = "選択できる能力がありません。", True
+                ability_select.options = [discord.SelectOption(label="placeholder", value="placeholder")]
+
         confirm_button = discord.utils.get(self.children, custom_id="confirm_advancement")
         if isinstance(confirm_button, ui.Button): confirm_button.disabled = True
+        
         await interaction.edit_original_response(view=self)
 
     async def on_ability_select(self, interaction: discord.Interaction):
@@ -351,9 +368,6 @@ class LevelSystem(commands.Cog):
             await view.initialize()
             
             self.active_advancement_threads[thread.id] = view
-            
-            # [✅✅✅ 핵심 수정] bot.add_view() 라인을 제거합니다.
-            # 임시 View는 메시지를 보낼 때 자동으로 등록됩니다.
             
             embed = discord.Embed(
                 title=f"🎉 レベル{level}達成！転職の時間です！",
