@@ -22,7 +22,7 @@ def create_xp_bar(current_xp: int, required_xp: int, length: int = 10) -> str:
     bar = '▓' * filled_length + '░' * (length - filled_length)
     return f"[{bar}]"
 
-# --- UI Views (RankingView, LevelPanelView는 변경 없음) ---
+# --- UI Views (RankingView는 변경 없음) ---
 class RankingView(ui.View):
     def __init__(self, user: discord.Member, total_users: int):
         super().__init__(timeout=180)
@@ -100,8 +100,9 @@ class LevelPanelView(ui.View):
             remaining = int(cooldown_seconds - (time.time() - last_used))
             await interaction.response.send_message(f"⏳ このボタンはクールダウン中です。あと`{remaining}`秒お待ちください。", ephemeral=True)
             return
-            
-        await interaction.response.defer(ephemeral=True)
+        
+        # [✅ 수정] ephemeral=True를 제거하여 "생각 중..." 메시지를 공개로 변경
+        await interaction.response.defer()
         
         try:
             await set_cooldown(user_id_str, cooldown_key)
@@ -158,7 +159,9 @@ class LevelPanelView(ui.View):
 
             description_parts = [ f"## {user.mention}のステータス\n", f"**レベル**: **Lv. {current_level}**", f"**等級**: {tier_role_mention or '`かけだし住民`'}\n**職業**: {job_role_mention or '`なし`'}\n", f"**経験値**\n`{xp_in_current_level:,} / {required_xp_for_this_level:,}`", f"{xp_bar}\n", f"**🏆 総獲得経験値**\n`{total_xp:,} XP`\n", f"**📊 経験値獲得の内訳**\n{xp_details_text}" ]
             embed.description = "\n".join(description_parts)
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+            # [✅ 수정] ephemeral=True를 제거하여 메시지를 공개로 변경
+            await interaction.followup.send(embed=embed)
         except Exception as e:
             logger.error(f"레벨 확인 중 오류 발생 (유저: {user.id}): {e}", exc_info=True)
             await interaction.followup.send("❌ ステータス情報の読み込み中にエラーが発生しました。", ephemeral=True)
@@ -178,7 +181,7 @@ class LevelPanelView(ui.View):
         except Exception as e:
             logger.error(f"랭킹 표시 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ ランキング情報の読み込み中にエラーが発生しました。", ephemeral=True)
-
+            
 class JobSelectionView(ui.View):
     def __init__(self, cog: 'LevelSystem', user: discord.Member, level: int, thread: discord.Thread):
         super().__init__(timeout=86400)
@@ -381,13 +384,10 @@ class LevelSystem(commands.Cog):
             if "転職" in thread.name:
                 try:
                     if thread.archived or thread.locked: continue
-                    # 스레드 이름에서 레벨과 사용자 정보를 더 안정적으로 파싱
                     name_parts = thread.name.split("さんのLv.")
                     if len(name_parts) != 2: continue
                     level_part = name_parts[1].split("転職")[0]
                     level = int(level_part)
-
-                    # 스레드 멤버 목록에서 봇이 아닌 첫 번째 사용자를 주인으로 간주
                     thread_members = await thread.fetch_members()
                     user = next((m for m in thread_members if not m.bot), None)
 
