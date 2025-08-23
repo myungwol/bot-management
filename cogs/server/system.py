@@ -56,6 +56,7 @@ class ServerSystem(commands.Cog):
             else:
                 await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
 
+    # --- [이하 코드는 이전과 동일] ---
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         for key, info in SETUP_COMMAND_MAP.items():
@@ -445,18 +446,19 @@ class ServerSystem(commands.Cog):
         await save_config_to_db(f"level_tier_update_request_{user.id}", {"level": new_level, "timestamp": timestamp})
         logger.info(f"유저의 레벨이 변경되어 DB에 등급 역할 업데이트 요청을 기록했습니다.")
 
-    # [✅✅✅ 핵심 수정] XP와 레벨을 관리하는 새로운 중앙 함수
+    # [✅✅✅ 핵심 수정]
     async def _update_user_xp_and_level(self, user: discord.Member, xp_to_add: int = 0, source: str = 'admin', exact_level: Optional[int] = None) -> tuple[int, int]:
         """
         사용자의 경험치와 레벨을 안전하게 업데이트하고, 레벨업을 처리하는 중앙 함수.
-        :param user: 대상 discord.Member 객체
-        :param xp_to_add: 추가할 경험치 양
-        :param source: 경험치 획득 경로 (로그용)
-        :param exact_level: 설정할 정확한 레벨 (이 경우 xp_to_add는 무시됨)
-        :return: (새로운 레벨, 새로운 총 경험치)
         """
         # 1. 현재 유저 데이터 가져오기
         res = await supabase.table('user_levels').select('level, xp').eq('user_id', user.id).maybe_single().execute()
+        
+        # [✅ 수정] DB 조회 실패 시 None을 반환하므로, 이를 처리하는 로직 추가
+        if res is None:
+            logger.error(f"유저 {user.id}의 레벨 데이터를 DB에서 가져오지 못했습니다. 업데이트를 중단합니다.")
+            raise ConnectionError(f"Failed to retrieve level data for user {user.id}.")
+            
         current_data = res.data or {'level': 1, 'xp': 0}
         current_level, current_xp = current_data['level'], current_data['xp']
         
@@ -464,18 +466,15 @@ class ServerSystem(commands.Cog):
         leveled_up = False
 
         if exact_level is not None:
-            # 특정 레벨로 설정하는 경우
             new_level = exact_level
             new_total_xp = calculate_xp_for_level(new_level)
             if new_level > current_level:
                 leveled_up = True
         else:
-            # 경험치를 추가하는 경우
             new_total_xp += xp_to_add
             if xp_to_add > 0:
                 await supabase.table('xp_logs').insert({'user_id': user.id, 'source': source, 'xp_amount': xp_to_add}).execute()
             
-            # 총 경험치를 기준으로 올바른 레벨을 다시 계산
             new_level = current_level
             while new_total_xp >= calculate_xp_for_level(new_level + 1):
                 new_level += 1
@@ -483,20 +482,17 @@ class ServerSystem(commands.Cog):
             if new_level > current_level:
                 leveled_up = True
         
-        # 2. DB에 최종 결과 업데이트
         await supabase.table('user_levels').upsert({
             'user_id': user.id,
             'level': new_level,
             'xp': new_total_xp
         }).execute()
         
-        # 3. 레벨이 변경된 경우, 후처리 이벤트 트리거
         if leveled_up:
             await self._trigger_level_up_events(user, {"leveled_up": True, "new_level": new_level})
             
         return new_level, new_total_xp
 
-    # [✅ 수정] 새로운 중앙 함수를 사용하도록 명령어 로직 변경
     @admin_group.command(name="xp부여", description="[관리자 전용] 특정 유저에게 XP를 부여합니다.")
     @app_commands.describe(user="XP를 부여할 유저", amount="부여할 XP 양")
     @app_commands.check(is_admin)
