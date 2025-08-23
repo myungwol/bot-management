@@ -424,5 +424,45 @@ class ServerSystem(commands.Cog):
         else:
             await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
 
+    # [✅ 테스트용 신규 추가] XP 및 레벨 관리 명령어
+    @admin_group.command(name="xp부여", description="[관리자 전용] 특정 유저에게 XP를 부여합니다.")
+    @app_commands.describe(user="XP를 부여할 유저", amount="부여할 XP 양")
+    @app_commands.check(is_admin)
+    async def give_xp(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            res = await supabase.rpc('add_xp', {'p_user_id': user.id, 'p_xp_to_add': amount, 'p_source': 'admin'}).execute()
+            if res.data:
+                new_level = res.data[0].get('new_level')
+                await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여했습니다. (현재 레벨: {new_level})")
+                
+                # 게임 봇에 레벨업 이벤트를 알리기 위해 DB에 요청 기록
+                if res.data[0].get('leveled_up'):
+                    if core_cog := self.bot.get_cog("LevelSystem"): # LevelSystem Cog 직접 참조
+                        await core_cog.handle_level_up_event(user, res.data[0])
+            else:
+                await interaction.followup.send("❌ XP 부여 중 DB 오류가 발생했습니다.")
+        except Exception as e:
+            logger.error(f"XP 부여 중 오류: {e}", exc_info=True)
+            await interaction.followup.send("❌ XP 부여 중 오류가 발생했습니다.")
+
+    @admin_group.command(name="레벨설정", description="[관리자 전용] 특정 유저의 레벨을 강제로 설정합니다.")
+    @app_commands.describe(user="레벨을 설정할 유저", level="설정할 레벨")
+    @app_commands.check(is_admin)
+    async def set_level(self, interaction: discord.Interaction, user: discord.Member, level: app_commands.Range[int, 1, None]):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            res = await supabase.rpc('set_user_level', {'p_user_id': user.id, 'p_new_level': level}).execute()
+            if res.data:
+                await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정했습니다.")
+                # 게임 봇에 레벨업 이벤트를 알리기 위해 DB에 요청 기록
+                if (core_cog := self.bot.get_cog("LevelSystem")): # LevelSystem Cog 직접 참조
+                    await core_cog.handle_level_up_event(user, {"leveled_up": True, "new_level": level})
+            else:
+                await interaction.followup.send("❌ 레벨 설정 중 DB 오류가 발생했습니다.")
+        except Exception as e:
+            logger.error(f"레벨 설정 중 오류: {e}", exc_info=True)
+            await interaction.followup.send("❌ 레벨 설정 중 오류가 발생했습니다.")
+            
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
