@@ -22,7 +22,7 @@ def create_xp_bar(current_xp: int, required_xp: int, length: int = 10) -> str:
     bar = '▓' * filled_length + '░' * (length - filled_length)
     return f"[{bar}]"
 
-# --- UI Views (RankingView는 변경 없음) ---
+# --- UI Views (이전과 동일) ---
 class RankingView(ui.View):
     def __init__(self, user: discord.Member, total_users: int):
         super().__init__(timeout=180)
@@ -138,7 +138,7 @@ class LevelPanelView(ui.View):
                         tier_role_mention = f"<@&{role_id}>"
                         break
             
-            source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業'}
+            source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業', 'admin'}
             aggregated_xp = {v: 0 for v in source_map.values()}
             if xp_logs_res and xp_logs_res.data:
                 for log in xp_logs_res.data:
@@ -146,7 +146,6 @@ class LevelPanelView(ui.View):
                     if source_name in aggregated_xp:
                         aggregated_xp[source_name] += log['xp_amount']
             
-            # [✅ 수정] 획득 경험치가 0이어도 항상 표시되도록 변경
             details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items()]
             xp_details_text = "\n".join(details)
             
@@ -159,8 +158,6 @@ class LevelPanelView(ui.View):
             embed.description = "\n".join(description_parts)
             
             await interaction.followup.send(embed=embed)
-
-            # [✅ 수정] 상태 메시지 전송 후, 패널을 다시 생성하여 맨 아래로 이동
             await self.cog.regenerate_panel(interaction.channel)
 
         except Exception as e:
@@ -183,7 +180,6 @@ class LevelPanelView(ui.View):
             logger.error(f"랭킹 표시 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ ランキング情報の読み込み中にエラーが発生しました。", ephemeral=True)
 
-# --- 이하 코드는 원본과 동일 ---
 class JobSelectionView(ui.View):
     def __init__(self, cog: 'LevelSystem', user: discord.Member, level: int, thread: discord.Thread):
         super().__init__(timeout=86400)
@@ -332,6 +328,7 @@ class LevelSystem(commands.Cog):
             logger.error(f"「{panel_key}」パネルの再設置中にエラー: {e}", exc_info=True)
             return False
 
+    # [✅✅✅ 핵심 수정]
     async def start_advancement_process(self, user: discord.Member, level: int):
         channel_id = get_id("job_advancement_channel_id")
         if not channel_id or not (channel := self.bot.get_channel(channel_id)):
@@ -341,14 +338,30 @@ class LevelSystem(commands.Cog):
             if any(v.user.id == user.id for v in self.active_advancement_threads.values()):
                 logger.warning(f"{user.display_name}님의 전직 프로세스가 이미 진행 중입니다.")
                 return
-            thread = await channel.create_thread(name=f"⚜️ {user.display_name}さんのLv.{level}転職", type=discord.ChannelType.private_thread, reason=f"{user.display_name}さんの転職進行")
+
+            thread = await channel.create_thread(
+                name=f"⚜️ {user.display_name}さんのLv.{level}転職",
+                type=discord.ChannelType.private_thread,
+                reason=f"{user.display_name}さんの転職進行"
+            )
+            
+            # 스레드에 봇과 유저를 추가하고, 메시지를 보내기 전에 잠시 기다립니다.
             await thread.add_user(user)
+            await asyncio.sleep(1) # API가 처리할 시간을 줍니다.
+
             view = JobSelectionView(self, user, level, thread)
             await view.initialize()
+            
             self.active_advancement_threads[thread.id] = view
             self.bot.add_view(view)
-            embed = discord.Embed(title=f"🎉 レベル{level}達成！転職の時間です！", description=f"{user.mention}さん、おめでとうございます！\n\n下のメニューから新しい職業と能力を選択し、「転職確定」ボタンを押してください。", color=0xFFD700)
+            
+            embed = discord.Embed(
+                title=f"🎉 レベル{level}達成！転職の時間です！",
+                description=f"{user.mention}さん、おめでとうございます！\n\n下のメニューから新しい職業と能力を選択し、「転職確定」ボタンを押してください。",
+                color=0xFFD700
+            )
             await thread.send(embed=embed, view=view)
+
         except Exception as e:
             logger.error(f"{user.display_name}님의 전직 스레드 생성 중 오류: {e}", exc_info=True)
     
