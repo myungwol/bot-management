@@ -141,24 +141,9 @@ UI_EMBEDS = {
     "log_coin_gain": { "title": "🪙 コイン獲得のお知らせ", "description": "{user_mention}さんが活動報酬でコインを獲得しました。", "color": 0x2ECC71, "fields": [{"name": "獲得者", "value": "{user_mention}", "inline": True}, {"name": "獲得コイン", "value": "+{amount}{currency_icon}", "inline": True}], "footer": {"text": "おめでとうございます！"} },
     "log_coin_transfer": { "title": "💸 送金完了のお知らせ", "description": "**送金した人:** {sender_mention}\n**受け取った人:** {recipient_mention}\n\n**金額:** `{amount}`{currency_icon}", "color": 0x3498DB },
     "log_coin_admin": { "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB },
-    # [✅ 버그 수정] 이 줄 끝에 쉼표(,)를 추가합니다.
-    "embed_whale_reset_announcement": {
-    "title": "🐋 海からの噂…",
-    "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。",
-    "color": 0x3498DB, # 바다색
-    "footer": {"text": "今月のヌシが海に戻ってきました。"}
-},
-    "embed_weather_forecast": {
-        "title": "{emoji} Dico森の今日の天気予報",
-        "description": "今日の天気は「**{weather_name}**」です！\n\n> {description}",
-        "color": "{color}",
-        "fields": [
-            {"name": "💡 今日のヒント", "value": "> {tip}", "inline": False}
-        ],
-        "footer": {
-            "text": "天気は毎日午前0時に変わります。"
-        }
-    }
+    "embed_weather_forecast": { "title": "{emoji} Dico森の今日の天気予報", "description": "今日の天気は「**{weather_name}**」です！\n\n> {description}", "color": "{color}", "fields": [ {"name": "💡 今日のヒント", "value": "> {tip}", "inline": False} ], "footer": { "text": "天気は毎日午前0時に変わります。" } },
+    "log_whale_catch": { "title": "🐋 今月のヌシ、現る！ 🐋", "description": "今月、ただ一度だけ姿を見せるという幻の**クジラ**が、**{user_mention}**さんの手によって釣り上げられました！\n\n巨大な影は、来月まで再び深い海の底へと姿を消します…。", "color": "0x206694", "fields": [ {"name": "釣り上げられたヌシ", "value": "{emoji} **{name}**\n**サイズ**: `{size}`cm\n**価値**: `{value}`{currency_icon}", "inline": False} ], "footer": {"text": "来月の挑戦者よ、来たれ！"} },
+    "embed_whale_reset_announcement": { "title": "🐋 海からの噂…", "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。", "color": 0x3498DB, "footer": {"text": "今月のヌシが海に戻ってきました。"} }
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
