@@ -138,7 +138,7 @@ class LevelPanelView(ui.View):
                         tier_role_mention = f"<@&{role_id}>"
                         break
             
-            source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業', 'admin'}
+            source_map = {'chat': '💬 チャット', 'voice': '🎙️ VC参加', 'fishing': '🎣 釣り', 'farming': '🌾 農業'}
             aggregated_xp = {v: 0 for v in source_map.values()}
             if xp_logs_res and xp_logs_res.data:
                 for log in xp_logs_res.data:
