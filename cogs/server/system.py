@@ -3,15 +3,17 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import asyncio
+import time
 
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel,
     _channel_id_cache,
-    update_wallet 
+    update_wallet,
+    supabase
 )
 from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS
 
@@ -423,8 +425,37 @@ class ServerSystem(commands.Cog):
             await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{currency_icon}を削減しました。")
         else:
             await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
+            
+    # [✅ 신규 추가] 레벨업/전직 이벤트를 DB를 통해 전달하는 헬퍼 함수
+    async def _trigger_level_up_events(self, user: discord.Member, result_data: Dict[str, Any]):
+        """
+        레벨업 후처리 로직을 DB에 요청을 기록하는 방식으로 처리합니다.
+        이 요청은 LevelSystem Cog의 백그라운드 작업이 감지하여 처리합니다.
+        """
+        if not result_data or not result_data.get('leveled_up'):
+            return
 
-    # [✅ 테스트용 신규 추가] XP 및 레벨 관리 명령어
+        new_level = result_data.get('new_level')
+        if not new_level:
+            return
+
+        logger.info(f"유저 {user.display_name}(ID: {user.id})가 레벨 {new_level}(으)로 변경되어, 레벨업 이벤트를 트리거합니다.")
+        
+        game_config = get_config("GAME_CONFIG", {})
+        job_advancement_levels = game_config.get("JOB_ADVANCEMENT_LEVELS", [])
+        
+        timestamp = time.time()
+        
+        # 1. 전직 레벨 달성 여부 확인 및 DB에 요청 기록
+        if new_level in job_advancement_levels:
+            await save_config_to_db(f"job_advancement_request_{user.id}", {"level": new_level, "timestamp": timestamp})
+            logger.info(f"유저가 전직 가능 레벨({new_level})에 도달하여 DB에 전직 요청을 기록했습니다.")
+
+        # 2. 등급 역할 업데이트를 위해 항상 DB에 요청 기록
+        await save_config_to_db(f"level_tier_update_request_{user.id}", {"level": new_level, "timestamp": timestamp})
+        logger.info(f"유저의 레벨이 변경되어 DB에 등급 역할 업데이트 요청을 기록했습니다.")
+
+    # [✅ 수정] XP 및 레벨 관리 명령어
     @admin_group.command(name="xp부여", description="[관리자 전용] 특정 유저에게 XP를 부여합니다.")
     @app_commands.describe(user="XP를 부여할 유저", amount="부여할 XP 양")
     @app_commands.check(is_admin)
@@ -436,10 +467,9 @@ class ServerSystem(commands.Cog):
                 new_level = res.data[0].get('new_level')
                 await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여했습니다. (현재 레벨: {new_level})")
                 
-                # 게임 봇에 레벨업 이벤트를 알리기 위해 DB에 요청 기록
+                # [✅ 수정] 레벨업 시 DB를 통해 이벤트를 전달하도록 변경
                 if res.data[0].get('leveled_up'):
-                    if core_cog := self.bot.get_cog("LevelSystem"): # LevelSystem Cog 직접 참조
-                        await core_cog.handle_level_up_event(user, res.data[0])
+                    await self._trigger_level_up_events(user, res.data[0])
             else:
                 await interaction.followup.send("❌ XP 부여 중 DB 오류가 발생했습니다.")
         except Exception as e:
@@ -455,9 +485,8 @@ class ServerSystem(commands.Cog):
             res = await supabase.rpc('set_user_level', {'p_user_id': user.id, 'p_new_level': level}).execute()
             if res.data:
                 await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정했습니다.")
-                # 게임 봇에 레벨업 이벤트를 알리기 위해 DB에 요청 기록
-                if (core_cog := self.bot.get_cog("LevelSystem")): # LevelSystem Cog 직접 참조
-                    await core_cog.handle_level_up_event(user, {"leveled_up": True, "new_level": level})
+                # [✅ 수정] 레벨 강제 설정 시에도 DB를 통해 이벤트를 전달하도록 변경
+                await self._trigger_level_up_events(user, {"leveled_up": True, "new_level": level})
             else:
                 await interaction.followup.send("❌ 레벨 설정 중 DB 오류가 발생했습니다.")
         except Exception as e:
