@@ -64,14 +64,12 @@ class RankingView(ui.View):
 
     @ui.button(label="◀", style=discord.ButtonStyle.secondary, custom_id="prev_page", disabled=True)
     async def prev_page(self, interaction: discord.Interaction, button: ui.Button):
-        if self.current_page > 0:
-            self.current_page -= 1
+        if self.current_page > 0: self.current_page -= 1
         await self.update_view(interaction)
 
     @ui.button(label="▶", style=discord.ButtonStyle.secondary, custom_id="next_page")
     async def next_page(self, interaction: discord.Interaction, button: ui.Button):
-        if self.current_page < self.total_pages - 1:
-            self.current_page += 1
+        if self.current_page < self.total_pages - 1: self.current_page += 1
         await self.update_view(interaction)
 
     @ui.button(label="自分の順位へ", style=discord.ButtonStyle.primary, emoji="👤", custom_id="my_rank")
@@ -111,7 +109,6 @@ class LevelPanelView(ui.View):
             level_res_task = supabase.table('user_levels').select('*').eq('user_id', user.id).maybe_single().execute()
             job_res_task = supabase.table('user_jobs').select('jobs(*)').eq('user_id', user.id).maybe_single().execute()
             xp_logs_res_task = supabase.table('xp_logs').select('source, xp_amount').eq('user_id', user.id).execute()
-            
             level_res, job_res, xp_logs_res = await asyncio.gather(level_res_task, job_res_task, xp_logs_res_task)
 
             user_level_data = level_res.data if level_res and level_res.data else {'level': 1, 'xp': 0}
@@ -126,9 +123,7 @@ class LevelPanelView(ui.View):
             
             xp_in_current_level = total_xp - xp_at_level_start
             required_xp_for_this_level = xp_for_next_level - xp_at_level_start
-
             job_system_config = get_config("JOB_SYSTEM_CONFIG", {})
-            
             job_name = "なし"
             job_role_mention = ""
             job_role_map = job_system_config.get("JOB_ROLE_MAP", {})
@@ -138,7 +133,6 @@ class LevelPanelView(ui.View):
                 if role_key := job_role_map.get(job_data['job_key']):
                     if role_id := get_id(role_key):
                         job_role_mention = f"<@&{role_id}>"
-
             level_tier_roles = job_system_config.get("LEVEL_TIER_ROLES", [])
             tier_role_mention = ""
             for tier in sorted(level_tier_roles, key=lambda x: x['level'], reverse=True):
@@ -158,24 +152,13 @@ class LevelPanelView(ui.View):
             details = [f"> {source}: `{amount:,} XP`" for source, amount in aggregated_xp.items()]
             xp_details_text = "\n".join(details) if details else "まだ経験値を獲得していません。"
             xp_bar = create_xp_bar(xp_in_current_level, required_xp_for_this_level)
-
             embed = discord.Embed(color=user.color or discord.Color.blue())
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
 
-            description_parts = [
-                f"## {user.mention}のステータス\n",
-                f"**レベル**: **Lv. {current_level}**",
-                f"**等級**: {tier_role_mention or '`かけだし住民`'} | **職業**: {job_role_mention or '`なし`'}\n",
-                f"**経験値**\n`{xp_in_current_level:,} / {required_xp_for_this_level:,}`",
-                f"{xp_bar}\n",
-                f"**🏆 総獲得経験値**\n`{total_xp:,} XP`\n",
-                f"**📊 経験値獲得の内訳**\n{xp_details_text}"
-            ]
+            description_parts = [ f"## {user.mention}のステータス\n", f"**レベル**: **Lv. {current_level}**", f"**等級**: {tier_role_mention or '`かけだし住民`'} | **職業**: {job_role_mention or '`なし`'}\n", f"**経験値**\n`{xp_in_current_level:,} / {required_xp_for_this_level:,}`", f"{xp_bar}\n", f"**🏆 総獲得経験値**\n`{total_xp:,} XP`\n", f"**📊 経験値獲得の内訳**\n{xp_details_text}" ]
             embed.description = "\n".join(description_parts)
-            
             await interaction.followup.send(embed=embed, ephemeral=True)
-
         except Exception as e:
             logger.error(f"레벨 확인 중 오류 발생 (유저: {user.id}): {e}", exc_info=True)
             await interaction.followup.send("❌ ステータス情報の読み込み中にエラーが発生しました。", ephemeral=True)
@@ -187,10 +170,7 @@ class LevelPanelView(ui.View):
             count_res = await supabase.table('user_levels').select('user_id', count='exact').execute()
             total_users = count_res.count if count_res and count_res.count is not None else 0
 
-            if total_users == 0:
-                await interaction.followup.send("まだランキング情報がありません。", ephemeral=True)
-                return
-
+            if total_users == 0: await interaction.followup.send("まだランキング情報がありません。", ephemeral=True); return
             view = RankingView(interaction.user, total_users)
             embed = await view.build_embed()
             view.update_buttons()
@@ -199,35 +179,22 @@ class LevelPanelView(ui.View):
             logger.error(f"랭킹 표시 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ ランキング情報の読み込み中にエラーが発生しました。", ephemeral=True)
 
-# [✅ 수정] 전직 UI 코드는 이전 답변과 동일합니다.
 class JobSelectionView(ui.View):
     def __init__(self, cog: 'LevelSystem', user: discord.Member, level: int, thread: discord.Thread):
-        super().__init__(timeout=86400) # 24시간 동안 유효
-        self.cog = cog
-        self.user = user
-        self.level = level
-        self.thread = thread
-        self.selected_job_id: Optional[int] = None
-        self.selected_job_name: Optional[str] = None
-        self.selected_ability_id: Optional[int] = None
-        self.selected_ability_name: Optional[str] = None
-        self.jobs_at_level: List[Dict] = []
-        self.abilities_for_job: List[Dict] = []
+        super().__init__(timeout=86400)
+        self.cog, self.user, self.level, self.thread = cog, user, level, thread
+        self.selected_job_id: Optional[int] = None; self.selected_job_name: Optional[str] = None
+        self.selected_ability_id: Optional[int] = None; self.selected_ability_name: Optional[str] = None
+        self.jobs_at_level: List[Dict] = []; self.abilities_for_job: List[Dict] = []
 
     async def initialize(self):
-        await self.load_data()
-        self.build_components()
-
+        await self.load_data(); self.build_components()
     async def load_data(self):
         res = await supabase.table('jobs').select('*, abilities(*)').eq('required_level', self.level).execute()
-        if res.data:
-            self.jobs_at_level = res.data
-
+        if res.data: self.jobs_at_level = res.data
     def build_components(self):
         self.clear_items()
-        if not self.jobs_at_level:
-            self.add_item(ui.Button(label="選択可能な職業がありません。", disabled=True))
-            return
+        if not self.jobs_at_level: self.add_item(ui.Button(label="選択可能な職業がありません。", disabled=True)); return
         job_options = [discord.SelectOption(label=j['job_name'], value=str(j['id']), description=j['description']) for j in self.jobs_at_level]
         job_select = ui.Select(placeholder="新しい職業を選択してください...", options=job_options, custom_id="job_select")
         job_select.callback = self.on_job_select
@@ -244,35 +211,28 @@ class JobSelectionView(ui.View):
         self.selected_job_id = int(interaction.data['values'][0])
         selected_job_data = next((j for j in self.jobs_at_level if j['id'] == self.selected_job_id), None)
         if not selected_job_data: return
-        self.selected_job_name = selected_job_data['job_name']
-        self.abilities_for_job = selected_job_data.get('abilities', [])
-        self.selected_ability_id = None
-        self.selected_ability_name = None
+        self.selected_job_name, self.abilities_for_job = selected_job_data['job_name'], selected_job_data.get('abilities', [])
+        self.selected_ability_id, self.selected_ability_name = None, None
         ability_select = discord.utils.get(self.children, custom_id="ability_select")
         if isinstance(ability_select, ui.Select):
-            ability_select.placeholder = "能力を選択してください..."
-            ability_select.disabled = False
+            ability_select.placeholder, ability_select.disabled = "能力を選択してください...", False
             ability_select.options = [discord.SelectOption(label=a['ability_name'], value=str(a['id']), description=a['description']) for a in self.abilities_for_job]
         confirm_button = discord.utils.get(self.children, custom_id="confirm_advancement")
-        if isinstance(confirm_button, ui.Button):
-            confirm_button.disabled = True
+        if isinstance(confirm_button, ui.Button): confirm_button.disabled = True
         await interaction.edit_original_response(view=self)
 
     async def on_ability_select(self, interaction: discord.Interaction):
         await interaction.response.defer()
         self.selected_ability_id = int(interaction.data['values'][0])
         ability_data = next((a for a in self.abilities_for_job if a['id'] == self.selected_ability_id), None)
-        if ability_data:
-            self.selected_ability_name = ability_data['ability_name']
+        if ability_data: self.selected_ability_name = ability_data['ability_name']
         confirm_button = discord.utils.get(self.children, custom_id="confirm_advancement")
-        if isinstance(confirm_button, ui.Button):
-            confirm_button.disabled = False
+        if isinstance(confirm_button, ui.Button): confirm_button.disabled = False
         await interaction.edit_original_response(view=self)
 
     async def on_confirm(self, interaction: discord.Interaction):
         if not all([self.selected_job_id, self.selected_ability_id]):
-            await interaction.response.send_message("職業と能力を両方選択してください。", ephemeral=True)
-            return
+            await interaction.response.send_message("職業と能力を両方選択してください。", ephemeral=True); return
         await interaction.response.defer()
         await supabase.rpc('set_user_job_and_ability', {'p_user_id': self.user.id, 'p_job_id': self.selected_job_id, 'p_ability_id': self.selected_ability_id}).execute()
         await self.cog.update_job_roles(self.user, self.selected_job_id)
@@ -283,24 +243,18 @@ class LevelSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.bot.add_view(LevelPanelView(self))
-        # [✅ 수정] __init__에서 태스크를 시작하지 않습니다.
-        # self.check_advancement_requests.start()
-        # self.check_level_tier_updates.start()
         self.active_advancement_threads: Dict[int, JobSelectionView] = {}
         logger.info("LevelSystem Cog가 성공적으로 초기화되었습니다.")
     
-    # [✅✅✅ 핵심 수정: on_ready 리스너 추가]
-    # 봇이 완전히 준비된 후에 백그라운드 태스크를 안전하게 시작합니다.
     @commands.Cog.listener()
     async def on_ready(self):
-        logger.info("[LevelSystem] 봇이 준비되어 백그라운드 태스크를 시작합니다.")
-        if not self.check_advancement_requests.is_running():
-            self.check_advancement_requests.start()
-        if not self.check_level_tier_updates.is_running():
-            self.check_level_tier_updates.start()
+        logger.info("[LevelSystem] 봇이 준비되었습니다. 기존 전직 스레드를 확인하고 태스크를 시작합니다.")
+        await self.reconnect_advancement_views()
+        if not self.check_advancement_requests.is_running(): self.check_advancement_requests.start()
+        if not self.check_level_tier_updates.is_running(): self.check_level_tier_updates.start()
 
     async def cog_load(self):
-        await self.reconnect_advancement_views()
+        pass
 
     def cog_unload(self):
         self.check_advancement_requests.cancel()
@@ -316,16 +270,10 @@ class LevelSystem(commands.Cog):
             if not res or not res.data: return
             keys_to_delete = [req['config_key'] for req in res.data]
             for req in res.data:
-                user_id = int(req['config_key'].split('_')[-1])
-                new_level = req['config_value'].get('level', 0)
-                user_member = None
-                for guild in self.bot.guilds:
-                    if member := guild.get_member(user_id):
-                        user_member = member; break
-                if user_member:
-                    await self.start_advancement_process(user_member, new_level)
-            if keys_to_delete:
-                await supabase.table('bot_configs').delete().in_('config_key', keys_to_delete).execute()
+                user_id, new_level = int(req['config_key'].split('_')[-1]), req['config_value'].get('level', 0)
+                user_member = discord.utils.find(lambda m: m.id == user_id, self.bot.get_all_members())
+                if user_member: await self.start_advancement_process(user_member, new_level)
+            if keys_to_delete: await supabase.table('bot_configs').delete().in_('config_key', keys_to_delete).execute()
         except Exception as e:
             logger.error(f"전직 요청 확인 중 오류: {e}", exc_info=True)
 
@@ -340,16 +288,10 @@ class LevelSystem(commands.Cog):
             if not res or not res.data: return
             keys_to_delete = [req['config_key'] for req in res.data]
             for req in res.data:
-                user_id = int(req['config_key'].split('_')[-1])
-                new_level = req['config_value'].get('level', 0)
-                user_member = None
-                for guild in self.bot.guilds:
-                    if member := guild.get_member(user_id):
-                        user_member = member; break
-                if user_member:
-                    await self.update_level_tier_role(user_member, new_level)
-            if keys_to_delete:
-                await supabase.table('bot_configs').delete().in_('config_key', keys_to_delete).execute()
+                user_id, new_level = int(req['config_key'].split('_')[-1]), req['config_value'].get('level', 0)
+                user_member = discord.utils.find(lambda m: m.id == user_id, self.bot.get_all_members())
+                if user_member: await self.update_level_tier_role(user_member, new_level)
+            if keys_to_delete: await supabase.table('bot_configs').delete().in_('config_key', keys_to_delete).execute()
         except Exception as e:
             logger.error(f"레벨 등급 업데이트 확인 중 오류: {e}", exc_info=True)
             
@@ -361,33 +303,23 @@ class LevelSystem(commands.Cog):
         job_system_config = get_config("JOB_SYSTEM_CONFIG", {})
         level_tier_roles = job_system_config.get("LEVEL_TIER_ROLES", [])
         if not level_tier_roles: return
-        role_key_to_add = None
-        for tier in sorted(level_tier_roles, key=lambda x: x['level'], reverse=True):
-            if current_level >= tier['level']:
-                role_key_to_add = tier['role_key']; break
+        role_key_to_add = next((tier['role_key'] for tier in sorted(level_tier_roles, key=lambda x: x['level'], reverse=True) if current_level >= tier['level']), None)
         if not role_key_to_add: return
         all_tier_role_ids = {get_id(tier['role_key']) for tier in level_tier_roles if get_id(tier['role_key'])}
         roles_to_remove = [role for role in user.roles if role.id in all_tier_role_ids]
-        if roles_to_remove:
-            await user.remove_roles(*roles_to_remove, reason="レベル等級の変更")
-        new_role_id = get_id(role_key_to_add)
-        if new_role_id and (new_role := user.guild.get_role(new_role_id)):
-            if new_role not in user.roles:
-                await user.add_roles(new_role, reason="レベル等級の変更")
-                logger.info(f"{user.display_name}さんの等級役割を「{new_role.name}」に更新しました。")
+        if roles_to_remove: await user.remove_roles(*roles_to_remove, reason="レベル等級の変更")
+        if (new_role_id := get_id(role_key_to_add)) and (new_role := user.guild.get_role(new_role_id)) and new_role not in user.roles:
+            await user.add_roles(new_role, reason="レベル等級の変更")
+            logger.info(f"{user.display_name}さんの等級役割を「{new_role.name}」に更新しました。")
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_level_check") -> bool:
         try:
-            panel_info = get_panel_id(panel_key)
-            if panel_info and panel_info.get('message_id'):
-                try:
-                    original_channel = self.bot.get_channel(panel_info.get('channel_id')) or channel
-                    msg = await original_channel.fetch_message(panel_info['message_id'])
-                    await msg.delete()
-                except (discord.NotFound, discord.Forbidden): pass
+            if panel_info := get_panel_id(panel_key):
+                if (ch := self.bot.get_channel(panel_info.get('channel_id'))) or channel:
+                    try: await (await ch.fetch_message(panel_info['message_id'])).delete()
+                    except (discord.NotFound, discord.Forbidden): pass
             embed = discord.Embed(title="📊 レベル＆ランキング", description="下のボタンでご自身のレベルを確認したり、サーバーのランキングを見ることができます。", color=0x5865F2)
-            view = LevelPanelView(self)
-            message = await channel.send(embed=embed, view=view)
+            message = await channel.send(embed=embed, view=LevelPanelView(self))
             await save_panel_id(panel_key, message.id, channel.id)
             logger.info(f"✅ 「{panel_key}」パネルを #{channel.name} に再設置しました。")
             return True
@@ -421,51 +353,45 @@ class LevelSystem(commands.Cog):
         all_job_role_keys = {job['role_key'] for job in all_jobs_res.data}
         all_job_role_ids = {get_id(key) for key in all_job_role_keys if get_id(key)}
         roles_to_remove = [role for role in user.roles if role.id in all_job_role_ids]
-        if roles_to_remove:
-            await user.remove_roles(*roles_to_remove, reason="転職による役割変更")
+        if roles_to_remove: await user.remove_roles(*roles_to_remove, reason="転職による役割変更")
         new_job_res = await supabase.table('jobs').select('role_key').eq('id', new_job_id).single().execute()
         if new_job_res.data:
-            new_role_key = new_job_res.data['role_key']
-            if (new_role_id := get_id(new_role_key)) and (new_role := user.guild.get_role(new_role_id)):
+            if (new_role_id := get_id(new_job_res.data['role_key'])) and (new_role := user.guild.get_role(new_role_id)):
                 await user.add_roles(new_role, reason="転職による役割変更")
-            else:
-                logger.warning(f"새로운 직업 역할({new_role_key})을 찾을 수 없습니다.")
+            else: logger.warning(f"새로운 직업 역할({new_job_res.data['role_key']})을 찾을 수 없습니다.")
 
     async def finalize_advancement(self, interaction: discord.Interaction, user: discord.Member, job_name: str, ability_name: str, thread: discord.Thread):
         await thread.send(f"✅ **{job_name}**への転職が完了しました！\nこのスレッドは10秒後に自動で削除されます。")
-        log_channel_id = get_id("job_log_channel_id")
-        if log_channel_id and (log_channel := self.bot.get_channel(log_channel_id)):
-            embed_data_res = await supabase.table('embeds').select('embed_data').eq('embed_key', 'log_job_advancement').single().execute()
-            if embed_data_res.data:
+        if (log_channel_id := get_id("job_log_channel_id")) and (log_channel := self.bot.get_channel(log_channel_id)):
+            if (embed_data_res := await supabase.table('embeds').select('embed_data').eq('embed_key', 'log_job_advancement').single().execute()).data:
                 embed = format_embed_from_db(embed_data_res.data['embed_data'], user_mention=user.mention, job_name=job_name, ability_name=ability_name)
-                if user.display_avatar:
-                    embed.set_thumbnail(url=user.display_avatar.url)
+                if user.display_avatar: embed.set_thumbnail(url=user.display_avatar.url)
                 await log_channel.send(embed=embed)
         await asyncio.sleep(10)
-        try:
-            await thread.delete()
+        try: await thread.delete()
         except discord.NotFound: pass
         self.active_advancement_threads.pop(thread.id, None)
 
     async def reconnect_advancement_views(self):
-        await self.bot.wait_until_ready()
         channel_id = get_id("job_advancement_channel_id")
-        if not channel_id or not (channel := self.bot.get_channel(channel_id)):
-            return
+        if not channel_id or not (channel := self.bot.get_channel(channel_id)): return
         logger.info("기존 전직 스레드를 확인하고 View를 다시 연결합니다...")
         count = 0
         for thread in channel.threads:
-            if thread.name.endswith("転職"):
+            if "転職" in thread.name:
                 try:
-                    parts = thread.name.replace("さんのLv.", " ").replace("転職", "").split()
-                    user_name, level_str = " ".join(parts[:-1]), parts[-1]
-                    level = int(level_str.strip("⚜️ "))
-                    user = thread.owner
-                    if not user:
-                         members = await thread.fetch_members()
-                         if members: user = members[0]
+                    if thread.archived or thread.locked: continue
+                    # 스레드 이름에서 레벨과 사용자 정보를 더 안정적으로 파싱
+                    name_parts = thread.name.split("さんのLv.")
+                    if len(name_parts) != 2: continue
+                    level_part = name_parts[1].split("転職")[0]
+                    level = int(level_part)
 
-                    if user and not thread.archived:
+                    # 스레드 멤버 목록에서 봇이 아닌 첫 번째 사용자를 주인으로 간주
+                    thread_members = await thread.fetch_members()
+                    user = next((m for m in thread_members if not m.bot), None)
+
+                    if user:
                         view = JobSelectionView(self, user, level, thread)
                         await view.initialize()
                         self.active_advancement_threads[thread.id] = view
