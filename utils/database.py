@@ -13,7 +13,11 @@ import discord
 from supabase import create_client, AsyncClient
 from postgrest.exceptions import APIError
 
-from .ui_defaults import UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, JOB_SYSTEM_CONFIG
+# [✅ 수정] ui_defaults에서 AGE_ROLE_MAPPING과 GAME_CONFIG를 가져옵니다.
+from .ui_defaults import (
+    UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, 
+    SETUP_COMMAND_MAP, JOB_SYSTEM_CONFIG, AGE_ROLE_MAPPING, GAME_CONFIG
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,13 +91,15 @@ async def sync_defaults_to_db():
         )
         await save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy)
         
+        # [✅ 신규 추가] AGE_ROLE_MAPPING, GAME_CONFIG 동기화 로직 추가
         await asyncio.gather(
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
-            save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP)
+            save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP),
+            save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG),
+            save_config_to_db("AGE_ROLE_MAPPING", AGE_ROLE_MAPPING),
+            save_config_to_db("GAME_CONFIG", GAME_CONFIG)
         )
-        
-        await save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG)
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
         all_channel_keys = [info['key'] for info in SETUP_COMMAND_MAP.values()]
@@ -103,7 +109,7 @@ async def sync_defaults_to_db():
         if placeholder_records:
             await supabase.table('channel_configs').upsert(placeholder_records, on_conflict="channel_key", ignore_duplicates=True).execute()
 
-        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 직업 설정 동기화 완료. 기존 채널/역할 ID 설정은 유지됩니다.")
+        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 게임/나이 설정 동기화 완료. 기존 채널/역할 ID 설정은 유지됩니다.")
 
     except Exception as e:
         logger.error(f"❌ 기본값 DB 동기화 중 치명적 오류 발생: {e}", exc_info=True)
@@ -310,4 +316,4 @@ async def update_wallet(user: discord.User, amount: int) -> Optional[dict]:
     """지정된 유저의 지갑 잔액을 업데이트합니다. (양수: 추가, 음수: 차감)"""
     params = {'p_user_id': str(user.id), 'p_amount': amount}
     response = await supabase.rpc('update_wallet_balance', params).execute()
-    return response.data[0] if response and response.data else None
+    return response.data[0] if response and response.data else None```
