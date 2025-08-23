@@ -328,7 +328,6 @@ class LevelSystem(commands.Cog):
             logger.error(f"「{panel_key}」パネルの再設置中にエラー: {e}", exc_info=True)
             return False
 
-    # [✅✅✅ 핵심 수정]
     async def start_advancement_process(self, user: discord.Member, level: int):
         channel_id = get_id("job_advancement_channel_id")
         if not channel_id or not (channel := self.bot.get_channel(channel_id)):
@@ -345,15 +344,16 @@ class LevelSystem(commands.Cog):
                 reason=f"{user.display_name}さんの転職進行"
             )
             
-            # 스레드에 봇과 유저를 추가하고, 메시지를 보내기 전에 잠시 기다립니다.
             await thread.add_user(user)
-            await asyncio.sleep(1) # API가 처리할 시간을 줍니다.
+            await asyncio.sleep(1)
 
             view = JobSelectionView(self, user, level, thread)
             await view.initialize()
             
             self.active_advancement_threads[thread.id] = view
-            self.bot.add_view(view)
+            
+            # [✅✅✅ 핵심 수정] bot.add_view() 라인을 제거합니다.
+            # 임시 View는 메시지를 보낼 때 자동으로 등록됩니다.
             
             embed = discord.Embed(
                 title=f"🎉 レベル{level}達成！転職の時間です！",
