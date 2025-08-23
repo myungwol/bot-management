@@ -247,7 +247,13 @@ class ApprovalView(ui.View):
         try:
             guild = member.guild; roles_to_add: List[discord.Role] = []; failed_to_find_roles: List[str] = []
             
-            role_keys_to_grant = ["role_resident", "role_resident_rookie", "role_warning_separator"]
+            # [✅ 수정] 부여할 역할 목록에 구분선 역할 추가
+            role_keys_to_grant = [
+                "role_resident", 
+                "role_resident_rookie", 
+                "role_warning_separator",
+                "role_shop_separator"
+            ]
             for key in role_keys_to_grant:
                 if (rid := get_id(key)) and (r := guild.get_role(rid)):
                     roles_to_add.append(r)
