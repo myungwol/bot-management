@@ -156,7 +156,7 @@ class LevelPanelView(ui.View):
             if user.display_avatar:
                 embed.set_thumbnail(url=user.display_avatar.url)
 
-            description_parts = [ f"## {user.mention}のステータス\n", f"**レベル**: **Lv. {current_level}**", f"**等級**: {tier_role_mention or '`かけだし住民`'} | **職業**: {job_role_mention or '`なし`'}\n", f"**経験値**\n`{xp_in_current_level:,} / {required_xp_for_this_level:,}`", f"{xp_bar}\n", f"**🏆 総獲得経験値**\n`{total_xp:,} XP`\n", f"**📊 経験値獲得の内訳**\n{xp_details_text}" ]
+            description_parts = [ f"## {user.mention}のステータス\n", f"**レベル**: **Lv. {current_level}**", f"**等級**: {tier_role_mention or '`かけだし住民`'}\n**職業**: {job_role_mention or '`なし`'}\n", f"**経験値**\n`{xp_in_current_level:,} / {required_xp_for_this_level:,}`", f"{xp_bar}\n", f"**🏆 総獲得経験値**\n`{total_xp:,} XP`\n", f"**📊 経験値獲得の内訳**\n{xp_details_text}" ]
             embed.description = "\n".join(description_parts)
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
