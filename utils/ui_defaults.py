@@ -90,7 +90,6 @@ ONBOARDING_CHOICES = {
     "gender": [
         {"label": "男性", "value": "男性"},
         {"label": "女性", "value": "女性"},
-        {"label": "非公開", "value": "非公開"}
     ],
     # 출생 연도를 10년 단위 그룹으로 나눔
     "birth_year_groups": {
