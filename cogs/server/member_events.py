@@ -10,7 +10,6 @@ import logging
 from typing import Optional, List
 
 from utils.helpers import format_embed_from_db
-# [✅ 수정] 재참여 관련 DB 함수를 import 합니다.
 from utils.database import get_id, get_embed_from_db, supabase, get_config, backup_member_data, get_member_backup, delete_member_backup
 
 logger = logging.getLogger(__name__)
@@ -35,39 +34,28 @@ class MemberEvents(commands.Cog):
         if member.bot:
             return
 
-        # --- [✅✅✅ 핵심 수정] 재참여 유저 복구 로직 ---
         backup = await get_member_backup(member.id, member.guild.id)
         if backup:
             logger.info(f"재참여 유저 '{member.display_name}'님의 데이터를 발견하여 복구를 시도합니다.")
             try:
-                # 1. 역할 복구
                 role_ids_to_restore = backup.get('roles', [])
                 roles_to_restore = [
                     role for role_id in role_ids_to_restore 
                     if (role := member.guild.get_role(role_id)) is not None
                 ]
-                
-                # 2. 닉네임 복구
                 restored_nick = backup.get('nickname')
 
-                # 3. 역할 및 닉네임 동시 적용
                 if roles_to_restore or restored_nick:
                     await member.edit(roles=roles_to_restore, nick=restored_nick, reason="サーバー再参加によるデータ復旧")
                 
-                # 4. 사용한 백업 데이터 삭제
                 await delete_member_backup(member.id, member.guild.id)
                 logger.info(f"'{member.display_name}'님의 역할과 닉네임을 성공적으로 복구했습니다.")
-
             except discord.Forbidden:
                 logger.error(f"'{member.display_name}'님의 데이터 복구에 실패했습니다. (권한 부족)")
             except Exception as e:
                 logger.error(f"'{member.display_name}'님 데이터 복구 중 예기치 않은 오류 발생: {e}", exc_info=True)
-            
-            # 재참여 유저는 아래의 신규 유저 로직을 실행하지 않고 여기서 종료
             return 
-        # --- [수정 끝] ---
             
-        # --- 아래는 신규 유저를 위한 로직 ---
         try:
             await supabase.table('user_levels').upsert({
                 'user_id': member.id,
@@ -78,7 +66,9 @@ class MemberEvents(commands.Cog):
         except Exception as e:
             logger.error(f"'{member.display_name}'님의 초기 레벨 데이터 생성 중 오류 발생: {e}", exc_info=True)
 
-        initial_role_keys = ["role_guest", "role_shop_separator", "role_warning_separator"]
+        # --- [✅✅✅ 핵심 수정] 초기 역할은 '손님' 역할 하나만 부여하도록 변경 ---
+        initial_role_keys = ["role_guest"]
+        
         roles_to_add: List[discord.Role] = []
         missing_role_names: List[str] = []
         role_key_map = get_config("ROLE_KEY_MAP", {})
@@ -99,7 +89,6 @@ class MemberEvents(commands.Cog):
         if missing_role_names:
             logger.warning(f"초기 역할 중 일부를 찾을 수 없습니다: {', '.join(missing_role_names)}")
         
-        # 환영 메시지 전송
         if self.welcome_channel_id and (channel := self.bot.get_channel(self.welcome_channel_id)):
             embed_data = await get_embed_from_db('welcome_embed')
             if embed_data:
@@ -113,15 +102,12 @@ class MemberEvents(commands.Cog):
         if member.bot:
             return
 
-        # --- [✅✅✅ 핵심 수정] 유저 데이터 백업 로직 ---
         try:
-            # @everyone 역할을 제외한 모든 역할 ID를 리스트로 만듭니다.
             role_ids_to_backup = [role.id for role in member.roles if not role.is_default()]
             await backup_member_data(member.id, member.guild.id, role_ids_to_backup, member.nick)
             logger.info(f"'{member.display_name}'님이 서버를 떠나 역할과 닉네임을 DB에 백업했습니다.")
         except Exception as e:
             logger.error(f"'{member.display_name}'님 데이터 백업 중 오류 발생: {e}", exc_info=True)
-        # --- [수정 끝] ---
             
         if self.farewell_channel_id and (channel := self.bot.get_channel(self.farewell_channel_id)):
             embed_data = await get_embed_from_db('farewell_embed')
