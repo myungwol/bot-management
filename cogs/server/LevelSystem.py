@@ -191,11 +191,46 @@ class JobSelectionView(ui.View):
     async def initialize(self):
         await self.load_data(); self.build_components()
         
+    # [✅✅✅ 핵심 수정]
     async def load_data(self):
+        # 1. 현재 레벨에 맞는 모든 직업을 일단 가져옵니다.
         res = await supabase.table('jobs').select('*, abilities(*)').eq('required_level', self.level).execute()
-        if res.data: 
-            # [✅✅✅ 핵심 수정] abilities가 비어있지 않은 직업만 필터링합니다.
-            self.jobs_at_level = [job for job in res.data if job.get('abilities')]
+        if not (res and res.data):
+            self.jobs_at_level = []
+            return
+
+        all_jobs_at_level = [job for job in res.data if job.get('abilities')]
+
+        # 2. 1차 전직(Lv.50)인 경우, 모든 직업을 보여줍니다.
+        if self.level <= 50:
+            self.jobs_at_level = all_jobs_at_level
+            return
+            
+        # 3. 2차 전직 이상인 경우, 유저의 현재 직업을 확인합니다.
+        user_job_res = await supabase.table('user_jobs').select('jobs(job_key)').eq('user_id', self.user.id).maybe_single().execute()
+        
+        # 유저가 직업이 없으면 아무것도 보여주지 않습니다.
+        if not (user_job_res and user_job_res.data and user_job_res.data.get('jobs')):
+            self.jobs_at_level = []
+            return
+        
+        current_job_key = user_job_res.data['jobs']['job_key']
+        
+        # 4. 직업 계보를 정의하고, 현재 직업에 맞는 상위 직업만 필터링합니다.
+        progression_map = {
+            'fisherman': 'master_angler', # 낚시꾼 -> 태공망
+            'farmer': 'master_farmer'      # 농부 -> 대농부
+        }
+
+        next_job_key = progression_map.get(current_job_key)
+        if not next_job_key:
+            self.jobs_at_level = []
+            return
+        
+        # 필터링된 직업만 최종 목록으로 설정합니다.
+        self.jobs_at_level = [
+            job for job in all_jobs_at_level if job.get('job_key') == next_job_key
+        ]
 
     def build_components(self):
         self.clear_items()
@@ -208,7 +243,7 @@ class JobSelectionView(ui.View):
         job_select.callback = self.on_job_select
         self.add_item(job_select)
         
-        ability_select = ui.Select(placeholder="まず職業を選択してください。", disabled=True, custom_id="ability_select", options=[discord.SelectOption(label="placeholder", value="placeholder")]) # [✅ 수정] 옵션이 비어있으면 안되므로 임시 플레이스홀더 추가
+        ability_select = ui.Select(placeholder="まず職業を選択してください。", disabled=True, custom_id="ability_select", options=[discord.SelectOption(label="placeholder", value="placeholder")])
         ability_select.callback = self.on_ability_select
         self.add_item(ability_select)
         
@@ -424,7 +459,8 @@ class LevelSystem(commands.Cog):
                         view = JobSelectionView(self, user, level, thread)
                         await view.initialize()
                         self.active_advancement_threads[thread.id] = view
-                        self.bot.add_view(view)
+                        # [✅ 수정] 재연결 시에는 add_view를 사용하지 않습니다. 메시지에 이미 View가 연결되어 있습니다.
+                        # self.bot.add_view(view) 
                         count += 1
                 except Exception as e:
                     logger.warning(f"스레드 '{thread.name}'의 View 재연결 실패: {e}")
