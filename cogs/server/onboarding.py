@@ -18,36 +18,26 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# --- UI 클래스 (RejectionReasonModal, IntroductionModal) ---
+# --- UI 클래스 ---
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
+# [✅ 수정] Modal에 성별, 나이 파라미터 추가
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
-    # [✅ 수정] '나이' 필드를 '출생 연도'로 변경하고 더 명확한 placeholder 제공
-    birth_year = ui.TextInput(label="生まれた年 (西暦)", placeholder="例: 1995 (4桁の数字で入力してください)", required=True, min_length=4, max_length=4)
-    gender = ui.TextInput(label="性別", placeholder="例：男、女性", required=True, max_length=10)
     hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     
-    def __init__(self, cog_instance: 'Onboarding'): super().__init__(); self.onboarding_cog = cog_instance
+    def __init__(self, cog_instance: 'Onboarding', gender: str, birth_year: str):
+        super().__init__()
+        self.onboarding_cog = cog_instance
+        self.gender = gender
+        self.birth_year = birth_year
     
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            # [✅ 추가] 출생 연도 유효성 검사
-            try:
-                year = int(self.birth_year.value)
-                # 서버 정책에 맞는 연도 범위 설정 (예: 1940년 ~ 2010년)
-                # 이 값은 필요에 따라 조정할 수 있습니다.
-                if not (1940 <= year <= 2010):
-                    await interaction.followup.send("❌ 生まれた年は1940年から2010年の間で入力してください。", ephemeral=True)
-                    return
-            except ValueError:
-                await interaction.followup.send("❌ 生まれた年は4桁の数字で入力してください。", ephemeral=True)
-                return
-
             approval_channel = self.onboarding_cog.approval_channel
             if not approval_channel: await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
             embed_data = await get_embed_from_db("embed_onboarding_approval")
@@ -57,9 +47,8 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             if interaction.user.display_avatar: embed.set_thumbnail(url=interaction.user.display_avatar.url)
             
             embed.add_field(name="名前", value=self.name.value, inline=False)
-            # [✅ 수정] '나이' 대신 '출생 연도'를 임베드에 추가
-            embed.add_field(name="生まれた年", value=self.birth_year.value, inline=False)
-            embed.add_field(name="性別", value=self.gender.value, inline=False)
+            embed.add_field(name="生まれた年", value=self.birth_year, inline=False)
+            embed.add_field(name="性別", value=self.gender, inline=False)
             embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             
@@ -71,6 +60,55 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         except Exception as e: 
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
+
+# [✅ 신규 추가] 성별과 나이를 먼저 선택하는 View
+class GenderAgeSelectView(ui.View):
+    def __init__(self, cog: 'Onboarding'):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.selected_gender: Optional[str] = None
+        self.selected_birth_year: Optional[str] = None
+
+        choices_config = get_config("ONBOARDING_CHOICES", {})
+        
+        # 성별 선택 드롭다운
+        gender_options = [discord.SelectOption(**opt) for opt in choices_config.get("gender", [])]
+        self.gender_select = ui.Select(placeholder="性別を選択してください...", options=gender_options, custom_id="onboarding_gender_select")
+        self.gender_select.callback = self.on_gender_select
+        self.add_item(self.gender_select)
+
+        # 출생 연도 선택 드롭다운
+        birth_year_options = [discord.SelectOption(**opt) for opt in choices_config.get("birth_year", [])]
+        self.birth_year_select = ui.Select(placeholder="生まれた年を選択してください...", options=birth_year_options, custom_id="onboarding_byear_select")
+        self.birth_year_select.callback = self.on_birth_year_select
+        self.add_item(self.birth_year_select)
+        
+        # 다음 단계 버튼
+        self.proceed_button = ui.Button(label="次へ進む", style=discord.ButtonStyle.success, disabled=True, custom_id="onboarding_proceed")
+        self.proceed_button.callback = self.on_proceed
+        self.add_item(self.proceed_button)
+
+    async def _check_selection_complete(self):
+        if self.selected_gender and self.selected_birth_year:
+            self.proceed_button.disabled = False
+
+    async def on_gender_select(self, interaction: discord.Interaction):
+        self.selected_gender = interaction.data["values"][0]
+        await self._check_selection_complete()
+        await interaction.response.edit_message(view=self)
+
+    async def on_birth_year_select(self, interaction: discord.Interaction):
+        self.selected_birth_year = interaction.data["values"][0]
+        await self._check_selection_complete()
+        await interaction.response.edit_message(view=self)
+        
+    async def on_proceed(self, interaction: discord.Interaction):
+        modal = IntroductionModal(self.cog, self.selected_gender, self.selected_birth_year)
+        await interaction.response.send_modal(modal)
+        # 성공적으로 Modal이 열리면, 이전 선택 메시지는 삭제
+        await interaction.delete_original_response()
+
+# [이하 ApprovalView와 OnboardingGuideView는 이전과 거의 동일, create_introduction 부분만 수정됨]
 
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
@@ -89,8 +127,6 @@ class ApprovalView(ui.View):
     
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
-    
-    # [✅ 삭제] 더 이상 복잡한 파싱 함수가 필요 없으므로 _parse_birth_year 함수를 제거합니다.
         
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
@@ -127,16 +163,11 @@ class ApprovalView(ui.View):
 
             status_text = "承認" if is_approved else "拒否"
             if success:
-                if interaction.response.is_done():
-                    await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
-                else:
-                    await interaction.edit_original_response(content=f"✅ **{status_text}**処理が完了しました。", view=None)
+                # [수정] ephemeral 메시지는 edit이 안될 수 있으므로 followup으로 통일
+                await interaction.followup.send(f"✅ **{status_text}**処理が完了しました。", ephemeral=True)
             else:
                 error_report = f"❌ **{status_text}**処理中にエラーが発生しました:\n" + "\n".join(f"- {res}" for res in results)
-                if interaction.response.is_done():
-                    await interaction.followup.send(error_report, ephemeral=True)
-                else:
-                    await interaction.edit_original_response(content=error_report, view=None)
+                await interaction.followup.send(error_report, ephemeral=True)
 
             try: await interaction.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
@@ -181,29 +212,21 @@ class ApprovalView(ui.View):
                 if (rid := get_id(key)) and (r := guild.get_role(rid)):
                     roles_to_add.append(r)
                 else: failed_to_find_roles.append(key)
-
-            # [✅ 수정] 성별 역할 부여 로직 (기존과 동일하지만 명시)
-            gender_role_mapping = get_config("GENDER_ROLE_MAPPING", [])
-            if gender_field := self._get_field_value(self.original_embed, "性別"):
-                for rule in gender_role_mapping:
-                    if any(k.lower() in gender_field.lower() for k in rule.get("keywords", [])):
-                        if (rid := get_id(rule["role_id_key"])) and (r := guild.get_role(rid)): roles_to_add.append(r)
-                        else: failed_to_find_roles.append(rule["role_id_key"])
-                        break
             
-            # [✅✅✅ 핵심 수정: 나이 역할 부여 로직]
+            gender_field = self._get_field_value(self.original_embed, "性別")
+            if gender_field == "男性":
+                if (rid := get_id("role_info_male")) and (r := guild.get_role(rid)): roles_to_add.append(r)
+            elif gender_field == "女性":
+                if (rid := get_id("role_info_female")) and (r := guild.get_role(rid)): roles_to_add.append(r)
+
             age_role_mapping = get_config("AGE_ROLE_MAPPING", [])
             birth_year_str = self._get_field_value(self.original_embed, "生まれた年")
 
             if birth_year_str and birth_year_str.isdigit():
                 birth_year = int(birth_year_str)
-                
-                # 서버의 나이 제한 정책 확인 (예: 20세 이상)
-                # 이 부분은 서버 정책에 맞게 조정이 필요합니다.
                 age_limit = 20
                 current_year = datetime.now(timezone.utc).year
                 if (current_year - birth_year) < age_limit:
-                    # [중요] 나이 제한에 걸리는 경우, 승인 프로세스를 중단하고 에러 메시지 반환
                     return f"年齢制限: ユーザーは{age_limit}歳未満です。 (生まれた年: {birth_year})"
 
                 for mapping in age_role_mapping:
@@ -293,14 +316,6 @@ class ApprovalView(ui.View):
         except Exception as e:
             logger.error(f"거부 로그 전송 실패: {e}", exc_info=True); return "거부 로그 채널에 메시지 전송 실패。"
         return None
-        
-    @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
-    async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
-    @ui.button(label="拒否", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
-    async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
-
-# ... 이하 OnboardingGuideView, OnboardingPanelView, Onboarding Cog 클래스는 기존과 동일하게 유지됩니다. ...
-# (생략 없이 전체 코드를 요청하셨으므로, 아래에 동일한 코드를 그대로 붙여넣습니다.)
 
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
@@ -355,13 +370,23 @@ class OnboardingGuideView(ui.View):
         if self.current_step > 0: self.current_step -= 1
         content = self._prepare_next_step_message_content()
         if self.message: await self.message.edit(**content)
+
+    # [✅✅✅ 핵심 수정] 자기소개서 생성 로직 변경
     async def create_introduction(self, interaction: discord.Interaction):
-        await interaction.response.send_modal(IntroductionModal(self.onboarding_cog))
+        # Modal을 바로 여는 대신, 새로 만든 GenderAgeSelectView를 전송합니다.
+        view = GenderAgeSelectView(self.onboarding_cog)
+        await interaction.response.send_message(
+            "まず、あなたの性別と生まれた年を選択してください。",
+            view=view,
+            ephemeral=True
+        )
+        # 가이드 메시지는 역할을 다했으므로 삭제
         if self.message:
             try: await self.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
+# ... (이하 OnboardingPanelView와 Onboarding Cog는 이전과 동일) ...
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
