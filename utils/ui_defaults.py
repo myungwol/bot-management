@@ -228,6 +228,8 @@ SETUP_COMMAND_MAP = {
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
     "channel_job_log": {"type": "channel", "cog_name": "LevelSystem", "key": "job_log_channel_id", "friendly_name": "[로그] 전직 기록", "channel_type": "text"},
     "log_daily_check":       {"type": "channel", "cog_name": "DailyCheck", "key": "log_daily_check_channel_id",             "friendly_name": "[로그] 출석체크 기록", "channel_type": "text"},
+    "log_market": {"type": "channel", "cog_name": "EconomyCore", "key": "market_log_channel_id", "friendly_name": "[로그] 시장 시세 변동", "channel_type": "text"},
+    "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "[로그] 코인 활동", "channel_type": "text"},
     
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
@@ -324,4 +326,38 @@ JOB_SYSTEM_CONFIG = {
         {"level": 50,  "role_key": "role_resident_regular"},
         {"level": 1,   "role_key": "role_resident_rookie"}
     ]
+}
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# [✅ 신규 추가] 나이대 역할 매핑 (AGE_ROLE_MAPPING)
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+AGE_ROLE_MAPPING = [
+    {"key": "role_info_age_00s", "range": [2000, 2100], "name": "00年代生"},
+    {"key": "role_info_age_90s", "range": [1990, 2000], "name": "90年代生"},
+    {"key": "role_info_age_80s", "range": [1980, 1990], "name": "80年代生"},
+    {"key": "role_info_age_70s", "range": [1970, 1980], "name": "70年代生"}
+]
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# [✅ 신규 추가] 게임 시스템 설정 (GAME_CONFIG)
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+GAME_CONFIG = {
+    "CURRENCY_ICON": "🪙",
+    "FISHING_BITE_REACTION_TIME": 3.0,
+    "FISHING_BIG_CATCH_THRESHOLD": 70.0,
+    "FISHING_SEA_REQ_TIER": 3,
+    "FISHING_WAITING_IMAGE_URL": "https://i.imgur.com/AcLgC2g.gif",
+    "RPS_LOBBY_TIMEOUT": 60,
+    "RPS_CHOICE_TIMEOUT": 45,
+    "RPS_MAX_PLAYERS": 5,
+    "SLOT_MAX_ACTIVE": 5,
+    "XP_FROM_FISHING": 20,
+    "XP_FROM_FARMING": 15,
+    "XP_FROM_VOICE": 10,
+    "XP_FROM_CHAT": 5,
+    "VOICE_TIME_REQUIREMENT_MINUTES": 10,
+    "VOICE_REWARD_RANGE": [10, 15],
+    "CHAT_MESSAGE_REQUIREMENT": 20,
+    "CHAT_REWARD_RANGE": [5, 10],
+    "JOB_ADVANCEMENT_LEVELS": [50, 100]
 }
