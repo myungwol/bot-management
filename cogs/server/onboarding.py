@@ -23,7 +23,6 @@ class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
-# [✅ 수정] Modal에 성별, 나이 파라미터 추가
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
     hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
@@ -61,7 +60,6 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
-# [✅ 신규 추가] 성별과 나이를 먼저 선택하는 View
 class GenderAgeSelectView(ui.View):
     def __init__(self, cog: 'Onboarding'):
         super().__init__(timeout=300)
@@ -71,19 +69,16 @@ class GenderAgeSelectView(ui.View):
 
         choices_config = get_config("ONBOARDING_CHOICES", {})
         
-        # 성별 선택 드롭다운
         gender_options = [discord.SelectOption(**opt) for opt in choices_config.get("gender", [])]
-        self.gender_select = ui.Select(placeholder="性別を選択してください...", options=gender_options, custom_id="onboarding_gender_select")
+        self.gender_select = ui.Select(placeholder="性別を選択してください...", options=gender_options or [discord.SelectOption(label="エラー", value="error", description="設定が見つかりません。")], disabled=not gender_options, custom_id="onboarding_gender_select")
         self.gender_select.callback = self.on_gender_select
         self.add_item(self.gender_select)
 
-        # 출생 연도 선택 드롭다운
         birth_year_options = [discord.SelectOption(**opt) for opt in choices_config.get("birth_year", [])]
-        self.birth_year_select = ui.Select(placeholder="生まれた年を選択してください...", options=birth_year_options, custom_id="onboarding_byear_select")
+        self.birth_year_select = ui.Select(placeholder="生まれた年を選択してください...", options=birth_year_options or [discord.SelectOption(label="エラー", value="error", description="設定が見つかりません。")], disabled=not birth_year_options, custom_id="onboarding_byear_select")
         self.birth_year_select.callback = self.on_birth_year_select
         self.add_item(self.birth_year_select)
         
-        # 다음 단계 버튼
         self.proceed_button = ui.Button(label="次へ進む", style=discord.ButtonStyle.success, disabled=True, custom_id="onboarding_proceed")
         self.proceed_button.callback = self.on_proceed
         self.add_item(self.proceed_button)
@@ -105,10 +100,84 @@ class GenderAgeSelectView(ui.View):
     async def on_proceed(self, interaction: discord.Interaction):
         modal = IntroductionModal(self.cog, self.selected_gender, self.selected_birth_year)
         await interaction.response.send_modal(modal)
-        # 성공적으로 Modal이 열리면, 이전 선택 메시지는 삭제
         await interaction.delete_original_response()
 
-# [이하 ApprovalView와 OnboardingGuideView는 이전과 거의 동일, create_introduction 부분만 수정됨]
+class OnboardingGuideView(ui.View):
+    def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
+        super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
+        self.user = user; self.current_step = 0; self.message: Optional[discord.WebhookMessage] = None
+    async def on_timeout(self) -> None:
+        if self.message:
+            for item in self.children: item.disabled = True
+            try: await self.message.edit(content="案内の時間が経過しました。最初からやり直してください。", view=self)
+            except (discord.NotFound, discord.HTTPException): pass
+    def stop(self):
+        super().stop()
+    def _update_components(self):
+        self.clear_items(); step_info = self.steps_data[self.current_step]
+        is_first = self.current_step == 0; is_last = self.current_step == len(self.steps_data) - 1
+        prev_button = ui.Button(label="◀ 戻る", style=discord.ButtonStyle.secondary, custom_id="onboarding_prev", row=1, disabled=is_first)
+        prev_button.callback = self.go_previous; self.add_item(prev_button)
+        step_type = step_info.get("step_type")
+        if step_type == "intro":
+             intro_button = ui.Button(label=step_info.get("button_label", "住民登録票を作成する"), style=discord.ButtonStyle.success, custom_id="onboarding_intro")
+             intro_button.callback = self.create_introduction; self.add_item(intro_button)
+        else:
+            next_button = ui.Button(label="次へ ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next", disabled=is_last)
+            next_button.callback = self.go_next; self.add_item(next_button)
+    async def _grant_step_role(self, interaction: discord.Interaction, role_key_to_add: str):
+        role_id = get_id(role_key_to_add)
+        if role_id and isinstance(interaction.user, discord.Member):
+            if role := interaction.guild.get_role(role_id):
+                try:
+                    if role not in interaction.user.roles: await interaction.user.add_roles(role, reason="オンボーディング進行")
+                except Exception as e: logger.error(f"온보딩 가이드 중 역할 부여 실패: {e}")
+            else: logger.warning(f"온보딩: DB에 설정된 역할 ID({role_id})를 서버에서 찾을 수 없습니다。 ({role_key_to_add})")
+    def _prepare_next_step_message_content(self) -> dict:
+        step_info = self.steps_data[self.current_step]
+        embed_data = step_info.get("embed_data", {}).get("embed_data")
+        if not embed_data: embed = discord.Embed(title="エラー", description="このステップの表示データが見つかりません。", color=discord.Color.red())
+        else: embed = format_embed_from_db(embed_data, member_mention=self.user.mention)
+        self._update_components()
+        return {"embed": embed, "view": self}
+    async def go_next(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        tasks = []
+        step_info = self.steps_data[self.current_step]
+        role_key_to_add = step_info.get("role_key_to_add")
+        if role_key_to_add: tasks.append(self._grant_step_role(interaction, role_key_to_add))
+        if self.current_step < len(self.steps_data) - 1: self.current_step += 1
+        content = self._prepare_next_step_message_content()
+        tasks.append(self.message.edit(**content))
+        await asyncio.gather(*tasks)
+    async def go_previous(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        if self.current_step > 0: self.current_step -= 1
+        content = self._prepare_next_step_message_content()
+        if self.message: await self.message.edit(**content)
+
+    # [✅ 수정] 안전장치 추가
+    async def create_introduction(self, interaction: discord.Interaction):
+        view = GenderAgeSelectView(self.onboarding_cog)
+        
+        if not view.gender_select.options or view.gender_select.options[0].value == "error" or \
+           not view.birth_year_select.options or view.birth_year_select.options[0].value == "error":
+            logger.error("オンボーディングエラー: 性別または生まれた年の選択肢が設定ファイル(ONBOARDING_CHOICES)に見つかりません。")
+            await interaction.response.send_message(
+                "❌ 申し訳ありません、住民登録票の初期化中にエラーが発生しました。管理者に連絡してください。",
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                "まず、あなたの性別と生まれた年を選択してください。",
+                view=view,
+                ephemeral=True
+            )
+
+        if self.message:
+            try: await self.message.delete()
+            except (discord.NotFound, discord.HTTPException): pass
+        self.stop()
 
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
