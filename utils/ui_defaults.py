@@ -8,32 +8,32 @@
 # 1. 역할 키 맵 (Role Key Map)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_ROLE_KEY_MAP = {
-    # --- 관리/스태프 역할 ---
+    # --- [✅✅✅ 핵심 수정] 요청하신 접두사 역할 및 우선순위 ---
     "role_admin_total":         {"name": "森の妖精", "is_prefix": True, "priority": 100},
     "role_staff_village_chief": {"name": "村長", "is_prefix": True, "priority": 90},
     "role_staff_deputy_chief":  {"name": "副村長", "is_prefix": True, "priority": 85},
-    "role_staff_police":        {"name": "交番さん", "is_prefix": True, "priority": 80},
-    "role_staff_festival":      {"name": "お祭り係", "is_prefix": True, "priority": 70},
-    "role_staff_pr":            {"name": "ビラ配りさん", "is_prefix": True, "priority": 70},
-    "role_staff_design":        {"name": "村の絵描きさん", "is_prefix": True, "priority": 70},
-    "role_staff_secretary":     {"name": "書記", "is_prefix": True, "priority": 70},
-    "role_staff_newbie_helper": {"name": "お世話係", "is_prefix": True, "priority": 70},
     "role_approval":            {"name": "役場の職員", "is_prefix": True, "priority": 60},
-
-    # --- 주민 등급 역할 ---
     "role_premium_booster":     {"name": "支援者", "is_prefix": True, "priority": 55},
     "role_resident_elder":      {"name": "長老", "is_prefix": True, "priority": 50},
-    "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": False, "priority": 40},
-    "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": False, "priority": 30},
-    "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": False, "priority": 20},
-    "role_job_fisherman":       {"name": "釣り人", "is_prefix": True, "priority": 0},
-    "role_job_farmer":          {"name": "農家", "is_prefix": True, "priority": 0},
-    "role_job_master_angler":   {"name": "太公望", "is_prefix": True, "priority": 0},
-    "role_job_master_farmer":   {"name": "大農家", "is_prefix": True, "priority": 0},
+    "role_job_master_angler":   {"name": "太公望", "is_prefix": True, "priority": 16},
+    "role_job_master_farmer":   {"name": "大農家", "is_prefix": True, "priority": 16},
+    "role_job_fisherman":       {"name": "釣り人", "is_prefix": True, "priority": 15},
+    "role_job_farmer":          {"name": "農家", "is_prefix": True, "priority": 15},
     "role_resident":            {"name": "住民", "is_prefix": True, "priority": 10},
     "role_guest":               {"name": "旅の人", "is_prefix": True, "priority": 5},
 
+    # --- 그 외 접두사가 아닌 역할들 ---
+    "role_staff_police":        {"name": "交番さん", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_staff_festival":      {"name": "お祭り係", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_staff_pr":            {"name": "ビラ配りさん", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_staff_design":        {"name": "村の絵描きさん", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_staff_secretary":     {"name": "書記", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_staff_newbie_helper": {"name": "お世話係", "is_prefix": False, "priority": 0}, # 접두사 아님
     
+    "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": False, "priority": 0}, # 접두사 아님
+
     # --- 온보딩/역할 패널 구분선 역할 ---
     "role_onboarding_step_1":   {"name": "════════════ゲーム══════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_2":   {"name": "════════════通知════════════", "is_prefix": False, "priority": 0},
