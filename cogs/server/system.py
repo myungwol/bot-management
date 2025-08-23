@@ -451,15 +451,14 @@ class ServerSystem(commands.Cog):
         """
         사용자의 경험치와 레벨을 안전하게 업데이트하고, 레벨업을 처리하는 중앙 함수.
         """
-        # 1. 현재 유저 데이터 가져오기
         res = await supabase.table('user_levels').select('level, xp').eq('user_id', user.id).maybe_single().execute()
         
-        # [✅ 수정] DB 조회 실패 시 None을 반환하므로, 이를 처리하는 로직 추가
-        if res is None:
-            logger.error(f"유저 {user.id}의 레벨 데이터를 DB에서 가져오지 못했습니다. 업데이트를 중단합니다.")
-            raise ConnectionError(f"Failed to retrieve level data for user {user.id}.")
-            
-        current_data = res.data or {'level': 1, 'xp': 0}
+        # [✅ 수정] DB 조회 실패(res is None) 또는 유저 데이터 없음(res.data is None)을 모두 처리
+        if res and res.data:
+            current_data = res.data
+        else:
+            current_data = {'level': 1, 'xp': 0}
+
         current_level, current_xp = current_data['level'], current_data['xp']
         
         new_total_xp = current_xp
