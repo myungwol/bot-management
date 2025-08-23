@@ -13,7 +13,6 @@ import discord
 from supabase import create_client, AsyncClient
 from postgrest.exceptions import APIError
 
-# [✅ 수정] ONBOARDING_CHOICES를 import 목록에 추가합니다.
 from .ui_defaults import (
     UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, 
     SETUP_COMMAND_MAP, JOB_SYSTEM_CONFIG, AGE_ROLE_MAPPING, GAME_CONFIG,
@@ -182,7 +181,7 @@ def get_panel_id(panel_name: str) -> Optional[Dict[str, int]]:
     return {"message_id": message_id, "channel_id": channel_id} if message_id and channel_id else None
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# ... (6. 임베드 ~ 15. 게임 경제 관련 함수는 이전과 동일)
+# 6. 임베드 및 UI 컴포넌트 관련 함수
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def save_embed_to_db(embed_key: str, embed_data: dict):
@@ -191,6 +190,14 @@ async def save_embed_to_db(embed_key: str, embed_data: dict):
 async def get_embed_from_db(embed_key: str) -> Optional[dict]:
     response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
     return response.data[0]['embed_data'] if response and response.data else None
+
+# [✅✅✅ 신규 추가] 모든 임베드 템플릿을 가져오는 함수
+@supabase_retry_handler()
+async def get_all_embeds() -> List[Dict[str, Any]]:
+    """데이터베이스에 저장된 모든 임베드 템플릿을 가져옵니다."""
+    response = await supabase.table('embeds').select('embed_key, embed_data').order('embed_key').execute()
+    return response.data if response and response.data else []
+
 @supabase_retry_handler()
 async def get_onboarding_steps() -> List[dict]:
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
