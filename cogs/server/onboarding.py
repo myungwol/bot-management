@@ -34,6 +34,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
         self.gender = gender
         self.birth_year = birth_year
     
+    # [✅✅✅ 핵심 수정]
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
@@ -51,10 +52,15 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             
+            # [✅ 수정] ApprovalView(승인/거절 버튼 View)를 다시 추가합니다.
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
+            
             approval_role_id = self.onboarding_cog.approval_role_id
             content = f"<@&{approval_role_id}> 新しい住人登録票が提出されました。" if approval_role_id else "新しい住人登録票が提出されました。"
+            
+            # [✅ 수정] 메시지를 보낼 때 view=view 파라미터를 추가합니다.
             await approval_channel.send(content=content, embed=embed, view=view, allowed_mentions=discord.AllowedMentions(roles=True))
+            
             await interaction.followup.send("✅ 住人登録票を公務員に提出しました。", ephemeral=True)
         except Exception as e: 
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
@@ -90,7 +96,6 @@ class GenderAgeSelectView(ui.View):
         self.decade_select.callback = self.on_decade_select
         self.add_item(self.decade_select)
 
-        # [✅✅✅ 핵심 수정] options 필드가 비어있지 않도록 임시 값을 추가합니다.
         self.year_select = ui.Select(
             placeholder="まず年代を選択してください...", 
             disabled=True, 
@@ -120,7 +125,6 @@ class GenderAgeSelectView(ui.View):
             self.selected_birth_year = "非公開"
             self.year_select.placeholder = "非公開が選択されました"
             self.year_select.disabled = True
-            # [✅ 수정] 비활성화 시에도 임시 옵션은 유지합니다.
             self.year_select.options = [discord.SelectOption(label="placeholder", value="placeholder")]
             await self._update_view_state(interaction)
             return
