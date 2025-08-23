@@ -60,7 +60,6 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
-# [✅✅✅ 핵심 수정] 출생 연도를 여러 드롭다운으로 나누는 View
 class GenderAgeSelectView(ui.View):
     def __init__(self, cog: 'Onboarding'):
         super().__init__(timeout=300)
@@ -70,7 +69,6 @@ class GenderAgeSelectView(ui.View):
         
         self.choices_config = get_config("ONBOARDING_CHOICES", {})
         
-        # 1. 성별 선택 드롭다운 생성
         gender_options = [discord.SelectOption(**opt) for opt in self.choices_config.get("gender", [])]
         self.gender_select = ui.Select(
             placeholder="性別を選択してください...",
@@ -81,7 +79,6 @@ class GenderAgeSelectView(ui.View):
         self.gender_select.callback = self.on_gender_select
         self.add_item(self.gender_select)
         
-        # 2. 출생 "연대" 선택 드롭다운 생성
         decade_options = [
             discord.SelectOption(label="2000年代", value="2000s"),
             discord.SelectOption(label="1990年代", value="1990s"),
@@ -93,18 +90,21 @@ class GenderAgeSelectView(ui.View):
         self.decade_select.callback = self.on_decade_select
         self.add_item(self.decade_select)
 
-        # 3. 실제 "연도"를 선택할 드롭다운 (처음에는 비활성화)
-        self.year_select = ui.Select(placeholder="まず年代を選択してください...", disabled=True, custom_id="onboarding_year_select")
+        # [✅✅✅ 핵심 수정] options 필드가 비어있지 않도록 임시 값을 추가합니다.
+        self.year_select = ui.Select(
+            placeholder="まず年代を選択してください...", 
+            disabled=True, 
+            custom_id="onboarding_year_select",
+            options=[discord.SelectOption(label="placeholder", value="placeholder")]
+        )
         self.year_select.callback = self.on_year_select
         self.add_item(self.year_select)
 
-        # 4. 다음 단계 버튼 (처음에는 비활성화)
         self.proceed_button = ui.Button(label="次へ進む", style=discord.ButtonStyle.success, disabled=True, custom_id="onboarding_proceed")
         self.proceed_button.callback = self.on_proceed
         self.add_item(self.proceed_button)
 
     async def _update_view_state(self, interaction: discord.Interaction):
-        """View의 현재 상태에 따라 버튼과 드롭다운을 업데이트합니다."""
         if self.selected_gender and self.selected_birth_year:
             self.proceed_button.disabled = False
         await interaction.response.edit_message(view=self)
@@ -116,24 +116,22 @@ class GenderAgeSelectView(ui.View):
     async def on_decade_select(self, interaction: discord.Interaction):
         selected_decade = interaction.data["values"][0]
         
-        # "비공개"를 선택한 경우
         if selected_decade == "private":
             self.selected_birth_year = "非公開"
-            self.year_select.placeholder = "非公開"
+            self.year_select.placeholder = "非公開が選択されました"
             self.year_select.disabled = True
-            self.year_select.options = []
+            # [✅ 수정] 비활성화 시에도 임시 옵션은 유지합니다.
+            self.year_select.options = [discord.SelectOption(label="placeholder", value="placeholder")]
             await self._update_view_state(interaction)
             return
 
-        # 연대를 선택하면, 그에 맞는 연도 옵션으로 드롭다운을 채웁니다.
         year_options_data = self.choices_config.get("birth_year_groups", {}).get(selected_decade, [])
         year_options = [discord.SelectOption(**opt) for opt in year_options_data]
         
-        self.year_select.options = year_options
+        self.year_select.options = year_options or [discord.SelectOption(label="エラー", value="error")]
         self.year_select.placeholder = f"{selected_decade}年代から選択..."
-        self.year_select.disabled = False
+        self.year_select.disabled = not year_options
         
-        # 연대만 바꾸고 연도는 아직 선택 안했으므로, 다음 버튼은 비활성화
         self.selected_birth_year = None
         self.proceed_button.disabled = True
         
