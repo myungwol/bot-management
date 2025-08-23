@@ -108,7 +108,17 @@ UI_EMBEDS = {
     "dm_onboarding_rejected": {"title": "❌ 住民登録拒否のお知らせ", "description": "申し訳ありませんが、「{guild_name}」での住民登録は拒否されました。", "color": 15548997},
     "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。\n\n**※すべてのメッセージはサーバー管理者が記録・確認しており、問題発生時には投稿者を特定し対処します。**", "color": 4342323},    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     "panel_custom_embed": {"title": "📢 カスタムメッセージ送信パネル", "description": "下のボタンを押して、指定したチャンネルにBotから埋め込みメッセージを送信します。\n\n**この機能は特定の役職を持つスタッフのみ使用可能です。**", "color": 0x34495E},
-    
+        # [✅ 신규 추가] 전직 로그 임베드
+    "log_job_advancement": {
+        "title": "🎉 新たな転職者！",
+        "description": "{user_mention}さんがついに新たな道を選択しました。",
+        "color": 0xFFD700, # 금색
+        "fields": [
+            {"name": "職業", "value": "```\n{job_name}\n```", "inline": True},
+            {"name": "選択した能力", "value": "```\n{ability_name}\n```", "inline": True}
+        ],
+        "footer": {"text": "これからの活躍を期待しています！"}
+    },
     # --- [게임 봇] ---
     "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "> アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
     "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "> 川辺でのんびり釣りを楽しみましょう。\n> 下のボタンを押して釣りを開始します。", "color": 0x5865F2},
@@ -183,6 +193,7 @@ SETUP_COMMAND_MAP = {
     
     # [✅ 레벨 시스템] 레벨 확인 패널 설정 추가
     "panel_level_check": {"type": "panel", "cog_name": "LevelSystem", "key": "level_check_panel_channel_id", "friendly_name": "[정보] 레벨 확인 패널", "channel_type": "text"},
+    "channel_job_advancement": {"type": "channel", "cog_name": "LevelSystem", "key": "job_advancement_channel_id", "friendly_name": "[채널] 전직소", "channel_type": "text"},
 
     "panel_item_usage": {"type": "panel", "cog_name": "ItemSystem", "key": "item_usage_panel_channel_id", "friendly_name": "[패널] 아이템 사용", "channel_type": "text"},
     "panel_anonymous_board": {"type": "panel", "cog_name": "AnonymousBoard", "key": "anonymous_board_channel_id", "friendly_name": "[패널] 익명 게시판", "channel_type": "text"},    
@@ -230,6 +241,7 @@ SETUP_COMMAND_MAP = {
     "log_daily_check":       {"type": "channel", "cog_name": "DailyCheck", "key": "log_daily_check_channel_id",             "friendly_name": "[로그] 출석체크 기록", "channel_type": "text"},
     "log_market": {"type": "channel", "cog_name": "EconomyCore", "key": "market_log_channel_id", "friendly_name": "[로그] 시장 시세 변동", "channel_type": "text"},
     "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "[로그] 코인 활동", "channel_type": "text"},
+    "log_job_advancement":     {"type": "channel", "cog_name": "LevelSystem", "key": "job_log_channel_id",         "friendly_name": "[로그] 전직 기록", "channel_type": "text"},
     
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
@@ -309,7 +321,7 @@ CUSTOM_EMBED_SENDER_ROLES = [
     # "role_staff_pr", # [보안] 악용 가능성을 줄이기 위해 홍보 담당은 주석 처리. 필요 시 주석 해제.
 ]
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# [✅ 신규 추가] 직업 및 레벨 시스템 설정
+# 11. 직업 및 레벨 시스템 설정
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 JOB_SYSTEM_CONFIG = {
     # 직업 키와 역할 키를 매핑합니다.
@@ -329,7 +341,7 @@ JOB_SYSTEM_CONFIG = {
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# [✅ 신규 추가] 나이대 역할 매핑 (AGE_ROLE_MAPPING)
+# 12. 나이대 역할 매핑 (AGE_ROLE_MAPPING)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 AGE_ROLE_MAPPING = [
     {"key": "role_info_age_00s", "range": [2000, 2100], "name": "00年代生"},
@@ -339,7 +351,7 @@ AGE_ROLE_MAPPING = [
 ]
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# [✅ 신규 추가] 게임 시스템 설정 (GAME_CONFIG)
+# 13. 게임 시스템 설정 (GAME_CONFIG)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 GAME_CONFIG = {
     "CURRENCY_ICON": "🪙",
@@ -361,3 +373,7 @@ GAME_CONFIG = {
     "CHAT_REWARD_RANGE": [5, 10],
     "JOB_ADVANCEMENT_LEVELS": [50, 100]
 }
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# [✅ 신규 추가] 전직 시스템 데이터
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+JOB_ADVANCEMENT_DATA = { 50: [ { "job_key": "fisherman", "job_name": "釣り人", "role_key": "role_job_fisherman", "description": "魚を釣ることに特化した専門家です。", "abilities": [ { "ability_key": "fish_rare_up_1", "ability_name": "レア魚確率UP (小)", "description": "珍しい魚を釣る確率が少し上昇します。" }, { "ability_key": "fish_junk_down_1", "ability_name": "ゴミ確率DOWN (小)", "description": "釣りの際にゴミが釣れる確率が少し減少します。" } ] }, { "job_key": "farmer", "job_name": "農家", "role_key": "role_job_farmer", "description": "作物を育て、収穫することに特化した専門家です。", "abilities": [ { "ability_key": "farm_yield_up_1", "ability_name": "収穫量UP (小)", "description": "作物を収穫する際の収穫量が少し増加します。" }, { "ability_key": "farm_quality_up_1", "ability_name": "高品質確率UP (小)", "description": "作物の品質が少し良くなりやすくなります。" } ] } ], 100: [ { "job_key": "master_angler", "job_name": "太公望", "role_key": "role_job_master_angler", "description": "釣りの道を極め、伝説の魚を追い求める者。釣り人の上位職です。", "abilities": [ { "ability_key": "fish_price_up_2", "ability_name": "魚の価値UP (中)", "description": "釣った魚の売却価格が上昇します。" }, { "ability_key": "fish_legendary_up_2", "ability_name": "ヌシ遭遇率UP (中)", "description": "伝説の魚と遭遇する確率が上昇します。" } ] }, { "job_key": "master_farmer", "job_name": "大農家", "role_key": "role_job_master_farmer", "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。", "abilities": [ { "ability_key": "farm_growth_speed_up_2", "ability_name": "成長速度UP (中)", "description": "作物の成長に必要な時間が短縮されます。" }, { "ability_key": "farm_multi_harvest_2", "ability_name": "連続収穫チャンス (中)", "description": "一度に複数の作物を収穫できることがあります。" } ] } ] }
