@@ -374,6 +374,85 @@ GAME_CONFIG = {
     "JOB_ADVANCEMENT_LEVELS": [50, 100]
 }
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# [✅ 신규 추가] 전직 시스템 데이터
+# [✅ 수정] 새로운 능력 정보로 전직 시스템 데이터 업데이트
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-JOB_ADVANCEMENT_DATA = { 50: [ { "job_key": "fisherman", "job_name": "釣り人", "role_key": "role_job_fisherman", "description": "魚を釣ることに特化した専門家です。", "abilities": [ { "ability_key": "fish_rare_up_1", "ability_name": "レア魚確率UP (小)", "description": "珍しい魚を釣る確率が少し上昇します。" }, { "ability_key": "fish_junk_down_1", "ability_name": "ゴミ確率DOWN (小)", "description": "釣りの際にゴミが釣れる確率が少し減少します。" } ] }, { "job_key": "farmer", "job_name": "農家", "role_key": "role_job_farmer", "description": "作物を育て、収穫することに特化した専門家です。", "abilities": [ { "ability_key": "farm_yield_up_1", "ability_name": "収穫量UP (小)", "description": "作物を収穫する際の収穫量が少し増加します。" }, { "ability_key": "farm_quality_up_1", "ability_name": "高品質確率UP (小)", "description": "作物の品質が少し良くなりやすくなります。" } ] } ], 100: [ { "job_key": "master_angler", "job_name": "太公望", "role_key": "role_job_master_angler", "description": "釣りの道を極め、伝説の魚を追い求める者。釣り人の上位職です。", "abilities": [ { "ability_key": "fish_price_up_2", "ability_name": "魚の価値UP (中)", "description": "釣った魚の売却価格が上昇します。" }, { "ability_key": "fish_legendary_up_2", "ability_name": "ヌシ遭遇率UP (中)", "description": "伝説の魚と遭遇する確率が上昇します。" } ] }, { "job_key": "master_farmer", "job_name": "大農家", "role_key": "role_job_master_farmer", "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。", "abilities": [ { "ability_key": "farm_growth_speed_up_2", "ability_name": "成長速度UP (中)", "description": "作物の成長に必要な時間が短縮されます。" }, { "ability_key": "farm_multi_harvest_2", "ability_name": "連続収穫チャンス (中)", "description": "一度に複数の作物を収穫できることがあります。" } ] } ] }
+JOB_ADVANCEMENT_DATA = {
+    # --- 레벨 50 전직 정보 ---
+    50: [
+        {
+            "job_key": "fisherman",
+            "job_name": "釣り人",
+            "role_key": "role_job_fisherman",
+            "description": "魚を釣ることに特化した専門家です。",
+            "abilities": [
+                {
+                    "ability_key": "fish_bait_saver_1",
+                    "ability_name": "エサ消費なし (確率)",
+                    "description": "釣りの際、一定の確率でエサを消費しません。"
+                },
+                {
+                    "ability_key": "fish_bite_time_down_1",
+                    "ability_name": "アタリ時間短縮",
+                    "description": "魚が食いつくまでの時間が全体的に2秒短縮されます。"
+                }
+            ]
+        },
+        {
+            "job_key": "farmer",
+            "job_name": "農家",
+            "role_key": "role_job_farmer",
+            "description": "作物を育て、収穫することに特化した専門家です。",
+            "abilities": [
+                {
+                    "ability_key": "farm_seed_saver_1",
+                    "ability_name": "種消費なし (確率)",
+                    "description": "種を植える際、一定の確率で種を消費しません。"
+                },
+                {
+                    "ability_key": "farm_water_retention_1",
+                    "ability_name": "水分保持力UP",
+                    "description": "作物が水分を保ちやすくなり、水やりの間隔が長くなります。"
+                }
+            ]
+        }
+    ],
+    # --- 레벨 100 전직 정보 ---
+    100: [
+        {
+            "job_key": "master_angler",
+            "job_name": "太公望",
+            "role_key": "role_job_master_angler",
+            "description": "釣りの道を極め、伝説の魚を追い求める者。釣り人の上位職です。",
+            "abilities": [
+                {
+                    "ability_key": "fish_rare_up_2",
+                    "ability_name": "レア魚確率UP (大)",
+                    "description": "珍しい魚を釣る確率が上昇します。"
+                },
+                {
+                    "ability_key": "fish_size_up_2",
+                    "ability_name": "魚のサイズUP (大)",
+                    "description": "釣り上げる魚の平均サイズが大きくなります。"
+                }
+            ]
+        },
+        {
+            "job_key": "master_farmer",
+            "job_name": "大農家",
+            "role_key": "role_job_master_farmer",
+            "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。",
+            "abilities": [
+                {
+                    "ability_key": "farm_yield_up_2",
+                    "ability_name": "収穫量UP (大)",
+                    "description": "作物を収穫する際の収穫量が大幅に増加します。"
+                },
+                {
+                    "ability_key": "farm_growth_speed_up_2",
+                    "ability_name": "成長速度UP (大)",
+                    "description": "作物の成長に必要な時間が短縮されます。"
+                }
+            ]
+        }
+    ]
+}
