@@ -1,7 +1,7 @@
 # bot-management/cogs/server/system.py
 import discord
 from discord.ext import commands
-from discord import app_commands
+from discord import app_commands, ui
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
@@ -13,7 +13,8 @@ from utils.database import (
     get_all_stats_channels, add_stats_channel, remove_stats_channel,
     _channel_id_cache,
     update_wallet,
-    supabase
+    supabase,
+    get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
 from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS
@@ -32,6 +33,84 @@ async def is_admin(interaction: discord.Interaction) -> bool:
             return True
         raise app_commands.CheckFailure("このコマンドを実行するための管理者権限がありません。")
     return True
+
+# --- 임베드 템플릿 수정을 위한 UI 클래스 ---
+class TemplateEditModal(ui.Modal, title="埋め込みテンプレート編集"):
+    title_input = ui.TextInput(label="タイトル", placeholder="埋め込みのタイトルを入力してください。", required=False, max_length=256)
+    description_input = ui.TextInput(label="説明", placeholder="埋め込みの説明文を入力してください。", style=discord.TextStyle.paragraph, required=False, max_length=4000)
+    color_input = ui.TextInput(label="色 (16進数コード)", placeholder="例: #5865F2 (空欄の場合はデフォルト色)", required=False, max_length=7)
+    image_url_input = ui.TextInput(label="画像URL", placeholder="埋め込みに表示する画像のURLを入力してください。", required=False)
+    thumbnail_url_input = ui.TextInput(label="サムネイルURL", placeholder="右上に表示するサムネイル画像のURLを入力してください。", required=False)
+
+    def __init__(self, existing_embed: discord.Embed):
+        super().__init__()
+        self.embed: Optional[discord.Embed] = None
+        self.title_input.default = existing_embed.title
+        self.description_input.default = existing_embed.description
+        if existing_embed.color: self.color_input.default = str(existing_embed.color)
+        if existing_embed.image and existing_embed.image.url: self.image_url_input.default = existing_embed.image.url
+        if existing_embed.thumbnail and existing_embed.thumbnail.url: self.thumbnail_url_input.default = existing_embed.thumbnail.url
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not self.title_input.value and not self.description_input.value and not self.image_url_input.value:
+            return await interaction.response.send_message("❌ タイトル、説明、画像URLのいずれか一つは必ず入力してください。", ephemeral=True)
+        try:
+            color = discord.Color.default()
+            if self.color_input.value:
+                color = discord.Color(int(self.color_input.value.replace("#", ""), 16))
+            
+            embed = discord.Embed(
+                title=self.title_input.value or None,
+                description=self.description_input.value or None,
+                color=color
+            )
+            if self.image_url_input.value: embed.set_image(url=self.image_url_input.value)
+            if self.thumbnail_url_input.value: embed.set_thumbnail(url=self.thumbnail_url_input.value)
+            self.embed = embed
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            await interaction.response.send_message("❌ 埋め込みの作成中にエラーが発生しました。", ephemeral=True)
+
+class EmbedTemplateSelectView(ui.View):
+    def __init__(self, all_embeds: List[Dict[str, Any]]):
+        super().__init__(timeout=300)
+        self.all_embeds = {e['embed_key']: e['embed_data'] for e in all_embeds}
+        
+        options = [
+            discord.SelectOption(label=key, description=data.get('title', 'タイトルなし')[:100])
+            for key, data in self.all_embeds.items()
+        ]
+        
+        for i in range(0, len(options), 25):
+            select = ui.Select(placeholder=f"編集する埋め込みテンプレートを選択... ({i//25 + 1})", options=options[i:i+25])
+            select.callback = self.select_callback
+            self.add_item(select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        embed_key = interaction.data['values'][0]
+        embed_data = self.all_embeds.get(embed_key)
+        if not embed_data:
+            return await interaction.response.send_message("❌ テンプレートが見つかりませんでした。", ephemeral=True)
+
+        existing_embed = discord.Embed.from_dict(embed_data)
+        modal = TemplateEditModal(existing_embed)
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+
+        if modal.embed:
+            new_embed_data = modal.embed.to_dict()
+            await save_embed_to_db(embed_key, new_embed_data)
+            
+            for item in self.children:
+                item.disabled = True
+            await interaction.edit_original_response(view=self)
+            
+            await interaction.followup.send(
+                f"✅ 埋め込みテンプレート`{embed_key}`が正常に更新されました。\n"
+                "`/admin setup`で関連パネルを再設置すると、変更が反映されます。",
+                embed=modal.embed,
+                ephemeral=True
+            )
 
 class ServerSystem(commands.Cog):
     admin_group = app_commands.Group(
@@ -56,11 +135,10 @@ class ServerSystem(commands.Cog):
             else:
                 await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
 
-    # --- [이하 코드는 이전과 동일] ---
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         for key, info in SETUP_COMMAND_MAP.items():
-            choice_name = f"{info.get('friendly_name', key)} 설정"
+            choice_name = f"{info.get('friendly_name', key)} 設定"
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
@@ -74,6 +152,11 @@ class ServerSystem(commands.Cog):
 
         panel_actions = {"panels_regenerate_all": "[패널] 모든 관리 패널 재설치"}
         for key, name in panel_actions.items():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
+                
+        template_actions = {"template_edit": "[テンプレート] 埋め込みテンプレートを編集"}
+        for key, name in template_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
 
@@ -128,7 +211,15 @@ class ServerSystem(commands.Cog):
         
         await interaction.response.defer(ephemeral=True)
 
-        if action == "request_regenerate_all_game_panels":
+        if action == "template_edit":
+            all_embeds = await get_all_embeds()
+            if not all_embeds:
+                return await interaction.followup.send("❌ DBに編集可能な埋め込みテンプレートがありません。", ephemeral=True)
+            
+            view = EmbedTemplateSelectView(all_embeds)
+            await interaction.followup.send("編集したい埋め込みテンプレートを下のメニューから選択してください。", view=view, ephemeral=True)
+
+        elif action == "request_regenerate_all_game_panels":
             game_panel_keys = [key for key, info in SETUP_COMMAND_MAP.items() if "[게임]" in info.get("friendly_name", "")]
             if not game_panel_keys:
                 return await interaction.followup.send("❌ 設定ファイルにゲームパネルが見つかりません。", ephemeral=True)
@@ -446,14 +537,9 @@ class ServerSystem(commands.Cog):
         await save_config_to_db(f"level_tier_update_request_{user.id}", {"level": new_level, "timestamp": timestamp})
         logger.info(f"유저의 레벨이 변경되어 DB에 등급 역할 업데이트 요청을 기록했습니다.")
 
-    # [✅✅✅ 핵심 수정]
     async def _update_user_xp_and_level(self, user: discord.Member, xp_to_add: int = 0, source: str = 'admin', exact_level: Optional[int] = None) -> tuple[int, int]:
-        """
-        사용자의 경험치와 레벨을 안전하게 업데이트하고, 레벨업을 처리하는 중앙 함수.
-        """
         res = await supabase.table('user_levels').select('level, xp').eq('user_id', user.id).maybe_single().execute()
         
-        # [✅ 수정] DB 조회 실패(res is None) 또는 유저 데이터 없음(res.data is None)을 모두 처리
         if res and res.data:
             current_data = res.data
         else:
@@ -511,7 +597,7 @@ class ServerSystem(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         try:
             await self._update_user_xp_and_level(user, exact_level=level)
-            await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정했습니다.")
+            await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정했습니다。")
         except Exception as e:
             logger.error(f"레벨 설정 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ レベル設定中にエラーが発生しました。")
