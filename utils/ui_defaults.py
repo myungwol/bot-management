@@ -85,19 +85,31 @@ UI_ROLE_KEY_MAP = {
     "role_warning_level_4":     {"name": "警告4個", "is_prefix": False, "priority": 0},
 }
 
-# --- [✅✅✅ 핵심 수정] 온보딩 드롭다운 선택지 추가 ---
+# [✅✅✅ 핵심 수정] 온보딩 드롭다운 선택지를 10년 단위로 그룹화
 ONBOARDING_CHOICES = {
     "gender": [
         {"label": "男性", "value": "男性"},
         {"label": "女性", "value": "女性"},
         {"label": "非公開", "value": "非公開"}
     ],
-    "birth_year": [
-        {"label": "非公開", "value": "非公開"},
-        # 주석: 여기에 연도를 추가하거나 범위를 변경할 수 있습니다.
-        # 예: 2010년부터 1960년까지 추가하려면 range(2010, 1959, -1)
-        *([{"label": f"{year}年生まれ", "value": str(year)} for year in range(2009, 1969, -1)])
-    ]
+    # 출생 연도를 10년 단위 그룹으로 나눔
+    "birth_year_groups": {
+        "2000s": [
+            {"label": f"{year}年生まれ", "value": str(year)} for year in range(2009, 1999, -1)
+        ],
+        "1990s": [
+            {"label": f"{year}年生まれ", "value": str(year)} for year in range(1999, 1989, -1)
+        ],
+        "1980s": [
+            {"label": f"{year}年生まれ", "value": str(year)} for year in range(1989, 1979, -1)
+        ],
+        "1970s": [
+            {"label": f"{year}年生まれ", "value": str(year)} for year in range(1979, 1969, -1)
+        ],
+        "private": [
+             {"label": "非公開", "value": "非公開"}
+        ]
+    }
 }
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
