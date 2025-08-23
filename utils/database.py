@@ -316,4 +316,4 @@ async def update_wallet(user: discord.User, amount: int) -> Optional[dict]:
     """지정된 유저의 지갑 잔액을 업데이트합니다. (양수: 추가, 음수: 차감)"""
     params = {'p_user_id': str(user.id), 'p_amount': amount}
     response = await supabase.rpc('update_wallet_balance', params).execute()
-    return response.data[0] if response and response.data else None```
+    return response.data[0] if response and response.data else None
