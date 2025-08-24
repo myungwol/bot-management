@@ -14,7 +14,8 @@ from utils.database import (
     get_id, get_embed_from_db, get_panel_components_from_db,
     get_config
 )
-from utils.helpers import get_clean_display_name, format_embed_from_db
+# [✅ 수정] 새로 만든 시간 포맷 함수를 임포트합니다.
+from utils.helpers import get_clean_display_name, format_embed_from_db, format_seconds_to_hms
 
 logger = logging.getLogger(__name__)
 
@@ -89,19 +90,13 @@ class NicknameApprovalView(ui.View):
         
         try: await interaction.message.delete()
         except discord.NotFound: pass
-
-        # [✅✅✅ 핵심 수정 ✅✅✅]
-        # 현재 채널(승인/거절 채널)이 아닌, 원래 패널이 있던 채널에 패널을 재생성합니다.
         
-        # 1. DB/캐시에서 원래 패널이 설치된 채널의 ID를 가져옵니다.
         original_panel_channel_id = get_id("nickname_panel_channel_id")
         
         if original_panel_channel_id:
-            # 2. ID를 이용해 채널 객체를 가져옵니다.
             original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
             
             if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
-                # 3. 찾은 채널에 패널 재생성을 요청합니다.
                 await self.nicknames_cog.regenerate_panel(original_panel_channel, panel_key="panel_nicknames")
             else:
                 logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다.")
@@ -205,8 +200,12 @@ class NicknameChangerPanelView(ui.View):
             utc_now = datetime.now(timezone.utc).timestamp()
 
             if last_time and utc_now - last_time < cooldown_seconds:
-                can_use_time = int(last_time + cooldown_seconds)
-                return await i.response.send_message(f"❌ 次の申請は <t:{can_use_time}:R> に可能になります。", ephemeral=True)
+                # [✅✅✅ 핵심 수정 ✅✅✅]
+                # 남은 시간을 계산하고, 새로 만든 함수로 보기 좋게 포맷합니다.
+                time_remaining = cooldown_seconds - (utc_now - last_time)
+                formatted_time = format_seconds_to_hms(time_remaining)
+                message = f"❌ 次の申請まであと **{formatted_time}** です。"
+                return await i.response.send_message(message, ephemeral=True)
             
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
