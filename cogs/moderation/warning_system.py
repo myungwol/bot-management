@@ -34,7 +34,6 @@ class WarningModal(ui.Modal, title="警告内容の入力"):
             await interaction.followup.send("❌ 警告回数は数字で入力してください。", ephemeral=True)
             return
 
-        # 1. DB에 경고 기록 추가
         await add_warning(
             guild_id=interaction.guild_id,
             user_id=self.target_member.id,
@@ -43,11 +42,9 @@ class WarningModal(ui.Modal, title="警告内容の入力"):
             amount=amount_val
         )
 
-        # 2. 누적 경고 횟수 확인 및 역할 업데이트
         new_total = await get_total_warning_count(self.target_member.id, interaction.guild_id)
         await self.cog.update_warning_roles(self.target_member, new_total)
 
-        # 3. 로그 채널에 기록
         await self.cog.send_log_message(
             moderator=interaction.user,
             target=self.target_member,
@@ -56,7 +53,6 @@ class WarningModal(ui.Modal, title="警告内容の入力"):
             new_total=new_total
         )
         
-        # 4. 대상자에게 DM 발송
         try:
             dm_embed = discord.Embed(title=f"🚨 {interaction.guild.name}にて警告が付与されました", color=0xED4245)
             dm_embed.add_field(name="理由", value=self.reason.value, inline=False)
@@ -85,7 +81,6 @@ class TargetUserSelectView(ui.View):
         modal = WarningModal(self.cog, target_user)
         await interaction.response.send_modal(modal)
         
-        # 이전 메시지(드롭다운) 삭제
         try:
             await interaction.delete_original_response()
         except (discord.NotFound, discord.HTTPException):
@@ -112,7 +107,6 @@ class WarningPanelView(ui.View):
         self.add_item(button)
 
     async def on_button_click(self, interaction: discord.Interaction):
-        # 권한 확인
         if not self.cog.police_role_id or not isinstance(interaction.user, discord.Member):
             return await interaction.response.send_message("❌ 権限がありません。", ephemeral=True)
             
@@ -153,14 +147,9 @@ class WarningSystem(commands.Cog):
         """누적 경고 횟수에 따라 역할을 업데이트합니다."""
         guild = member.guild
         
-        # 1. 이 시스템이 관리하는 모든 경고 역할 ID를 가져옵니다.
         all_warning_role_ids = {get_id(t['role_key']) for t in WARNING_THRESHOLDS if get_id(t['role_key'])}
-        
-        # 2. 유저가 현재 가지고 있는 경고 역할을 확인합니다.
         current_warning_roles = [role for role in member.roles if role.id in all_warning_role_ids]
         
-        # 3. 유저가 받아야 할 새로운 역할을 결정합니다.
-        #    (경고 횟수가 높은 순으로 정렬하여 가장 먼저 맞는 조건을 찾음)
         target_role_id = None
         for threshold in sorted(WARNING_THRESHOLDS, key=lambda x: x['count'], reverse=True):
             if total_count >= threshold['count']:
@@ -169,7 +158,6 @@ class WarningSystem(commands.Cog):
         
         target_role = guild.get_role(target_role_id) if target_role_id else None
 
-        # 4. 역할 추가/제거 로직
         try:
             roles_to_add = []
             roles_to_remove = []
@@ -210,40 +198,43 @@ class WarningSystem(commands.Cog):
         
         await log_channel.send(embed=embed)
         
-    async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None, panel_type: str = "warning"):
-        target_channel = channel
-        if not target_channel:
-            if self.panel_channel_id: target_channel = self.bot.get_channel(self.panel_channel_id)
-            else: return
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # 함수가 panel_key를 인자로 받도록 변경하고, 내부 로직을 수정합니다.
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_warning") -> bool:
+        base_panel_key = panel_key.replace("panel_", "") # "warning"
+        embed_key = panel_key # "panel_warning"
 
-        if not target_channel: 
-            logger.warning(f"경고 패널 채널(ID: {self.panel_channel_id})을 찾을 수 없어 재생성할 수 없습니다.")
+        if not channel:
+            logger.warning(f"경고 패널 채널을 찾을 수 없어 재생성할 수 없습니다.")
             return False
 
-        # 기존 패널 메시지 삭제
-        panel_info = get_panel_id("warning")
-        if panel_info and (old_id := panel_info.get('message_id')):
-            try:
-                old_message = await target_channel.fetch_message(old_id)
-                await old_message.delete()
-            except (discord.NotFound, discord.Forbidden):
-                pass
-        
-        embed_data = await get_embed_from_db("panel_warning")
-        if not embed_data:
-            logger.error("DB에서 'panel_warning' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
-            return False
+        try:
+            panel_info = get_panel_id(base_panel_key)
+            if panel_info and (old_id := panel_info.get('message_id')):
+                try:
+                    old_message = await channel.fetch_message(old_id)
+                    await old_message.delete()
+                except (discord.NotFound, discord.Forbidden):
+                    pass
             
-        embed = discord.Embed.from_dict(embed_data)
-        
-        if self.view_instance is None:
-            self.view_instance = WarningPanelView(self)
-        await self.view_instance.setup_buttons()
-        
-        new_message = await target_channel.send(embed=embed, view=self.view_instance)
-        await save_panel_id("warning", new_message.id, target_channel.id)
-        logger.info(f"✅ 경고 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
-        return True
+            embed_data = await get_embed_from_db(embed_key)
+            if not embed_data:
+                logger.error("DB에서 'panel_warning' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
+                return False
+                
+            embed = discord.Embed.from_dict(embed_data)
+            
+            if self.view_instance is None:
+                self.view_instance = WarningPanelView(self)
+            await self.view_instance.setup_buttons()
+            
+            new_message = await channel.send(embed=embed, view=self.view_instance)
+            await save_panel_id(base_panel_key, new_message.id, channel.id)
+            logger.info(f"✅ 경고 패널을 성공적으로 새로 생성했습니다. (채널: #{channel.name})")
+            return True
+        except Exception as e:
+            logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
+            return False
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(WarningSystem(bot))
