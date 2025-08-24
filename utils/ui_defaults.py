@@ -247,7 +247,8 @@ SETUP_COMMAND_MAP = {
     "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "서버 안내 패널", "channel_type": "text"},
     "panel_nicknames":  {"type": "panel",   "cog_name": "Nicknames",    "key": "nickname_panel_channel_id",       "friendly_name": "닉네임 변경 패널", "channel_type": "text"},
     
-    "panel_level_check": {"type": "panel", "cog_name": "LevelSystem", "key": "level_check_panel_channel_id", "friendly_name": "[정보] 레벨 확인 패널", "channel_type": "text"},
+    # [✅✅✅ 핵심 수정 ✅✅✅] 레벨 확인 패널을 [게임]으로 분류하여 PanelUpdater가 인식하도록 변경합니다.
+    "panel_level_check": {"type": "panel", "cog_name": "LevelSystem", "key": "level_check_panel_channel_id", "friendly_name": "[게임] 레벨 확인 패널", "channel_type": "text"},
     "channel_job_advancement": {"type": "channel", "cog_name": "LevelSystem", "key": "job_advancement_channel_id", "friendly_name": "[채널] 전직소", "channel_type": "text"},
 
     "panel_item_usage": {"type": "panel", "cog_name": "ItemSystem", "key": "item_usage_panel_channel_id", "friendly_name": "[패널] 아이템 사용", "channel_type": "text"},
