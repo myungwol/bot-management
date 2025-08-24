@@ -25,7 +25,7 @@ class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
 
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
-    hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
+    hobby = ui.TextInput(label="趣味", placeholder="趣味を自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     
     def __init__(self, cog_instance: 'Onboarding', gender: str, birth_year: str):
@@ -373,7 +373,6 @@ class ApprovalView(ui.View):
             logger.error(f"거부 로그 전송 실패: {e}", exc_info=True); return "거부 로그 채널에 메시지 전송 실패。"
         return None
 
-# ... (OnboardingGuideView, OnboardingPanelView, Onboarding Cog의 나머지 부분은 변경 없이 그대로 유지) ...
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
