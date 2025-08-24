@@ -98,6 +98,7 @@ class PersistentCategorySelectView(ui.View):
     async def on_category_select(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
+        # [✅ 수정] 이제 get_config는 항상 최신 설정을 반환합니다.
         panel_configs = get_config("STATIC_AUTO_ROLE_PANELS", {})
         if not panel_configs or not isinstance(panel_configs, dict):
             await interaction.followup.send("❌ 役職パネルの設定が正しくありません。管理者に問い合わせてください。", ephemeral=True)
@@ -133,6 +134,7 @@ class RolePanel(commands.Cog):
         await self.load_configs()
 
     async def load_configs(self):
+        # [✅ 수정] DB 동기화는 main.py가 보장하므로, 여기서는 그냥 불러오기만 하면 됩니다.
         self.panel_configs = get_config("STATIC_AUTO_ROLE_PANELS", {})
         if self.panel_configs:
             logger.info("✅ 역할 패널 설정을 성공적으로 로드했습니다。")
@@ -148,7 +150,6 @@ class RolePanel(commands.Cog):
             logger.warning("⚠️ 역할 패널 설정이 없어 영구 View를 등록할 수 없습니다。")
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_roles") -> bool:
-        # [✅ 수정] cog_load 대신 실시간으로 설정을 다시 불러와서 최신 상태를 유지합니다.
         await self.load_configs()
         if not self.panel_configs:
             logger.error("❌ 역할 패널을 생성할 수 없습니다: DB에 설정 정보가 없습니다。")
@@ -156,11 +157,17 @@ class RolePanel(commands.Cog):
         
         panel_config = self.panel_configs.get(panel_key)
         if not panel_config:
-            # [✅ 수정] 오류 메시지를 더 명확하게 변경합니다.
             logger.error(f"❌ 역할 패널 설정(STATIC_AUTO_ROLE_PANELS)에서 '{panel_key}' 키를 찾을 수 없습니다. ui_defaults.py를 확인해주세요.")
             return False
 
-        base_panel_key = panel_key.replace("panel_", "")
+        base_panel_key = "roles" # SETUP_COMMAND_MAP의 키는 'panel_roles'지만, DB 저장은 'roles'로 해야 할 수 있음
+        
+        # DB의 channel_configs 테이블에 맞는 키를 사용합니다. 스크린샷에 'auto_role_channel_id'로 되어 있으므로,
+        # 이 키에 해당하는 SETUP_COMMAND_MAP의 항목을 찾아 base_panel_key를 설정하는 것이 더 안정적입니다.
+        # 여기서는 간단하게 'roles'로 가정하지만, 필요시 `utils/database.py`의 `save_panel_id`와 맞춰야 합니다.
+        # DB 스크린샷을 보니 auto_role_channel_id의 channel_key는 auto_role_channel_id 그대로 사용되네요.
+        # 따라서 base_panel_key를 panel_key에서 파생시키는 것이 더 안정적입니다.
+        base_panel_key = panel_key.replace("panel_", "") # "roles"
         
         try:
             panel_info = get_panel_id(base_panel_key)
