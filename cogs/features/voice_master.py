@@ -7,8 +7,9 @@ import discord
 from discord.ext import commands
 from discord import ui
 import logging
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, Set
 import asyncio
+import time
 
 from utils.database import get_id, get_all_temp_channels, add_temp_channel, update_temp_channel_owner, remove_temp_channel, remove_multiple_temp_channels, get_config
 from utils.helpers import get_clean_display_name
@@ -16,11 +17,11 @@ from utils.ui_defaults import ADMIN_ROLE_KEYS
 
 logger = logging.getLogger(__name__)
 
-# 채널 타입별 기본 설정값
+# 채널 타입별 기본 설정값 (일본어)
 CHANNEL_TYPE_INFO = {
     "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "みんなの広場"},
-    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "プレイ中のゲーム名に変更してください"},
-    "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "新人のベンチ"},
+    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "ゲーム名などに変更してください"},
+    "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "初心者のベンチ"},
     "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のハウス"},
     "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}の部屋"} # Fallback
 }
@@ -128,10 +129,7 @@ class VCOwnerSelect(ui.UserSelect):
 class ControlPanelView(ui.View):
     def __init__(self, cog: 'VoiceMaster', owner_id: int, vc_id: int, channel_type: str):
         super().__init__(timeout=None)
-        self.cog = cog
-        self.owner_id = owner_id
-        self.vc_id = vc_id
-        self.channel_type = channel_type
+        self.cog = cog; self.owner_id = owner_id; self.vc_id = vc_id; self.channel_type = channel_type
         self.setup_buttons()
     def setup_buttons(self):
         self.clear_items()
@@ -149,8 +147,7 @@ class ControlPanelView(ui.View):
         for item in self.children:
             if isinstance(item, ui.Button): item.callback = self.dispatch_button
     async def dispatch_button(self, interaction: discord.Interaction):
-        custom_id = interaction.data.get("custom_id")
-        dispatch_map = { "vc_edit": self.edit_channel, "vc_transfer": self.transfer_owner, "vc_invite": self.invite_user, "vc_kick": self.kick_user, "vc_add_blacklist": self.add_to_blacklist, "vc_remove_blacklist": self.remove_from_blacklist }
+        custom_id = interaction.data.get("custom_id"); dispatch_map = { "vc_edit": self.edit_channel, "vc_transfer": self.transfer_owner, "vc_invite": self.invite_user, "vc_kick": self.kick_user, "vc_add_blacklist": self.add_to_blacklist, "vc_remove_blacklist": self.remove_from_blacklist }
         if callback := dispatch_map.get(custom_id): await callback(interaction)
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         vc = self.cog.bot.get_channel(self.vc_id)
@@ -166,34 +163,20 @@ class ControlPanelView(ui.View):
         vc = self.cog.bot.get_channel(self.vc_id)
         if not vc: return
         type_info = CHANNEL_TYPE_INFO.get(self.channel_type, CHANNEL_TYPE_INFO["normal"])
-        modal = VCEditModal(
-            name_editable=type_info["name_editable"], 
-            limit_editable=type_info["limit_editable"],
-            current_name=vc.name.split('꒱')[-1].strip(),
-            current_limit=vc.user_limit
-        )
+        modal = VCEditModal(name_editable=type_info["name_editable"], limit_editable=type_info["limit_editable"], current_name=vc.name.split('꒱')[-1].strip(), current_limit=vc.user_limit)
         await interaction.response.send_modal(modal)
         await modal.wait()
         if modal.submitted:
             vc = self.cog.bot.get_channel(self.vc_id)
             if not vc: return await interaction.followup.send("❌ 処理中にチャンネルが見つからなくなりました。", ephemeral=True)
-            
-            new_name = vc.name
+            new_name, new_limit = vc.name, vc.user_limit
             if type_info["name_editable"]:
-                emoji = type_info["emoji"]
                 base_name = modal.name_input.value if hasattr(modal, 'name_input') else vc.name.split('꒱')[-1].strip()
-                new_name = f"・ {emoji} ꒱ {base_name.strip()}"
-
-            new_limit = vc.user_limit
+                new_name = f"・ {type_info['emoji']} ꒱ {base_name.strip()}"
             if type_info["limit_editable"] and hasattr(modal, 'limit_input') and modal.limit_input.value:
-                try:
-                    new_limit = int(modal.limit_input.value)
-                    if not (0 <= new_limit <= 99): raise ValueError()
-                except (ValueError, TypeError): return await interaction.followup.send("❌ 人数制限は0から99までの数字で入力してください。", ephemeral=True)
-            
-            await vc.edit(name=new_name, user_limit=new_limit, reason=f"{interaction.user.display_name}の要請")
-            await interaction.followup.send("✅ チャンネル設定を更新しました。", ephemeral=True)
-
+                try: new_limit = int(modal.limit_input.value); assert 0 <= new_limit <= 99
+                except (ValueError, TypeError, AssertionError): return await interaction.followup.send("❌ 人数制限は0から99までの数字で入力してください。", ephemeral=True)
+            await vc.edit(name=new_name, user_limit=new_limit, reason=f"{interaction.user.display_name}の要請"); await interaction.followup.send("✅ チャンネル設定を更新しました。", ephemeral=True)
     async def transfer_owner(self, interaction: discord.Interaction):
         view = ui.View(timeout=180).add_item(VCOwnerSelect(self)); await interaction.response.send_message("新しい所有者を選んでください。", view=view, ephemeral=True)
     async def invite_user(self, interaction: discord.Interaction):
@@ -217,11 +200,16 @@ class VoiceMaster(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.creator_channel_configs: Dict[int, Dict] = {}
+        # [✅ 최적화] 채널 ID를 키로 하는 기본 정보 저장소
         self.temp_channels: Dict[int, Dict[str, Any]] = {}
+        # [✅✅✅ 핵심 추가] 유저 ID를 키로 하여 소유한 채널 ID를 저장, O(1) 시간 복잡도로 조회
+        self.user_channel_map: Dict[int, int] = {}
+        # [✅✅✅ 핵심 추가] 현재 채널 생성 절차를 진행 중인 유저 ID를 저장
+        self.active_creations: Set[int] = set()
+        # [✅✅✅ 핵심 추가] 유저별 채널 생성 쿨다운 관리
+        self.vc_creation_cooldowns: Dict[int, float] = {}
         self.admin_role_ids: List[int] = []
         self.default_category_id: Optional[int] = None
-        # [개선] 유저별 채널 생성 쿨다운을 위한 딕셔너리
-        self.vc_creation_cooldowns: Dict[int, float] = {}
         logger.info("VoiceMaster Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
@@ -239,9 +227,6 @@ class VoiceMaster(commands.Cog):
         self.admin_role_ids = [role_id for key in ADMIN_ROLE_KEYS if (role_id := get_id(key)) is not None]
         self.default_category_id = get_id("temp_vc_category_id")
         logger.info(f"[VoiceMaster] 생성 채널 설정을 로드했습니다: {list(self.creator_channel_configs.keys())}")
-        logger.info(f"[VoiceMaster] {len(self.admin_role_ids)}개의 관리자 역할을 로드했습니다.")
-        if self.default_category_id:
-            logger.info(f"[VoiceMaster] 기본 생성 카테고리를 로드했습니다: {self.default_category_id}")
 
     async def sync_channels_from_db(self):
         await self.bot.wait_until_ready()
@@ -250,96 +235,76 @@ class VoiceMaster(commands.Cog):
         logger.info(f"[VoiceMaster] DB에서 {len(db_channels)}개의 임시 채널 정보를 발견하여 동기화를 시작합니다.")
         zombie_channel_ids = []
         for ch_data in db_channels:
-            channel_id, guild_id, message_id = ch_data.get("channel_id"), ch_data.get("guild_id"), ch_data.get("message_id")
-            if not message_id:
-                zombie_channel_ids.append(channel_id)
-                continue
-            guild = self.bot.get_guild(guild_id)
+            channel_id, owner_id, message_id = ch_data.get("channel_id"), ch_data.get("owner_id"), ch_data.get("message_id")
+            guild = self.bot.get_guild(ch_data.get("guild_id"))
             if guild and guild.get_channel(channel_id):
-                self.temp_channels[channel_id] = { "owner_id": ch_data.get("owner_id"), "message_id": message_id, "type": ch_data.get("channel_type", "normal") }
-                view = ControlPanelView(self, ch_data.get("owner_id"), channel_id, ch_data.get("channel_type", "normal"))
+                self.temp_channels[channel_id] = { "owner_id": owner_id, "message_id": message_id, "type": ch_data.get("channel_type", "normal") }
+                self.user_channel_map[owner_id] = channel_id
+                view = ControlPanelView(self, owner_id, channel_id, ch_data.get("channel_type", "normal"))
                 self.bot.add_view(view, message_id=message_id)
             else:
                 zombie_channel_ids.append(channel_id)
-        if zombie_channel_ids: await remove_multiple_temp_channels(zombie_channel_ids); logger.warning(f"[VoiceMaster] 존재하지 않거나 데이터가 불완전한 {len(zombie_channel_ids)}개의 채널을 DB에서 정리했습니다.")
+        if zombie_channel_ids: await remove_multiple_temp_channels(zombie_channel_ids)
         logger.info(f"[VoiceMaster] 임시 채널 동기화 완료. (활성: {len(self.temp_channels)} / 정리: {len(zombie_channel_ids)})")
-
-    async def schedule_channel_check_and_delete(self, channel: discord.VoiceChannel):
-        await asyncio.sleep(1)
-        try:
-            refreshed_channel = channel.guild.get_channel(channel.id)
-            if refreshed_channel and not refreshed_channel.members:
-                await self._delete_temp_channel(refreshed_channel)
-        except discord.NotFound:
-            await self._cleanup_channel_data(channel.id)
-        except Exception as e:
-            logger.error(f"채널 체크 및 삭제 스케줄링 중 오류 발생: {e}", exc_info=True)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        if member.bot or before.channel == after.channel: return
         try:
-            if member.bot or before.channel == after.channel: return
-
             # --- 채널 생성 로직 ---
             if after.channel and after.channel.id in self.creator_channel_configs:
-                # [개선] 채널 생성 쿨다운 (60초) 체크
-                cooldown_seconds = 60
-                now = asyncio.get_event_loop().time()
-                last_creation_time = self.vc_creation_cooldowns.get(member.id, 0)
-                
-                if (now - last_creation_time) < cooldown_seconds:
-                    remaining = cooldown_seconds - (now - last_creation_time)
-                    try:
-                        await member.send(f"❌ ボイスチャンネルの作成は{cooldown_seconds}秒に一回だけ可能です。あと {int(remaining)}秒 お待ちください。")
+                # [✅✅✅ 핵심 수정] 채널 생성 전 빠른 사전 조건 검사
+                if member.id in self.active_creations: return  # 이미 생성 절차 진행 중
+                if member.id in self.user_channel_map: # 이미 채널 소유 중 (O(1) 조회)
+                    try: await member.send("❌ 個人ボイスチャンネルは一度に一つしか所有できません。")
                     except discord.Forbidden: pass
-                    await member.move_to(None, reason="VC 생성 쿨타임")
-                    return
+                    return await member.move_to(None, reason="이미 다른 개인 채널을 소유 중")
                 
+                # [✅✅✅ 핵심 수정] 채널 생성 쿨다운 확인
+                cooldown_seconds = 60
+                now = time.monotonic()
+                if (now - self.vc_creation_cooldowns.get(member.id, 0)) < cooldown_seconds:
+                    remaining = cooldown_seconds - (now - self.vc_creation_cooldowns.get(member.id, 0))
+                    try: await member.send(f"❌ ボイスチャンネルの作成は{cooldown_seconds}秒に一回だけ可能です。あと {int(remaining)+1}秒 お待ちください。")
+                    except discord.Forbidden: pass
+                    return await member.move_to(None, reason="VC 생성 쿨타임")
+                
+                self.active_creations.add(member.id)
                 self.vc_creation_cooldowns[member.id] = now
                 await self._create_temp_channel_flow(member, self.creator_channel_configs[after.channel.id], after.channel)
+                self.active_creations.discard(member.id)
 
             # --- 채널 삭제 로직 ---
             if before.channel and before.channel.id in self.temp_channels:
                 if not before.channel.members:
-                    self.bot.loop.create_task(self.schedule_channel_check_and_delete(before.channel))
+                    await self._delete_temp_channel(before.channel)
         
         except Exception as e:
-            logger.critical(f"🚨 on_voice_state_update 이벤트 처리 중 치명적인 오류 발생! (유저: {member.id}, 이전 채널: {before.channel.id if before.channel else 'None'}, 이후 채널: {after.channel.id if after.channel else 'None'})", exc_info=True)
+            self.active_creations.discard(member.id)
+            logger.critical(f"🚨 on_voice_state_update 이벤트 처리 중 치명적인 오류: {e}", exc_info=True)
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
-        if not isinstance(channel, discord.VoiceChannel): return
         if channel.id in self.temp_channels:
             await self._cleanup_channel_data(channel.id)
-            logger.info(f"임시 채널 '{channel.name}'(ID: {channel.id})이 수동으로 삭제되어 내부 데이터와 DB에서 제거합니다.")
 
     async def _cleanup_channel_data(self, channel_id: int):
-        self.temp_channels.pop(channel_id, None)
+        info = self.temp_channels.pop(channel_id, None)
+        if info and (owner_id := info.get("owner_id")):
+            self.user_channel_map.pop(owner_id, None)
         await remove_temp_channel(channel_id)
 
     async def _create_temp_channel_flow(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel):
-        # [개선] 채널 생성 전 사전 조건 확인
-        member_role_ids = {r.id for r in member.roles}
-        is_master = any(role_id in member_role_ids for role_id in [get_id("role_staff_village_chief"), get_id("role_staff_deputy_chief")])
-
-        if not is_master and any(info.get('owner_id') == member.id for info in self.temp_channels.values()):
-            try: await member.send("❌ 個人ボイスチャンネルは一度に一つしか所有できません。")
-            except discord.Forbidden: pass
-            await member.move_to(None, reason="이미 다른 개인 채널을 소유 중")
-            return
-
         required_role_key = config.get("required_role_key")
-        if not is_master and required_role_key:
+        if required_role_key:
             required_role_id = get_id(required_role_key)
-            if not required_role_id or required_role_id not in member_role_ids:
+            if not required_role_id or required_role_id not in {r.id for r in member.roles}:
                 role_name_map = get_config("ROLE_KEY_MAP", {})
                 role_name = role_name_map.get(required_role_key, "特定")
                 try: await member.send(f"❌ 「{creator_channel.name}」チャンネルに入るには「{role_name}」の役割が必要です。")
                 except discord.Forbidden: pass
-                await member.move_to(None, reason="요구 역할 없음")
-                return
+                return await member.move_to(None, reason="요구 역할 없음")
         
-        # [개선] 오류 처리를 위한 롤백 기능 추가
         vc: Optional[discord.VoiceChannel] = None
         try:
             vc = await self._create_discord_channel(member, config, creator_channel)
@@ -347,20 +312,15 @@ class VoiceMaster(commands.Cog):
             
             await add_temp_channel(vc.id, member.id, member.guild.id, panel_message.id, config.get("type", "normal"))
             self.temp_channels[vc.id] = {"owner_id": member.id, "message_id": panel_message.id, "type": config.get("type", "normal")}
-            logger.info(f"'{config.get('type', 'normal')}' 타입 임시 채널 '{vc.name}'을(를) 생성 및 DB에 저장했습니다.")
-            await member.move_to(vc, reason="생성된 임시 채널로 자동 이동")
-
+            self.user_channel_map[member.id] = vc.id
+            await member.move_to(vc)
         except Exception as e:
-            logger.error(f"임시 채널 생성 플로우 중 치명적 오류 발생: {e}", exc_info=True)
+            logger.error(f"임시 채널 생성 플로우 중 오류: {e}", exc_info=True)
             if vc:
-                logger.warning(f"오류로 인해 방금 생성된 음성 채널 '{vc.name}'(ID: {vc.id})을(를) 삭제합니다.")
                 try: await vc.delete(reason="생성 과정 오류로 인한 자동 삭제")
                 except discord.NotFound: pass
-                except Exception as del_e: logger.error(f"오류 롤백 중 채널 삭제 실패: {del_e}", exc_info=True)
-            
             try: await member.send("申し訳ありません、ボイスチャンネルの作成中にエラーが発生しました。しばらくしてからもう一度お試しください。")
             except discord.Forbidden: pass
-            
             if member.voice and member.voice.channel == creator_channel:
                  await member.move_to(None, reason="임시 채널 생성 오류")
 
@@ -376,23 +336,21 @@ class VoiceMaster(commands.Cog):
             channels_in_category = target_category.voice_channels if target_category else guild.voice_channels
             prefix_to_check = f"・ {type_info['emoji']} ꒱ {base_name}"
             existing_numbers = {int(ch.name.split('-')[-1]) for ch in channels_in_category if ch.name.startswith(prefix_to_check) and ch.name.split('-')[-1].isdigit()}
-            next_number = 1
-            while next_number in existing_numbers: next_number += 1
+            next_number = max(existing_numbers) + 1 if existing_numbers else 1
             if next_number > 1: base_name = f"{base_name}-{next_number}"
 
         vc_name = f"・ {type_info['emoji']} ꒱ {base_name}"
-        overwrites = self._get_permission_overwrites(guild, member, config, channel_type)
-        
+        overwrites = self._get_permission_overwrites(guild, member, channel_type)
         return await guild.create_voice_channel(name=vc_name, category=target_category, overwrites=overwrites, user_limit=user_limit, reason=f"{member.display_name}の要請")
 
-    def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, config: Dict, channel_type: str) -> Dict:
+    def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
         overwrites = {owner: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True)}
         if channel_type in ['vip', 'newbie']:
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
         else:
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=True)
         if channel_type == 'newbie':
-            if (role_id := get_id(config.get("required_role_key"))) and (role := guild.get_role(role_id)):
+            if (role_id := get_id("role_resident_rookie")) and (role := guild.get_role(role_id)):
                  overwrites[role] = discord.PermissionOverwrite(connect=True)
             for admin_role_id in self.admin_role_ids:
                 if admin_role := guild.get_role(admin_role_id):
@@ -409,21 +367,21 @@ class VoiceMaster(commands.Cog):
         return await vc.send(f"{owner.mention}", embed=embed, view=view)
 
     async def _delete_temp_channel(self, vc: discord.VoiceChannel):
-        vc_id = vc.id
+        await asyncio.sleep(1) # 유저가 빠르게 재접속하는 경우를 대비한 짧은 대기
         try:
-            await vc.delete(reason="채널이 비어서 자동 삭제")
-            logger.info(f"임시 채널 '{vc.name}'을 자동 삭제했습니다.")
+            # 채널이 여전히 비어있는지 한 번 더 확인
+            if vc.id in self.temp_channels and not vc.members:
+                await vc.delete(reason="チャンネルが空になったため自動削除")
+                logger.info(f"임시 채널 '{vc.name}'을(를) 자동 삭제했습니다.")
+                await self._cleanup_channel_data(vc.id)
         except discord.NotFound:
-            logger.warning(f"임시 채널 '{vc.name}'은(는) 이미 삭제되었습니다.")
+            await self._cleanup_channel_data(vc.id)
         except Exception as e:
-            logger.error(f"임시 채널 '{vc.name}' 삭제 중 오류 발생: {e}", exc_info=True)
-        finally:
-            await self._cleanup_channel_data(vc_id)
+            logger.error(f"임시 채널 '{vc.name}' 삭제 중 오류: {e}", exc_info=True)
 
     async def _transfer_ownership(self, interaction: discord.Interaction, vc: discord.VoiceChannel, new_owner: discord.Member):
         info = self.temp_channels.get(vc.id)
         if not info or not interaction.guild: return await interaction.followup.send("❌ チャンネル情報が見つかりません。", ephemeral=True)
-        
         old_owner = interaction.guild.get_member(info['owner_id'])
         try:
             await vc.set_permissions(new_owner, manage_channels=True, manage_permissions=True, connect=True)
@@ -431,18 +389,12 @@ class VoiceMaster(commands.Cog):
             
             await update_temp_channel_owner(vc.id, new_owner.id)
             self.temp_channels[vc.id]['owner_id'] = new_owner.id
+            self.user_channel_map.pop(old_owner.id, None)
+            self.user_channel_map[new_owner.id] = vc.id
             
-            new_view = ControlPanelView(self, new_owner.id, vc.id, info['type'])
-            try:
-                panel_message = await vc.fetch_message(info['message_id'])
-                embed = panel_message.embeds[0]
-                embed.title = f"ようこそ、{get_clean_display_name(new_owner)}さん！"
-                await panel_message.edit(content=f"{new_owner.mention}", embed=embed, view=new_view)
-            except discord.NotFound:
-                logger.warning(f"채널 {vc.id}의 제어판 메시지를 찾을 수 없어 새로 생성합니다.")
-                panel_message = await self._send_control_panel(vc, new_owner, info['type'])
-                await supabase.table('temp_voice_channels').update({'message_id': panel_message.id}).eq('channel_id', vc.id).execute()
-                self.temp_channels[vc.id]['message_id'] = panel_message.id
+            panel_message = await vc.fetch_message(info['message_id'])
+            embed = panel_message.embeds[0]; embed.title = f"ようこそ、{get_clean_display_name(new_owner)}さん！"
+            await panel_message.edit(content=f"{new_owner.mention}", embed=embed, view=ControlPanelView(self, new_owner.id, vc.id, info['type']))
 
             await vc.send(f"👑 {interaction.user.mention}さんがチャンネルの所有権を{new_owner.mention}さんに移譲しました。")
             await interaction.followup.send("✅ 所有権を正常に移譲しました。", ephemeral=True)
