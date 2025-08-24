@@ -1,4 +1,4 @@
-# bot-management/main.py
+# main.py (최종 수정본)
 
 import discord
 from discord.ext import commands
@@ -9,6 +9,9 @@ import logging.handlers
 from datetime import datetime, timezone
 from typing import Optional
 
+# 각 봇에 맞는 database 파일 임포트
+# 두 봇의 database.py에 이름이 겹치는 함수가 없다면 둘 다 임포트해도 괜찮습니다.
+# 만약 오류가 발생하면, 현재 봇에 맞지 않는 import 구문을 주석 처리(#) 하세요.
 from utils.database import load_all_data_from_db, sync_defaults_to_db
 
 # --- 중앙 로깅 설정 ---
@@ -26,7 +29,7 @@ logging.getLogger('websockets').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # --- 환경 변수 및 인텐트 설정 ---
-BOT_TOKEN = os.environ.get('BOT_TOKEN') # 실제 환경 변수 이름에 맞게 조정 필요
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
 RAW_TEST_GUILD_ID = os.environ.get('TEST_GUILD_ID')
 TEST_GUILD_ID: Optional[int] = None
 if RAW_TEST_GUILD_ID:
@@ -40,7 +43,7 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.voice_states = True
-BOT_VERSION = "v2.1-hotfix" # [개선] 버그 수정 버전 업데이트
+BOT_VERSION = "v2.3-loader-fix" # 로더 버그 수정 버전
 
 # --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
@@ -48,15 +51,22 @@ class MyBot(commands.Bot):
         super().__init__(*args, **kwargs)
 
     async def setup_hook(self):
-        await sync_defaults_to_db()
+        if callable(globals().get('sync_defaults_to_db')):
+            await sync_defaults_to_db()
 
         await self.load_all_extensions()
         
+        # [중요] 이 목록은 각 봇에 맞게 수정해야 합니다.
+        # 이 목록은 서버 관리 봇과 게임 봇의 모든 기능을 합친 예시입니다.
+        # 본인의 봇에 맞게 사용하지 않는 기능은 목록에서 지워주세요.
         cogs_with_persistent_views = [
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "LevelSystem", "ItemSystem", "AnonymousBoard", 
-            "WarningSystem", "VoiceMaster"
+            "WarningSystem", "VoiceMaster", "UserProfile", "Fishing", "Commerce", "Atm",
+            "DiceGame", "SlotMachine", "RPSGame",
+            "DailyCheck", "Quests", "Farm"
         ]
+        
         registered_views_count = 0
         for cog_name in cogs_with_persistent_views:
             cog = self.get_cog(cog_name)
@@ -71,8 +81,8 @@ class MyBot(commands.Bot):
 
     async def load_all_extensions(self):
         logger.info("------ [ Cog 로드 시작 ] ------")
-        cogs_dir = './cogs'
-        if not os.path.exists(cogs_dir):
+        cogs_dir = 'cogs' # 경로 표기를 './cogs'에서 'cogs'로 변경하여 명확하게 함
+        if not os.path.isdir(cogs_dir):
             logger.critical(f"❌ Cogs 디렉토리를 찾을 수 없습니다: {cogs_dir}.")
             return
 
@@ -83,11 +93,11 @@ class MyBot(commands.Bot):
                 dirs.remove('__pycache__')
             for filename in files:
                 if filename.endswith('.py') and not filename.startswith('__'):
-                    # [✅✅✅ 핵심 수정 ✅✅✅]
-                    # 파일 경로를 올바른 파이썬 모듈 경로로 변환하는 로직을 수정합니다.
-                    # 예: ./cogs/server/system.py -> cogs.server.system
+                    # [✅✅✅ 최종 핵심 수정 ✅✅✅]
+                    # 어떤 OS 환경에서도 안정적으로 경로를 생성하는 방식으로 변경
+                    # 예: cogs/server/system.py -> cogs.server.system
                     path = os.path.join(root, filename)
-                    extension_path = path.replace(os.path.sep, '.').replace('./', '')[:-3]
+                    extension_path = os.path.splitext(path)[0].replace(os.path.sep, '.')
                     
                     try:
                         await self.load_extension(extension_path)
@@ -109,7 +119,8 @@ async def on_ready():
     logger.info(f"✅ 현재 UTC 시간: {datetime.now(timezone.utc)}")
     logger.info("==================================================")
     
-    await load_all_data_from_db()
+    if callable(globals().get('load_all_data_from_db')):
+        await load_all_data_from_db()
     
     logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
     refreshed_cogs_count = 0
