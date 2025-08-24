@@ -14,7 +14,6 @@ from utils.database import (
     get_id, get_embed_from_db, get_panel_components_from_db,
     get_config
 )
-# [✅ 수정] 새로 만든 시간 포맷 함수를 임포트합니다.
 from utils.helpers import get_clean_display_name, format_embed_from_db, format_seconds_to_hms
 
 logger = logging.getLogger(__name__)
@@ -75,34 +74,37 @@ class NicknameApprovalView(ui.View):
                 await member.edit(nick=final_name, reason=f"管理者が承認 ({interaction.user})")
             except Exception as e: error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
         
+        # [✅ 수정] 로그 임베드를 먼저 생성합니다.
         log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
-        try:
-            await self._send_log_message(log_embed)
-        except Exception as e: error_report += f"- 로그 메시지 전송 실패: `{type(e).__name__}: {e}`\n"
         
+        # [✅✅✅ 핵심 수정 ✅✅✅]
+        # 패널 재생성 함수에 로그 임베드를 함께 전달하여 동시에 처리하도록 합니다.
+        original_panel_channel_id = get_id("nickname_panel_channel_id")
+        if original_panel_channel_id:
+            original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
+            if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
+                await self.nicknames_cog.regenerate_panel(
+                    original_panel_channel, 
+                    panel_key="panel_nicknames", 
+                    log_embed=log_embed
+                )
+            else:
+                logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다. 로그만 전송합니다.")
+                await self._send_log_message_fallback(log_embed)
+        else:
+            logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
+            await self._send_log_message_fallback(log_embed)
+
         status_text = "承認" if is_approved else "拒否"
         if error_report:
             await interaction.followup.send(f"❌ **{status_text}**処理中に一部作業に失敗しました:\n{error_report}", ephemeral=True)
         else:
             message = await interaction.followup.send(f"✅ {status_text} 処理が正常に完了しました。", ephemeral=True, wait=True)
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
             await message.delete()
         
         try: await interaction.message.delete()
         except discord.NotFound: pass
-        
-        original_panel_channel_id = get_id("nickname_panel_channel_id")
-        
-        if original_panel_channel_id:
-            original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
-            
-            if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
-                await self.nicknames_cog.regenerate_panel(original_panel_channel, panel_key="panel_nicknames")
-            else:
-                logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다.")
-        else:
-            logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다.")
-
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
@@ -120,7 +122,8 @@ class NicknameApprovalView(ui.View):
             embed.add_field(name="担当者", value=moderator.mention, inline=False)
         return embed
 
-    async def _send_log_message(self, result_embed: discord.Embed):
+    # [✅ 수정] 패널 채널을 찾지 못했을 때를 대비한 비상 로그 전송 함수
+    async def _send_log_message_fallback(self, result_embed: discord.Embed):
         if (log_ch_id := self.nicknames_cog.nickname_log_channel_id) and (log_ch := self.nicknames_cog.bot.get_channel(log_ch_id)):
             await log_ch.send(embed=result_embed)
 
@@ -200,8 +203,6 @@ class NicknameChangerPanelView(ui.View):
             utc_now = datetime.now(timezone.utc).timestamp()
 
             if last_time and utc_now - last_time < cooldown_seconds:
-                # [✅✅✅ 핵심 수정 ✅✅✅]
-                # 남은 시간을 계산하고, 새로 만든 함수로 보기 좋게 포맷합니다.
                 time_remaining = cooldown_seconds - (utc_now - last_time)
                 formatted_time = format_seconds_to_hms(time_remaining)
                 message = f"❌ 次の申請まであと **{formatted_time}** です。"
@@ -283,7 +284,9 @@ class Nicknames(commands.Cog):
             except discord.Forbidden:
                 pass
 
-    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames") -> bool:
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # 로그 임베드를 인자로 받아, 로그와 새 패널을 거의 동시에 보내도록 수정합니다.
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames", log_embed: Optional[discord.Embed] = None) -> bool:
         base_panel_key = panel_key.replace("panel_", "")
         embed_key = panel_key
 
@@ -298,6 +301,9 @@ class Nicknames(commands.Cog):
             embed_data = await get_embed_from_db(embed_key)
             if not embed_data:
                 logger.warning(f"DB에서 '{embed_key}' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다。")
+                if log_embed and self.nickname_log_channel_id: # 비상시 로그 채널에만 전송
+                    if log_channel := self.bot.get_channel(self.nickname_log_channel_id):
+                        await log_channel.send(embed=log_embed)
                 return False
                 
             embed = discord.Embed.from_dict(embed_data)
@@ -305,10 +311,23 @@ class Nicknames(commands.Cog):
                 await self.register_persistent_views()
 
             await self.view_instance.setup_buttons()
-            new_message = await channel.send(embed=embed, view=self.view_instance)
-            await save_panel_id(base_panel_key, new_message.id, channel.id)
-            logger.info(f"✅ {panel_key} 패널을 성공적으로 새로 생성했습니다。 (채널: #{channel.name})")
-            return True
+
+            tasks = []
+            if log_embed:
+                tasks.append(channel.send(embed=log_embed))
+            tasks.append(channel.send(embed=embed, view=self.view_instance))
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            new_panel_message = next((res for res in results if isinstance(res, discord.Message) and res.view is not None), None)
+            
+            if new_panel_message:
+                await save_panel_id(base_panel_key, new_panel_message.id, channel.id)
+                logger.info(f"✅ {panel_key} 패널을 성공적으로 새로 생성/갱신했습니다。 (채널: #{channel.name})")
+                return True
+            else:
+                logger.error("닉네임 패널 메시지 전송에 실패하여 ID를 저장할 수 없습니다.")
+                return False
+
         except Exception as e:
             logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
             return False
