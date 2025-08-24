@@ -273,7 +273,7 @@ class ServerSystem(commands.Cog):
                     timestamp = datetime.now(timezone.utc).timestamp()
                     await save_config_to_db(f"panel_regenerate_request_{setting_key}", timestamp)
                     await interaction.followup.send(
-                        f"✅ **{friendly_name}** の 채널을 {channel.mention}(으)로 설정하고, 게임 봇에게 패널 생성을 요청했습니다。\n"
+                        f"✅ **{friendly_name}** のチャンネルを {channel.mention}(으)로 설정하고, 게임 봇에게 패널 생성을 요청했습니다。\n"
                         "잠시 후 게임 봇이 해당 채널에 패널을 생성할 것입니다。",
                         ephemeral=True
                     )
@@ -492,4 +492,75 @@ class ServerSystem(commands.Cog):
         amount_str = f"+{amount:,}" if amount > 0 else f"{amount:,}"
         
         embed = discord.Embed(
-            description=f"⚙️ {admin.mention}さんが{target.mention}さんのコインを`{amount_
+            description=f"⚙️ {admin.mention}さんが{target.mention}さんのコインを`{amount_str}`{currency_icon}だけ**{action}**しました。",
+            color=action_color
+        )
+        try:
+            await log_channel.send(embed=embed)
+        except Exception as e:
+            logger.error(f"管理者のコイン操作ログ送信に失敗しました: {e}", exc_info=True)
+
+    @admin_group.command(name="コイン付与", description="[管理者専用] 特定のユーザーにコインを付与します。")
+    @app_commands.describe(user="コインを付与するユーザー", amount="付与するコインの量")
+    @app_commands.check(is_admin)
+    async def give_coin(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
+        await interaction.response.defer(ephemeral=True)
+        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+        
+        result = await update_wallet(user, amount)
+        if result:
+            await self.log_coin_admin_action(interaction.user, user, amount, "付与")
+            await interaction.followup.send(f"✅ {user.mention}さんへ `{amount:,}`{currency_icon}を付与しました。")
+        else:
+            await interaction.followup.send("❌ コイン付与中にエラーが発生しました。")
+    
+    @admin_group.command(name="コイン削減", description="[管理者専用] 特定のユーザーのコインを削減します。")
+    @app_commands.describe(user="コインを削減するユーザー", amount="削減するコインの量")
+    @app_commands.check(is_admin)
+    async def take_coin(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
+        await interaction.response.defer(ephemeral=True)
+        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+
+        result = await update_wallet(user, -amount)
+        if result:
+            await self.log_coin_admin_action(interaction.user, user, -amount, "削減")
+            await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{currency_icon}を削減しました。")
+        else:
+            await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
+
+    @admin_group.command(name="xp부여", description="[관리자 전용] 특정 유저에게 XP를 부여합니다.")
+    @app_commands.describe(user="XP를 부여할 유저", amount="부여할 XP 양")
+    @app_commands.check(is_admin)
+    async def give_xp(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            db_key = f"xp_admin_update_request_{user.id}"
+            payload = {
+                "xp_to_add": amount,
+                "timestamp": time.time()
+            }
+            await save_config_to_db(db_key, payload)
+            await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여하도록 게임 봇에게 요청했습니다.")
+        except Exception as e:
+            logger.error(f"XP 부여 요청 중 오류: {e}", exc_info=True)
+            await interaction.followup.send("❌ XP 부여 요청 중 오류가 발생했습니다.")
+
+    @admin_group.command(name="레벨설정", description="[관리자 전용] 특정 유저의 레벨을 강제로 설정합니다.")
+    @app_commands.describe(user="레벨을 설정할 유저", level="설정할 레벨")
+    @app_commands.check(is_admin)
+    async def set_level(self, interaction: discord.Interaction, user: discord.Member, level: app_commands.Range[int, 1, None]):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            db_key = f"xp_admin_update_request_{user.id}"
+            payload = {
+                "exact_level": level,
+                "timestamp": time.time()
+            }
+            await save_config_to_db(db_key, payload)
+            await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다。")
+        except Exception as e:
+            logger.error(f"레벨 설정 요청 중 오류: {e}", exc_info=True)
+            await interaction.followup.send("❌ レベル設定の要請中にエラーが発生しました。")
+            
+async def setup(bot: commands.Bot):
+    await bot.add_cog(ServerSystem(bot))
