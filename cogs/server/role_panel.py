@@ -109,7 +109,7 @@ class PersistentCategorySelectView(ui.View):
             await interaction.followup.send("❌ 役職パネルの設定が正しくありません。管理者に問い合わせてください。", ephemeral=True)
             return
 
-        # [수정] 여러 패널이 있을 수 있으므로, 현재 View의 설정과 일치하는 설정을 찾습니다.
+        # [✅ 수정] 여러 패널이 있을 수 있으므로, 현재 View의 설정과 일치하는 설정을 찾습니다.
         panel_key = self.panel_config.get("panel_key")
         panel_config = panel_configs.get(panel_key)
 
@@ -130,9 +130,6 @@ class PersistentCategorySelectView(ui.View):
         temp_view.add_item(RoleSelectDropdown(interaction.user, category_roles, category_name))
         await interaction.followup.send("下のメニューから希望の役割をすべて選択した後、メニューの外側をクリックして閉じてください。", view=temp_view, ephemeral=True)
 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# RolePanel Cog
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 class RolePanel(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -157,20 +154,16 @@ class RolePanel(commands.Cog):
         else:
             logger.warning("⚠️ 역할 패널 설정이 없어 영구 View를 등록할 수 없습니다。")
 
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 함수가 panel_key를 인자로 받도록 변경하고, 내부 로직을 수정합니다.
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_roles") -> bool:
         if not self.panel_configs:
             logger.error("❌ 역할 패널을 생성할 수 없습니다: DB에 설정 정보가 없습니다。")
             return False
         
-        # 전달받은 panel_key를 사용하여 정확한 설정을 찾습니다.
         panel_config = self.panel_configs.get(panel_key)
         if not panel_config:
             logger.error(f"❌ 역할 패널 설정에서 '{panel_key}'에 대한 구성을 찾을 수 없습니다.")
             return False
 
-        # DB에서 패널 ID를 찾을 때도 base key를 사용합니다 (예: "panel_roles" -> "roles")
         base_panel_key = panel_key.replace("panel_", "")
         
         try:
