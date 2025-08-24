@@ -11,13 +11,11 @@ logger = logging.getLogger(__name__)
 class StatsUpdater(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # [수정] Cog가 초기화될 때 루프를 바로 시작하지 않습니다.
-        # self.update_stats_loop.start() 
         logger.info("StatsUpdater Cog가 성공적으로 초기화되었습니다.")
 
-    # [수정] on_ready 리스너를 추가하여 봇이 완전히 준비된 후에 루프를 시작합니다.
     @commands.Cog.listener()
     async def on_ready(self):
+        # [개선] 봇이 완전히 준비된 후에 루프를 시작하여 초기 오류 방지
         if not self.update_stats_loop.is_running():
             self.update_stats_loop.start()
             logger.info("봇이 준비되어 통계 업데이트 루프를 시작합니다.")
@@ -38,7 +36,6 @@ class StatsUpdater(commands.Cog):
                 if not guild_configs:
                     continue
                 
-                # 이제 이 시점의 guild.members는 on_ready 이후이므로 신뢰할 수 있습니다.
                 all_members = guild.members
 
                 for config in guild_configs:
