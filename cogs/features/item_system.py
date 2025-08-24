@@ -68,7 +68,7 @@ class ItemSelectDropdown(ui.Select):
 
         else:
             message = await interaction.followup.send("❌ このアイテムは現在使用できません。", ephemeral=True, wait=True)
-            self.cog.bot.loop.create_task(self.cog.delete_message_after_delay(message, 3))
+            self.cog.bot.loop.create_task(self.cog.delete_message_after_delay(message, 5))
 
 class ItemUsagePanelView(ui.View):
     def __init__(self, cog: 'ItemSystem'):
