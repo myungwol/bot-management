@@ -72,12 +72,12 @@ class NicknameApprovalView(ui.View):
         if is_approved:
             try:
                 await member.edit(nick=final_name, reason=f"管理者が承認 ({interaction.user})")
-            except Exception as e: error_report += f"- ニックネーム変更失敗: `{type(e).__name__}: {e}`\n"
+            except Exception as e: error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
         
         log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
         try:
             await self._send_log_message(log_embed)
-        except Exception as e: error_report += f"- ログメッセージ送信失敗: `{type(e).__name__}: {e}`\n"
+        except Exception as e: error_report += f"- 로그 메시지 전송 실패: `{type(e).__name__}: {e}`\n"
         
         status_text = "承認" if is_approved else "拒否"
         if error_report:
@@ -90,8 +90,24 @@ class NicknameApprovalView(ui.View):
         try: await interaction.message.delete()
         except discord.NotFound: pass
 
-        # [✅ 수정] regenerate_panel 호출 시 panel_key 전달
-        await self.nicknames_cog.regenerate_panel(interaction.channel, panel_key="panel_nicknames")
+        # [✅✅✅ 핵심 수정 ✅✅✅]
+        # 현재 채널(승인/거절 채널)이 아닌, 원래 패널이 있던 채널에 패널을 재생성합니다.
+        
+        # 1. DB/캐시에서 원래 패널이 설치된 채널의 ID를 가져옵니다.
+        original_panel_channel_id = get_id("nickname_panel_channel_id")
+        
+        if original_panel_channel_id:
+            # 2. ID를 이용해 채널 객체를 가져옵니다.
+            original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
+            
+            if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
+                # 3. 찾은 채널에 패널 재생성을 요청합니다.
+                await self.nicknames_cog.regenerate_panel(original_panel_channel, panel_key="panel_nicknames")
+            else:
+                logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다.")
+        else:
+            logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다.")
+
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
@@ -268,11 +284,9 @@ class Nicknames(commands.Cog):
             except discord.Forbidden:
                 pass
 
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 함수가 panel_key를 인자로 받도록 변경하고, 내부 로직을 수정합니다.
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames") -> bool:
-        base_panel_key = panel_key.replace("panel_", "") # e.g., "nicknames"
-        embed_key = panel_key # e.g., "panel_nicknames"
+        base_panel_key = panel_key.replace("panel_", "")
+        embed_key = panel_key
 
         try:
             panel_info = get_panel_id(base_panel_key)
