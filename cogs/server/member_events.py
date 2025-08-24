@@ -45,7 +45,6 @@ class MemberEvents(commands.Cog):
                 ]
                 restored_nick = backup.get('nickname')
 
-                # 역할과 닉네임을 동시에 수정
                 if roles_to_restore or restored_nick:
                     await member.edit(roles=roles_to_restore, nick=restored_nick, reason="サーバー再参加によるデータ復旧")
                 
@@ -55,7 +54,7 @@ class MemberEvents(commands.Cog):
                 logger.error(f"'{member.display_name}'님의 데이터 복구에 실패했습니다. (권한 부족)")
             except Exception as e:
                 logger.error(f"'{member.display_name}'님 데이터 복구 중 예기치 않은 오류 발생: {e}", exc_info=True)
-            return # 데이터 복구 후, 신규 유저 로직은 실행하지 않음
+            return
             
         try:
             await supabase.table('user_levels').upsert({
@@ -67,7 +66,6 @@ class MemberEvents(commands.Cog):
         except Exception as e:
             logger.error(f"'{member.display_name}'님의 초기 레벨 데이터 생성 중 오류 발생: {e}", exc_info=True)
 
-        # --- 초기 역할은 '손님' 역할 하나만 부여하도록 변경 ---
         initial_role_keys = ["role_guest"]
         
         roles_to_add: List[discord.Role] = []
@@ -113,6 +111,9 @@ class MemberEvents(commands.Cog):
         if self.farewell_channel_id and (channel := self.bot.get_channel(self.farewell_channel_id)):
             embed_data = await get_embed_from_db('farewell_embed')
             if embed_data:
+                # [✅✅✅ 핵심 수정 ✅✅✅]
+                # ui_defaults.py의 placeholder와 동일한 키워드 인자(member_name)를 사용합니다.
+                # member.display_name은 닉네임이 있으면 닉네임을, 없으면 유저명을 보여주므로 가장 적합합니다.
                 embed = format_embed_from_db(embed_data, member_name=member.display_name)
                 if member.display_avatar:
                     embed.set_thumbnail(url=member.display_avatar.url)
