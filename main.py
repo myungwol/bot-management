@@ -40,7 +40,7 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.voice_states = True
-BOT_VERSION = "v2.0-unified" # [개선] 통합 봇 버전 업데이트
+BOT_VERSION = "v2.1-hotfix" # [개선] 버그 수정 버전 업데이트
 
 # --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
@@ -48,12 +48,10 @@ class MyBot(commands.Bot):
         super().__init__(*args, **kwargs)
 
     async def setup_hook(self):
-        # [개선] Cog를 로드하기 전에 DB에 기본 설정을 먼저 동기화합니다.
         await sync_defaults_to_db()
 
         await self.load_all_extensions()
         
-        # [개선] 모든 Cog의 영구 View를 한 곳에서 관리합니다.
         cogs_with_persistent_views = [
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "LevelSystem", "ItemSystem", "AnonymousBoard", 
@@ -82,14 +80,17 @@ class MyBot(commands.Bot):
 
         loaded_count = 0
         failed_count = 0
-        # [개선] 하위 폴더까지 모두 자동으로 탐색하여 Cog를 로드하도록 개선
         for root, dirs, files in os.walk(cogs_dir):
             if '__pycache__' in dirs:
                 dirs.remove('__pycache__')
             for filename in files:
                 if filename.endswith('.py') and not filename.startswith('__'):
-                    extension_path = os.path.join(root, filename) \
-                        .replace(os.path.sep, '.')[:-3]
+                    # [✅✅✅ 핵심 수정 ✅✅✅]
+                    # 파일 경로를 올바른 파이썬 모듈 경로로 변환하는 로직을 수정합니다.
+                    # 예: ./cogs/server/system.py -> cogs.server.system
+                    path = os.path.join(root, filename)
+                    extension_path = path.replace(os.path.sep, '.').replace('./', '')[:-3]
+                    
                     try:
                         await self.load_extension(extension_path)
                         logger.info(f'✅ Cog 로드 성공: {extension_path}')
@@ -110,7 +111,6 @@ async def on_ready():
     logger.info(f"✅ 현재 UTC 시간: {datetime.now(timezone.utc)}")
     logger.info("==================================================")
     
-    # [개선] DB 동기화는 setup_hook으로 이동했으므로, 여기서는 데이터 로드만 수행합니다.
     await load_all_data_from_db()
     
     logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
