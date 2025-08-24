@@ -7,7 +7,12 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
-from utils.database import get_id, get_cooldown, set_cooldown, add_anonymous_message, get_embed_from_db, get_panel_id, save_panel_id, get_panel_components_from_db
+# [✅ 수정] 자정 초기화 확인을 위한 새로운 DB 함수 임포트
+from utils.database import (
+    get_id, add_anonymous_message, get_embed_from_db, 
+    get_panel_id, save_panel_id, get_panel_components_from_db,
+    has_posted_anonymously_today # <-- 이 함수가 새로 추가되었습니다.
+)
 from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
@@ -32,16 +37,16 @@ class AnonymousModal(ui.Modal, title="匿名メッセージ作成"):
             # 1. DB에 메시지 기록
             await add_anonymous_message(interaction.guild_id, interaction.user.id, self.content.value)
 
-            # 2. 공개 채널에 익명 임베드 전송
+            # 2. 공개 채널에 전송할 익명 임베드 준비
             embed_data = await get_embed_from_db("anonymous_message")
-            if embed_data and self.cog.panel_channel:
-                embed = format_embed_from_db(embed_data)
-                embed.description = self.content.value
-                embed.timestamp = datetime.now(timezone.utc)
-                await self.cog.panel_channel.send(embed=embed)
+            anonymous_embed = None
+            if embed_data:
+                anonymous_embed = format_embed_from_db(embed_data)
+                anonymous_embed.description = self.content.value
+                anonymous_embed.timestamp = datetime.now(timezone.utc)
             
-            # 3. 쿨다운 설정
-            await set_cooldown(str(interaction.user.id), "anonymous_post")
+            # [✅ 수정] 쿨다운 설정을 제거하고, 패널 재설치 함수를 호출하여 로그와 패널을 함께 보냅니다.
+            await self.cog.regenerate_panel(last_anonymous_embed=anonymous_embed)
             
             # 4. 사용자에게 성공 메시지 전송 (5초 후 삭제)
             message = await interaction.followup.send("✅ あなたの匿名の声が届けられました。", ephemeral=True, wait=True)
@@ -73,15 +78,12 @@ class AnonymousPanelView(ui.View):
         self.add_item(button)
 
     async def on_button_click(self, interaction: discord.Interaction):
-        # 쿨다운 (하루에 한 번) 체크 - 86400초 = 24시간
-        cooldown_seconds = 86400
-        last_time = await get_cooldown(str(interaction.user.id), "anonymous_post")
-        utc_now = datetime.now(timezone.utc).timestamp()
-
-        if last_time and utc_now - last_time < cooldown_seconds:
-            # [✅✅✅ 핵심 수정 ✅✅✅]
-            can_use_time = int(last_time + cooldown_seconds)
-            await interaction.response.send_message(f"❌ 次の投稿は <t:{can_use_time}:R> に可能になります。", ephemeral=True)
+        # [✅✅✅ 핵심 수정 ✅✅✅]
+        # 24시간 쿨다운 대신, 자정 초기화 방식으로 변경
+        already_posted = await has_posted_anonymously_today(interaction.user.id)
+        
+        if already_posted:
+            await interaction.response.send_message("❌ 本日の匿名投稿は既に完了しています。明日になると再度投稿できます。", ephemeral=True)
             return
             
         await interaction.response.send_modal(AnonymousModal(self.cog))
@@ -112,7 +114,7 @@ class AnonymousBoard(commands.Cog):
             return self.bot.get_channel(self.panel_channel_id)
         return None
         
-    async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None) -> bool:
+    async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None, last_anonymous_embed: Optional[discord.Embed] = None) -> bool:
         target_channel = channel or self.panel_channel
         if not target_channel:
             return False
@@ -121,6 +123,7 @@ class AnonymousBoard(commands.Cog):
         embed_key = "panel_anonymous_board"
 
         try:
+            # 1. 이전 패널 메시지 삭제
             panel_info = get_panel_id(panel_key)
             if panel_info and (old_id := panel_info.get('message_id')):
                 try:
@@ -128,6 +131,14 @@ class AnonymousBoard(commands.Cog):
                     await old_message.delete()
                 except (discord.NotFound, discord.Forbidden): pass
             
+            # [✅ 추가] 2. 새로운 익명 메시지가 있다면 먼저 전송
+            if last_anonymous_embed:
+                try:
+                    await target_channel.send(embed=last_anonymous_embed)
+                except Exception as e:
+                    logger.error(f"익명 게시판에 로그 메시지 전송 실패: {e}")
+
+            # 3. 새로운 패널 임베드와 View 준비
             embed_data = await get_embed_from_db(embed_key)
             if not embed_data:
                 logger.error(f"DB에서 '{embed_key}' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
@@ -137,11 +148,13 @@ class AnonymousBoard(commands.Cog):
             if self.view_instance is None:
                 await self.register_persistent_views()
             
+            # 4. 새로운 패널 메시지 전송 및 DB에 ID 저장
             await self.view_instance.setup_buttons()
             new_message = await target_channel.send(embed=embed, view=self.view_instance)
             await save_panel_id(panel_key, new_message.id, target_channel.id)
-            logger.info(f"✅ 익명 게시판 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
+            logger.info(f"✅ 익명 게시판 패널을 성공적으로 새로 생성/갱신했습니다. (채널: #{target_channel.name})")
             return True
+            
         except Exception as e:
             logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
             return False
