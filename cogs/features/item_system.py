@@ -3,7 +3,7 @@ import discord
 from discord import ui
 from discord.ext import commands
 import logging
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from datetime import datetime, timezone
 import asyncio
 
@@ -34,29 +34,41 @@ class ItemSelectDropdown(ui.Select):
             disabled=not options
         )
 
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # 아이템 사용 흐름 전체를 재구성하여 요청사항을 반영합니다.
     async def callback(self, interaction: discord.Interaction):
+        # 1. 드롭다운 메시지를 즉시 삭제합니다.
         await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.delete_original_response()
+        except discord.HTTPException:
+            pass
+
         member = interaction.user
         item_key = self.values[0]
         item_info = USABLE_ITEMS.get(item_key)
         item_role = interaction.guild.get_role(get_id(item_key))
 
         if not all([isinstance(member, discord.Member), item_info, item_role]):
-            return await interaction.followup.send("❌ アイテムの使用中にエラーが発生しました。", ephemeral=True)
+            message = await interaction.followup.send("❌ アイテムの使用中にエラーが発生しました。", ephemeral=True, wait=True)
+            self.cog.bot.loop.create_task(self.cog.delete_message_after_delay(message, 3))
+            return
 
+        # 2. 아이템 사용 로직을 실행하고, 결과(성공 여부, 메시지 내용)를 받습니다.
         if item_info['type'] == 'warning_deduction':
-            success = await self.cog.use_warning_deduction_ticket(interaction, member, item_role, item_info)
-            # [✅✅✅ 핵심 수정 ✅✅✅]
-            # 아이템 사용에 성공했을 때, 패널을 다시 생성하도록 명시적으로 호출합니다.
+            success, message_content = await self.cog.use_warning_deduction_ticket(interaction, member, item_role, item_info)
+            
+            # 3. 아이템 사용에 성공했다면, 패널을 즉시 재생성합니다.
             if success:
                 await self.cog.regenerate_panel(interaction.channel, panel_key="panel_item_usage")
+
+            # 4. 결과 메시지를 3초간 보여주고 삭제하는 작업을 예약합니다.
+            message = await interaction.followup.send(message_content, ephemeral=True, wait=True)
+            self.cog.bot.loop.create_task(self.cog.delete_message_after_delay(message, 3))
+
         else:
-            await interaction.followup.send("❌ このアイテムは現在使用できません。", ephemeral=True)
-        
-        try:
-            await interaction.delete_original_response()
-        except discord.HTTPException:
-            pass
+            message = await interaction.followup.send("❌ このアイテムは現在使用できません。", ephemeral=True, wait=True)
+            self.cog.bot.loop.create_task(self.cog.delete_message_after_delay(message, 3))
 
 class ItemUsagePanelView(ui.View):
     def __init__(self, cog: 'ItemSystem'):
@@ -113,15 +125,25 @@ class ItemSystem(commands.Cog):
         self.panel_channel_id = get_id("item_usage_panel_channel_id")
         self.log_channel_id = get_id("log_channel_item")
         logger.info("[ItemSystem Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
-        
-    async def use_warning_deduction_ticket(self, interaction: discord.Interaction, member: discord.Member, item_role: discord.Role, item_info: dict) -> bool:
+
+    # [✅ 추가] 메시지를 일정 시간 뒤에 삭제하는 헬퍼 함수
+    async def delete_message_after_delay(self, message: discord.InteractionMessage, delay: int):
+        await asyncio.sleep(delay)
+        try:
+            await message.delete()
+        except discord.NotFound:
+            pass # 유저가 이미 메시지를 닫은 경우
+        except Exception as e:
+            logger.warning(f"아이템 사용 확인 메시지 삭제 중 오류: {e}")
+
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # 함수가 UI(메시지 보내기, sleep)를 직접 제어하지 않고,
+    # 순수하게 로직만 처리한 뒤 결과(성공여부, 메시지 내용)를 반환하도록 변경합니다.
+    async def use_warning_deduction_ticket(self, interaction: discord.Interaction, member: discord.Member, item_role: discord.Role, item_info: dict) -> Tuple[bool, str]:
         current_warnings = await get_total_warning_count(member.id, interaction.guild_id)
         if current_warnings <= 0:
-            message = await interaction.followup.send(f"✅ 累積警告が0回なので、「{item_info['name']}」を使用する必要はありません。", ephemeral=True, wait=True)
-            # [✅ 수정] 메시지 표시 시간을 3초로 단축
-            await asyncio.sleep(3)
-            await message.delete()
-            return False
+            message_content = f"✅ 累積警告が0回なので、「{item_info['name']}」を使用する必要はありません。"
+            return False, message_content
             
         try:
             await member.remove_roles(item_role, reason=f"「{item_info['name']}」アイテム使用")
@@ -138,18 +160,14 @@ class ItemSystem(commands.Cog):
             
             await self.send_log_message(member, item_info['name'], new_total)
             
-            message = await interaction.followup.send(f"✅ アイテム「{item_info['name']}」を使用しました！ (累積警告: {current_warnings}回 → {new_total}回)", ephemeral=True, wait=True)
-            # [✅✅✅ 핵심 수정 ✅✅✅] 메시지 표시 시간을 5초에서 3초로 단축
-            await asyncio.sleep(3)
-            await message.delete()
-            return True
+            message_content = f"✅ アイテム「{item_info['name']}」を使用しました！ (累積警告: {current_warnings}回 → {new_total}回)"
+            return True, message_content
             
         except discord.Forbidden:
-            await interaction.followup.send("❌ 役割の変更中にエラーが発生しました。ボットの権限が不足している可能性があります。", ephemeral=True)
+            return False, "❌ 役割の変更中にエラーが発生しました。ボットの権限が不足している可能性があります。"
         except Exception as e:
             logger.error(f"아이템 사용 중 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send("❌ アイテムの使用中に予期せぬエラーが発生しました。", ephemeral=True)
-        return False
+            return False, "❌ アイテムの使用中に予期せぬエラーが発生しました。"
 
     async def send_log_message(self, member: discord.Member, item_name: str, new_total_warnings: int):
         if not self.log_channel_id: return
