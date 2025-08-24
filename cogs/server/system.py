@@ -1,4 +1,4 @@
-# bot-management/cogs/server/system.py
+# cogs/server/system.py
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
@@ -260,7 +260,7 @@ class ServerSystem(commands.Cog):
             
             save_success = await save_id_to_db(db_key, channel.id)
             if not save_success:
-                return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요。", ephemeral=True)
+                return await interaction.followup.send(f"❌ **{friendly_name}** 設定中、DB保存に失敗しました。Supabase RLSポリシーを確認してください。", ephemeral=True)
 
             cog_to_reload = self.bot.get_cog(config["cog_name"])
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
@@ -269,11 +269,14 @@ class ServerSystem(commands.Cog):
             if config.get("type") == "panel":
                 if hasattr(cog_to_reload, 'regenerate_panel'):
                     success = False
+                    # [✅✅✅ 핵심 수정 ✅✅✅]
+                    # cog의 regenerate_panel 함수를 호출할 때, 설정 키(setting_key)를 명확하게 전달합니다.
+                    # 이로써 각 cog가 어떤 패널을 생성해야 하는지 정확히 알 수 있습니다.
                     if config["cog_name"] == "TicketSystem":
                         panel_type = setting_key.replace("panel_", "")
-                        success = await cog_to_reload.regenerate_panel(channel, panel_type)
+                        success = await cog_to_reload.regenerate_panel(channel, panel_type=panel_type)
                     else:
-                        success = await cog_to_reload.regenerate_panel(channel)
+                        success = await cog_to_reload.regenerate_panel(channel, panel_key=setting_key)
                         
                     if success:
                         await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
@@ -292,11 +295,11 @@ class ServerSystem(commands.Cog):
             friendly_name = "알림 역할"
             for choice in await self.setup_action_autocomplete(interaction, ""):
                 if choice.value == action:
-                    friendly_name = choice.name.replace(" 설정", "")
+                    friendly_name = choice.name.replace(" 設定", "")
             
             save_success = await save_id_to_db(db_key, role.id)
             if not save_success:
-                 return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요。", ephemeral=True)
+                 return await interaction.followup.send(f"❌ **{friendly_name}** 設定中、DB保存に失敗しました。Supabase RLSポリシーを確認してください。", ephemeral=True)
 
             cog_to_reload = self.bot.get_cog("Reminder")
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
@@ -330,9 +333,9 @@ class ServerSystem(commands.Cog):
                         success = False
                         if cog_name == "TicketSystem":
                             panel_type = key.replace("panel_", "")
-                            success = await cog.regenerate_panel(target_channel, panel_type)
+                            success = await cog.regenerate_panel(target_channel, panel_type=panel_type)
                         else:
-                            success = await cog.regenerate_panel(target_channel)
+                            success = await cog.regenerate_panel(target_channel, panel_key=key)
                         
                         if success: success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
                         else: failure_list.append(f"・`{friendly_name}`: 再生成中に不明なエラーが発生しました。")
