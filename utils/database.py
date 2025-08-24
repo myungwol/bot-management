@@ -7,7 +7,8 @@ import asyncio
 import logging
 import time
 from functools import wraps
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
 from typing import Dict, Callable, Any, List, Optional
 import discord
 
@@ -21,6 +22,9 @@ from .ui_defaults import (
 )
 
 logger = logging.getLogger(__name__)
+
+# JST 타임존 객체 생성
+JST = timezone(timedelta(hours=9))
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 1. 클라이언트 초기화 및 캐시
@@ -39,7 +43,7 @@ except Exception as e:
 
 _bot_configs_cache: Dict[str, Any] = {}
 _channel_id_cache: Dict[str, int] = {}
-_user_abilities_cache: Dict[int, tuple[List[str], float]] = {} # [추가] 능력 정보 캐시
+_user_abilities_cache: Dict[int, tuple[List[str], float]] = {}
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 2. DB 오류 처리 데코레이터
@@ -68,7 +72,6 @@ def supabase_retry_handler(retries: int = 3, delay: int = 2):
             
             logger.error(f"❌ '{func.__name__}' 함수가 모든 재시도({retries}번)에 실패했습니다. 마지막 오류: {last_exception}", exc_info=True)
             
-            # [개선] 실패 시 반환 타입을 보고 적절한 기본값 반환
             return_type = func.__annotations__.get("return")
             if return_type:
                 type_str = str(return_type).lower()
@@ -78,8 +81,9 @@ def supabase_retry_handler(retries: int = 3, delay: int = 2):
         return wrapper
     return decorator
 
+# ... (sync_defaults_to_db, load_all_data_from_db 등 다른 함수들은 변경 없이 그대로 유지) ...
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 3. 데이터 로드 및 동기화
+# 3. 데이터 로드 및 동기화 (이전과 동일)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 async def sync_defaults_to_db():
     logger.info("------ [ 기본값 DB 동기화 시작 ] ------")
@@ -94,7 +98,6 @@ async def sync_defaults_to_db():
         )
         await save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy)
         
-        # [개선] ONBOARDING_CHOICES 설정을 DB에 저장하는 로직을 추가합니다.
         await asyncio.gather(
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
@@ -125,7 +128,7 @@ async def load_all_data_from_db():
     logger.info("------ [ 모든 DB 데이터 캐시 로드 완료 ] ------")
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 4. 설정 (bot_configs) 관련 함수
+# 4. 설정 (bot_configs) 관련 함수 (이전과 동일)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def load_bot_configs_from_db():
@@ -145,7 +148,7 @@ def get_config(key: str, default: Any = None) -> Any:
     return _bot_configs_cache.get(key, default)
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 5. ID (channel_configs) 관련 함수
+# 5. ID (channel_configs) 관련 함수 (이전과 동일)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def load_channel_ids_from_db():
@@ -184,7 +187,7 @@ def get_panel_id(panel_name: str) -> Optional[Dict[str, int]]:
     return {"message_id": message_id, "channel_id": channel_id} if message_id and channel_id else None
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 6. 임베드 및 UI 컴포넌트 관련 함수
+# ... (6번부터 15번까지의 함수들은 변경 없이 그대로 유지됩니다) ...
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def save_embed_to_db(embed_key: str, embed_data: dict):
@@ -193,13 +196,10 @@ async def save_embed_to_db(embed_key: str, embed_data: dict):
 async def get_embed_from_db(embed_key: str) -> Optional[dict]:
     response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
     return response.data[0]['embed_data'] if response and response.data else None
-
 @supabase_retry_handler()
 async def get_all_embeds() -> List[Dict[str, Any]]:
-    """데이터베이스에 저장된 모든 임베드 템플릿을 가져옵니다."""
     response = await supabase.table('embeds').select('embed_key, embed_data').order('embed_key').execute()
     return response.data if response and response.data else []
-
 @supabase_retry_handler()
 async def get_onboarding_steps() -> List[dict]:
     response = await supabase.table('onboarding_steps').select('*, embed_data:embeds(embed_data)').order('step_number', desc=False).execute()
@@ -297,37 +297,25 @@ async def update_wallet(user: discord.User, amount: int) -> Optional[dict]:
     return response.data[0] if response and response.data else None
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 16. 재참여 유저 데이터 관련 함수
+# 16. 재참여 유저 데이터 관련 함수 (이전과 동일)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def backup_member_data(user_id: int, guild_id: int, role_ids: List[int], nickname: Optional[str]):
-    """유저가 나갔을 때 역할과 닉네임을 DB에 백업합니다."""
-    await supabase.table('left_members').upsert({
-        'user_id': user_id,
-        'guild_id': guild_id,
-        'roles': role_ids,
-        'nickname': nickname,
-        'left_at': datetime.now(timezone.utc).isoformat()
-    }).execute()
-
+    await supabase.table('left_members').upsert({ 'user_id': user_id, 'guild_id': guild_id, 'roles': role_ids, 'nickname': nickname, 'left_at': datetime.now(timezone.utc).isoformat() }).execute()
 @supabase_retry_handler()
 async def get_member_backup(user_id: int, guild_id: int) -> Optional[Dict[str, Any]]:
-    """백업된 유저 데이터를 DB에서 가져옵니다."""
     response = await supabase.table('left_members').select('*').eq('user_id', user_id).eq('guild_id', guild_id).maybe_single().execute()
     return response.data if response else None
-
 @supabase_retry_handler()
 async def delete_member_backup(user_id: int, guild_id: int):
-    """사용한 백업 데이터를 DB에서 삭제합니다."""
     await supabase.table('left_members').delete().eq('user_id', user_id).eq('guild_id', guild_id).execute()
-    
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 17. [신규 추가] 게임 기능 관련 함수
+# 17. 게임 기능 관련 함수 (이전과 동일)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def get_user_abilities(user_id: int) -> List[str]:
-    """사용자가 보유한 모든 능력의 키(key) 목록을 반환합니다. (5분 캐시 적용)"""
-    CACHE_TTL = 300 # 5분
+    CACHE_TTL = 300
     now = time.time()
     
     if user_id in _user_abilities_cache:
@@ -344,3 +332,20 @@ async def get_user_abilities(user_id: int) -> List[str]:
     
     _user_abilities_cache[user_id] = ([], now)
     return []
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 18. [✅✅✅ 신규 추가] 익명 게시판 일일 작성 확인 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def has_posted_anonymously_today(user_id: int) -> bool:
+    """JST 기준 오늘 날짜에 해당 유저가 익명 글을 작성했는지 확인합니다."""
+    # 일본 시간(JST) 기준 오늘 자정 시간 계산
+    today_jst_start = datetime.now(JST).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # DB의 created_at 컬럼은 UTC 기준이므로, JST 자정 시간을 UTC로 변환
+    today_utc_start = today_jst_start.astimezone(timezone.utc)
+    
+    # 오늘 자정 이후에 작성된 기록이 있는지 확인
+    response = await supabase.table('anonymous_messages').select('id', count='exact').eq('user_id', user_id).gte('created_at', today_utc_start.isoformat()).limit(1).execute()
+    
+    return response.count > 0 if response else False
