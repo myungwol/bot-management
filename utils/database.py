@@ -265,9 +265,11 @@ async def update_ticket_lock_status(thread_id: int, is_locked: bool):
 async def remove_multiple_tickets(thread_ids: List[int]):
     if not thread_ids: return
     await supabase.table('tickets').delete().in_('thread_id', thread_ids).execute()
+
+# [✅✅✅ 핵심 수정 ✅✅✅] 오류가 발생하던 부분을 수정합니다.
+# insert().select().execute()가 아닌, insert().execute() 후 반환된 데이터(response.data)를 사용합니다.
 @supabase_retry_handler()
 async def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: str, amount: int) -> Optional[dict]:
-    # [✅ 수정] insert().select().execute()가 아닌, insert().execute() 후 반환된 데이터(response.data)를 사용합니다.
     response = await supabase.table('warnings').insert({
         "guild_id": guild_id, 
         "user_id": user_id, 
@@ -276,7 +278,7 @@ async def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: st
         "amount": amount
     }).execute()
     return response.data[0] if response and response.data else None
-    return response.data[0] if response and response.data else None
+
 @supabase_retry_handler()
 async def get_total_warning_count(user_id: int, guild_id: int) -> int:
     response = await supabase.table('warnings').select('amount').eq('user_id', user_id).eq('guild_id', guild_id).execute()
@@ -284,12 +286,21 @@ async def get_total_warning_count(user_id: int, guild_id: int) -> int:
 @supabase_retry_handler()
 async def add_anonymous_message(guild_id: int, user_id: int, content: str):
     await supabase.table('anonymous_messages').insert({"guild_id": guild_id, "user_id": user_id, "message_content": content}).execute()
+
 @supabase_retry_handler()
 async def has_posted_anonymously_today(user_id: int) -> bool:
+    """JST 기준 오늘 날짜에 해당 유저가 익명 글을 작성했는지 확인합니다."""
+    # 일본 시간(JST) 기준 오늘 자정 시간 계산
     today_jst_start = datetime.now(JST).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # DB의 created_at 컬럼은 UTC 기준이므로, JST 자정 시간을 UTC로 변환
     today_utc_start = today_jst_start.astimezone(timezone.utc)
+    
+    # 오늘 자정 이후에 작성된 기록이 있는지 확인
     response = await supabase.table('anonymous_messages').select('id', count='exact').eq('user_id', user_id).gte('created_at', today_utc_start.isoformat()).limit(1).execute()
+    
     return response.count > 0 if response else False
+
 @supabase_retry_handler()
 async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime):
     await supabase.table('reminders').update({"is_active": False}).eq('guild_id', guild_id).eq('reminder_type', reminder_type).eq('is_active', True).execute()
@@ -332,20 +343,3 @@ async def get_user_abilities(user_id: int) -> List[str]:
         return abilities
     _user_abilities_cache[user_id] = ([], now)
     return []
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 18. [✅✅✅ 신규 추가] 익명 게시판 일일 작성 확인 함수
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-@supabase_retry_handler()
-async def has_posted_anonymously_today(user_id: int) -> bool:
-    """JST 기준 오늘 날짜에 해당 유저가 익명 글을 작성했는지 확인합니다."""
-    # 일본 시간(JST) 기준 오늘 자정 시간 계산
-    today_jst_start = datetime.now(JST).replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # DB의 created_at 컬럼은 UTC 기준이므로, JST 자정 시간을 UTC로 변환
-    today_utc_start = today_jst_start.astimezone(timezone.utc)
-    
-    # 오늘 자정 이후에 작성된 기록이 있는지 확인
-    response = await supabase.table('anonymous_messages').select('id', count='exact').eq('user_id', user_id).gte('created_at', today_utc_start.isoformat()).limit(1).execute()
-    
-    return response.count > 0 if response else False
