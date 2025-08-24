@@ -325,33 +325,37 @@ ADMIN_ROLE_KEYS = [
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 STATIC_AUTO_ROLE_PANELS = {
     # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 오류의 원인이었던 키 이름을 'default_role_panel'에서 'panel_roles'로 변경합니다.
-    # 또한, 각 설정에 panel_key를 명시적으로 추가하여 혼동을 방지합니다.
+    # 요청하신 대로 '알림'과 '게임' 카테고리만 남기고, '알림'이 먼저 오도록 순서를 변경했습니다.
     "panel_roles": {
         "panel_key": "panel_roles",
         "embed_key": "panel_roles",
         "categories": [
-            {"id": "games", "label": "🎮 ゲーム", "description": "プレイするゲームを選択してください。", "emoji": "🎮"},
             {"id": "notifications", "label": "🔔 通知", "description": "受け取りたい通知を選択してください。", "emoji": "🔔"},
-            {"id": "info", "label": "👤 情報", "description": "ご自身の情報を選択してください。", "emoji": "👤"},
+            {"id": "games", "label": "🎮 ゲーム", "description": "プレイするゲームを選択してください。", "emoji": "🎮"},
         ],
         "roles": {
-            "games": [
-                {"role_id_key": "role_game_minecraft", "label": "マインクラフト"},
-                {"role_id_key": "role_game_valorant", "label": "ヴァロラント"},
-                # ... (다른 게임 역할들) ...
-                {"role_id_key": "role_platform_switch", "label": "スイッチ"},
-            ],
             "notifications": [
                 {"role_id_key": "role_notify_voice", "label": "通話"},
                 {"role_id_key": "role_notify_friends", "label": "友達"},
-                # ... (다른 알림 역할들) ...
+                {"role_id_key": "role_notify_disboard", "label": "Disboard"},
+                {"role_id_key": "role_notify_up", "label": "Up"},
             ],
-            "info": [
-                {"role_id_key": "role_info_male", "label": "男性"},
-                {"role_id_key": "role_info_female", "label": "女性"},
-                # ... (다른 정보 역할들) ...
-            ]
+            "games": [
+                {"role_id_key": "role_game_minecraft", "label": "マインクラフト"},
+                {"role_id_key": "role_game_valorant", "label": "ヴァロラント"},
+                {"role_id_key": "role_game_overwatch", "label": "オーバーウォッチ"},
+                {"role_id_key": "role_game_lol", "label": "リーグ・オブ・レジェンド"},
+                {"role_id_key": "role_game_mahjong", "label": "麻雀"},
+                {"role_id_key": "role_game_amongus", "label": "アモングアス"},
+                {"role_id_key": "role_game_mh", "label": "モンスターハンター"},
+                {"role_id_key": "role_game_genshin", "label": "原神"},
+                {"role_id_key": "role_game_apex", "label": "エーペックスレジェンズ"},
+                {"role_id_key": "role_game_splatoon", "label": "スプラトゥーン"},
+                {"role_id_key": "role_game_gf", "label": "ゴッドフィールド"},
+                {"role_id_key": "role_platform_steam", "label": "スチーム"},
+                {"role_id_key": "role_platform_smartphone", "label": "スマートフォン"},
+                {"role_id_key": "role_platform_switch", "label": "スイッチ"},
+            ],
         }
     }
 }
