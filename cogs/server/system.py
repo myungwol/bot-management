@@ -265,13 +265,24 @@ class ServerSystem(commands.Cog):
             cog_to_reload = self.bot.get_cog(config["cog_name"])
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
                 await cog_to_reload.load_configs()
+            
+            # [✅✅✅ 핵심 수정 ✅✅✅]
+            # 설정하려는 패널이 '[게임]' 패널인지 확인합니다.
+            is_game_panel = "[게임]" in friendly_name
 
             if config.get("type") == "panel":
-                if hasattr(cog_to_reload, 'regenerate_panel'):
+                # [수정] 게임 패널일 경우, 직접 생성하지 않고 DB에 요청만 남깁니다.
+                if is_game_panel:
+                    timestamp = datetime.now(timezone.utc).timestamp()
+                    await save_config_to_db(f"panel_regenerate_request_{setting_key}", timestamp)
+                    await interaction.followup.send(
+                        f"✅ **{friendly_name}** 의 채널을 {channel.mention}(으)로 설정하고, 게임 봇에게 패널 생성을 요청했습니다.\n"
+                        "잠시 후 게임 봇이 해당 채널에 패널을 생성할 것입니다.",
+                        ephemeral=True
+                    )
+                # [수정] 게임 패널이 아닌 경우 (서버 관리 봇의 패널)에만 직접 생성합니다.
+                elif hasattr(cog_to_reload, 'regenerate_panel'):
                     success = False
-                    # [✅✅✅ 핵심 수정 ✅✅✅]
-                    # cog의 regenerate_panel 함수를 호출할 때, 설정 키(setting_key)를 명확하게 전달합니다.
-                    # 이로써 각 cog가 어떤 패널을 생성해야 하는지 정확히 알 수 있습니다.
                     if config["cog_name"] == "TicketSystem":
                         panel_type = setting_key.replace("panel_", "")
                         success = await cog_to_reload.regenerate_panel(channel, panel_type=panel_type)
@@ -321,6 +332,15 @@ class ServerSystem(commands.Cog):
                         if not all([cog_name, channel_db_key]):
                             failure_list.append(f"・`{friendly_name}`: 設定情報が不完全です。")
                             continue
+
+                        # [수정] 게임 패널은 요청만, 서버 패널은 직접 실행
+                        is_game_panel = "[게임]" in friendly_name
+                        if is_game_panel:
+                            timestamp = datetime.now(timezone.utc).timestamp()
+                            await save_config_to_db(f"panel_regenerate_request_{key}", timestamp)
+                            success_list.append(f"・`{friendly_name}`: ゲームボットに再設置を要請しました。")
+                            continue
+
                         cog = self.bot.get_cog(cog_name)
                         if not cog or not hasattr(cog, 'regenerate_panel'):
                             failure_list.append(f"・`{friendly_name}`: Cogが見つからないか、再生成機能がありません。")
@@ -345,7 +365,7 @@ class ServerSystem(commands.Cog):
                         failure_list.append(f"・`{friendly_name}`: スクリプトエラー発生。")
 
             embed = discord.Embed(title="⚙️ すべてのパネルの再設置結果", color=0x3498DB, timestamp=discord.utils.utcnow())
-            if success_list: embed.add_field(name="✅ 成功", value="\n".join(success_list), inline=False)
+            if success_list: embed.add_field(name="✅ 成功/要請", value="\n".join(success_list), inline=False)
             if failure_list:
                 embed.color = 0xED4245
                 embed.add_field(name="❌ 失敗", value="\n".join(failure_list), inline=False)
