@@ -55,9 +55,7 @@ class MyBot(commands.Bot):
         cogs_with_persistent_views = [
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "LevelSystem", "ItemSystem", "AnonymousBoard", 
-            "WarningSystem", "VoiceMaster", "UserProfile", "Fishing", "Commerce", "Atm",
-            "DiceGame", "SlotMachine", "RPSGame",
-            "DailyCheck", "Quests", "Farm"
+            "WarningSystem", "VoiceMaster"
         ]
         registered_views_count = 0
         for cog_name in cogs_with_persistent_views:
