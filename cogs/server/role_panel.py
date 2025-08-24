@@ -11,9 +11,6 @@ from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_d
 
 logger = logging.getLogger(__name__)
 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 역할 선택 드롭다운 UI (사용자에게 임시로 보여짐)
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 class RoleSelectDropdown(ui.Select):
     def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
         current_user_role_ids: Set[int] = {r.id for r in member.roles}
@@ -74,9 +71,6 @@ class RoleSelectDropdown(ui.Select):
             logger.error(f"役割パネルの更新中に予期せぬエラーが発生しました: {e}", exc_info=True)
             await interaction.followup.send("❌ 処理中にエラーが発生しました。しばらくしてからもう一度お試しください。", ephemeral=True)
 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 역할 카테고리 선택 View (채널에 항상 떠 있는 영구 View)
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 class PersistentCategorySelectView(ui.View):
     def __init__(self, panel_config: Dict[str, Any]):
         super().__init__(timeout=None)
@@ -109,7 +103,6 @@ class PersistentCategorySelectView(ui.View):
             await interaction.followup.send("❌ 役職パネルの設定が正しくありません。管理者に問い合わせてください。", ephemeral=True)
             return
 
-        # [✅ 수정] 여러 패널이 있을 수 있으므로, 현재 View의 설정과 일치하는 설정을 찾습니다.
         panel_key = self.panel_config.get("panel_key")
         panel_config = panel_configs.get(panel_key)
 
@@ -155,13 +148,16 @@ class RolePanel(commands.Cog):
             logger.warning("⚠️ 역할 패널 설정이 없어 영구 View를 등록할 수 없습니다。")
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_roles") -> bool:
+        # [✅ 수정] cog_load 대신 실시간으로 설정을 다시 불러와서 최신 상태를 유지합니다.
+        await self.load_configs()
         if not self.panel_configs:
             logger.error("❌ 역할 패널을 생성할 수 없습니다: DB에 설정 정보가 없습니다。")
             return False
         
         panel_config = self.panel_configs.get(panel_key)
         if not panel_config:
-            logger.error(f"❌ 역할 패널 설정에서 '{panel_key}'에 대한 구성을 찾을 수 없습니다.")
+            # [✅ 수정] 오류 메시지를 더 명확하게 변경합니다.
+            logger.error(f"❌ 역할 패널 설정(STATIC_AUTO_ROLE_PANELS)에서 '{panel_key}' 키를 찾을 수 없습니다. ui_defaults.py를 확인해주세요.")
             return False
 
         base_panel_key = panel_key.replace("panel_", "")
