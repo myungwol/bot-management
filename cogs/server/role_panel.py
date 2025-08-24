@@ -109,7 +109,14 @@ class PersistentCategorySelectView(ui.View):
             await interaction.followup.send("❌ 役職パネルの設定が正しくありません。管理者に問い合わせてください。", ephemeral=True)
             return
 
-        panel_config = next(iter(panel_configs.values()))
+        # [수정] 여러 패널이 있을 수 있으므로, 현재 View의 설정과 일치하는 설정을 찾습니다.
+        panel_key = self.panel_config.get("panel_key")
+        panel_config = panel_configs.get(panel_key)
+
+        if not panel_config:
+             await interaction.followup.send("❌ 役職パネルの設定が見つかりませんでした。", ephemeral=True)
+             return
+
         selected_category_id = interaction.data["values"][0]
         category_info = next((c for c in panel_config.get("categories", []) if c.get('id') == selected_category_id), None)
         if not category_info:
@@ -150,34 +157,45 @@ class RolePanel(commands.Cog):
         else:
             logger.warning("⚠️ 역할 패널 설정이 없어 영구 View를 등록할 수 없습니다。")
 
-    async def regenerate_panel(self, channel: discord.TextChannel) -> bool:
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # 함수가 panel_key를 인자로 받도록 변경하고, 내부 로직을 수정합니다.
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_roles") -> bool:
         if not self.panel_configs:
             logger.error("❌ 역할 패널을 생성할 수 없습니다: DB에 설정 정보가 없습니다。")
             return False
         
-        panel_config = next(iter(self.panel_configs.values()), None)
-        if not panel_config: return False
+        # 전달받은 panel_key를 사용하여 정확한 설정을 찾습니다.
+        panel_config = self.panel_configs.get(panel_key)
+        if not panel_config:
+            logger.error(f"❌ 역할 패널 설정에서 '{panel_key}'에 대한 구성을 찾을 수 없습니다.")
+            return False
 
-        panel_key = panel_config.get("panel_key", "default_role_panel")
+        # DB에서 패널 ID를 찾을 때도 base key를 사용합니다 (예: "panel_roles" -> "roles")
+        base_panel_key = panel_key.replace("panel_", "")
         
         try:
-            panel_info = get_panel_id(panel_key)
+            panel_info = get_panel_id(base_panel_key)
             if panel_info and (old_message_id := panel_info.get('message_id')):
                 try:
                     old_message = await channel.fetch_message(old_message_id)
                     await old_message.delete()
                 except (discord.NotFound, discord.Forbidden): pass
             
-            embed_data = await get_embed_from_db(panel_config.get('embed_key'))
+            embed_key = panel_config.get('embed_key')
+            if not embed_key:
+                logger.error(f"❌ '{panel_key}' 설정에 'embed_key'가 지정되지 않았습니다.")
+                return False
+
+            embed_data = await get_embed_from_db(embed_key)
             if not embed_data:
-                logger.error(f"❌ '{panel_config.get('embed_key')}' 임베드 데이터를 찾을 수 없어 패널 생성을 중단합니다。")
+                logger.error(f"❌ '{embed_key}' 임베드 데이터를 찾을 수 없어 패널 생성을 중단합니다。")
                 return False
             
             embed = discord.Embed.from_dict(embed_data)
             view = PersistentCategorySelectView(panel_config)
             new_message = await channel.send(embed=embed, view=view)
             
-            await save_panel_id(panel_key, new_message.id, channel.id)
+            await save_panel_id(base_panel_key, new_message.id, channel.id)
             logger.info(f"✅ '{panel_key}' 패널을 #{channel.name} 채널에 성공적으로 새로 생성했습니다。")
             return True
         except Exception as e:
