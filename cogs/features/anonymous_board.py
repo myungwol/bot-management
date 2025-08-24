@@ -5,7 +5,7 @@ from discord.ext import commands
 import logging
 import asyncio
 from datetime import datetime, timezone
-from typing import Optional # <--- 이 줄이 추가되었습니다.
+from typing import Optional
 
 from utils.database import get_id, get_cooldown, set_cooldown, add_anonymous_message, get_embed_from_db, get_panel_id, save_panel_id, get_panel_components_from_db
 from utils.helpers import format_embed_from_db
@@ -42,11 +42,8 @@ class AnonymousModal(ui.Modal, title="匿名メッセージ作成"):
             
             # 3. 쿨다운 설정
             await set_cooldown(str(interaction.user.id), "anonymous_post")
-
-            # 4. 패널 재생성
-            await self.cog.regenerate_panel()
             
-            # 5. 사용자에게 성공 메시지 전송 (5초 후 삭제)
+            # 4. 사용자에게 성공 메시지 전송 (5초 후 삭제)
             message = await interaction.followup.send("✅ あなたの匿名の声が届けられました。", ephemeral=True, wait=True)
             await asyncio.sleep(5)
             await message.delete()
@@ -82,10 +79,9 @@ class AnonymousPanelView(ui.View):
         utc_now = datetime.now(timezone.utc).timestamp()
 
         if last_time and utc_now - last_time < cooldown_seconds:
-            rem = cooldown_seconds - (utc_now - last_time)
-            h, r = divmod(int(rem), 3600)
-            m, s = divmod(r, 60)
-            await interaction.response.send_message(f"❌ 次の投稿まであと {h}時間{m}分{s}秒 お待ちください。", ephemeral=True)
+            # [✅✅✅ 핵심 수정 ✅✅✅]
+            can_use_time = int(last_time + cooldown_seconds)
+            await interaction.response.send_message(f"❌ 次の投稿は <t:{can_use_time}:R> に可能になります。", ephemeral=True)
             return
             
         await interaction.response.send_modal(AnonymousModal(self.cog))
