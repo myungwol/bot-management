@@ -11,6 +11,27 @@ from .database import get_config
 
 logger = logging.getLogger(__name__)
 
+# [✅✅✅ 핵심 추가 ✅✅✅]
+# 초를 "X시간 Y분 Z초" 형식으로 변환하는 함수
+def format_seconds_to_hms(seconds: float) -> str:
+    """초를 시, 분, 초 형식의 문자열로 변환합니다."""
+    if seconds <= 0:
+        return "0秒"
+    
+    seconds = int(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}時間")
+    if minutes > 0:
+        parts.append(f"{minutes}分")
+    if secs > 0 or not parts: # 남은 시간이 0초이거나, 전체가 1분 미만일 때 초를 표시
+        parts.append(f"{secs}秒")
+        
+    return ' '.join(parts)
 
 def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.Embed:
     if not isinstance(embed_data, dict):
