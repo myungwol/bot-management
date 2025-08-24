@@ -296,7 +296,8 @@ SETUP_COMMAND_MAP = {
     "log_market": {"type": "channel", "cog_name": "EconomyCore", "key": "market_log_channel_id", "friendly_name": "[로그] 시장 시세 변동", "channel_type": "text"},
     "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "[로그] 코인 활동", "channel_type": "text"},
     "log_job_advancement":     {"type": "channel", "cog_name": "LevelSystem", "key": "job_log_channel_id",         "friendly_name": "[로그] 전직 기록", "channel_type": "text"},
-    
+    "log_fishing": {"type": "channel", "cog_name": "Fishing", "key": "fishing_log_channel_id", "friendly_name": "[로그] 낚시 성공 기록", "channel_type": "text"},
+
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
     "channel_weather": {"type": "channel", "cog_name": "WorldSystem", "key": "weather_channel_id", "friendly_name": "[알림] 날씨 예보 채널", "channel_type": "text"},
