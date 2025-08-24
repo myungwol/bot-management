@@ -7,7 +7,6 @@ import copy
 import logging
 from typing import Any, Dict
 import re
-# [수정] database.py의 get_config 함수를 불러오기 위한 import문 추가
 from .database import get_config
 
 logger = logging.getLogger(__name__)
@@ -60,7 +59,7 @@ def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.E
                 if isinstance(field, dict):
                     if field.get('name') and isinstance(field['name'], str):
                         field['name'] = field['name'].format_map(safe_kwargs)
-                    if field.get('value') and isinstance(field.get('value'), str):
+                    if field.get('value') and isinstance(field['value'], str):
                         field['value'] = field['value'].format_map(safe_kwargs)
                         
         return discord.Embed.from_dict(formatted_data)
@@ -97,7 +96,6 @@ def get_clean_display_name(member: discord.Member) -> str:
             return re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", display_name).strip()
     return display_name
 
-# --- [✅ 신규 추가] ---
 def calculate_xp_for_level(level: int) -> int:
     """
     특정 레벨에 도달하기 위해 필요한 *총* 경험치를 계산합니다.
