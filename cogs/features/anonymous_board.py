@@ -33,10 +33,8 @@ class AnonymousModal(ui.Modal, title="匿名メッセージ作成"):
         await interaction.response.defer(ephemeral=True)
 
         try:
-            # 1. DB에 메시지 기록
             await add_anonymous_message(interaction.guild_id, interaction.user.id, self.content.value)
 
-            # 2. 공개 채널에 전송할 익명 임베드 준비
             embed_data = await get_embed_from_db("anonymous_message")
             anonymous_embed = None
             if embed_data:
@@ -44,10 +42,8 @@ class AnonymousModal(ui.Modal, title="匿名メッセージ作成"):
                 anonymous_embed.description = self.content.value
                 anonymous_embed.timestamp = datetime.now(timezone.utc)
             
-            # 3. 패널 재생성 함수를 호출하여 로그와 패널을 함께 보냅니다.
             await self.cog.regenerate_panel(interaction.channel, last_anonymous_embed=anonymous_embed)
             
-            # 4. 사용자에게 성공 메시지 전송 (5초 후 삭제)
             message = await interaction.followup.send("✅ あなたの匿名の声が届けられました。", ephemeral=True, wait=True)
             await asyncio.sleep(5)
             await message.delete()
@@ -111,8 +107,6 @@ class AnonymousBoard(commands.Cog):
             return self.bot.get_channel(self.panel_channel_id)
         return None
         
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 패널 재생성 로직을 변경하여 로그와 패널이 거의 동시에 나타나도록 합니다.
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None, panel_key: str = "panel_anonymous_board", last_anonymous_embed: Optional[discord.Embed] = None) -> bool:
         target_channel = channel or self.panel_channel
         if not target_channel:
@@ -122,7 +116,6 @@ class AnonymousBoard(commands.Cog):
         embed_key = panel_key
 
         try:
-            # 1. 이전 패널 메시지를 먼저 삭제합니다.
             panel_info = get_panel_id(base_panel_key)
             if panel_info and (old_id := panel_info.get('message_id')):
                 try:
@@ -130,7 +123,6 @@ class AnonymousBoard(commands.Cog):
                     await old_message.delete()
                 except (discord.NotFound, discord.Forbidden): pass
             
-            # 2. 새로운 패널 임베드와 View를 준비합니다.
             embed_data = await get_embed_from_db(embed_key)
             if not embed_data:
                 logger.error(f"DB에서 '{embed_key}' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
@@ -141,8 +133,6 @@ class AnonymousBoard(commands.Cog):
                 await self.register_persistent_views()
             await self.view_instance.setup_buttons()
 
-            # 3. 새로운 로그 메시지(익명 글)와 새로운 패널을 거의 동시에 보냅니다.
-            #    asyncio.gather를 사용하여 두 작업을 병렬로 실행 요청합니다.
             tasks = []
             if last_anonymous_embed:
                 tasks.append(target_channel.send(embed=last_anonymous_embed))
@@ -150,12 +140,12 @@ class AnonymousBoard(commands.Cog):
             tasks.append(target_channel.send(embed=embed, view=self.view_instance))
             
             results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # 4. 패널 메시지의 ID를 DB에 저장합니다.
-            #    gather의 결과에서 패널 메시지를 찾아 ID를 저장합니다.
+            
             new_panel_message = None
             for result in results:
-                if isinstance(result, discord.Message) and result.view is not None:
+                # [✅✅✅ 핵심 수정 ✅✅✅]
+                # .view 대신 .components가 있는지 확인하여 패널 메시지를 찾습니다.
+                if isinstance(result, discord.Message) and result.components:
                     new_panel_message = result
                     break
             
