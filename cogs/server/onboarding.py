@@ -60,7 +60,6 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
-# [개선] 자기소개서 작성 전 성별/나이를 먼저 선택하는 View
 class GenderAgeSelectView(ui.View):
     def __init__(self, cog: 'Onboarding'):
         super().__init__(timeout=300)
@@ -196,11 +195,13 @@ class ApprovalView(ui.View):
             for item in self.children: item.disabled = True
             try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
             except (discord.NotFound, discord.HTTPException): pass
-
+            
+            # [✅ 수정] 처리하는 관리자(moderator) 정보를 _process_approval 함수로 넘겨줍니다.
+            moderator = interaction.user
             if is_approved:
-                success, results = await self._process_approval(member)
+                success, results = await self._process_approval(moderator, member)
             else:
-                success, results = await self._process_rejection(interaction.user, member, rejection_reason)
+                success, results = await self._process_rejection(moderator, member, rejection_reason)
 
             status_text = "承認" if is_approved else "拒否"
             if success:
@@ -215,16 +216,18 @@ class ApprovalView(ui.View):
         if self.author_id in self.onboarding_cog._user_locks:
             del self.onboarding_cog._user_locks[self.author_id]
 
-    async def _process_approval(self, member: discord.Member) -> (bool, List[str]):
+    # [✅ 수정] moderator 인자를 받도록 수정
+    async def _process_approval(self, moderator: discord.Member, member: discord.Member) -> (bool, List[str]):
         role_grant_error = await self._grant_roles(member)
         
         if role_grant_error:
             logger.error(f"자기소개 승인 실패: 역할 부여 중 오류 발생 - {role_grant_error}")
             return False, [role_grant_error]
         
+        # [✅ 수정] moderator 정보를 다음 함수들로 전달
         remaining_tasks = [
             self._update_nickname(member),
-            self._send_public_welcome(member),
+            self._send_public_welcome(moderator, member),
             self._send_main_chat_welcome(member),
             self._send_dm_notification(member, is_approved=True)
         ]
@@ -303,14 +306,22 @@ class ApprovalView(ui.View):
             logger.error(f"닉네임 업데이트 중 오류: {e}", exc_info=True); return f"닉네임 업데이트 중 알 수 없는 오류 발생。"
         return None
     
-    async def _send_public_welcome(self, member: discord.Member) -> Optional[str]:
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # moderator 인자를 받아서 embed에 "担当者" 필드를 추가합니다.
+    async def _send_public_welcome(self, moderator: discord.Member, member: discord.Member) -> Optional[str]:
         try:
             ch_id = self.onboarding_cog.introduction_channel_id
             if ch_id and (ch := member.guild.get_channel(ch_id)):
                 embed = discord.Embed(title="📝 自己紹介", color=discord.Color.green())
                 embed.add_field(name="住民", value=member.mention, inline=False)
-                for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
-                if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
+                for field in self.original_embed.fields: 
+                    embed.add_field(name=field.name, value=field.value, inline=False)
+                
+                # 담당자 필드를 다시 추가합니다.
+                embed.add_field(name="担当者", value=moderator.mention, inline=False)
+                
+                if member.display_avatar: 
+                    embed.set_thumbnail(url=member.display_avatar.url)
                 await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
             logger.error(f"공개 환영 메시지 전송 실패: {e}", exc_info=True); return "자기소개 채널에 메시지 전송 실패。"
@@ -339,10 +350,10 @@ class ApprovalView(ui.View):
                 embed_data = await get_embed_from_db("dm_onboarding_rejected")
                 if not embed_data: return
                 embed = format_embed_from_db(embed_data, guild_name=guild_name)
-                embed.add_field(name="理由 (理由)", value=reason, inline=False)
+                embed.add_field(name="理由", value=reason, inline=False)
                 panel_channel_id = self.onboarding_cog.panel_channel_id
                 if panel_channel_id:
-                    embed.add_field(name="再申請 (再申請)", value=f"<#{panel_channel_id}> からやり直してください。", inline=False)
+                    embed.add_field(name="再申請", value=f"<#{panel_channel_id}> からやり直してください。", inline=False)
             await member.send(embed=embed)
         except discord.Forbidden: logger.warning(f"{member.display_name}님에게 DM을 보낼 수 없습니다 (DM 차단됨)。")
         except Exception as e: logger.error(f"DM 알림 전송 실패: {e}", exc_info=True)
@@ -362,6 +373,7 @@ class ApprovalView(ui.View):
             logger.error(f"거부 로그 전송 실패: {e}", exc_info=True); return "거부 로그 채널에 메시지 전송 실패。"
         return None
 
+# ... (OnboardingGuideView, OnboardingPanelView, Onboarding Cog의 나머지 부분은 변경 없이 그대로 유지) ...
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
@@ -416,16 +428,13 @@ class OnboardingGuideView(ui.View):
         content = self._prepare_next_step_message_content()
         if self.message: await self.message.edit(**content)
 
-    # [개선] 자기소개서 생성 로직 변경
     async def create_introduction(self, interaction: discord.Interaction):
-        # Modal을 바로 여는 대신, 새로 만든 GenderAgeSelectView를 전송합니다.
         view = GenderAgeSelectView(self.onboarding_cog)
         await interaction.response.send_message(
             "まず、あなたの性別と生まれた年を選択してください。",
             view=view,
             ephemeral=True
         )
-        # 가이드 메시지는 역할을 다했으므로 삭제
         if self.message:
             try: await self.message.delete()
             except (discord.NotFound, discord.HTTPException): pass
@@ -462,10 +471,8 @@ class OnboardingPanelView(ui.View):
         utc_now = datetime.now(timezone.utc).timestamp()
         last_time = await get_cooldown(user_id_str, cooldown_key)
         if last_time > 0 and (utc_now - last_time) < cooldown_seconds:
-            remaining_time = cooldown_seconds - (utc_now - last_time)
-            minutes = int(remaining_time // 60)
-            seconds = int(remaining_time % 60)
-            await interaction.response.send_message(f"次の案内まであと{minutes}分{seconds}秒です。少々お待ちください。", ephemeral=True)
+            can_use_time = int(last_time + cooldown_seconds)
+            await interaction.response.send_message(f"❌ 次の案内は <t:{can_use_time}:R> に閲覧可能になります。少々お待ちください。", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         await set_cooldown(user_id_str, cooldown_key)
