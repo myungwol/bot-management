@@ -60,6 +60,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
 
+# [개선] 자기소개서 작성 전 성별/나이를 먼저 선택하는 View
 class GenderAgeSelectView(ui.View):
     def __init__(self, cog: 'Onboarding'):
         super().__init__(timeout=300)
@@ -152,7 +153,6 @@ class ApprovalView(ui.View):
         self.onboarding_cog = cog_instance
         self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
     
-    # [✅✅✅ 핵심 수정] 누락되었던 버튼들을 다시 추가합니다.
     @ui.button(label="承認", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     
@@ -247,7 +247,6 @@ class ApprovalView(ui.View):
         try:
             guild = member.guild; roles_to_add: List[discord.Role] = []; failed_to_find_roles: List[str] = []
             
-            # [✅ 수정] 부여할 역할 목록에 구분선 역할 추가
             role_keys_to_grant = [
                 "role_resident", 
                 "role_resident_rookie", 
@@ -417,7 +416,7 @@ class OnboardingGuideView(ui.View):
         content = self._prepare_next_step_message_content()
         if self.message: await self.message.edit(**content)
 
-    # [✅✅✅ 핵심 수정] 자기소개서 생성 로직 변경
+    # [개선] 자기소개서 생성 로직 변경
     async def create_introduction(self, interaction: discord.Interaction):
         # Modal을 바로 여는 대신, 새로 만든 GenderAgeSelectView를 전송합니다.
         view = GenderAgeSelectView(self.onboarding_cog)
@@ -432,7 +431,6 @@ class OnboardingGuideView(ui.View):
             except (discord.NotFound, discord.HTTPException): pass
         self.stop()
 
-# ... (이하 OnboardingPanelView와 Onboarding Cog는 이전과 동일) ...
 class OnboardingPanelView(ui.View):
     def __init__(self, cog_instance: 'Onboarding'):
         super().__init__(timeout=None)
