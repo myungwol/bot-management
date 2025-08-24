@@ -8,7 +8,7 @@
 # 1. 역할 키 맵 (Role Key Map)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_ROLE_KEY_MAP = {
-    # --- [✅✅✅ 핵심 수정] 요청하신 접두사 역할 및 우선순위 ---
+    # --- [핵심] 접두사 역할 및 우선순위 ---
     "role_admin_total":         {"name": "森の妖精", "is_prefix": True, "priority": 100},
     "role_staff_village_chief": {"name": "村長", "is_prefix": True, "priority": 90},
     "role_staff_deputy_chief":  {"name": "副村長", "is_prefix": True, "priority": 85},
@@ -23,16 +23,16 @@ UI_ROLE_KEY_MAP = {
     "role_guest":               {"name": "旅の人", "is_prefix": True, "priority": 5},
 
     # --- 그 외 접두사가 아닌 역할들 ---
-    "role_staff_police":        {"name": "交番さん", "is_prefix": False, "priority": 0}, # 접두사 아님
-    "role_staff_festival":      {"name": "お祭り係", "is_prefix": False, "priority": 0}, # 접두사 아님
-    "role_staff_pr":            {"name": "ビラ配りさん", "is_prefix": False, "priority": 0}, # 접두사 아님
-    "role_staff_design":        {"name": "村の絵描きさん", "is_prefix": False, "priority": 0}, # 접두사 아님
-    "role_staff_secretary":     {"name": "書記", "is_prefix": False, "priority": 0}, # 접두사 아님
-    "role_staff_newbie_helper": {"name": "お世話係", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_staff_police":        {"name": "交番さん", "is_prefix": False, "priority": 0},
+    "role_staff_festival":      {"name": "お祭り係", "is_prefix": False, "priority": 0},
+    "role_staff_pr":            {"name": "ビラ配りさん", "is_prefix": False, "priority": 0},
+    "role_staff_design":        {"name": "村の絵描きさん", "is_prefix": False, "priority": 0},
+    "role_staff_secretary":     {"name": "書記", "is_prefix": False, "priority": 0},
+    "role_staff_newbie_helper": {"name": "お世話係", "is_prefix": False, "priority": 0},
     
-    "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": False, "priority": 0}, # 접두사 아님
-    "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": False, "priority": 0}, # 접두사 아님
-    "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": False, "priority": 0}, # 접두사 아님
+    "role_resident_veteran":    {"name": "ベテラン住民", "is_prefix": False, "priority": 0},
+    "role_resident_regular":    {"name": "おなじみ住民", "is_prefix": False, "priority": 0},
+    "role_resident_rookie":     {"name": "かけだし住民", "is_prefix": False, "priority": 0},
 
     # --- 온보딩/역할 패널 구분선 역할 ---
     "role_onboarding_step_1":   {"name": "════════════ゲーム══════════", "is_prefix": False, "priority": 0},
@@ -85,7 +85,7 @@ UI_ROLE_KEY_MAP = {
     "role_warning_level_4":     {"name": "警告4個", "is_prefix": False, "priority": 0},
 }
 
-# [✅✅✅ 핵심 수정] 온보딩 드롭다운 선택지를 10년 단위로 그룹화
+# [개선] 온보딩 드롭다운 선택지를 10년 단위로 그룹화
 ONBOARDING_CHOICES = {
     "gender": [
         {"label": "男性", "value": "男性"},
@@ -115,7 +115,7 @@ ONBOARDING_CHOICES = {
 # 2. 임베드(Embed) 기본값
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_EMBEDS = {
-    # --- [✅✅✅ 핵심 수정] 새로운 온보딩 안내 임베드 추가 ---
+    # --- [개선] 새로운 온보딩 안내 임베드 추가 ---
     "onboarding_guide_server": {
         "title": "① Dico森へようこそ！",
         "description": "ここは、ゲームをしたり、雑談をしたり、自由に過ごせる場所です。\nみんなが快適に過ごせるように、いくつかの案内とルールがあります。\n\n下の「次へ」ボタンを押して、案内を読み進めてください。",
@@ -172,7 +172,7 @@ UI_EMBEDS = {
     "dm_onboarding_rejected": {"title": "❌ 住民登録拒否のお知らせ", "description": "申し訳ありませんが、「{guild_name}」での住民登録は拒否されました。", "color": 15548997},
     "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。\n\n**※すべてのメッセージはサーバー管理者が記録・確認しており、問題発生時には投稿者を特定し対処します。**", "color": 4342323},    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     "panel_custom_embed": {"title": "📢 カスタムメッセージ送信パネル", "description": "下のボタンを押して、指定したチャンネルにBotから埋め込みメッセージを送信します。\n\n**この機能は特定の役職を持つスタッフのみ使用可能です。**", "color": 0x34495E},
-        # [✅ 신규 추가] 전직 로그 임베드
+    # [신규 추가] 전직 로그 임베드
     "log_job_advancement": {
         "title": "🎉 新たな転職者！",
         "description": "{user_mention}さんがついに新たな道を選択しました。",
@@ -246,7 +246,6 @@ SETUP_COMMAND_MAP = {
     "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "서버 안내 패널", "channel_type": "text"},
     "panel_nicknames":  {"type": "panel",   "cog_name": "Nicknames",    "key": "nickname_panel_channel_id",       "friendly_name": "닉네임 변경 패널", "channel_type": "text"},
     
-    # [✅ 레벨 시스템] 레벨 확인 패널 설정 추가
     "panel_level_check": {"type": "panel", "cog_name": "LevelSystem", "key": "level_check_panel_channel_id", "friendly_name": "[정보] 레벨 확인 패널", "channel_type": "text"},
     "channel_job_advancement": {"type": "channel", "cog_name": "LevelSystem", "key": "job_advancement_channel_id", "friendly_name": "[채널] 전직소", "channel_type": "text"},
 
@@ -429,7 +428,7 @@ GAME_CONFIG = {
     "JOB_ADVANCEMENT_LEVELS": [50, 100]
 }
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# [✅ 수정] 새로운 능력 정보로 전직 시스템 데이터 업데이트
+# 14. [신규 추가] 전직 시스템 데이터
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 JOB_ADVANCEMENT_DATA = {
     # --- 레벨 50 전직 정보 ---
