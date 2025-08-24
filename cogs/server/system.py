@@ -527,7 +527,7 @@ class ServerSystem(commands.Cog):
             await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{currency_icon}を削減しました。")
         else:
             await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
-
+            
     @admin_group.command(name="xp부여", description="[관리자 전용] 특정 유저에게 XP를 부여합니다.")
     @app_commands.describe(user="XP를 부여할 유저", amount="부여할 XP 양")
     @app_commands.check(is_admin)
@@ -561,6 +561,27 @@ class ServerSystem(commands.Cog):
         except Exception as e:
             logger.error(f"레벨 설정 요청 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ レベル設定の要請中にエラーが発生しました。")
+
+    # [✅✅✅ 신규 추가 ✅✅✅] 서버 ID를 설정하는 명령어를 추가합니다.
+    @admin_group.command(name="set_server_id", description="[초기설정] 이 서버의 ID를 봇의 핵심 설정으로 저장합니다.")
+    @app_commands.check(is_admin)
+    async def set_server_id(self, interaction: discord.Interaction):
+        """
+        이 명령어를 실행한 서버의 고유 ID를 데이터베이스에 'SERVER_ID' 키로 저장합니다.
+        게임 봇이 관리자 요청을 처리할 때 올바른 서버에서 유저를 찾기 위해 필수적인 설정입니다.
+        """
+        await interaction.response.defer(ephemeral=True)
+        server_id = interaction.guild.id
+        try:
+            await save_config_to_db("SERVER_ID", str(server_id))
+            logger.info(f"서버 ID가 {server_id}(으)로 성공적으로 설정되었습니다. (요청자: {interaction.user.name})")
+            await interaction.followup.send(
+                f"✅ 이 서버의 ID (`{server_id}`)를 봇의 핵심 설정으로 성공적으로 저장했습니다.\n"
+                "이제 게임 봇이 관리자 명령어를 정상적으로 처리할 수 있습니다."
+            )
+        except Exception as e:
+            logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
+            await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
             
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
