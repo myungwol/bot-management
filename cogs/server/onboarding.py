@@ -48,7 +48,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             embed.add_field(name="名前", value=self.name.value, inline=False)
             embed.add_field(name="生まれた年", value=self.birth_year, inline=False)
             embed.add_field(name="性別", value=self.gender, inline=False)
-            embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
+            embed.add_field(name="趣味", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
