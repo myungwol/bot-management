@@ -15,10 +15,11 @@ import discord
 from supabase import create_client, AsyncClient
 from postgrest.exceptions import APIError
 
+# [✅ 수정] STATIC_AUTO_ROLE_PANELS를 임포트합니다.
 from .ui_defaults import (
     UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, 
     SETUP_COMMAND_MAP, JOB_SYSTEM_CONFIG, AGE_ROLE_MAPPING, GAME_CONFIG,
-    ONBOARDING_CHOICES
+    ONBOARDING_CHOICES, STATIC_AUTO_ROLE_PANELS
 )
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,10 @@ async def sync_defaults_to_db():
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
             save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP),
+            # [✅✅✅ 핵심 수정 ✅✅✅]
+            # 누락되었던 역할 패널 설정을 DB에 동기화하는 코드를 추가합니다.
+            # 이 설정이 없으면 역할 패널 Cog가 어떤 역할을 표시해야 할지 알 수 없습니다.
+            save_config_to_db("STATIC_AUTO_ROLE_PANELS", STATIC_AUTO_ROLE_PANELS),
             save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG),
             save_config_to_db("AGE_ROLE_MAPPING", AGE_ROLE_MAPPING),
             save_config_to_db("GAME_CONFIG", GAME_CONFIG),
@@ -114,7 +119,7 @@ async def sync_defaults_to_db():
         if placeholder_records:
             await supabase.table('channel_configs').upsert(placeholder_records, on_conflict="channel_key", ignore_duplicates=True).execute()
 
-        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 게임/나이/온보딩 설정 동기화 완료.")
+        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 역할 패널/게임/나이/온보딩 설정 동기화 완료.")
 
     except Exception as e:
         logger.error(f"❌ 기본값 DB 동기화 중 치명적 오류 발생: {e}", exc_info=True)
@@ -265,9 +270,6 @@ async def update_ticket_lock_status(thread_id: int, is_locked: bool):
 async def remove_multiple_tickets(thread_ids: List[int]):
     if not thread_ids: return
     await supabase.table('tickets').delete().in_('thread_id', thread_ids).execute()
-
-# [✅✅✅ 핵심 수정 ✅✅✅] 오류가 발생하던 부분을 수정합니다.
-# insert().select().execute()가 아닌, insert().execute() 후 반환된 데이터(response.data)를 사용합니다.
 @supabase_retry_handler()
 async def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: str, amount: int) -> Optional[dict]:
     response = await supabase.table('warnings').insert({
@@ -278,7 +280,6 @@ async def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: st
         "amount": amount
     }).execute()
     return response.data[0] if response and response.data else None
-
 @supabase_retry_handler()
 async def get_total_warning_count(user_id: int, guild_id: int) -> int:
     response = await supabase.table('warnings').select('amount').eq('user_id', user_id).eq('guild_id', guild_id).execute()
@@ -286,21 +287,12 @@ async def get_total_warning_count(user_id: int, guild_id: int) -> int:
 @supabase_retry_handler()
 async def add_anonymous_message(guild_id: int, user_id: int, content: str):
     await supabase.table('anonymous_messages').insert({"guild_id": guild_id, "user_id": user_id, "message_content": content}).execute()
-
 @supabase_retry_handler()
 async def has_posted_anonymously_today(user_id: int) -> bool:
-    """JST 기준 오늘 날짜에 해당 유저가 익명 글을 작성했는지 확인합니다."""
-    # 일본 시간(JST) 기준 오늘 자정 시간 계산
     today_jst_start = datetime.now(JST).replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # DB의 created_at 컬럼은 UTC 기준이므로, JST 자정 시간을 UTC로 변환
     today_utc_start = today_jst_start.astimezone(timezone.utc)
-    
-    # 오늘 자정 이후에 작성된 기록이 있는지 확인
     response = await supabase.table('anonymous_messages').select('id', count='exact').eq('user_id', user_id).gte('created_at', today_utc_start.isoformat()).limit(1).execute()
-    
     return response.count > 0 if response else False
-
 @supabase_retry_handler()
 async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime):
     await supabase.table('reminders').update({"is_active": False}).eq('guild_id', guild_id).eq('reminder_type', reminder_type).eq('is_active', True).execute()
