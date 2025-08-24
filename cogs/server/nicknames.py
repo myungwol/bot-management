@@ -188,10 +188,9 @@ class NicknameChangerPanelView(ui.View):
             utc_now = datetime.now(timezone.utc).timestamp()
 
             if last_time and utc_now - last_time < cooldown_seconds:
-                rem = cooldown_seconds - (utc_now - last_time)
-                h, r = divmod(int(rem), 3600)
-                m, _ = divmod(r, 60)
-                return await i.response.send_message(f"次の申請まであと {h}時間{m}分 お待ちください。", ephemeral=True)
+                # [✅✅✅ 핵심 수정 ✅✅✅]
+                can_use_time = int(last_time + cooldown_seconds)
+                return await i.response.send_message(f"❌ 次の申請は <t:{can_use_time}:R> に可能になります。", ephemeral=True)
             
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
