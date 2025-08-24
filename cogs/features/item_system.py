@@ -46,6 +46,8 @@ class ItemSelectDropdown(ui.Select):
 
         if item_info['type'] == 'warning_deduction':
             success = await self.cog.use_warning_deduction_ticket(interaction, member, item_role, item_info)
+            # [✅✅✅ 핵심 수정 ✅✅✅]
+            # 아이템 사용에 성공했을 때, 패널을 다시 생성하도록 명시적으로 호출합니다.
             if success:
                 await self.cog.regenerate_panel(interaction.channel, panel_key="panel_item_usage")
         else:
@@ -89,6 +91,7 @@ class ItemUsagePanelView(ui.View):
         view.add_item(dropdown)
         await interaction.response.send_message("どのアイテムを使用しますか？", view=view, ephemeral=True)
 
+
 class ItemSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -115,7 +118,8 @@ class ItemSystem(commands.Cog):
         current_warnings = await get_total_warning_count(member.id, interaction.guild_id)
         if current_warnings <= 0:
             message = await interaction.followup.send(f"✅ 累積警告が0回なので、「{item_info['name']}」を使用する必要はありません。", ephemeral=True, wait=True)
-            await asyncio.sleep(5)
+            # [✅ 수정] 메시지 표시 시간을 3초로 단축
+            await asyncio.sleep(3)
             await message.delete()
             return False
             
@@ -135,7 +139,8 @@ class ItemSystem(commands.Cog):
             await self.send_log_message(member, item_info['name'], new_total)
             
             message = await interaction.followup.send(f"✅ アイテム「{item_info['name']}」を使用しました！ (累積警告: {current_warnings}回 → {new_total}回)", ephemeral=True, wait=True)
-            await asyncio.sleep(5)
+            # [✅✅✅ 핵심 수정 ✅✅✅] 메시지 표시 시간을 5초에서 3초로 단축
+            await asyncio.sleep(3)
             await message.delete()
             return True
             
@@ -161,14 +166,12 @@ class ItemSystem(commands.Cog):
         embed.timestamp = datetime.now(timezone.utc)
         await log_channel.send(embed=embed)
 
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 함수가 panel_key를 인자로 받도록 변경하고, 내부 로직을 수정합니다.
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_item_usage") -> bool:
-        base_panel_key = panel_key.replace("panel_", "") # e.g., "item_usage"
-        embed_key = panel_key # e.g., "panel_item_usage"
+        base_panel_key = panel_key.replace("panel_", "")
+        embed_key = panel_key
         
-        if not channel: 
-            logger.warning(f"아이템 사용 패널 채널(ID: {self.panel_channel_id})을 찾을 수 없어 재생성할 수 없습니다.")
+        if not channel:
+            logger.warning(f"아이템 사용 패널 채널을 찾을 수 없어 재생성할 수 없습니다.")
             return False
 
         try:
