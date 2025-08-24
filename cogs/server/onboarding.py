@@ -14,18 +14,20 @@ from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
     get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
-from utils.helpers import format_embed_from_db
+# [✅ 수정] 새로 만든 시간 포맷 함수를 임포트합니다.
+from utils.helpers import format_embed_from_db, format_seconds_to_hms
 
 logger = logging.getLogger(__name__)
 
 # --- UI 클래스 ---
+# ... (IntroductionModal, GenderAgeSelectView, ApprovalView 클래스는 이전과 동일하므로 생략) ...
 class RejectionReasonModal(ui.Modal, title="拒否理由入力"):
     reason = ui.TextInput(label="拒否理由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
 class IntroductionModal(ui.Modal, title="住人登録票"):
     name = ui.TextInput(label="名前", placeholder="里で使用する名前を記入してください", required=True, max_length=12)
-    hobby = ui.TextInput(label="趣味", placeholder="趣味を自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
+    hobby = ui.TextInput(label="趣味・好きなこと", placeholder="趣味や好きなことを自由に記入してください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経路", placeholder="例：Disboard、〇〇からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     
     def __init__(self, cog_instance: 'Onboarding', gender: str, birth_year: str):
@@ -48,7 +50,7 @@ class IntroductionModal(ui.Modal, title="住人登録票"):
             embed.add_field(name="名前", value=self.name.value, inline=False)
             embed.add_field(name="生まれた年", value=self.birth_year, inline=False)
             embed.add_field(name="性別", value=self.gender, inline=False)
-            embed.add_field(name="趣味", value=self.hobby.value, inline=False)
+            embed.add_field(name="趣味・好きなこと", value=self.hobby.value, inline=False)
             embed.add_field(name="参加経路", value=self.path.value, inline=False)
             
             view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
@@ -196,7 +198,6 @@ class ApprovalView(ui.View):
             try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}さんが処理中...", view=self)
             except (discord.NotFound, discord.HTTPException): pass
             
-            # [✅ 수정] 처리하는 관리자(moderator) 정보를 _process_approval 함수로 넘겨줍니다.
             moderator = interaction.user
             if is_approved:
                 success, results = await self._process_approval(moderator, member)
@@ -216,7 +217,6 @@ class ApprovalView(ui.View):
         if self.author_id in self.onboarding_cog._user_locks:
             del self.onboarding_cog._user_locks[self.author_id]
 
-    # [✅ 수정] moderator 인자를 받도록 수정
     async def _process_approval(self, moderator: discord.Member, member: discord.Member) -> (bool, List[str]):
         role_grant_error = await self._grant_roles(member)
         
@@ -224,7 +224,6 @@ class ApprovalView(ui.View):
             logger.error(f"자기소개 승인 실패: 역할 부여 중 오류 발생 - {role_grant_error}")
             return False, [role_grant_error]
         
-        # [✅ 수정] moderator 정보를 다음 함수들로 전달
         remaining_tasks = [
             self._update_nickname(member),
             self._send_public_welcome(moderator, member),
@@ -306,8 +305,6 @@ class ApprovalView(ui.View):
             logger.error(f"닉네임 업데이트 중 오류: {e}", exc_info=True); return f"닉네임 업데이트 중 알 수 없는 오류 발생。"
         return None
     
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # moderator 인자를 받아서 embed에 "担当者" 필드를 추가합니다.
     async def _send_public_welcome(self, moderator: discord.Member, member: discord.Member) -> Optional[str]:
         try:
             ch_id = self.onboarding_cog.introduction_channel_id
@@ -317,7 +314,6 @@ class ApprovalView(ui.View):
                 for field in self.original_embed.fields: 
                     embed.add_field(name=field.name, value=field.value, inline=False)
                 
-                # 담당자 필드를 다시 추가합니다.
                 embed.add_field(name="担当者", value=moderator.mention, inline=False)
                 
                 if member.display_avatar: 
@@ -467,12 +463,19 @@ class OnboardingPanelView(ui.View):
         except (ValueError, TypeError):
             cooldown_seconds = 300
             logger.warning("ONBOARDING_COOLDOWN_SECONDS 설정값이 숫자가 아니므로 기본값(300)을 사용합니다。")
+        
         utc_now = datetime.now(timezone.utc).timestamp()
         last_time = await get_cooldown(user_id_str, cooldown_key)
+        
         if last_time > 0 and (utc_now - last_time) < cooldown_seconds:
-            can_use_time = int(last_time + cooldown_seconds)
-            await interaction.response.send_message(f"❌ 次の案内は <t:{can_use_time}:R> に閲覧可能になります。少々お待ちください。", ephemeral=True)
+            # [✅✅✅ 핵심 수정 ✅✅✅]
+            # 남은 시간을 계산하고, 새로 만든 함수로 보기 좋게 포맷합니다.
+            time_remaining = cooldown_seconds - (utc_now - last_time)
+            formatted_time = format_seconds_to_hms(time_remaining)
+            message = f"❌ 次の案内は **{formatted_time}** 後に閲覧可能になります。少々お待ちください。"
+            await interaction.response.send_message(message, ephemeral=True)
             return
+            
         await interaction.response.defer(ephemeral=True, thinking=True)
         await set_cooldown(user_id_str, cooldown_key)
         try:
@@ -530,12 +533,12 @@ class Onboarding(commands.Cog):
         self.approval_role_id = get_id("role_approval")
         self.main_chat_channel_id = get_id("main_chat_channel_id")
     
-    async def regenerate_panel(self, channel: discord.TextChannel) -> bool:
-        panel_key = "onboarding"
-        embed_key = "panel_onboarding"
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_onboarding") -> bool:
+        base_panel_key = panel_key.replace("panel_", "")
+        embed_key = panel_key
 
         try:
-            panel_info = get_panel_id(panel_key)
+            panel_info = get_panel_id(base_panel_key)
             if panel_info and (old_id := panel_info.get('message_id')):
                 try: 
                     old_message = await channel.fetch_message(old_id)
@@ -553,7 +556,7 @@ class Onboarding(commands.Cog):
             
             await self.view_instance.setup_buttons()
             new_message = await channel.send(embed=embed, view=self.view_instance)
-            await save_panel_id(panel_key, new_message.id, channel.id)
+            await save_panel_id(base_panel_key, new_message.id, channel.id)
             logger.info(f"✅ {panel_key} 패널을 성공적으로 새로 생성했습니다。 (채널: #{channel.name})")
             return True
         except Exception as e:
