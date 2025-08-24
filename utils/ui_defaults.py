@@ -321,8 +321,6 @@ ADMIN_ROLE_KEYS = [
 ]
 
 STATIC_AUTO_ROLE_PANELS = {
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 오류의 원인이었던 키 이름을 'panel_roles'로 통일합니다.
     "panel_roles": {
         "panel_key": "panel_roles",
         "embed_key": "panel_roles",
