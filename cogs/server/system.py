@@ -135,8 +135,19 @@ class ServerSystem(commands.Cog):
             else:
                 await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
 
+    # [✅✅✅ 핵심 수정] 자동완성 목록에 모든 관리 명령어를 통합합니다.
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
+
+        # 기존 설정 액션들
+        core_actions = {
+            "status_show": "[現状] 設定ダッシュボード表示",
+            "server_id_set": "[重要] サーバーIDを設定"
+        }
+        for key, name in core_actions.items():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
+
         for key, info in SETUP_COMMAND_MAP.items():
             choice_name = f"{info.get('friendly_name', key)} 設定"
             if current.lower() in choice_name.lower():
@@ -150,7 +161,7 @@ class ServerSystem(commands.Cog):
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
 
-        panel_actions = {"panels_regenerate_all": "[패널] 모든 관리 패널 재설치"}
+        panel_actions = {"panels_regenerate_all": "[パネル] 全パネルを再設置"}
         for key, name in panel_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
@@ -165,22 +176,34 @@ class ServerSystem(commands.Cog):
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
 
-        role_actions = {"roles_sync": "[역할] 모든 역할 DB와 동기화"}
+        role_actions = {"roles_sync": "[役割] DBと全役割を同期"}
         for key, name in role_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
 
         stats_actions = {
-            "stats_set": "[통계] 통계 채널 설정/제거",
-            "stats_refresh": "[통계] 모든 통계 채널 새로고침",
-            "stats_list": "[통계] 설정된 통계 채널 목록 보기",
+            "stats_set": "[統計] 統計チャンネルを設定/削除",
+            "stats_refresh": "[統計] 全統計チャンネルを更新",
+            "stats_list": "[統計] 設定済みの統計チャンネル一覧",
         }
         for key, name in stats_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
         
+        # 유저 데이터 관리 액션 추가
+        user_data_actions = {
+            "coin_give": "[コイン] ユーザーにコインを付与",
+            "coin_take": "[コイン] ユーザーのコインを削減",
+            "xp_give": "[XP] ユーザーにXPを付与",
+            "level_set": "[レベル] ユーザーのレベルを設定",
+        }
+        for key, name in user_data_actions.items():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
+        
         return sorted(choices, key=lambda c: c.name)[:25]
 
+    # [✅✅✅ 핵심 수정] setup 명령어를 모든 관리 기능의 중심으로 통합합니다.
     @admin_group.command(
         name="setup",
         description="ボットのチャンネル、役割、統計など、すべての設定を管理します。"
@@ -189,6 +212,9 @@ class ServerSystem(commands.Cog):
         action="実行するタスクを選択してください。",
         channel="[チャンネル/統計] タスクに必要なチャンネルを選択してください。",
         role="[役割/統計] タスクに必要な役割を選択してください。",
+        user="[コイン/XP/レベル] 対象となるユーザーを選択してください。",
+        amount="[コイン/XP] 付与または削減する量を入力してください。",
+        level="[レベル] 設定するレベルを入力してください。",
         stat_type="[統計] 表示する統計の種類を選択してください。",
         template="[統計] チャンネル名の形式を指定します (例: 👤 ユーザー: {count}人)"
     )
@@ -206,12 +232,100 @@ class ServerSystem(commands.Cog):
                     action: str,
                     channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None,
                     role: Optional[discord.Role] = None,
+                    user: Optional[discord.Member] = None,
+                    amount: Optional[app_commands.Range[int, 1, None]] = None,
+                    level: Optional[app_commands.Range[int, 1, None]] = None,
                     stat_type: Optional[str] = None,
                     template: Optional[str] = None):
         
         await interaction.response.defer(ephemeral=True)
 
-        if action == "template_edit":
+        # --- [신규] status 명령어 로직 통합 ---
+        if action == "status_show":
+            embed = discord.Embed(title="⚙️ サーバー設定 現況ダッシュボード", color=0x3498DB)
+            embed.set_footer(text=f"最終確認: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
+
+            channel_lines = []
+            for key, info in sorted(SETUP_COMMAND_MAP.items(), key=lambda item: item[1]['friendly_name']):
+                channel_id = _channel_id_cache.get(info['key'])
+                status_emoji = "✅" if channel_id else "❌"
+                channel_mention = f"<#{channel_id}>" if channel_id else "未設定"
+                channel_lines.append(f"{status_emoji} **{info['friendly_name']}**: {channel_mention}")
+            
+            full_channel_text = "\n".join(channel_lines)
+            chunk_size = 1024
+            for i in range(0, len(full_channel_text), chunk_size):
+                chunk = full_channel_text[i:i+chunk_size]
+                field_name = "チャンネル設定" if i == 0 else "チャンネル設定 (続き)"
+                embed.add_field(name=f"**{field_name}**", value=chunk, inline=False)
+
+            role_lines = []
+            for key, info in sorted(UI_ROLE_KEY_MAP.items(), key=lambda item: item[1]['priority'], reverse=True):
+                if info.get('priority', 0) > 0:
+                    role_id = _channel_id_cache.get(key)
+                    status_emoji = "✅" if role_id else "❌"
+                    role_mention = f"<@&{role_id}>" if role_id else f"`{info['name']}` (未設定)"
+                    role_lines.append(f"{status_emoji} **{info['name']}**: {role_mention if role_id else '未設定'}")
+            
+            if role_lines:
+                embed.add_field(name="**主要な役割設定**", value="\n".join(role_lines)[:1024], inline=False)
+
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+        # --- [신규] set_server_id 명령어 로직 통합 ---
+        elif action == "server_id_set":
+            server_id = interaction.guild.id
+            try:
+                await save_config_to_db("SERVER_ID", str(server_id))
+                logger.info(f"서버 ID가 {server_id}(으)로 성공적으로 설정되었습니다. (요청자: {interaction.user.name})")
+                await interaction.followup.send(
+                    f"✅ このサーバーの ID (`{server_id}`) をボットのコア設定として正常に保存しました。\n"
+                    "これで、ゲームボットは管理者コマンドを正しく処理できます。"
+                )
+            except Exception as e:
+                logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
+                await interaction.followup.send("❌ サーバーIDをデータベースに保存中にエラーが発生しました。")
+
+        # --- [신규] 코인/XP/레벨 관리 명령어 로직 통합 ---
+        elif action in ["coin_give", "coin_take", "xp_give", "level_set"]:
+            if not user:
+                return await interaction.followup.send("❌ このアクションには `user` オプションが必要です。", ephemeral=True)
+            
+            if action == "coin_give":
+                if not amount: return await interaction.followup.send("❌ `amount` オプションが必要です。", ephemeral=True)
+                currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+                result = await update_wallet(user, amount)
+                if result:
+                    await self.log_coin_admin_action(interaction.user, user, amount, "付与")
+                    await interaction.followup.send(f"✅ {user.mention}さんへ `{amount:,}`{currency_icon}を付与しました。")
+                else:
+                    await interaction.followup.send("❌ コイン付与中にエラーが発生しました。")
+
+            elif action == "coin_take":
+                if not amount: return await interaction.followup.send("❌ `amount` オプションが必要です。", ephemeral=True)
+                currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+                result = await update_wallet(user, -amount)
+                if result:
+                    await self.log_coin_admin_action(interaction.user, user, -amount, "削減")
+                    await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{currency_icon}を削減しました。")
+                else:
+                    await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
+            
+            elif action == "xp_give":
+                if not amount: return await interaction.followup.send("❌ `amount` オプションが必要です。", ephemeral=True)
+                db_key = f"xp_admin_update_request_{user.id}"
+                payload = {"xp_to_add": amount, "timestamp": time.time()}
+                await save_config_to_db(db_key, payload)
+                await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여하도록 게임 봇에게 요청했습니다.")
+
+            elif action == "level_set":
+                if not level: return await interaction.followup.send("❌ `level` オプションが必要です。", ephemeral=True)
+                db_key = f"xp_admin_update_request_{user.id}"
+                payload = {"exact_level": level, "timestamp": time.time()}
+                await save_config_to_db(db_key, payload)
+                await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다。")
+
+        elif action == "template_edit":
             all_embeds = await get_all_embeds()
             if not all_embeds:
                 return await interaction.followup.send("❌ DBに編集可能な埋め込みテンプレートがありません。", ephemeral=True)
@@ -446,41 +560,7 @@ class ServerSystem(commands.Cog):
         else:
             await interaction.followup.send("❌ 不明なタスクです。リストから正しいタスクを選択してください。", ephemeral=True)
 
-    @admin_group.command(name="status", description="ボットの現在の設定状態を一覧で表示します。")
-    @app_commands.check(is_admin)
-    async def status(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-        embed = discord.Embed(title="⚙️ サーバー設定 現況ダッシュボード", color=0x3498DB)
-        embed.set_footer(text=f"最終確認: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
-
-        channel_lines = []
-        for key, info in sorted(SETUP_COMMAND_MAP.items(), key=lambda item: item[1]['friendly_name']):
-            channel_id = _channel_id_cache.get(info['key'])
-            status_emoji = "✅" if channel_id else "❌"
-            channel_mention = f"<#{channel_id}>" if channel_id else "未設定"
-            channel_lines.append(f"{status_emoji} **{info['friendly_name']}**: {channel_mention}")
-        
-        full_channel_text = "\n".join(channel_lines)
-        chunk_size = 1024
-        for i in range(0, len(full_channel_text), chunk_size):
-            chunk = full_channel_text[i:i+chunk_size]
-            field_name = "チャンネル設定" if i == 0 else "チャンネル設定 (続き)"
-            embed.add_field(name=f"**{field_name}**", value=chunk, inline=False)
-
-        role_lines = []
-        for key, info in sorted(UI_ROLE_KEY_MAP.items(), key=lambda item: item[1]['priority'], reverse=True):
-            if info.get('priority', 0) > 0:
-                role_id = _channel_id_cache.get(key)
-                status_emoji = "✅" if role_id else "❌"
-                role_mention = f"<@&{role_id}>" if role_id else f"`{info['name']}` (未設定)"
-                role_lines.append(f"{status_emoji} **{info['name']}**: {role_mention if role_id else '未設定'}")
-        
-        if role_lines:
-            embed.add_field(name="**主要な役割設定**", value="\n".join(role_lines)[:1024], inline=False)
-
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
+    # [✅ 수정] 코인 관리 로그 함수는 setup 명령어 내부에서 사용되므로 유지합니다.
     async def log_coin_admin_action(self, admin: discord.Member, target: discord.Member, amount: int, action: str):
         log_channel_id = get_id("coin_log_channel_id")
         if not log_channel_id or not (log_channel := self.bot.get_channel(log_channel_id)):
@@ -500,88 +580,5 @@ class ServerSystem(commands.Cog):
         except Exception as e:
             logger.error(f"管理者のコイン操作ログ送信に失敗しました: {e}", exc_info=True)
 
-    @admin_group.command(name="コイン付与", description="[管理者専用] 特定のユーザーにコインを付与します。")
-    @app_commands.describe(user="コインを付与するユーザー", amount="付与するコインの量")
-    @app_commands.check(is_admin)
-    async def give_coin(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
-        await interaction.response.defer(ephemeral=True)
-        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
-        
-        result = await update_wallet(user, amount)
-        if result:
-            await self.log_coin_admin_action(interaction.user, user, amount, "付与")
-            await interaction.followup.send(f"✅ {user.mention}さんへ `{amount:,}`{currency_icon}を付与しました。")
-        else:
-            await interaction.followup.send("❌ コイン付与中にエラーが発生しました。")
-    
-    @admin_group.command(name="コイン削減", description="[管理者専用] 特定のユーザーのコインを削減します。")
-    @app_commands.describe(user="コインを削減するユーザー", amount="削減するコインの量")
-    @app_commands.check(is_admin)
-    async def take_coin(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
-        await interaction.response.defer(ephemeral=True)
-        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
-
-        result = await update_wallet(user, -amount)
-        if result:
-            await self.log_coin_admin_action(interaction.user, user, -amount, "削減")
-            await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{currency_icon}を削減しました。")
-        else:
-            await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
-            
-    @admin_group.command(name="xp부여", description="[관리자 전용] 특정 유저에게 XP를 부여합니다.")
-    @app_commands.describe(user="XP를 부여할 유저", amount="부여할 XP 양")
-    @app_commands.check(is_admin)
-    async def give_xp(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
-        await interaction.response.defer(ephemeral=True)
-        try:
-            db_key = f"xp_admin_update_request_{user.id}"
-            payload = {
-                "xp_to_add": amount,
-                "timestamp": time.time()
-            }
-            await save_config_to_db(db_key, payload)
-            await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여하도록 게임 봇에게 요청했습니다.")
-        except Exception as e:
-            logger.error(f"XP 부여 요청 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ XP 부여 요청 중 오류가 발생했습니다.")
-
-    @admin_group.command(name="레벨설정", description="[관리자 전용] 특정 유저의 레벨을 강제로 설정합니다.")
-    @app_commands.describe(user="레벨을 설정할 유저", level="설정할 레벨")
-    @app_commands.check(is_admin)
-    async def set_level(self, interaction: discord.Interaction, user: discord.Member, level: app_commands.Range[int, 1, None]):
-        await interaction.response.defer(ephemeral=True)
-        try:
-            db_key = f"xp_admin_update_request_{user.id}"
-            payload = {
-                "exact_level": level,
-                "timestamp": time.time()
-            }
-            await save_config_to_db(db_key, payload)
-            await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다。")
-        except Exception as e:
-            logger.error(f"레벨 설정 요청 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ レベル設定の要請中にエラーが発生しました。")
-
-    # [✅✅✅ 신규 추가 ✅✅✅] 서버 ID를 설정하는 명령어를 추가합니다.
-    @admin_group.command(name="set_server_id", description="[초기설정] 이 서버의 ID를 봇의 핵심 설정으로 저장합니다.")
-    @app_commands.check(is_admin)
-    async def set_server_id(self, interaction: discord.Interaction):
-        """
-        이 명령어를 실행한 서버의 고유 ID를 데이터베이스에 'SERVER_ID' 키로 저장합니다.
-        게임 봇이 관리자 요청을 처리할 때 올바른 서버에서 유저를 찾기 위해 필수적인 설정입니다.
-        """
-        await interaction.response.defer(ephemeral=True)
-        server_id = interaction.guild.id
-        try:
-            await save_config_to_db("SERVER_ID", str(server_id))
-            logger.info(f"서버 ID가 {server_id}(으)로 성공적으로 설정되었습니다. (요청자: {interaction.user.name})")
-            await interaction.followup.send(
-                f"✅ 이 서버의 ID (`{server_id}`)를 봇의 핵심 설정으로 성공적으로 저장했습니다.\n"
-                "이제 게임 봇이 관리자 명령어를 정상적으로 처리할 수 있습니다."
-            )
-        except Exception as e:
-            logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
-            
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
