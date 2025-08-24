@@ -5,6 +5,7 @@ Supabase 데이터베이스와의 모든 상호작용을 관리하는 중앙 파
 import os
 import asyncio
 import logging
+import time
 from functools import wraps
 from datetime import datetime, timezone
 from typing import Dict, Callable, Any, List, Optional
@@ -38,6 +39,7 @@ except Exception as e:
 
 _bot_configs_cache: Dict[str, Any] = {}
 _channel_id_cache: Dict[str, int] = {}
+_user_abilities_cache: Dict[int, tuple[List[str], float]] = {} # [추가] 능력 정보 캐시
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 2. DB 오류 처리 데코레이터
@@ -66,6 +68,7 @@ def supabase_retry_handler(retries: int = 3, delay: int = 2):
             
             logger.error(f"❌ '{func.__name__}' 함수가 모든 재시도({retries}번)에 실패했습니다. 마지막 오류: {last_exception}", exc_info=True)
             
+            # [개선] 실패 시 반환 타입을 보고 적절한 기본값 반환
             return_type = func.__annotations__.get("return")
             if return_type:
                 type_str = str(return_type).lower()
@@ -91,7 +94,7 @@ async def sync_defaults_to_db():
         )
         await save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy)
         
-        # [✅ 수정] ONBOARDING_CHOICES 설정을 DB에 저장하는 로직을 추가합니다.
+        # [개선] ONBOARDING_CHOICES 설정을 DB에 저장하는 로직을 추가합니다.
         await asyncio.gather(
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
@@ -191,7 +194,6 @@ async def get_embed_from_db(embed_key: str) -> Optional[dict]:
     response = await supabase.table('embeds').select('embed_data').eq('embed_key', embed_key).limit(1).execute()
     return response.data[0]['embed_data'] if response and response.data else None
 
-# [✅✅✅ 신규 추가] 모든 임베드 템플릿을 가져오는 함수
 @supabase_retry_handler()
 async def get_all_embeds() -> List[Dict[str, Any]]:
     """데이터베이스에 저장된 모든 임베드 템플릿을 가져옵니다."""
@@ -295,7 +297,7 @@ async def update_wallet(user: discord.User, amount: int) -> Optional[dict]:
     return response.data[0] if response and response.data else None
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 16. [✅ 신규 추가] 재참여 유저 데이터 관련 함수
+# 16. 재참여 유저 데이터 관련 함수
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def backup_member_data(user_id: int, guild_id: int, role_ids: List[int], nickname: Optional[str]):
@@ -318,3 +320,27 @@ async def get_member_backup(user_id: int, guild_id: int) -> Optional[Dict[str, A
 async def delete_member_backup(user_id: int, guild_id: int):
     """사용한 백업 데이터를 DB에서 삭제합니다."""
     await supabase.table('left_members').delete().eq('user_id', user_id).eq('guild_id', guild_id).execute()
+    
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 17. [신규 추가] 게임 기능 관련 함수
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+@supabase_retry_handler()
+async def get_user_abilities(user_id: int) -> List[str]:
+    """사용자가 보유한 모든 능력의 키(key) 목록을 반환합니다. (5분 캐시 적용)"""
+    CACHE_TTL = 300 # 5분
+    now = time.time()
+    
+    if user_id in _user_abilities_cache:
+        cached_data, timestamp = _user_abilities_cache[user_id]
+        if now - timestamp < CACHE_TTL:
+            return cached_data
+
+    response = await supabase.rpc('get_user_ability_keys', {'p_user_id': user_id}).execute()
+    
+    if response and hasattr(response, 'data'):
+        abilities = response.data if response.data else []
+        _user_abilities_cache[user_id] = (abilities, now)
+        return abilities
+    
+    _user_abilities_cache[user_id] = ([], now)
+    return []
