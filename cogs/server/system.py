@@ -34,7 +34,7 @@ async def is_admin(interaction: discord.Interaction) -> bool:
         raise app_commands.CheckFailure("このコマンドを実行するための管理者権限がありません。")
     return True
 
-# --- 임베드 템플릿 수정을 위한 UI 클래스 ---
+# --- [신규 추가] 임베드 템플릿 수정을 위한 UI 클래스 ---
 class TemplateEditModal(ui.Modal, title="埋め込みテンプレート編集"):
     title_input = ui.TextInput(label="タイトル", placeholder="埋め込みのタイトルを入力してください。", required=False, max_length=256)
     description_input = ui.TextInput(label="説明", placeholder="埋め込みの説明文を入力してください。", style=discord.TextStyle.paragraph, required=False, max_length=4000)
@@ -267,29 +267,20 @@ class ServerSystem(commands.Cog):
                 await cog_to_reload.load_configs()
 
             if config.get("type") == "panel":
-                if "[게임]" in friendly_name:
-                    timestamp = datetime.now(timezone.utc).timestamp()
-                    request_key = f"panel_regenerate_request_{setting_key}"
-                    await save_config_to_db(request_key, timestamp)
-                    await interaction.followup.send(
-                        f"✅ **{friendly_name}** 채널을 `{channel.mention}`(으)로 설정하고, 게임 봇에게 패널 재설치를 요청했습니다。",
-                        ephemeral=True
-                    )
-                else:
-                    if hasattr(cog_to_reload, 'regenerate_panel'):
-                        success = False
-                        if config["cog_name"] == "TicketSystem":
-                            panel_type = setting_key.replace("panel_", "")
-                            success = await cog_to_reload.regenerate_panel(channel, panel_type)
-                        else:
-                            success = await cog_to_reload.regenerate_panel(channel)
-                            
-                        if success:
-                            await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
-                        else:
-                            await interaction.followup.send(f"❌ `{channel.mention}` チャンネルへのパネル設置中にエラーが発生しました。", ephemeral=True)
+                if hasattr(cog_to_reload, 'regenerate_panel'):
+                    success = False
+                    if config["cog_name"] == "TicketSystem":
+                        panel_type = setting_key.replace("panel_", "")
+                        success = await cog_to_reload.regenerate_panel(channel, panel_type)
                     else:
-                        await interaction.followup.send(f"⚠️ **{friendly_name}** は設定されましたが、パネルを自動生成する機能が見つかりません。", ephemeral=True)
+                        success = await cog_to_reload.regenerate_panel(channel)
+                        
+                    if success:
+                        await interaction.followup.send(f"✅ `{channel.mention}` チャンネルに **{friendly_name}** パネルを正常に設置しました。", ephemeral=True)
+                    else:
+                        await interaction.followup.send(f"❌ `{channel.mention}` チャンネルへのパネル設置中にエラーが発生しました。", ephemeral=True)
+                else:
+                    await interaction.followup.send(f"⚠️ **{friendly_name}** は設定されましたが、パネルを自動生成する機能が見つかりません。", ephemeral=True)
             else:
                 await interaction.followup.send(f"✅ **{friendly_name}** を `{channel.mention}` チャンネルに設定しました。", ephemeral=True)
 
@@ -320,7 +311,7 @@ class ServerSystem(commands.Cog):
             await interaction.followup.send("⏳ すべてのパネルの再設置を開始します...", ephemeral=True)
 
             for key, info in setup_map.items():
-                if info.get("type") == "panel" and "[게임]" not in info.get("friendly_name", ""):
+                if info.get("type") == "panel":
                     friendly_name = info.get("friendly_name", key)
                     try:
                         cog_name, channel_db_key = info.get("cog_name"), info.get("key")
@@ -561,6 +552,7 @@ class ServerSystem(commands.Cog):
                 await supabase.table('xp_logs').insert({'user_id': user.id, 'source': source, 'xp_amount': xp_to_add}).execute()
             
             new_level = current_level
+            # [개선] 레벨업 공식을 사용하여 다음 레벨까지 필요한 총 경험치량과 비교
             while new_total_xp >= calculate_xp_for_level(new_level + 1):
                 new_level += 1
             
