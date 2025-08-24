@@ -14,7 +14,7 @@ from utils.helpers import format_embed_from_db, calculate_xp_for_level
 
 logger = logging.getLogger(__name__)
 
-# --- Helper Functions (변경 없음) ---
+# --- Helper Functions ---
 def create_xp_bar(current_xp: int, required_xp: int, length: int = 10) -> str:
     if required_xp <= 0: return "▓" * length
     progress = min(current_xp / required_xp, 1.0)
@@ -22,7 +22,7 @@ def create_xp_bar(current_xp: int, required_xp: int, length: int = 10) -> str:
     bar = '▓' * filled_length + '░' * (length - filled_length)
     return f"[{bar}]"
 
-# --- UI Views (이전과 동일) ---
+# --- UI Views ---
 class RankingView(ui.View):
     def __init__(self, user: discord.Member, total_users: int):
         super().__init__(timeout=180)
@@ -101,7 +101,7 @@ class LevelPanelView(ui.View):
             await interaction.response.send_message(f"⏳ このボタンはクールダウン中です。あと`{remaining}`秒お待ちください。", ephemeral=True)
             return
             
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True, thinking=True)
         
         try:
             await set_cooldown(user_id_str, cooldown_key)
@@ -157,8 +157,7 @@ class LevelPanelView(ui.View):
             description_parts = [ f"## {user.mention}のステータス\n", f"**レベル**: **Lv. {current_level}**", f"**等級**: {tier_role_mention or '`かけだし住民`'}\n**職業**: {job_role_mention or '`なし`'}\n", f"**経験値**\n`{xp_in_current_level:,} / {required_xp_for_this_level:,}`", f"{xp_bar}\n", f"**🏆 総獲得経験値**\n`{total_xp:,} XP`\n", f"**📊 経験値獲得の内訳**\n{xp_details_text}" ]
             embed.description = "\n".join(description_parts)
             
-            await interaction.followup.send(embed=embed)
-            await self.cog.regenerate_panel(interaction.channel)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
         except Exception as e:
             logger.error(f"레벨 확인 중 오류 발생 (유저: {user.id}): {e}", exc_info=True)
@@ -191,9 +190,9 @@ class JobSelectionView(ui.View):
     async def initialize(self):
         await self.load_data(); self.build_components()
         
-    # [✅✅✅ 핵심 수정]
+    # [개선] 상위 직업 필터링 로직 추가
     async def load_data(self):
-        # 1. 현재 레벨에 맞는 모든 직업을 일단 가져옵니다.
+        # 1. 현재 레벨에 맞는 모든 직업을 가져옵니다.
         res = await supabase.table('jobs').select('*, abilities(*)').eq('required_level', self.level).execute()
         if not (res and res.data):
             self.jobs_at_level = []
@@ -201,7 +200,7 @@ class JobSelectionView(ui.View):
 
         all_jobs_at_level = [job for job in res.data if job.get('abilities')]
 
-        # 2. 1차 전직(Lv.50)인 경우, 모든 직업을 보여줍니다.
+        # 2. 1차 전직(Lv.50 이하)인 경우, 모든 직업을 보여줍니다.
         if self.level <= 50:
             self.jobs_at_level = all_jobs_at_level
             return
@@ -227,7 +226,7 @@ class JobSelectionView(ui.View):
             self.jobs_at_level = []
             return
         
-        # 필터링된 직업만 최종 목록으로 설정합니다.
+        # 5. 필터링된 직업만 최종 목록으로 설정합니다.
         self.jobs_at_level = [
             job for job in all_jobs_at_level if job.get('job_key') == next_job_key
         ]
@@ -295,19 +294,19 @@ class JobSelectionView(ui.View):
 class LevelSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.bot.add_view(LevelPanelView(self))
         self.active_advancement_threads: Dict[int, JobSelectionView] = {}
         logger.info("LevelSystem Cog가 성공적으로 초기화되었습니다.")
     
+    async def register_persistent_views(self):
+        self.bot.add_view(LevelPanelView(self))
+        logger.info("✅ 레벨 시스템의 영구 View가 성공적으로 등록되었습니다.")
+        
     @commands.Cog.listener()
     async def on_ready(self):
         logger.info("[LevelSystem] 봇이 준비되었습니다. 기존 전직 스레드를 확인하고 태스크를 시작합니다.")
         await self.reconnect_advancement_views()
         if not self.check_advancement_requests.is_running(): self.check_advancement_requests.start()
         if not self.check_level_tier_updates.is_running(): self.check_level_tier_updates.start()
-
-    async def cog_load(self):
-        pass
 
     def cog_unload(self):
         self.check_advancement_requests.cancel()
@@ -365,11 +364,15 @@ class LevelSystem(commands.Cog):
             await user.add_roles(new_role, reason="レベル等級の変更")
             logger.info(f"{user.display_name}さんの等級役割を「{new_role.name}」に更新しました。")
 
-    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_level_check") -> bool:
+    async def regenerate_panel(self, channel: discord.TextChannel) -> bool:
+        panel_key = "level_check"
         try:
-            if panel_info := get_panel_id(panel_key):
-                if (ch := self.bot.get_channel(panel_info.get('channel_id'))) or channel:
-                    try: await (await ch.fetch_message(panel_info['message_id'])).delete()
+            panel_info = get_panel_id(panel_key)
+            if panel_info and panel_info.get('channel_id') and panel_info.get('message_id'):
+                if (ch := self.bot.get_channel(panel_info['channel_id'])):
+                    try: 
+                        msg = await ch.fetch_message(panel_info['message_id'])
+                        await msg.delete()
                     except (discord.NotFound, discord.Forbidden): pass
             embed = discord.Embed(title="📊 レベル＆ランキング", description="下のボタンでご自身のレベルを確認したり、サーバーのランキングを見ることができます。", color=0x5865F2)
             message = await channel.send(embed=embed, view=LevelPanelView(self))
@@ -458,10 +461,14 @@ class LevelSystem(commands.Cog):
                     if user:
                         view = JobSelectionView(self, user, level, thread)
                         await view.initialize()
-                        self.active_advancement_threads[thread.id] = view
-                        # [✅ 수정] 재연결 시에는 add_view를 사용하지 않습니다. 메시지에 이미 View가 연결되어 있습니다.
-                        # self.bot.add_view(view) 
-                        count += 1
+                        # [개선] 메시지에 View를 다시 연결하여 상호작용이 가능하게 합니다.
+                        # message_id는 DB에 저장하지 않으므로, 최근 메시지를 가져와서 연결합니다.
+                        async for message in thread.history(limit=5):
+                            if message.author.id == self.bot.user.id and message.components:
+                                await message.edit(view=view)
+                                self.active_advancement_threads[thread.id] = view
+                                count += 1
+                                break
                 except Exception as e:
                     logger.warning(f"스레드 '{thread.name}'의 View 재연결 실패: {e}")
         if count > 0:
