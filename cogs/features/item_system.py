@@ -5,7 +5,7 @@ from discord.ext import commands
 import logging
 from typing import Optional, List
 from datetime import datetime, timezone
-import asyncio # [수정] asyncio 임포트
+import asyncio
 
 from utils.database import get_id, add_warning, get_total_warning_count, get_embed_from_db, get_panel_id, save_panel_id, get_panel_components_from_db
 from utils.ui_defaults import USABLE_ITEMS
@@ -44,16 +44,13 @@ class ItemSelectDropdown(ui.Select):
         if not all([isinstance(member, discord.Member), item_info, item_role]):
             return await interaction.followup.send("❌ アイテムの使用中にエラーが発生しました。", ephemeral=True)
 
-        # 아이템 종류에 따라 로직 분기
         if item_info['type'] == 'warning_deduction':
             success = await self.cog.use_warning_deduction_ticket(interaction, member, item_role, item_info)
             if success:
-                # [핵심] 아이템 사용 성공 시 패널 재생성
-                await self.cog.regenerate_panel()
+                await self.cog.regenerate_panel(interaction.channel, panel_key="panel_item_usage")
         else:
             await interaction.followup.send("❌ このアイテムは現在使用できません。", ephemeral=True)
         
-        # 임시 선택 메뉴 메시지 삭제
         try:
             await interaction.delete_original_response()
         except discord.HTTPException:
@@ -92,7 +89,6 @@ class ItemUsagePanelView(ui.View):
         view.add_item(dropdown)
         await interaction.response.send_message("どのアイテムを使用しますか？", view=view, ephemeral=True)
 
-
 class ItemSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -118,7 +114,6 @@ class ItemSystem(commands.Cog):
     async def use_warning_deduction_ticket(self, interaction: discord.Interaction, member: discord.Member, item_role: discord.Role, item_info: dict) -> bool:
         current_warnings = await get_total_warning_count(member.id, interaction.guild_id)
         if current_warnings <= 0:
-            # [수정] 메시지를 보낸 후 5초 뒤에 삭제
             message = await interaction.followup.send(f"✅ 累積警告が0回なので、「{item_info['name']}」を使用する必要はありません。", ephemeral=True, wait=True)
             await asyncio.sleep(5)
             await message.delete()
@@ -139,7 +134,6 @@ class ItemSystem(commands.Cog):
             
             await self.send_log_message(member, item_info['name'], new_total)
             
-            # [수정] 메시지를 보낸 후 5초 뒤에 삭제
             message = await interaction.followup.send(f"✅ アイテム「{item_info['name']}」を使用しました！ (累積警告: {current_warnings}回 → {new_total}回)", ephemeral=True, wait=True)
             await asyncio.sleep(5)
             await message.delete()
@@ -167,37 +161,41 @@ class ItemSystem(commands.Cog):
         embed.timestamp = datetime.now(timezone.utc)
         await log_channel.send(embed=embed)
 
-    async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None, panel_type: str = "item_usage"):
-        target_channel = channel
-        if not target_channel:
-            if self.panel_channel_id: target_channel = self.bot.get_channel(self.panel_channel_id)
-            else: return False
-
-        if not target_channel: 
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # 함수가 panel_key를 인자로 받도록 변경하고, 내부 로직을 수정합니다.
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_item_usage") -> bool:
+        base_panel_key = panel_key.replace("panel_", "") # e.g., "item_usage"
+        embed_key = panel_key # e.g., "panel_item_usage"
+        
+        if not channel: 
             logger.warning(f"아이템 사용 패널 채널(ID: {self.panel_channel_id})을 찾을 수 없어 재생성할 수 없습니다.")
             return False
 
-        panel_info = get_panel_id("item_usage")
-        if panel_info and (old_id := panel_info.get('message_id')):
-            try:
-                old_message = await target_channel.fetch_message(old_id)
-                await old_message.delete()
-            except (discord.NotFound, discord.Forbidden): pass
-        
-        embed_data = await get_embed_from_db("panel_item_usage")
-        if not embed_data:
-            logger.error("DB에서 'panel_item_usage' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
-            return False
+        try:
+            panel_info = get_panel_id(base_panel_key)
+            if panel_info and (old_id := panel_info.get('message_id')):
+                try:
+                    old_message = await channel.fetch_message(old_id)
+                    await old_message.delete()
+                except (discord.NotFound, discord.Forbidden): pass
             
-        embed = discord.Embed.from_dict(embed_data)
-        if self.view_instance is None:
-            self.view_instance = ItemUsagePanelView(self)
-        await self.view_instance.setup_buttons()
-        
-        new_message = await target_channel.send(embed=embed, view=self.view_instance)
-        await save_panel_id("item_usage", new_message.id, target_channel.id)
-        logger.info(f"✅ 아이템 사용 패널을 성공적으로 새로 생성했습니다. (채널: #{target_channel.name})")
-        return True
+            embed_data = await get_embed_from_db(embed_key)
+            if not embed_data:
+                logger.error(f"DB에서 '{embed_key}' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
+                return False
+                
+            embed = discord.Embed.from_dict(embed_data)
+            if self.view_instance is None:
+                self.view_instance = ItemUsagePanelView(self)
+            await self.view_instance.setup_buttons()
+            
+            new_message = await channel.send(embed=embed, view=self.view_instance)
+            await save_panel_id(base_panel_key, new_message.id, channel.id)
+            logger.info(f"✅ 아이템 사용 패널을 성공적으로 새로 생성했습니다. (채널: #{channel.name})")
+            return True
+        except Exception as e:
+            logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
+            return False
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ItemSystem(bot))
