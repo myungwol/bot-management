@@ -85,79 +85,24 @@ UI_ROLE_KEY_MAP = {
     "role_warning_level_4":     {"name": "警告4個", "is_prefix": False, "priority": 0},
 }
 
-# [개선] 온보딩 드롭다운 선택지를 10년 단위로 그룹화
 ONBOARDING_CHOICES = {
-    "gender": [
-        {"label": "男性", "value": "男性"},
-        {"label": "女性", "value": "女性"},
-    ],
-    # 출생 연도를 10년 단위 그룹으로 나눔
+    "gender": [{"label": "男性", "value": "男性"}, {"label": "女性", "value": "女性"}],
     "birth_year_groups": {
-        "2000s": [
-            {"label": f"{year}年生まれ", "value": str(year)} for year in range(2009, 1999, -1)
-        ],
-        "1990s": [
-            {"label": f"{year}年生まれ", "value": str(year)} for year in range(1999, 1989, -1)
-        ],
-        "1980s": [
-            {"label": f"{year}年生まれ", "value": str(year)} for year in range(1989, 1979, -1)
-        ],
-        "1970s": [
-            {"label": f"{year}年生まれ", "value": str(year)} for year in range(1979, 1969, -1)
-        ],
-        "private": [
-             {"label": "非公開", "value": "非公開"}
-        ]
+        "2000s": [{"label": f"{year}年生まれ", "value": str(year)} for year in range(2009, 1999, -1)],
+        "1990s": [{"label": f"{year}年生まれ", "value": str(year)} for year in range(1999, 1989, -1)],
+        "1980s": [{"label": f"{year}年生まれ", "value": str(year)} for year in range(1989, 1979, -1)],
+        "1970s": [{"label": f"{year}年生まれ", "value": str(year)} for year in range(1979, 1969, -1)],
+        "private": [{"label": "非公開", "value": "非公開"}]
     }
 }
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 2. 임베드(Embed) 기본값
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_EMBEDS = {
-    # --- [개선] 새로운 온보딩 안내 임베드 추가 ---
-    "onboarding_guide_server": {
-        "title": "① Dico森へようこそ！",
-        "description": "ここは、ゲームをしたり、雑談をしたり、自由に過ごせる場所です。\nみんなが快適に過ごせるように、いくつかの案内とルールがあります。\n\n下の「次へ」ボタンを押して、案内を読み進めてください。",
-        "color": 0x5865F2,
-        "footer": {"text": "ステップ 1/7"}
-    },
-    "onboarding_guide_bots": {
-        "title": "② ボットの紹介",
-        "description": "このサーバーには、生活を便利にするためのボットがいくつかいます。\n\n- **管理ボット**: 役割の付与やニックネームの変更など、サーバー管理全般を担当します。\n- **ゲームボット**: 釣りや農場、カジノなど、ミニゲームで遊べます。\n\n各機能は、対応するチャンネルの「パネル」から利用できます。",
-        "color": 0x5865F2,
-        "footer": {"text": "ステップ 2/7"}
-    },
-    "onboarding_guide_rules": {
-        "title": "③ 村のルール",
-        "description": "みんなが楽しく過ごすために、以下のルールを守ってください。\n\n- **尊重**: 他のメンバーを尊重し、誹謗中傷や迷惑行為は禁止です。\n- **安全性**: 個人情報の公開や不適切なコンテンツの投稿は禁止です。\n- **報告**: 問題が発生した場合は、すぐに<#チャンネルID>から管理者に報告してください。\n\n詳細は<#チャンネルID>で確認できます。",
-        "color": 0x5865F2,
-        "footer": {"text": "ステップ 3/7"}
-    },
-    "onboarding_guide_channels": {
-        "title": "④ 主なチャンネルの紹介",
-        "description": "サーバーには様々な目的のチャンネルがあります。\n\n- <#チャンネルID>: メインの雑談場所です。\n- <#チャンネルID>: ボイスチャンネルに参加して会話を楽しめます。\n- <#チャンネルID>: プレイするゲームの仲間を探せます。\n\n他にもたくさんのチャンネルがあるので、ぜひ探検してみてください！",
-        "color": 0x5865F2,
-        "footer": {"text": "ステップ 4/7"}
-    },
-    "onboarding_guide_roles": {
-        "title": "⑤ 役割の取得",
-        "description": "自分のプロフィールを充実させるために、<#チャンネルID>で役割を取得しましょう。\n\n- **ゲーム**: プレイするゲームやプラットフォームを選択できます。\n- **通知**: 特定の活動（通話開始など）の通知を受け取るか選択できます。\n- **情報**: 自分の性別や年代などを他のメンバーに表示できます。",
-        "color": 0x5865F2,
-        "footer": {"text": "ステップ 5/7"}
-    },
-    "onboarding_guide_staff": {
-        "title": "⑥ 村のスタッフ紹介",
-        "description": "困ったことがあれば、以下のスタッフに相談してください。\n\n- **村長・副村長**: サーバーの最高責任者です。\n- **役場の職員**: サーバーの運営全般をサポートします。\n- **交番さん**: ルール違反の対応やトラブルの仲裁をします。\n\nスタッフ一覧は<#チャンネルID>で確認できます。",
-        "color": 0x5865F2,
-        "footer": {"text": "ステップ 6/7"}
-    },
-    "onboarding_guide_intro": {
-        "title": "⑦ 住民登録票の作成",
-        "description": "最後に、自己紹介となる「住民登録票」を作成しましょう！\n\n下のボタンを押して、あなたの名前や趣味などを記入してください。\n提出後、役場の職員が確認し、承認されると正式な住民として迎えられます。",
-        "color": 0x5865F2,
-        "footer": {"text": "ステップ 7/7"}
-    },
+    "onboarding_guide_server": {"title": "① Dico森へようこそ！", "description": "ここは、ゲームをしたり、雑談をしたり、自由に過ごせる場所です。\nみんなが快適に過ごせるように、いくつかの案内とルールがあります。\n\n下の「次へ」ボタンを押して、案内を読み進めてください。", "color": 0x5865F2, "footer": {"text": "ステップ 1/7"}},
+    "onboarding_guide_bots": {"title": "② ボットの紹介", "description": "このサーバーには、生活を便利にするためのボットがいくつかいます。\n\n- **管理ボット**: 役割の付与やニックネームの変更など、サーバー管理全般を担当します。\n- **ゲームボット**: 釣りや農場、カジノなど、ミニゲームで遊べます。\n\n各機能は、対応するチャンネルの「パネル」から利用できます。", "color": 0x5865F2, "footer": {"text": "ステップ 2/7"}},
+    "onboarding_guide_rules": {"title": "③ 村のルール", "description": "みんなが楽しく過ごすために、以下のルールを守ってください。\n\n- **尊重**: 他のメンバーを尊重し、誹謗中傷や迷惑行為は禁止です。\n- **安全性**: 個人情報の公開や不適切なコンテンツの投稿は禁止です。\n- **報告**: 問題が発生した場合は、すぐに<#チャンネルID>から管理者に報告してください。\n\n詳細は<#チャンネルID>で確認できます。", "color": 0x5865F2, "footer": {"text": "ステップ 3/7"}},
+    "onboarding_guide_channels": {"title": "④ 主なチャンネルの紹介", "description": "サーバーには様々な目的のチャンネルがあります。\n\n- <#チャンネルID>: メインの雑談場所です。\n- <#チャンネルID>: ボイスチャンネルに参加して会話を楽しめます。\n- <#チャンネルID>: プレイするゲームの仲間を探せます。\n\n他にもたくさんのチャンネルがあるので、ぜひ探検してみてください！", "color": 0x5865F2, "footer": {"text": "ステップ 4/7"}},
+    "onboarding_guide_roles": {"title": "⑤ 役割の取得", "description": "自分のプロフィールを充実させるために、<#チャンネルID>で役割を取得しましょう。\n\n- **ゲーム**: プレイするゲームやプラットフォームを選択できます。\n- **通知**: 特定の活動（通話開始など）の通知を受け取るか選択できます。\n- **情報**: 自分の性別や年代などを他のメンバーに表示できます。", "color": 0x5865F2, "footer": {"text": "ステップ 5/7"}},
+    "onboarding_guide_staff": {"title": "⑥ 村のスタッフ紹介", "description": "困ったことがあれば、以下のスタッフに相談してください。\n\n- **村長・副村長**: サーバーの最高責任者です。\n- **役場の職員**: サーバーの運営全般をサポートします。\n- **交番さん**: ルール違反の対応やトラブルの仲裁をします。\n\nスタッフ一覧は<#チャンネルID>で確認できます。", "color": 0x5865F2, "footer": {"text": "ステップ 6/7"}},
+    "onboarding_guide_intro": {"title": "⑦ 住民登録票の作成", "description": "最後に、自己紹介となる「住民登録票」を作成しましょう！\n\n下のボタンを押して、あなたの名前や趣味などを記入してください。\n提出後、役場の職員が確認し、承認されると正式な住民として迎えられます。", "color": 0x5865F2, "footer": {"text": "ステップ 7/7"}},
     "welcome_embed": {"title": "🎉 {guild_name}へようこそ！", "description": "{member_mention}さん、はじめまして！\n\nまずは、サーバーの案内を読んで、自己紹介の作成をお願いします。", "color": 0x3498DB},
     "farewell_embed": {"title": "👋 また会いましょう", "description": "**{member_name}**さんが村から旅立ちました。", "color": 0x99AAB5},
     "panel_roles": {"title": "📖 役割付与", "description": "下のメニューからカテゴリーを選択して、自分に必要な役割を受け取ってください。", "color": 0x5865F2},
@@ -173,18 +118,7 @@ UI_EMBEDS = {
     "dm_onboarding_rejected": {"title": "❌ 住民登録拒否のお知らせ", "description": "申し訳ありませんが、「{guild_name}」での住民登録は拒否されました。", "color": 15548997},
     "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。\n\n**※すべてのメッセージはサーバー管理者が記録・確認しており、問題発生時には投稿者を特定し対処します。**", "color": 4342323},    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     "panel_custom_embed": {"title": "📢 カスタムメッセージ送信パネル", "description": "下のボタンを押して、指定したチャンネルにBotから埋め込みメッセージを送信します。\n\n**この機能は特定の役職を持つスタッフのみ使用可能です。**", "color": 0x34495E},
-    # [신규 추가] 전직 로그 임베드
-    "log_job_advancement": {
-        "title": "🎉 新たな転職者！",
-        "description": "{user_mention}さんがついに新たな道を選択しました。",
-        "color": 0xFFD700, # 금색
-        "fields": [
-            {"name": "職業", "value": "```\n{job_name}\n```", "inline": True},
-            {"name": "選択した能力", "value": "```\n{ability_name}\n```", "inline": True}
-        ],
-        "footer": {"text": "これからの活躍を期待しています！"}
-    },
-    # --- [게임 봇] ---
+    "log_job_advancement": {"title": "🎉 新たな転職者！", "description": "{user_mention}さんがついに新たな道を選択しました。", "color": 0xFFD700, "fields": [{"name": "職業", "value": "```\n{job_name}\n```", "inline": True}, {"name": "選択した能力", "value": "```\n{ability_name}\n```", "inline": True}], "footer": {"text": "これからの活躍を期待しています！"}},
     "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "> アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
     "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "> 川辺でのんびり釣りを楽しみましょう。\n> 下のボタンを押して釣りを開始します。", "color": 0x5865F2},
     "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "> 広い海で大物の夢を追いかけましょう！\n> 下のボタンを押して釣りを開始します。", "color": 0x3498DB},
@@ -210,20 +144,13 @@ UI_EMBEDS = {
     "log_whale_catch": { "title": "🐋 今月のヌシ、現る！ 🐋", "description": "今月、ただ一度だけ姿を見せるという幻の**クジラ**が、**{user_mention}**さんの手によって釣り上げられました！\n\n巨大な影は、来月まで再び深い海の底へと姿を消します…。", "color": "0x206694", "fields": [ {"name": "釣り上げられたヌシ", "value": "{emoji} **{name}**\n**サイズ**: `{size}`cm\n**価値**: `{value}`{currency_icon}", "inline": False} ], "footer": {"text": "来月の挑戦者よ、来たれ！"} },
     "embed_whale_reset_announcement": { "title": "🐋 海からの噂…", "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。", "color": 0x3498DB, "footer": {"text": "今月のヌシが海に戻ってきました。"} }
 }
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 3. 패널 컴포넌트(Panel Components) 기본값
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_PANEL_COMPONENTS = [
-    # --- [서버 관리 봇] ---
     {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0, "order_in_row": 0},
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0, "order_in_row": 0},
     {"component_key": "issue_warning_button", "panel_key": "warning", "component_type": "button", "label": "警告を発行する", "style": "danger", "emoji": "🚨", "row": 0, "order_in_row": 0},
     {"component_key": "use_item_button", "panel_key": "item_usage", "component_type": "button", "label": "アイテムを使用する", "style": "success", "emoji": "✨", "row": 0, "order_in_row": 0},
     {"component_key": "post_anonymous_message_button", "panel_key": "anonymous_board", "component_type": "button", "label": "匿名で投稿する", "style": "secondary", "emoji": "✍️", "row": 0, "order_in_row": 0},
     {"component_key": "create_custom_embed", "panel_key": "custom_embed", "component_type": "button", "label": "埋め込みメッセージ作成", "style": "primary", "emoji": "✉️", "row": 0, "order_in_row": 0},
-    
-    # --- [게임 봇] ---
     {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "商店 (アイテム購入)", "style": "success", "emoji": "🏪", "row": 0, "order_in_row": 0},
     {"component_key": "open_market", "panel_key": "commerce", "component_type": "button", "label": "買取ボックス (アイテム売却)", "style": "danger", "emoji": "📦", "row": 0, "order_in_row": 1},
     {"component_key": "open_inventory", "panel_key": "profile", "component_type": "button", "label": "持ち物を見る", "style": "primary", "emoji": "📦", "row": 0, "order_in_row": 0},
@@ -237,20 +164,12 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "open_quests", "panel_key": "panel_quests", "component_type": "button", "label": "クエスト確認", "style": "primary", "emoji": "📜", "row": 0, "order_in_row": 0},
     {"component_key": "create_farm", "panel_key": "panel_farm_creation", "component_type": "button", "label": "農場を作る", "style": "success", "emoji": "🌱", "row": 0, "order_in_row": 0},
 ]
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 4. /setup 명령어 설정 맵
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 SETUP_COMMAND_MAP = {
-    # --- [채널/패널 설정] ---
     "panel_roles":      {"type": "panel",   "cog_name": "RolePanel",    "key": "auto_role_channel_id",            "friendly_name": "역할 자동부여 패널", "channel_type": "text"},
     "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "서버 안내 패널", "channel_type": "text"},
     "panel_nicknames":  {"type": "panel",   "cog_name": "Nicknames",    "key": "nickname_panel_channel_id",       "friendly_name": "닉네임 변경 패널", "channel_type": "text"},
-    
-    # [✅✅✅ 핵심 수정 ✅✅✅] 레벨 확인 패널을 [게임]으로 분류하여 PanelUpdater가 인식하도록 변경합니다.
     "panel_level_check": {"type": "panel", "cog_name": "LevelSystem", "key": "level_check_panel_channel_id", "friendly_name": "[게임] 레벨 확인 패널", "channel_type": "text"},
     "channel_job_advancement": {"type": "channel", "cog_name": "LevelSystem", "key": "job_advancement_channel_id", "friendly_name": "[채널] 전직소", "channel_type": "text"},
-
     "panel_item_usage": {"type": "panel", "cog_name": "ItemSystem", "key": "item_usage_panel_channel_id", "friendly_name": "[패널] 아이템 사용", "channel_type": "text"},
     "panel_anonymous_board": {"type": "panel", "cog_name": "AnonymousBoard", "key": "anonymous_board_channel_id", "friendly_name": "[패널] 익명 게시판", "channel_type": "text"},    
     "panel_warning": {"type": "panel", "cog_name": "WarningSystem", "key": "warning_panel_channel_id", "friendly_name": "[패널] 경고 관리", "channel_type": "text"},
@@ -266,23 +185,17 @@ SETUP_COMMAND_MAP = {
     "panel_daily_check":   {"type": "panel", "cog_name": "DailyCheck",  "key": "daily_check_panel_channel_id", "friendly_name": "[게임] 출석체크 패널", "channel_type": "text"},
     "panel_quests":        {"type": "panel", "cog_name": "Quests",      "key": "quests_panel_channel_id",      "friendly_name": "[게임] 퀘스트 패널", "channel_type": "text"},
     "panel_farm_creation": {"type": "panel", "cog_name": "Farm",        "key": "farm_creation_panel_channel_id", "friendly_name": "[게임] 농장 생성 패널", "channel_type": "text"},
-    
     "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"},
     "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
-    
     "channel_new_welcome": {"type": "channel", "cog_name": "MemberEvents", "key": "new_welcome_channel_id",      "friendly_name": "신규 멤버 환영 채널", "channel_type": "text"},
     "channel_farewell":    {"type": "channel", "cog_name": "MemberEvents", "key": "farewell_channel_id",         "friendly_name": "멤버 퇴장 안내 채널", "channel_type": "text"},
     "channel_main_chat":   {"type": "channel", "cog_name": "Onboarding",   "key": "main_chat_channel_id",        "friendly_name": "메인 채팅 채널 (자기소개 승인 후 안내)", "channel_type": "text"},
-
     "channel_onboarding_approval": {"type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id", "friendly_name": "자기소개 승인/거절 채널", "channel_type": "text"},
     "channel_nickname_approval":   {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_approval_channel_id",   "friendly_name": "닉네임 변경 승인 채널", "channel_type": "text"},
-    
     "channel_vc_creator_3p": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_3p", "friendly_name": "음성 채널 자동 생성 (게임)", "channel_type": "voice"},
     "channel_vc_creator_4p": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_4p", "friendly_name": "음성 채널 자동 생성 (광장)", "channel_type": "voice"},
     "channel_vc_creator_newbie": {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_newbie", "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"},
     "channel_vc_creator_vip":    {"type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_vip", "friendly_name": "[음성 채널] VIP 전용 생성기", "channel_type": "voice"},
-
-    # --- [로그 채널 설정] ---
     "log_nickname":          {"type": "channel", "cog_name": "Nicknames",  "key": "nickname_log_channel_id",                "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"},
     "log_intro_approval":    {"type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",                "friendly_name": "[로그] 자기소개 승인 기록", "channel_type": "text"},
     "log_intro_rejection":   {"type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",  "friendly_name": "[로그] 자기소개 거절 기록", "channel_type": "text"},
@@ -298,29 +211,11 @@ SETUP_COMMAND_MAP = {
     "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "[로그] 코인 활동", "channel_type": "text"},
     "log_job_advancement":     {"type": "channel", "cog_name": "LevelSystem", "key": "job_log_channel_id",         "friendly_name": "[로그] 전직 기록", "channel_type": "text"},
     "log_fishing": {"type": "channel", "cog_name": "Fishing", "key": "fishing_log_channel_id", "friendly_name": "[로그] 낚시 성공 기록", "channel_type": "text"},
-
     "channel_bump_reminder": {"type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id", "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"},
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
     "channel_weather": {"type": "channel", "cog_name": "WorldSystem", "key": "weather_channel_id", "friendly_name": "[알림] 날씨 예보 채널", "channel_type": "text"},
-    
 }
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 5. 관리자 역할 키 목록
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-ADMIN_ROLE_KEYS = [
-    "role_admin_total",
-    "role_staff_village_chief",
-    "role_staff_deputy_chief",
-    "role_staff_police",
-    "role_staff_festival",
-    "role_staff_pr",
-    "role_staff_design",
-    "role_staff_secretary",
-    "role_staff_newbie_helper",
-    "role_approval",
-]
-
+ADMIN_ROLE_KEYS = ["role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief", "role_staff_police", "role_staff_festival", "role_staff_pr", "role_staff_design", "role_staff_secretary", "role_staff_newbie_helper", "role_approval"]
 STATIC_AUTO_ROLE_PANELS = {
     "panel_roles": {
         "panel_key": "panel_roles",
@@ -355,32 +250,10 @@ STATIC_AUTO_ROLE_PANELS = {
         }
     }
 }
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 7. 티켓 시스템 설정
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-TICKET_MASTER_ROLES = [
-    "role_staff_village_chief",
-    "role_staff_deputy_chief",
-]
-TICKET_STAFF_GENERAL_ROLES = [
-    "role_approval",
-]
-TICKET_STAFF_SPECIFIC_ROLES = [
-    "role_staff_police",
-    "role_staff_festival",
-    "role_staff_pr",
-    "role_staff_design",
-    "role_staff_secretary",
-    "role_staff_newbie_helper",
-]
-TICKET_REPORT_ROLES = [
-    "role_staff_police",
-]
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 8. 경고 시스템 설정
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+TICKET_MASTER_ROLES = ["role_staff_village_chief", "role_staff_deputy_chief"]
+TICKET_STAFF_GENERAL_ROLES = ["role_approval"]
+TICKET_STAFF_SPECIFIC_ROLES = ["role_staff_police", "role_staff_festival", "role_staff_pr", "role_staff_design", "role_staff_secretary", "role_staff_newbie_helper"]
+TICKET_REPORT_ROLES = ["role_staff_police"]
 POLICE_ROLE_KEY = "role_staff_police"
 WARNING_THRESHOLDS = [
     {"count": 1, "role_key": "role_warning_level_1"},
@@ -388,185 +261,83 @@ WARNING_THRESHOLDS = [
     {"count": 3, "role_key": "role_warning_level_3"},
     {"count": 4, "role_key": "role_warning_level_4"},
 ]
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 9. 아이템 시스템 설정
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-USABLE_ITEMS = {
-    "role_item_warning_deduct": {
-        "name": "警告1個差引権",
-        "type": "warning_deduction",
-        "value": -1,
-        "description": "累積警告を1回分減らします。"
-    }
-}
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 10. 커스텀 임베드 전송 권한
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-CUSTOM_EMBED_SENDER_ROLES = [
-    "role_admin_total",
-    "role_staff_village_chief",
-    "role_staff_deputy_chief",
-    # "role_staff_pr", # [보안] 악용 가능성을 줄이기 위해 홍보 담당은 주석 처리. 필요 시 주석 해제.
-]
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 11. 직업 및 레벨 시스템 설정
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+USABLE_ITEMS = { "role_item_warning_deduct": {"name": "警告1個差引権", "type": "warning_deduction", "value": -1, "description": "累積警告を1回分減らします。"} }
+CUSTOM_EMBED_SENDER_ROLES = ["role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief"]
 JOB_SYSTEM_CONFIG = {
-    # 직업 키와 역할 키를 매핑합니다.
-    "JOB_ROLE_MAP": {
-        "fisherman": "role_job_fisherman",
-        "farmer": "role_job_farmer",
-        "master_angler": "role_job_master_angler",
-        "master_farmer": "role_job_master_farmer",
-    },
-    # 레벨에 따라 부여될 주민 등급 역할입니다. 높은 레벨부터 순서대로 적어야 합니다.
-    "LEVEL_TIER_ROLES": [
-        {"level": 150, "role_key": "role_resident_elder"},
-        {"level": 100, "role_key": "role_resident_veteran"},
-        {"level": 50,  "role_key": "role_resident_regular"},
-        {"level": 1,   "role_key": "role_resident_rookie"}
-    ]
+    "JOB_ROLE_MAP": {"fisherman": "role_job_fisherman", "farmer": "role_job_farmer", "master_angler": "role_job_master_angler", "master_farmer": "role_job_master_farmer"},
+    "LEVEL_TIER_ROLES": [{"level": 150, "role_key": "role_resident_elder"}, {"level": 100, "role_key": "role_resident_veteran"}, {"level": 50,  "role_key": "role_resident_regular"}, {"level": 1,   "role_key": "role_resident_rookie"}]
 }
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 12. 나이대 역할 매핑 (AGE_ROLE_MAPPING)
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 AGE_ROLE_MAPPING = [
     {"key": "role_info_age_00s", "range": [2000, 2100], "name": "00年代生"},
     {"key": "role_info_age_90s", "range": [1990, 2000], "name": "90年代生"},
     {"key": "role_info_age_80s", "range": [1980, 1990], "name": "80年代生"},
     {"key": "role_info_age_70s", "range": [1970, 1980], "name": "70年代生"}
 ]
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 13. 게임 시스템 설정 (GAME_CONFIG)
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 GAME_CONFIG = {
-    "CURRENCY_ICON": "🪙",
-    "FISHING_BITE_REACTION_TIME": 3.0,
-    "FISHING_BIG_CATCH_THRESHOLD": 70.0,
-    "FISHING_SEA_REQ_TIER": 3,
-    "FISHING_WAITING_IMAGE_URL": "https://i.imgur.com/AcLgC2g.gif",
-    "RPS_LOBBY_TIMEOUT": 60,
-    "RPS_CHOICE_TIMEOUT": 45,
-    "RPS_MAX_PLAYERS": 5,
-    "SLOT_MAX_ACTIVE": 5,
-    "XP_FROM_FISHING": 20,
-    "XP_FROM_FARMING": 15,
-    "XP_FROM_VOICE": 10,
-    "XP_FROM_CHAT": 5,
-    "VOICE_TIME_REQUIREMENT_MINUTES": 10,
-    "VOICE_REWARD_RANGE": [10, 15],
-    "CHAT_MESSAGE_REQUIREMENT": 20,
-    "CHAT_REWARD_RANGE": [5, 10],
+    "CURRENCY_ICON": "🪙", "FISHING_BITE_REACTION_TIME": 3.0, "FISHING_BIG_CATCH_THRESHOLD": 70.0, "FISHING_SEA_REQ_TIER": 3, "FISHING_WAITING_IMAGE_URL": "https://i.imgur.com/AcLgC2g.gif",
+    "RPS_LOBBY_TIMEOUT": 60, "RPS_CHOICE_TIMEOUT": 45, "RPS_MAX_PLAYERS": 5, "SLOT_MAX_ACTIVE": 5,
+    "XP_FROM_FISHING": 20, "XP_FROM_FARMING": 15, "XP_FROM_VOICE": 10, "XP_FROM_CHAT": 5,
+    "VOICE_TIME_REQUIREMENT_MINUTES": 10, "VOICE_REWARD_RANGE": [10, 15], "CHAT_MESSAGE_REQUIREMENT": 20, "CHAT_REWARD_RANGE": [5, 10],
     "JOB_ADVANCEMENT_LEVELS": [50, 100]
 }
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 14. [신규 추가] 전직 시스템 데이터
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 JOB_ADVANCEMENT_DATA = {
-    # --- 레벨 50 전직 정보 ---
     50: [
-        {
-            "job_key": "fisherman",
-            "job_name": "釣り人",
-            "role_key": "role_job_fisherman",
-            "description": "魚を釣ることに特化した専門家です。",
-            "abilities": [
-                {
-                    "ability_key": "fish_bait_saver_1",
-                    "ability_name": "エサ消費なし (確率)",
-                    "description": "釣りの際、一定の確率でエサを消費しません。"
-                },
-                {
-                    "ability_key": "fish_bite_time_down_1",
-                    "ability_name": "アタリ時間短縮",
-                    "description": "魚が食いつくまでの時間が全体的に2秒短縮されます。"
-                }
-            ]
-        },
-        {
-            "job_key": "farmer",
-            "job_name": "農家",
-            "role_key": "role_job_farmer",
-            "description": "作物を育て、収穫することに特化した専門家です。",
-            "abilities": [
-                {
-                    "ability_key": "farm_seed_saver_1",
-                    "ability_name": "種消費なし (確率)",
-                    "description": "種を植える際、一定の確率で種を消費しません。"
-                },
-                {
-                    "ability_key": "farm_water_retention_1",
-                    "ability_name": "水分保持力UP",
-                    "description": "作物が水分を保ちやすくなり、水やりの間隔が長くなります。"
-                }
-            ]
-        }
+        {"job_key": "fisherman", "job_name": "釣り人", "role_key": "role_job_fisherman", "description": "魚を釣ることに特化した専門家です。", "abilities": [{"ability_key": "fish_bait_saver_1", "ability_name": "エサ消費なし (確率)", "description": "釣りの際、一定の確率でエサを消費しません。"}, {"ability_key": "fish_bite_time_down_1", "ability_name": "アタリ時間短縮", "description": "魚が食いつくまでの時間が全体的に2秒短縮されます。"}]},
+        {"job_key": "farmer", "job_name": "農家", "role_key": "role_job_farmer", "description": "作物を育て、収穫することに特化した専門家です。", "abilities": [{"ability_key": "farm_seed_saver_1", "ability_name": "種消費なし (確率)", "description": "種を植える際、一定の確率で種を消費しません。"}, {"ability_key": "farm_water_retention_1", "ability_name": "水分保持力UP", "description": "作物が水分を保ちやすくなり、水やりの間隔が長くなります。"}]}
     ],
-    # --- 레벨 100 전직 정보 ---
     100: [
-        {
-            "job_key": "master_angler",
-            "job_name": "太公望",
-            "role_key": "role_job_master_angler",
-            "description": "釣りの道を極め、伝説の魚を追い求める者。釣り人の上位職です。",
-            "abilities": [
-                {
-                    "ability_key": "fish_rare_up_2",
-                    "ability_name": "レア魚確率UP (大)",
-                    "description": "珍しい魚を釣る確率が上昇します。"
-                },
-                {
-                    "ability_key": "fish_size_up_2",
-                    "ability_name": "魚のサイズUP (大)",
-                    "description": "釣り上げる魚の平均サイズが大きくなります。"
-                }
-            ]
-        },
-        {
-            "job_key": "master_farmer",
-            "job_name": "大農家",
-            "role_key": "role_job_master_farmer",
-            "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。",
-            "abilities": [
-                {
-                    "ability_key": "farm_yield_up_2",
-                    "ability_name": "収穫量UP (大)",
-                    "description": "作物を収穫する際の収穫量が大幅に増加します。"
-                },
-                {
-                    "ability_key": "farm_growth_speed_up_2",
-                    "ability_name": "成長速度UP (大)",
-                    "description": "作物の成長に必要な時間が短縮されます。"
-                }
-            ]
-        }
+        {"job_key": "master_angler", "job_name": "太公望", "role_key": "role_job_master_angler", "description": "釣りの道を極め、伝説の魚を追い求める者。釣り人の上位職です。", "prerequisite_job": "fisherman", "abilities": [{"ability_key": "fish_rare_up_2", "ability_name": "レア魚確率UP (大)", "description": "珍しい魚を釣る確率が上昇します。"}, {"ability_key": "fish_size_up_2", "ability_name": "魚のサイズUP (大)", "description": "釣り上げる魚の平均サイズが大きくなります。"}]},
+        {"job_key": "master_farmer", "job_name": "大農家", "role_key": "role_job_master_farmer", "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。", "prerequisite_job": "farmer", "abilities": [{"ability_key": "farm_yield_up_2", "ability_name": "収穫量UP (大)", "description": "作物を収穫する際の収穫量が大幅に増加します。"}, {"ability_key": "farm_growth_speed_up_2", "ability_name": "成長速度UP (大)", "description": "作物の成長に必要な時間が短縮されます。"}]}
     ]
 }
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 15. [✅✅✅ 신규 추가] 관리자 명령어 한글 이름 맵
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 ADMIN_ACTION_MAP = {
-    # --- 핵심 기능 ---
-    "status_show": "[현황] 설정 대시보드 표시",
-    "server_id_set": "[중요] 서버 ID 설정",
-    # --- 패널 및 템플릿 관리 ---
-    "panels_regenerate_all": "[패널] 모든 관리 패널 재설치",
-    "template_edit": "[템플릿] 임베드 템플릿 편집",
+    "status_show": "[현황] 설정 대시보드 표시", "server_id_set": "[중요] 서버 ID 설정",
+    "panels_regenerate_all": "[패널] 모든 관리 패널 재설치", "template_edit": "[템플릿] 임베드 템플릿 편집",
     "request_regenerate_all_game_panels": "[게임] 모든 게임 패널 재설치 요청",
-    # --- 역할 관리 ---
     "roles_sync": "[역할] 모든 역할 DB와 동기화",
-    # --- 통계 채널 관리 ---
-    "stats_set": "[통계] 통계 채널 설정/제거",
-    "stats_refresh": "[통계] 모든 통계 채널 새로고침",
-    "stats_list": "[통계] 설정된 통계 채널 목록",
-    # --- 유저 데이터 관리 ---
-    "coin_give": "[코인] 유저에게 코인 지급",
-    "coin_take": "[코인] 유저의 코인 차감",
-    "xp_give": "[XP] 유저에게 XP 지급",
-    "level_set": "[레벨] 유저 레벨 설정",
+    "stats_set": "[통계] 통계 채널 설정/제거", "stats_refresh": "[통계] 모든 통계 채널 새로고침", "stats_list": "[통계] 설정된 통계 채널 목록",
+    "coin_give": "[코인] 유저에게 코인 지급", "coin_take": "[코인] 유저의 코인 차감",
+    "xp_give": "[XP] 유저에게 XP 지급", "level_set": "[레벨] 유저 레벨 설정",
+}
+
+# [✅✅✅ 신규 추가] UI에 표시될 모든 텍스트를 중앙에서 관리합니다.
+UI_STRINGS = {
+    "commerce": {
+        "item_view_desc": "現在の所持金: `{balance}`{currency_icon}\n購入したい商品を選択してください。",
+        "wip_category": "このカテゴリーの商品は現在準備中です。"
+    },
+    "profile_view": {
+        "base_title": "{user_name}の持ち物",
+        "tabs": {
+            "info": {"title_suffix": " - 情報", "label": "情報", "emoji": "ℹ️"},
+            "item": {"title_suffix": " - アイテム", "label": "アイテム", "emoji": "📦"},
+            "gear": {"title_suffix": " - 装備", "label": "装備", "emoji": "⚔️"},
+            "fish": {"title_suffix": " - 水槽", "label": "水槽", "emoji": "🐠"},
+            "seed": {"title_suffix": " - 種", "label": "種", "emoji": "🌱"},
+            "crop": {"title_suffix": " - 作物", "label": "作物", "emoji": "🌾"},
+        },
+        "info_tab": {
+            "description": "下のタブを選択して、詳細情報を確認できます。",
+            "field_balance": "所持金",
+            "field_rank": "等級",
+            "default_rank_name": "かけだし住民"
+        },
+        "item_tab": {"no_items": "所持しているアイテムがありません。"},
+        "gear_tab": {"no_owned_gear": "所持している装備がありません。"},
+        "fish_tab": {
+            "no_fish": "水槽に魚がいません。",
+            "pagination_footer": "ページ {current_page} / {total_pages}"
+        },
+        "seed_tab": {"no_items": "所持している種がありません。"},
+        "crop_tab": {"no_items": "所持している作物がありません。"},
+        "wip_tab": {"description": "この機能は現在準備中です。"},
+        "pagination_buttons": {"prev": "◀", "next": "▶"},
+        "gear_select_view": {
+            "embed_title": "{category_name} 変更",
+            "embed_description": "装備したいアイテムを選択してください。",
+            "placeholder": "{category_name}を選択...",
+            "unequip_prefix": "✋",
+            "back_button": "戻る"
+        }
+    }
 }
