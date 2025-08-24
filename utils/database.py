@@ -1,4 +1,4 @@
-# bot-management/utils/database.py
+# utils/database.py (양쪽 봇 공용)
 """
 Supabase 데이터베이스와의 모든 상호작용을 관리하는 중앙 파일입니다.
 """
@@ -23,7 +23,6 @@ from .ui_defaults import (
 
 logger = logging.getLogger(__name__)
 
-# JST 타임존 객체 생성
 JST = timezone(timedelta(hours=9))
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -81,9 +80,8 @@ def supabase_retry_handler(retries: int = 3, delay: int = 2):
         return wrapper
     return decorator
 
-# ... (sync_defaults_to_db, load_all_data_from_db 등 다른 함수들은 변경 없이 그대로 유지) ...
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 3. 데이터 로드 및 동기화 (이전과 동일)
+# 3. 데이터 로드 및 동기화
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 async def sync_defaults_to_db():
     logger.info("------ [ 기본값 DB 동기화 시작 ] ------")
@@ -128,7 +126,7 @@ async def load_all_data_from_db():
     logger.info("------ [ 모든 DB 데이터 캐시 로드 완료 ] ------")
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 4. 설정 (bot_configs) 관련 함수 (이전과 동일)
+# 4. 설정 (bot_configs) 관련 함수
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def load_bot_configs_from_db():
@@ -148,7 +146,7 @@ def get_config(key: str, default: Any = None) -> Any:
     return _bot_configs_cache.get(key, default)
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 5. ID (channel_configs) 관련 함수 (이전과 동일)
+# 5. ID (channel_configs) 관련 함수
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def load_channel_ids_from_db():
@@ -168,7 +166,7 @@ async def save_id_to_db(key: str, object_id: int) -> bool:
             logger.info(f"✅ '{key}' ID({object_id})를 DB와 캐시에 저장했습니다.")
             return True
         else:
-            logger.error(f"❌ '{key}' ID({object_id})를 DB에 저장하려 했으나, DB가 성공 응답을 반환하지 않았습니다. (RLS 정책 확인 필요)")
+            logger.error(f"❌ '{key}' ID({object_id})를 DB에 저장하려 했으나, DB가 성공 응답을 반환하지 않았습니다.")
             return False
     except Exception as e:
         logger.error(f"❌ '{key}' ID 저장 중 예외 발생: {e}", exc_info=True)
@@ -187,7 +185,7 @@ def get_panel_id(panel_name: str) -> Optional[Dict[str, int]]:
     return {"message_id": message_id, "channel_id": channel_id} if message_id and channel_id else None
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# ... (6번부터 15번까지의 함수들은 변경 없이 그대로 유지됩니다) ...
+# 6. 임베드 및 UI 컴포넌트 관련 함수
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def save_embed_to_db(embed_key: str, embed_data: dict):
@@ -279,6 +277,12 @@ async def get_total_warning_count(user_id: int, guild_id: int) -> int:
 async def add_anonymous_message(guild_id: int, user_id: int, content: str):
     await supabase.table('anonymous_messages').insert({"guild_id": guild_id, "user_id": user_id, "message_content": content}).execute()
 @supabase_retry_handler()
+async def has_posted_anonymously_today(user_id: int) -> bool:
+    today_jst_start = datetime.now(JST).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_utc_start = today_jst_start.astimezone(timezone.utc)
+    response = await supabase.table('anonymous_messages').select('id', count='exact').eq('user_id', user_id).gte('created_at', today_utc_start.isoformat()).limit(1).execute()
+    return response.count > 0 if response else False
+@supabase_retry_handler()
 async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime):
     await supabase.table('reminders').update({"is_active": False}).eq('guild_id', guild_id).eq('reminder_type', reminder_type).eq('is_active', True).execute()
     await supabase.table('reminders').insert({"guild_id": guild_id, "reminder_type": reminder_type, "remind_at": remind_at.isoformat(), "is_active": True}).execute()
@@ -295,10 +299,6 @@ async def update_wallet(user: discord.User, amount: int) -> Optional[dict]:
     params = {'p_user_id': str(user.id), 'p_amount': amount}
     response = await supabase.rpc('update_wallet_balance', params).execute()
     return response.data[0] if response and response.data else None
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 16. 재참여 유저 데이터 관련 함수 (이전과 동일)
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def backup_member_data(user_id: int, guild_id: int, role_ids: List[int], nickname: Optional[str]):
     await supabase.table('left_members').upsert({ 'user_id': user_id, 'guild_id': guild_id, 'roles': role_ids, 'nickname': nickname, 'left_at': datetime.now(timezone.utc).isoformat() }).execute()
@@ -309,27 +309,19 @@ async def get_member_backup(user_id: int, guild_id: int) -> Optional[Dict[str, A
 @supabase_retry_handler()
 async def delete_member_backup(user_id: int, guild_id: int):
     await supabase.table('left_members').delete().eq('user_id', user_id).eq('guild_id', guild_id).execute()
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 17. 게임 기능 관련 함수 (이전과 동일)
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 @supabase_retry_handler()
 async def get_user_abilities(user_id: int) -> List[str]:
     CACHE_TTL = 300
     now = time.time()
-    
     if user_id in _user_abilities_cache:
         cached_data, timestamp = _user_abilities_cache[user_id]
         if now - timestamp < CACHE_TTL:
             return cached_data
-
     response = await supabase.rpc('get_user_ability_keys', {'p_user_id': user_id}).execute()
-    
     if response and hasattr(response, 'data'):
         abilities = response.data if response.data else []
         _user_abilities_cache[user_id] = (abilities, now)
         return abilities
-    
     _user_abilities_cache[user_id] = ([], now)
     return []
 
