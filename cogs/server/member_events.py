@@ -112,9 +112,8 @@ class MemberEvents(commands.Cog):
             embed_data = await get_embed_from_db('farewell_embed')
             if embed_data:
                 # [✅✅✅ 핵심 수정 ✅✅✅]
-                # ui_defaults.py의 placeholder와 동일한 키워드 인자(member_name)를 사용합니다.
-                # member.display_name은 닉네임이 있으면 닉네임을, 없으면 유저명을 보여주므로 가장 적합합니다.
-                embed = format_embed_from_db(embed_data, member_name=member.display_name)
+                # member.display_name (닉네임) 대신 member.name (사용자명)을 사용합니다.
+                embed = format_embed_from_db(embed_data, member_name=member.name)
                 if member.display_avatar:
                     embed.set_thumbnail(url=member.display_avatar.url)
                 await channel.send(embed=embed)
