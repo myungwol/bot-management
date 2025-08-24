@@ -266,21 +266,17 @@ class ServerSystem(commands.Cog):
             if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
                 await cog_to_reload.load_configs()
             
-            # [✅✅✅ 핵심 수정 ✅✅✅]
-            # 설정하려는 패널이 '[게임]' 패널인지 확인합니다.
             is_game_panel = "[게임]" in friendly_name
 
             if config.get("type") == "panel":
-                # [수정] 게임 패널일 경우, 직접 생성하지 않고 DB에 요청만 남깁니다.
                 if is_game_panel:
                     timestamp = datetime.now(timezone.utc).timestamp()
                     await save_config_to_db(f"panel_regenerate_request_{setting_key}", timestamp)
                     await interaction.followup.send(
-                        f"✅ **{friendly_name}** 의 채널을 {channel.mention}(으)로 설정하고, 게임 봇에게 패널 생성을 요청했습니다.\n"
-                        "잠시 후 게임 봇이 해당 채널에 패널을 생성할 것입니다.",
+                        f"✅ **{friendly_name}** の 채널을 {channel.mention}(으)로 설정하고, 게임 봇에게 패널 생성을 요청했습니다。\n"
+                        "잠시 후 게임 봇이 해당 채널에 패널을 생성할 것입니다。",
                         ephemeral=True
                     )
-                # [수정] 게임 패널이 아닌 경우 (서버 관리 봇의 패널)에만 직접 생성합니다.
                 elif hasattr(cog_to_reload, 'regenerate_panel'):
                     success = False
                     if config["cog_name"] == "TicketSystem":
@@ -333,7 +329,6 @@ class ServerSystem(commands.Cog):
                             failure_list.append(f"・`{friendly_name}`: 設定情報が不完全です。")
                             continue
 
-                        # [수정] 게임 패널은 요청만, 서버 패널은 직접 실행
                         is_game_panel = "[게임]" in friendly_name
                         if is_game_panel:
                             timestamp = datetime.now(timezone.utc).timestamp()
@@ -497,125 +492,4 @@ class ServerSystem(commands.Cog):
         amount_str = f"+{amount:,}" if amount > 0 else f"{amount:,}"
         
         embed = discord.Embed(
-            description=f"⚙️ {admin.mention}さんが{target.mention}さんのコインを`{amount_str}`{currency_icon}だけ**{action}**しました。",
-            color=action_color
-        )
-        try:
-            await log_channel.send(embed=embed)
-        except Exception as e:
-            logger.error(f"管理者のコイン操作ログ送信に失敗しました: {e}", exc_info=True)
-
-    @admin_group.command(name="コイン付与", description="[管理者専用] 特定のユーザーにコインを付与します。")
-    @app_commands.describe(user="コインを付与するユーザー", amount="付与するコインの量")
-    @app_commands.check(is_admin)
-    async def give_coin(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
-        await interaction.response.defer(ephemeral=True)
-        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
-        
-        result = await update_wallet(user, amount)
-        if result:
-            await self.log_coin_admin_action(interaction.user, user, amount, "付与")
-            await interaction.followup.send(f"✅ {user.mention}さんへ `{amount:,}`{currency_icon}を付与しました。")
-        else:
-            await interaction.followup.send("❌ コイン付与中にエラーが発生しました。")
-    
-    @admin_group.command(name="コイン削減", description="[管理者専用] 特定のユーザーのコインを削減します。")
-    @app_commands.describe(user="コインを削減するユーザー", amount="削減するコインの量")
-    @app_commands.check(is_admin)
-    async def take_coin(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
-        await interaction.response.defer(ephemeral=True)
-        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
-
-        result = await update_wallet(user, -amount)
-        if result:
-            await self.log_coin_admin_action(interaction.user, user, -amount, "削減")
-            await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{currency_icon}を削減しました。")
-        else:
-            await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
-            
-    async def _trigger_level_up_events(self, user: discord.Member, result_data: Dict[str, Any]):
-        if not result_data or not result_data.get('leveled_up'):
-            return
-        new_level = result_data.get('new_level')
-        if not new_level:
-            return
-        logger.info(f"유저 {user.display_name}(ID: {user.id})가 레벨 {new_level}(으)로 변경되어, 레벨업 이벤트를 트리거합니다.")
-        game_config = get_config("GAME_CONFIG", {})
-        job_advancement_levels = game_config.get("JOB_ADVANCEMENT_LEVELS", [])
-        timestamp = time.time()
-        
-        if new_level in job_advancement_levels:
-            await save_config_to_db(f"job_advancement_request_{user.id}", {"level": new_level, "timestamp": timestamp})
-            logger.info(f"유저가 전직 가능 레벨({new_level})에 도달하여 DB에 전직 요청을 기록했습니다.")
-
-        await save_config_to_db(f"level_tier_update_request_{user.id}", {"level": new_level, "timestamp": timestamp})
-        logger.info(f"유저의 레벨이 변경되어 DB에 등급 역할 업데이트 요청을 기록했습니다.")
-
-    async def _update_user_xp_and_level(self, user: discord.Member, xp_to_add: int = 0, source: str = 'admin', exact_level: Optional[int] = None) -> tuple[int, int]:
-        res = await supabase.table('user_levels').select('level, xp').eq('user_id', user.id).maybe_single().execute()
-        
-        if res and res.data:
-            current_data = res.data
-        else:
-            current_data = {'level': 1, 'xp': 0}
-
-        current_level, current_xp = current_data['level'], current_data['xp']
-        
-        new_total_xp = current_xp
-        leveled_up = False
-
-        if exact_level is not None:
-            new_level = exact_level
-            new_total_xp = calculate_xp_for_level(new_level)
-            if new_level > current_level:
-                leveled_up = True
-        else:
-            new_total_xp += xp_to_add
-            if xp_to_add > 0:
-                await supabase.table('xp_logs').insert({'user_id': user.id, 'source': source, 'xp_amount': xp_to_add}).execute()
-            
-            new_level = current_level
-            # [개선] 레벨업 공식을 사용하여 다음 레벨까지 필요한 총 경험치량과 비교
-            while new_total_xp >= calculate_xp_for_level(new_level + 1):
-                new_level += 1
-            
-            if new_level > current_level:
-                leveled_up = True
-        
-        await supabase.table('user_levels').upsert({
-            'user_id': user.id,
-            'level': new_level,
-            'xp': new_total_xp
-        }).execute()
-        
-        if leveled_up:
-            await self._trigger_level_up_events(user, {"leveled_up": True, "new_level": new_level})
-            
-        return new_level, new_total_xp
-
-    @admin_group.command(name="xp부여", description="[관리자 전용] 특정 유저에게 XP를 부여합니다.")
-    @app_commands.describe(user="XP를 부여할 유저", amount="부여할 XP 양")
-    @app_commands.check(is_admin)
-    async def give_xp(self, interaction: discord.Interaction, user: discord.Member, amount: app_commands.Range[int, 1, None]):
-        await interaction.response.defer(ephemeral=True)
-        try:
-            new_level, _ = await self._update_user_xp_and_level(user, xp_to_add=amount, source='admin')
-            await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여했습니다. (현재 레벨: {new_level})")
-        except Exception as e:
-            logger.error(f"XP 부여 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ XP 부여 중 오류가 발생했습니다.")
-
-    @admin_group.command(name="레벨설정", description="[관리자 전용] 특정 유저의 레벨을 강제로 설정합니다.")
-    @app_commands.describe(user="레벨을 설정할 유저", level="설정할 레벨")
-    @app_commands.check(is_admin)
-    async def set_level(self, interaction: discord.Interaction, user: discord.Member, level: app_commands.Range[int, 1, None]):
-        await interaction.response.defer(ephemeral=True)
-        try:
-            await self._update_user_xp_and_level(user, exact_level=level)
-            await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정했습니다。")
-        except Exception as e:
-            logger.error(f"레벨 설정 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ レベル設定中にエラーが発生しました。")
-            
-async def setup(bot: commands.Bot):
-    await bot.add_cog(ServerSystem(bot))
+            description=f"⚙️ {admin.mention}さんが{target.mention}さんのコインを`{amount_
