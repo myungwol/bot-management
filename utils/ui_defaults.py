@@ -292,7 +292,6 @@ SETUP_COMMAND_MAP = {
     "log_channel": {"type": "channel", "cog_name": "ChannelLogger", "key": "log_channel_channel", "friendly_name": "[로그] 채널 관리 (생성/삭제/변경)", "channel_type": "text"},
     "log_server":  {"type": "channel", "cog_name": "ServerLogger",  "key": "log_channel_server",  "friendly_name": "[로그] 서버 및 역할 관리", "channel_type": "text"},
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
-    "channel_job_log": {"type": "channel", "cog_name": "LevelSystem", "key": "job_log_channel_id", "friendly_name": "[로그] 전직 기록", "channel_type": "text"},
     "log_daily_check":       {"type": "channel", "cog_name": "DailyCheck", "key": "log_daily_check_channel_id",             "friendly_name": "[로그] 출석체크 기록", "channel_type": "text"},
     "log_market": {"type": "channel", "cog_name": "EconomyCore", "key": "market_log_channel_id", "friendly_name": "[로그] 시장 시세 변동", "channel_type": "text"},
     "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "[로그] 코인 활동", "channel_type": "text"},
