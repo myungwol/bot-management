@@ -119,7 +119,8 @@ UI_EMBEDS = {
     "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。\n\n**※すべてのメッセージはサーバー管理者が記録・確認しており、問題発生時には投稿者を特定し対処します。**", "color": 4342323},    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     "panel_custom_embed": {"title": "📢 カスタムメッセージ送信パネル", "description": "下のボタンを押して、指定したチャンネルにBotから埋め込みメッセージを送信します。\n\n**この機能は特定の役職を持つスタッフのみ使用可能です。**", "color": 0x34495E},
     "log_job_advancement": {"title": "🎉 新たな転職者！", "description": "{user_mention}さんがついに新たな道を選択しました。", "color": 0xFFD700, "fields": [{"name": "職業", "value": "```\n{job_name}\n```", "inline": True}, {"name": "選択した能力", "value": "```\n{ability_name}\n```", "inline": True}], "footer": {"text": "これからの活躍を期待しています！"}},
-    "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "> アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2},
+    # [✅✅✅ 핵심 수정] 상점 패널에 가격 변동을 표시할 'fields' 항목을 추가합니다.
+    "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "> アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2, "fields": [{"name": "📢 今日の主な相場変動", "value": "{market_updates}", "inline": False}]},
     "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "> 川辺でのんびり釣りを楽しみましょう。\n> 下のボタンを押して釣りを開始します。", "color": 0x5865F2},
     "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "> 広い海で大物の夢を追いかけましょう！\n> 下のボタンを押して釣りを開始します。", "color": 0x3498DB},
     "panel_atm": {"title": "🏧 Dico森 ATM", "description": "> 下のボタンから、他の住民にコインを送金できます。", "color": 0x2ECC71},
