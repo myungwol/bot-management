@@ -313,7 +313,7 @@ UI_STRINGS = {
         "tabs": [
             {"key": "info", "title_suffix": " - 情報", "label": "情報", "emoji": "ℹ️"},
             {"key": "item", "title_suffix": " - アイテム", "label": "アイテム", "emoji": "📦"},
-            {"key": "gear", "title_suffix": " - 装備", "label": "装備", "emoji": "⚔️"},
+            {"key": "gear", "title_suffix": " - 装備", "label": "装備", "emoji": "⚒️"},
             {"key": "fish", "title_suffix": " - 水槽", "label": "水槽", "emoji": "🐠"},
             {"key": "seed", "title_suffix": " - 種", "label": "種", "emoji": "🌱"},
             {"key": "crop", "title_suffix": " - 作物", "label": "作物", "emoji": "🌾"}
