@@ -290,11 +290,14 @@ JOB_ADVANCEMENT_DATA = {
         {"job_key": "master_farmer", "job_name": "大農家", "role_key": "role_job_master_farmer", "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。", "prerequisite_job": "farmer", "abilities": [{"ability_key": "farm_yield_up_2", "ability_name": "収穫量UP (大)", "description": "作物を収穫する際の収穫量が大幅に増加します。"}, {"ability_key": "farm_growth_speed_up_2", "ability_name": "成長速度UP (大)", "description": "作物の成長に必要な時間が短縮されます。"}]}
     ]
 }
+
+# --- [✅✅✅ 핵심 수정] ADMIN_ACTION_MAP에 strings_sync 액션을 추가합니다. ---
 ADMIN_ACTION_MAP = {
     "status_show": "[현황] 설정 대시보드 표시", "server_id_set": "[중요] 서버 ID 설정",
     "panels_regenerate_all": "[패널] 모든 관리 패널 재설치", "template_edit": "[템플릿] 임베드 템플릿 편집",
     "request_regenerate_all_game_panels": "[게임] 모든 게임 패널 재설치 요청",
     "roles_sync": "[역할] 모든 역할 DB와 동기화",
+    "strings_sync": "[UI] 모든 UI 텍스트 DB와 동기화", # <-- 이 줄이 추가되었습니다!
     "stats_set": "[통계] 통계 채널 설정/제거", "stats_refresh": "[통계] 모든 통계 채널 새로고침", "stats_list": "[통계] 설정된 통계 채널 목록",
     "coin_give": "[코인] 유저에게 코인 지급", "coin_take": "[코인] 유저의 코인 차감",
     "xp_give": "[XP] 유저에게 XP 지급", "level_set": "[레벨] 유저 레벨 설정",
