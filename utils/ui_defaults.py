@@ -144,10 +144,10 @@ UI_EMBEDS = {
     "embed_whale_reset_announcement": { "title": "🐋 海からの噂…", "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。", "color": 0x3498DB, "footer": {"text": "今月のヌシが海に戻ってきました。"} },
     
     # [✅✅✅ 핵심 수정 ✅✅✅]
-    # '주간 챔피언'을 표시할 새로운 임베드 템플릿을 추가합니다.
+    # '주간' 대신 '종합' 챔피언을 의미하도록 텍스트를 수정합니다.
     "embed_weekly_champions": {
-        "title": "🏆 今週のチャンピオン 🏆",
-        "description": "先週、各分野で最も輝いた住民を紹介します！\n今週も皆さんの活躍を期待しています！",
+        "title": "🏆 総合チャンピオン 🏆",
+        "description": "各分野で最も輝いている総合1位の住民を紹介します！",
         "color": 0xFFD700,
         "fields": [
             {"name": "👑 総合レベル", "value": "{level_champion}", "inline": False},
@@ -179,7 +179,6 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "open_quests", "panel_key": "panel_tasks", "component_type": "button", "label": "クエスト確認", "style": "primary", "emoji": "📜", "row": 0, "order_in_row": 1},
     {"component_key": "create_farm", "panel_key": "panel_farm_creation", "component_type": "button", "label": "農場を作る", "style": "success", "emoji": "🌱", "row": 0, "order_in_row": 0},
 ]
-# [✅ 수정] HallOfFame 관련 설정을 제거합니다.
 SETUP_COMMAND_MAP = {
     "panel_roles":      {"type": "panel",   "cog_name": "RolePanel",    "key": "auto_role_channel_id",            "friendly_name": "역할 자동부여 패널", "channel_type": "text"},
     "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "서버 안내 패널", "channel_type": "text"},
