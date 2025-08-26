@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 # 채널 타입별 기본 설정값 (일본어)
 CHANNEL_TYPE_INFO = {
-    "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "みんなの広場"},
-    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "ゲーム名などに変更してください"},
+    "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "みんなの広場", "min_limit": 4}, # [수정] 광장 최소 인원 4명 설정
+    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "ゲーム名などに変更してください", "min_limit": 3}, # [수정] 게임 최소 인원 3명 설정
     "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "初心者のベンチ"},
     "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のハウス"},
     "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}の部屋"} # Fallback
@@ -174,8 +174,18 @@ class ControlPanelView(ui.View):
                 base_name = modal.name_input.value if hasattr(modal, 'name_input') else vc.name.split('꒱')[-1].strip()
                 new_name = f"・ {type_info['emoji']} ꒱ {base_name.strip()}"
             if type_info["limit_editable"] and hasattr(modal, 'limit_input') and modal.limit_input.value:
-                try: new_limit = int(modal.limit_input.value); assert 0 <= new_limit <= 99
-                except (ValueError, TypeError, AssertionError): return await interaction.followup.send("❌ 人数制限は0から99までの数字で入力してください。", ephemeral=True)
+                try: 
+                    new_limit = int(modal.limit_input.value)
+                    assert 0 <= new_limit <= 99
+                    
+                    # [수정] 최소 인원 제한 로직 추가
+                    min_limit = type_info.get("min_limit", 0)
+                    if new_limit != 0 and new_limit < min_limit:
+                        await interaction.followup.send(f"❌ このチャンネルの最小人数は{min_limit}人です。{min_limit}人以上に設定するか、0(無制限)に設定してください。", ephemeral=True)
+                        return
+
+                except (ValueError, TypeError, AssertionError): 
+                    return await interaction.followup.send("❌ 人数制限は0から99までの数字で入力してください。", ephemeral=True)
             await vc.edit(name=new_name, user_limit=new_limit, reason=f"{interaction.user.display_name}の要請"); await interaction.followup.send("✅ チャンネル設定を更新しました。", ephemeral=True)
     async def transfer_owner(self, interaction: discord.Interaction):
         view = ui.View(timeout=180).add_item(VCOwnerSelect(self)); await interaction.response.send_message("新しい所有者を選んでください。", view=view, ephemeral=True)
@@ -344,7 +354,10 @@ class VoiceMaster(commands.Cog):
         return await guild.create_voice_channel(name=vc_name, category=target_category, overwrites=overwrites, user_limit=user_limit, reason=f"{member.display_name}の要請")
 
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
-        overwrites = {owner: discord.PermissionOverwrite(manage_channels=True, manage_permissions=True, connect=True)}
+        # [수정] 채널 소유자에게 manage_channels, manage_permissions 권한을 더 이상 부여하지 않습니다.
+        # 오직 패널을 통해서만 제어할 수 있도록 connect 권한만 부여합니다.
+        overwrites = {owner: discord.PermissionOverwrite(connect=True)}
+        
         if channel_type in ['vip', 'newbie']:
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
         else:
@@ -384,12 +397,13 @@ class VoiceMaster(commands.Cog):
         if not info or not interaction.guild: return await interaction.followup.send("❌ チャンネル情報が見つかりません。", ephemeral=True)
         old_owner = interaction.guild.get_member(info['owner_id'])
         try:
-            await vc.set_permissions(new_owner, manage_channels=True, manage_permissions=True, connect=True)
+            # [수정] 새로운 소유자에게도 manage_channels 권한을 주지 않습니다.
+            await vc.set_permissions(new_owner, connect=True)
             if old_owner: await vc.set_permissions(old_owner, overwrite=None)
             
             await update_temp_channel_owner(vc.id, new_owner.id)
             self.temp_channels[vc.id]['owner_id'] = new_owner.id
-            self.user_channel_map.pop(old_owner.id, None)
+            if old_owner: self.user_channel_map.pop(old_owner.id, None)
             self.user_channel_map[new_owner.id] = vc.id
             
             panel_message = await vc.fetch_message(info['message_id'])
