@@ -119,7 +119,6 @@ UI_EMBEDS = {
     "panel_anonymous_board": {"title": "🤫 匿名の声", "description": "誰にも知られずにあなたの考えや気持ちを共有しましょう。\n下のボタンを押して、1日に1回メッセージを投稿できます。\n\n**※すべてのメッセージはサーバー管理者が記録・確認しており、問題発生時には投稿者を特定し対処します。**", "color": 4342323},    "anonymous_message": {"title": "匿名の声が届きました", "color": 16777215},
     "panel_custom_embed": {"title": "📢 カスタムメッセージ送信パネル", "description": "下のボタンを押して、指定したチャンネルにBotから埋め込みメッセージを送信します。\n\n**この機能は特定の役職を持つスタッフのみ使用可能です。**", "color": 0x34495E},
     "log_job_advancement": {"title": "🎉 新たな転職者！", "description": "{user_mention}さんがついに新たな道を選択しました。", "color": 0xFFD700, "fields": [{"name": "職業", "value": "```\n{job_name}\n```", "inline": True}, {"name": "選択した能力", "value": "```\n{ability_name}\n```", "inline": True}], "footer": {"text": "これからの活躍を期待しています！"}},
-    # [✅✅✅ 핵심 수정] 상점 패널에 가격 변동을 표시할 'fields' 항목을 추가합니다.
     "panel_commerce": {"title": "🏪 Dico森商店＆買取ボックス", "description": "> アイテムを買ったり、釣った魚などを売ったりできます。", "color": 0x5865F2, "fields": [{"name": "📢 今日の主な相場変動", "value": "{market_updates}", "inline": False}]},
     "panel_fishing_river": {"title": "🏞️ 川の釣り場", "description": "> 川辺でのんびり釣りを楽しみましょう。\n> 下のボタンを押して釣りを開始します。", "color": 0x5865F2},
     "panel_fishing_sea": {"title": "🌊 海の釣り場", "description": "> 広い海で大物の夢を追いかけましょう！\n> 下のボタンを押して釣りを開始します。", "color": 0x3498DB},
@@ -133,9 +132,12 @@ UI_EMBEDS = {
     "log_slot_machine_lose": { "title": "💧 **スロットマシン** 💧", "description": "**{user_mention}** さんは **`{bet_amount:,}`** {currency_icon} を失いました。\n> 次の幸運を祈ります！", "color": 0xF44336, "fields": [{"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "結果", "value": "**{result_text}**", "inline": True}] },
     "panel_rps_game": { "title": "✊✌️✋ じゃんけん部屋", "description": "> 他の村人とじゃんけん勝負！\n> 下のボタンを押して部屋を作成し、参加者と勝負できます。", "color": 0x9B59B6 },
     "log_rps_game_end": { "title": "🏆 **じゃんけん勝負終了！** 🏆", "description": "**{winner_mention}** さんが最終勝者となりました！", "color": 0xFFD700, "fields": [{"name": "💰 総賞金", "value": "> **`{total_pot:,}`** {currency_icon}", "inline": False}, {"name": "ベット額 (1人当たり)", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "👥 参加者", "value": "{participants_list}", "inline": False}] },
-    "panel_daily_check": {"title": "✅ 出席チェック", "description": "> 下のボタンを押して、毎日の出席報酬を受け取りましょう！", "color": 0x4CAF50},
+    
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # 출석체크 패널 임베드를 삭제하고, 새로운 '태스크보드' 임베드를 추가합니다.
+    "panel_tasks": {"title": "✅ タスクボード", "description": "> 下のボタンを押して、毎日の出席報酬を受け取ったり、クエストを確認したりしましょう！", "color": 0x4CAF50},
     "log_daily_check": {"title": "✅ 出席チェック完了", "description": "{user_mention}さんが出席し、**`{reward}`**{currency_icon}を受け取りました。", "color": 0x8BC34A},
-    "panel_quests": {"title": "📜 クエストボード", "description": "> 下のボタンを押して、デイリー・ウィークリークエストを確認できます。", "color": 0x795548},
+    
     "panel_farm_creation": {"title": "🌾 自分だけの農場を作ろう！", "description": "> 下のボタンを押して、あなただけの農場(プライベートスレッド)を作成します。\n> 自分だけの空間で、作物を育ててみましょう！", "color": 0x8BC34A},
     "farm_thread_welcome": {"title": "{user_name}さんの農場", "description": "ようこそ！ここはあなただけの農場です。\n\n**始め方:**\n1. まずは商店で「古いクワ」と「種」を購入します。\n2. 下のボタンから畑を耕し、種を植えましょう！", "color": 0x4CAF50},
     "log_coin_gain": { "title": "🪙 コイン獲得のお知らせ", "description": "{user_mention}さんが活動報酬でコインを獲得しました。", "color": 0x2ECC71, "fields": [{"name": "獲得者", "value": "{user_mention}", "inline": True}, {"name": "獲得コイン", "value": "+{amount}{currency_icon}", "inline": True}], "footer": {"text": "おめでとうございます！"} },
@@ -145,6 +147,8 @@ UI_EMBEDS = {
     "log_whale_catch": { "title": "🐋 今月のヌシ、現る！ 🐋", "description": "今月、ただ一度だけ姿を見せるという幻の**クジラ**が、**{user_mention}**さんの手によって釣り上げられました！\n\n巨大な影は、来月まで再び深い海の底へと姿を消します…。", "color": "0x206694", "fields": [ {"name": "釣り上げられたヌシ", "value": "{emoji} **{name}**\n**サイズ**: `{size}`cm\n**価値**: `{value}`{currency_icon}", "inline": False} ], "footer": {"text": "来月の挑戦者よ、来たれ！"} },
     "embed_whale_reset_announcement": { "title": "🐋 海からの噂…", "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。", "color": 0x3498DB, "footer": {"text": "今月のヌシが海に戻ってきました。"} }
 }
+# [✅✅✅ 핵심 수정 ✅✅✅]
+# 패널 버튼(컴포넌트) 설정을 새로운 '태스크보드'에 맞게 수정합니다.
 UI_PANEL_COMPONENTS = [
     {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0, "order_in_row": 0},
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0, "order_in_row": 0},
@@ -161,10 +165,13 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "start_dice_game", "panel_key": "panel_dice_game", "component_type": "button", "label": "サイコロゲーム開始", "style": "primary", "emoji": "🎲", "row": 0, "order_in_row": 0},
     {"component_key": "start_slot_machine", "panel_key": "panel_slot_machine", "component_type": "button", "label": "スロットをプレイ", "style": "success", "emoji": "🎰", "row": 0, "order_in_row": 0},
     {"component_key": "create_rps_room", "panel_key": "panel_rps_game", "component_type": "button", "label": "部屋を作る", "style": "secondary", "emoji": "✊", "row": 0, "order_in_row": 0},
-    {"component_key": "do_daily_check", "panel_key": "panel_daily_check", "component_type": "button", "label": "出席チェック", "style": "success", "emoji": "✅", "row": 0, "order_in_row": 0},
-    {"component_key": "open_quests", "panel_key": "panel_quests", "component_type": "button", "label": "クエスト確認", "style": "primary", "emoji": "📜", "row": 0, "order_in_row": 0},
+    {"component_key": "do_daily_check", "panel_key": "panel_tasks", "component_type": "button", "label": "出席チェック", "style": "success", "emoji": "✅", "row": 0, "order_in_row": 0},
+    {"component_key": "open_quests", "panel_key": "panel_tasks", "component_type": "button", "label": "クエスト確認", "style": "primary", "emoji": "📜", "row": 0, "order_in_row": 1},
     {"component_key": "create_farm", "panel_key": "panel_farm_creation", "component_type": "button", "label": "農場を作る", "style": "success", "emoji": "🌱", "row": 0, "order_in_row": 0},
 ]
+# [✅✅✅ 핵심 수정 ✅✅✅]
+# /admin setup 명령어에서 사용할 패널 목록을 수정합니다.
+# panel_daily_check와 panel_quests를 삭제하고, 새로운 panel_tasks를 추가합니다.
 SETUP_COMMAND_MAP = {
     "panel_roles":      {"type": "panel",   "cog_name": "RolePanel",    "key": "auto_role_channel_id",            "friendly_name": "역할 자동부여 패널", "channel_type": "text"},
     "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "서버 안내 패널", "channel_type": "text"},
@@ -183,8 +190,7 @@ SETUP_COMMAND_MAP = {
     "panel_dice_game":       {"type": "panel", "cog_name": "DiceGame",    "key": "dice_game_panel_channel_id",       "friendly_name": "[게임] 주사위 게임 패널", "channel_type": "text"},
     "panel_slot_machine":    {"type": "panel", "cog_name": "SlotMachine", "key": "slot_machine_panel_channel_id",  "friendly_name": "[게임] 슬롯머신 패널", "channel_type": "text"},
     "panel_rps_game":        {"type": "panel", "cog_name": "RPSGame",     "key": "rps_game_panel_channel_id",        "friendly_name": "[게임] 가위바위보 패널", "channel_type": "text"},
-    "panel_daily_check":   {"type": "panel", "cog_name": "DailyCheck",  "key": "daily_check_panel_channel_id", "friendly_name": "[게임] 출석체크 패널", "channel_type": "text"},
-    "panel_quests":        {"type": "panel", "cog_name": "Quests",      "key": "quests_panel_channel_id",      "friendly_name": "[게임] 퀘스트 패널", "channel_type": "text"},
+    "panel_tasks":           {"type": "panel", "cog_name": "Quests",      "key": "tasks_panel_channel_id",           "friendly_name": "[게임] 일일 게시판 패널", "channel_type": "text"},
     "panel_farm_creation": {"type": "panel", "cog_name": "Farm",        "key": "farm_creation_panel_channel_id", "friendly_name": "[게임] 농장 생성 패널", "channel_type": "text"},
     "panel_inquiry": {"type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id", "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"},
     "panel_report":  {"type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",  "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"},
@@ -207,7 +213,7 @@ SETUP_COMMAND_MAP = {
     "log_channel": {"type": "channel", "cog_name": "ChannelLogger", "key": "log_channel_channel", "friendly_name": "[로그] 채널 관리 (생성/삭제/변경)", "channel_type": "text"},
     "log_server":  {"type": "channel", "cog_name": "ServerLogger",  "key": "log_channel_server",  "friendly_name": "[로그] 서버 및 역할 관리", "channel_type": "text"},
     "log_warning":   {"type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id", "friendly_name": "[로그] 경고 발행 기록", "channel_type": "text"},
-    "log_daily_check":       {"type": "channel", "cog_name": "DailyCheck", "key": "log_daily_check_channel_id",             "friendly_name": "[로그] 출석체크 기록", "channel_type": "text"},
+    "log_daily_check":       {"type": "channel", "cog_name": "Quests", "key": "log_daily_check_channel_id",             "friendly_name": "[로그] 출석체크 기록", "channel_type": "text"},
     "log_market": {"type": "channel", "cog_name": "EconomyCore", "key": "market_log_channel_id", "friendly_name": "[로그] 시장 시세 변동", "channel_type": "text"},
     "log_coin": {"type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id", "friendly_name": "[로그] 코인 활동", "channel_type": "text"},
     "log_job_advancement":     {"type": "channel", "cog_name": "LevelSystem", "key": "job_log_channel_id",         "friendly_name": "[로그] 전직 기록", "channel_type": "text"},
@@ -302,7 +308,6 @@ ADMIN_ACTION_MAP = {
     "xp_give": "[XP] 유저에게 XP 지급", "level_set": "[레벨] 유저 레벨 설정",
 }
 
-# [✅✅✅ 신규 추가] UI에 표시될 모든 텍스트를 중앙에서 관리합니다.
 UI_STRINGS = {
     "commerce": {
         "item_view_desc": "現在の所持金: `{balance}`{currency_icon}\n購入したい商品を選択してください。",
@@ -310,7 +315,6 @@ UI_STRINGS = {
     },
     "profile_view": {
         "base_title": "{user_name}の持ち物",
-        # [✅✅✅ 핵심 수정] 버튼 순서를 고정하기 위해 딕셔너리에서 리스트로 변경
         "tabs": [
             {"key": "info", "title_suffix": " - 情報", "label": "情報", "emoji": "ℹ️"},
             {"key": "item", "title_suffix": " - アイテム", "label": "アイテム", "emoji": "📦"},
