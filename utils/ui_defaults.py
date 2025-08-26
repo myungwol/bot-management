@@ -132,12 +132,8 @@ UI_EMBEDS = {
     "log_slot_machine_lose": { "title": "💧 **スロットマシン** 💧", "description": "**{user_mention}** さんは **`{bet_amount:,}`** {currency_icon} を失いました。\n> 次の幸運を祈ります！", "color": 0xF44336, "fields": [{"name": "ベット額", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "結果", "value": "**{result_text}**", "inline": True}] },
     "panel_rps_game": { "title": "✊✌️✋ じゃんけん部屋", "description": "> 他の村人とじゃんけん勝負！\n> 下のボタンを押して部屋を作成し、参加者と勝負できます。", "color": 0x9B59B6 },
     "log_rps_game_end": { "title": "🏆 **じゃんけん勝負終了！** 🏆", "description": "**{winner_mention}** さんが最終勝者となりました！", "color": 0xFFD700, "fields": [{"name": "💰 総賞金", "value": "> **`{total_pot:,}`** {currency_icon}", "inline": False}, {"name": "ベット額 (1人当たり)", "value": "`{bet_amount:,}` {currency_icon}", "inline": True}, {"name": "👥 参加者", "value": "{participants_list}", "inline": False}] },
-    
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 출석체크 패널 임베드를 삭제하고, 새로운 '태스크보드' 임베드를 추가합니다.
     "panel_tasks": {"title": "✅ タスクボード", "description": "> 下のボタンを押して、毎日の出席報酬を受け取ったり、クエストを確認したりしましょう！", "color": 0x4CAF50},
     "log_daily_check": {"title": "✅ 出席チェック完了", "description": "{user_mention}さんが出席し、**`{reward}`**{currency_icon}を受け取りました。", "color": 0x8BC34A},
-    
     "panel_farm_creation": {"title": "🌾 自分だけの農場を作ろう！", "description": "> 下のボタンを押して、あなただけの農場(プライベートスレッド)を作成します。\n> 自分だけの空間で、作物を育ててみましょう！", "color": 0x8BC34A},
     "farm_thread_welcome": {"title": "{user_name}さんの農場", "description": "ようこそ！ここはあなただけの農場です。\n\n**始め方:**\n1. まずは商店で「古いクワ」と「種」を購入します。\n2. 下のボタンから畑を耕し、種を植えましょう！", "color": 0x4CAF50},
     "log_coin_gain": { "title": "🪙 コイン獲得のお知らせ", "description": "{user_mention}さんが活動報酬でコインを獲得しました。", "color": 0x2ECC71, "fields": [{"name": "獲得者", "value": "{user_mention}", "inline": True}, {"name": "獲得コイン", "value": "+{amount}{currency_icon}", "inline": True}], "footer": {"text": "おめでとうございます！"} },
@@ -145,10 +141,24 @@ UI_EMBEDS = {
     "log_coin_admin": { "description": "⚙️ {admin_mention}さんが{target_mention}さんのコインを`{amount}`{currency_icon}だけ**{action}**しました。", "color": 0x3498DB },
     "embed_weather_forecast": { "title": "{emoji} Dico森の今日の天気予報", "description": "今日の天気は「**{weather_name}**」です！\n\n> {description}", "color": "{color}", "fields": [ {"name": "💡 今日のヒント", "value": "> {tip}", "inline": False} ], "footer": { "text": "天気は毎日午前0時に変わります。" } },
     "log_whale_catch": { "title": "🐋 今月のヌシ、現る！ 🐋", "description": "今月、ただ一度だけ姿を見せるという幻の**クジラ**が、**{user_mention}**さんの手によって釣り上げられました！\n\n巨大な影は、来月まで再び深い海の底へと姿を消します…。", "color": "0x206694", "fields": [ {"name": "釣り上げられたヌシ", "value": "{emoji} **{name}**\n**サイズ**: `{size}`cm\n**価値**: `{value}`{currency_icon}", "inline": False} ], "footer": {"text": "来月の挑戦者よ、来たれ！"} },
-    "embed_whale_reset_announcement": { "title": "🐋 海からの噂…", "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。", "color": 0x3498DB, "footer": {"text": "今月のヌシが海に戻ってきました。"} }
+    "embed_whale_reset_announcement": { "title": "🐋 海からの噂…", "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。", "color": 0x3498DB, "footer": {"text": "今月のヌシが海に戻ってきました。"} },
+    
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # '주간 챔피언'을 표시할 새로운 임베드 템플릿을 추가합니다.
+    "embed_weekly_champions": {
+        "title": "🏆 今週のチャンピオン 🏆",
+        "description": "先週、各分野で最も輝いた住民を紹介します！\n今週も皆さんの活躍を期待しています！",
+        "color": 0xFFD700,
+        "fields": [
+            {"name": "👑 総合レベル", "value": "{level_champion}", "inline": False},
+            {"name": "🎙️ ボイスチャット", "value": "{voice_champion}", "inline": False},
+            {"name": "💬 チャット", "value": "{chat_champion}", "inline": False},
+            {"name": "🎣 釣り", "value": "{fishing_champion}", "inline": False},
+            {"name": "🌾 収穫", "value": "{harvest_champion}", "inline": False}
+        ],
+        "footer": {"text": "毎週月曜日の0時に更新されます。"}
+    }
 }
-# [✅✅✅ 핵심 수정 ✅✅✅]
-# 패널 버튼(컴포넌트) 설정을 새로운 '태스크보드'에 맞게 수정합니다.
 UI_PANEL_COMPONENTS = [
     {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "案内を読む", "style": "success", "emoji": "📖", "row": 0, "order_in_row": 0},
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "名前変更申請", "style": "primary", "emoji": "✒️", "row": 0, "order_in_row": 0},
@@ -169,9 +179,7 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "open_quests", "panel_key": "panel_tasks", "component_type": "button", "label": "クエスト確認", "style": "primary", "emoji": "📜", "row": 0, "order_in_row": 1},
     {"component_key": "create_farm", "panel_key": "panel_farm_creation", "component_type": "button", "label": "農場を作る", "style": "success", "emoji": "🌱", "row": 0, "order_in_row": 0},
 ]
-# [✅✅✅ 핵심 수정 ✅✅✅]
-# /admin setup 명령어에서 사용할 패널 목록을 수정합니다.
-# panel_daily_check와 panel_quests를 삭제하고, 새로운 panel_tasks를 추가합니다.
+# [✅ 수정] HallOfFame 관련 설정을 제거합니다.
 SETUP_COMMAND_MAP = {
     "panel_roles":      {"type": "panel",   "cog_name": "RolePanel",    "key": "auto_role_channel_id",            "friendly_name": "역할 자동부여 패널", "channel_type": "text"},
     "panel_onboarding": {"type": "panel",   "cog_name": "Onboarding",   "key": "onboarding_panel_channel_id",     "friendly_name": "서버 안내 패널", "channel_type": "text"},
