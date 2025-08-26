@@ -144,10 +144,10 @@ UI_EMBEDS = {
     "embed_whale_reset_announcement": { "title": "🐋 海からの噂…", "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。", "color": 0x3498DB, "footer": {"text": "今月のヌシが海に戻ってきました。"} },
     
     # [✅✅✅ 핵심 수정 ✅✅✅]
-    # '주간' 대신 '종합' 챔피언을 의미하도록 텍스트를 수정합니다.
-    "embed_weekly_champions": {
-        "title": "🏆 総合チャンピオン 🏆",
-        "description": "各分野で最も輝いている総合1位の住民を紹介します！",
+    # panel_level_check를 삭제하고, panel_champion_board로 이름을 명확히 합니다.
+    "panel_champion_board": {
+        "title": "🏆 総合チャンピオンボード 🏆",
+        "description": "各分野で最も輝いている総合1位の住民を紹介します！\n下のボタンから、ご自身のステータスを確認したり、詳細ランキングを見ることができます。",
         "color": 0xFFD700,
         "fields": [
             {"name": "👑 総合レベル", "value": "{level_champion}", "inline": False},
