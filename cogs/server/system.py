@@ -134,6 +134,19 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ UI 텍스트 동기화 중 오류가 발생했습니다.")
             return
 
+        # [✅✅✅ 신규 추가] 게임 데이터 새로고침 로직
+        if action == "game_data_reload":
+            try:
+                # 게임 봇에게 DB를 다시 로드하라는 요청을 보냅니다.
+                await save_config_to_db("game_data_reload_request", time.time())
+                logger.info("게임 데이터 새로고침 요청을 DB에 저장했습니다.")
+                await interaction.followup.send("✅ 게임 봇에게 게임 데이터(아이템, 낚시 확률 등)를 새로고침하도록 요청했습니다.\n"
+                                                "약 10초 내에 변경사항이 적용됩니다.")
+            except Exception as e:
+                logger.error(f"게임 데이터 새로고침 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 게임 데이터 새로고침 요청 중 오류가 발생했습니다.")
+            return
+
         # --- 이하 로직은 이전과 동일 ---
         if action == "status_show":
             embed = discord.Embed(title="⚙️ サーバー設定 現況ダッシュボード", color=0x3498DB)
