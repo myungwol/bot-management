@@ -310,6 +310,7 @@ ADMIN_ACTION_MAP = {
     "request_regenerate_all_game_panels": "[게임] 모든 게임 패널 재설치 요청",
     "roles_sync": "[역할] 모든 역할 DB와 동기화",
     "strings_sync": "[UI] 모든 UI 텍스트 DB와 동기화",
+    "game_data_reload": "[게임] 게임 데이터 새로고침", # [✅ 신규 추가]
     "stats_set": "[통계] 통계 채널 설정/제거", "stats_refresh": "[통계] 모든 통계 채널 새로고침", "stats_list": "[통계] 설정된 통계 채널 목록",
     "coin_give": "[코인] 유저에게 코인 지급", "coin_take": "[코인] 유저의 코인 차감",
     "xp_give": "[XP] 유저에게 XP 지급", "level_set": "[레벨] 유저 레벨 설정",
