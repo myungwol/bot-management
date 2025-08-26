@@ -22,7 +22,7 @@ CHANNEL_TYPE_INFO = {
     "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "みんなの広場", "min_limit": 4}, # [수정] 광장 최소 인원 4명 설정
     "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "ゲーム名などに変更してください", "min_limit": 3}, # [수정] 게임 최소 인원 3명 설정
     "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "初心者のベンチ", "min_limit": 4},
-    "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のハウス"},
+    "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のマイルーム"},
     "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}の部屋"} # Fallback
 }
 
