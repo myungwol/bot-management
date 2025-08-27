@@ -1,4 +1,4 @@
-# bot-management/ui_defaults.py
+# bot-management/utils/ui_defaults.py
 """
 봇이 사용하는 모든 UI 요소 및 핵심 매핑 데이터의 기본값을 정의하는 파일입니다.
 봇이 시작될 때 이 파일의 데이터가 Supabase 데이터베이스에 동기화됩니다.
@@ -345,7 +345,6 @@ UI_STRINGS = {
     }
 }
 
-# [✅✅✅ 핵심 수정] JOB_ADVANCEMENT_DATA를 이 파일에서 정의합니다.
 JOB_ADVANCEMENT_DATA = {
     "50": [
         {"job_key": "fisherman", "job_name": "釣り人", "role_key": "role_job_fisherman", "description": "魚を釣ることに特化した専門家です。", "abilities": [{"ability_key": "fish_bait_saver_1", "ability_name": "エサ消費なし (確率)", "description": "釣りの際、一定の確率でエサを消費しません。"}, {"ability_key": "fish_bite_time_down_1", "ability_name": "アタリ時間短縮", "description": "魚が食いつくまでの時間が全体的に2秒短縮されます。"}]},
