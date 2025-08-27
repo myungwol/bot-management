@@ -294,6 +294,8 @@ GAME_CONFIG = {
     "VOICE_TIME_REQUIREMENT_MINUTES": 10, "VOICE_REWARD_RANGE": [10, 15], "CHAT_MESSAGE_REQUIREMENT": 20, "CHAT_REWARD_RANGE": [5, 10],
     "JOB_ADVANCEMENT_LEVELS": [50, 100]
 }
+# [✅✅✅ 신규 추가] 전직 시스템 데이터를 ui_defaults.py에도 추가합니다.
+# 이 데이터가 있어야 strings_sync 명령어가 DB에 올바르게 동기화할 수 있습니다.
 JOB_ADVANCEMENT_DATA = {
     50: [
         {"job_key": "fisherman", "job_name": "釣り人", "role_key": "role_job_fisherman", "description": "魚を釣ることに特化した専門家です。", "abilities": [{"ability_key": "fish_bait_saver_1", "ability_name": "エサ消費なし (確率)", "description": "釣りの際、一定の確率でエサを消費しません。"}, {"ability_key": "fish_bite_time_down_1", "ability_name": "アタリ時間短縮", "description": "魚が食いつくまでの時間が全体的に2秒短縮されます。"}]},
@@ -304,6 +306,10 @@ JOB_ADVANCEMENT_DATA = {
         {"job_key": "master_farmer", "job_name": "大農家", "role_key": "role_job_master_farmer", "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。", "prerequisite_job": "farmer", "abilities": [{"ability_key": "farm_yield_up_2", "ability_name": "収穫量UP (大)", "description": "作物を収穫する際の収穫量が大幅に増加します。"}, {"ability_key": "farm_growth_speed_up_2", "ability_name": "成長速度UP (大)", "description": "作物の成長に必要な時間が短縮されます。"}]}
     ]
 }
+
+# [✅✅✅ 핵심 수정] UI_STRINGS 딕셔너리에 JOB_ADVANCEMENT_DATA를 포함시킵니다.
+# 기존 UI_STRINGS는 그대로 두고, 이 한 줄만 추가하면 됩니다.
+UI_STRINGS["JOB_ADVANCEMENT_DATA"] = JOB_ADVANCEMENT_DATA
 ADMIN_ACTION_MAP = {
     "status_show": "[현황] 설정 대시보드 표시", "server_id_set": "[중요] 서버 ID 설정",
     "panels_regenerate_all": "[패널] 모든 관리 패널 재설치", "template_edit": "[템플릿] 임베드 템플릿 편집",
