@@ -143,8 +143,6 @@ UI_EMBEDS = {
     "log_whale_catch": { "title": "🐋 今月のヌシ、現る！ 🐋", "description": "今月、ただ一度だけ姿を見せるという幻の**クジラ**が、**{user_mention}**さんの手によって釣り上げられました！\n\n巨大な影は、来月まで再び深い海の底へと姿を消します…。", "color": "0x206694", "fields": [ {"name": "釣り上げられたヌシ", "value": "{emoji} **{name}**\n**サイズ**: `{size}`cm\n**価値**: `{value}`{currency_icon}", "inline": False} ], "footer": {"text": "来月の挑戦者よ、来たれ！"} },
     "embed_whale_reset_announcement": { "title": "🐋 海からの噂…", "description": "今月、海の奥深くから巨大な何かの目撃情報が噂されている…\nどうやら、腕利きの釣り人を待っているようだ。", "color": 0x3498DB, "footer": {"text": "今月のヌシが海に戻ってきました。"} },
     
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # panel_level_check를 삭제하고, panel_champion_board로 이름을 명확히 합니다.
     "panel_champion_board": {
         "title": "🏆 総合チャンピオンボード 🏆",
         "description": "各分野で最も輝いている総合1位の住民を紹介します！\n下のボタンから、ご自身のステータスを確認したり、詳細ランキングを見ることができます。",
@@ -300,25 +298,12 @@ ADMIN_ACTION_MAP = {
     "request_regenerate_all_game_panels": "[게임] 모든 게임 패널 재설치 요청",
     "roles_sync": "[역할] 모든 역할 DB와 동기화",
     "strings_sync": "[UI] 모든 UI 텍스트 DB와 동기화",
-    "game_data_reload": "[게임] 게임 데이터 새로고침", # [✅ 신규 추가]
+    "game_data_reload": "[게임] 게임 데이터 새로고침",
     "stats_set": "[통계] 통계 채널 설정/제거", "stats_refresh": "[통계] 모든 통계 채널 새로고침", "stats_list": "[통계] 설정된 통계 채널 목록",
     "coin_give": "[코인] 유저에게 코인 지급", "coin_take": "[코인] 유저의 코인 차감",
     "xp_give": "[XP] 유저에게 XP 지급", "level_set": "[레벨] 유저 레벨 설정",
 }
-JOB_ADVANCEMENT_DATA = {
-    50: [
-        {"job_key": "fisherman", "job_name": "釣り人", "role_key": "role_job_fisherman", "description": "魚を釣ることに特化した専門家です。", "abilities": [{"ability_key": "fish_bait_saver_1", "ability_name": "エサ消費なし (確率)", "description": "釣りの際、一定の確率でエサを消費しません。"}, {"ability_key": "fish_bite_time_down_1", "ability_name": "アタリ時間短縮", "description": "魚が食いつくまでの時間が全体的に2秒短縮されます。"}]},
-        {"job_key": "farmer", "job_name": "農家", "role_key": "role_job_farmer", "description": "作物を育て、収穫することに特化した専門家です。", "abilities": [{"ability_key": "farm_seed_saver_1", "ability_name": "種消費なし (確率)", "description": "種を植える際、一定の確率で種を消費しません。"}, {"ability_key": "farm_water_retention_1", "ability_name": "水分保持力UP", "description": "作物が水分を保ちやすくなり、水やりの間隔が長くなります。"}]}
-    ],
-    100: [
-        {"job_key": "master_angler", "job_name": "太公望", "role_key": "role_job_master_angler", "description": "釣りの道を極め、伝説の魚を追い求める者。釣り人の上位職です。", "prerequisite_job": "fisherman", "abilities": [{"ability_key": "fish_rare_up_2", "ability_name": "レア魚確率UP (大)", "description": "珍しい魚を釣る確率が上昇します。"}, {"ability_key": "fish_size_up_2", "ability_name": "魚のサイズUP (大)", "description": "釣り上げる魚の平均サイズが大きくなります。"}]},
-        {"job_key": "master_farmer", "job_name": "大農家", "role_key": "role_job_master_farmer", "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。", "prerequisite_job": "farmer", "abilities": [{"ability_key": "farm_yield_up_2", "ability_name": "収穫量UP (大)", "description": "作物を収穫する際の収穫量が大幅に増加します。"}, {"ability_key": "farm_growth_speed_up_2", "ability_name": "成長速度UP (大)", "description": "作物の成長に必要な時間が短縮されます。"}]}
-    ]
-}
 
-# [✅✅✅ 핵심 수정] UI_STRINGS 딕셔너리에 JOB_ADVANCEMENT_DATA를 포함시킵니다.
-# 기존 UI_STRINGS는 그대로 두고, 이 한 줄만 추가하면 됩니다.
-UI_STRINGS["JOB_ADVANCEMENT_DATA"] = JOB_ADVANCEMENT_DATA
 UI_STRINGS = {
     "commerce": {
         "item_view_desc": "現在の所持金: `{balance}`{currency_icon}\n購入したい商品を選択してください。",
@@ -358,4 +343,16 @@ UI_STRINGS = {
             "back_button": "戻る"
         }
     }
+}
+
+# [✅✅✅ 핵심 수정] JOB_ADVANCEMENT_DATA를 이 파일에서 정의합니다.
+JOB_ADVANCEMENT_DATA = {
+    "50": [
+        {"job_key": "fisherman", "job_name": "釣り人", "role_key": "role_job_fisherman", "description": "魚を釣ることに特化した専門家です。", "abilities": [{"ability_key": "fish_bait_saver_1", "ability_name": "エサ消費なし (確率)", "description": "釣りの際、一定の確率でエサを消費しません。"}, {"ability_key": "fish_bite_time_down_1", "ability_name": "アタリ時間短縮", "description": "魚が食いつくまでの時間が全体的に2秒短縮されます。"}]},
+        {"job_key": "farmer", "job_name": "農家", "role_key": "role_job_farmer", "description": "作物を育て、収穫することに特化した専門家です。", "abilities": [{"ability_key": "farm_seed_saver_1", "ability_name": "種消費なし (確率)", "description": "種を植える際、一定の確率で種を消費しません。"}, {"ability_key": "farm_water_retention_1", "ability_name": "水分保持力UP", "description": "作物が水分を保ちやすくなり、水やりの間隔が長くなります。"}]}
+    ],
+    "100": [
+        {"job_key": "master_angler", "job_name": "太公望", "role_key": "role_job_master_angler", "description": "釣りの道を極め、伝説の魚を追い求める者。釣り人の上位職です。", "prerequisite_job": "fisherman", "abilities": [{"ability_key": "fish_rare_up_2", "ability_name": "レア魚確率UP (大)", "description": "珍しい魚を釣る確率が上昇します。"}, {"ability_key": "fish_size_up_2", "ability_name": "魚のサイズUP (大)", "description": "釣り上げる魚の平均サイズが大きくなります。"}]},
+        {"job_key": "master_farmer", "job_name": "大農家", "role_key": "role_job_master_farmer", "description": "農業の神髄を悟り、大地から最大の恵みを得る者。農家の上位職です。", "prerequisite_job": "farmer", "abilities": [{"ability_key": "farm_yield_up_2", "ability_name": "収穫量UP (大)", "description": "作物を収穫する際の収穫量が大幅に増加します。"}, {"ability_key": "farm_growth_speed_up_2", "ability_name": "成長速度UP (大)", "description": "作物の成長に必要な時間が短縮されます。"}]}
+    ]
 }
