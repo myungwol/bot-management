@@ -17,8 +17,8 @@ from utils.database import (
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
-# [✅ 수정] UI_STRINGS를 import 목록에 추가합니다.
-from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, ADMIN_ACTION_MAP, UI_STRINGS
+# [✅✅✅ 핵심 수정] JOB_ADVANCEMENT_DATA를 ui_defaults에서 가져오도록 추가
+from utils.ui_defaults import UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,6 @@ class ServerSystem(commands.Cog):
 
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
-        # [✅ 수정] ADMIN_ACTION_MAP에 strings_sync 액션을 추가했으므로, 이 함수는 자동으로 새 액션을 포함합니다.
         for key, name in ADMIN_ACTION_MAP.items():
             if current.lower() in name.lower(): choices.append(app_commands.Choice(name=name, value=key))
         for key, info in SETUP_COMMAND_MAP.items():
@@ -120,24 +119,28 @@ class ServerSystem(commands.Cog):
     async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
 
-        # [✅✅✅ 신규 추가] UI 텍스트 동기화 로직
+        # [✅✅✅ 핵심 수정] strings_sync 로직 변경
         if action == "strings_sync":
             try:
+                # 1. 기존 UI 텍스트 동기화
                 await save_config_to_db("strings", UI_STRINGS)
-                # 게임 봇이 새 설정을 불러오도록 요청 (선택적)
+                
+                # 2. 전직 데이터(JOB_ADVANCEMENT_DATA)를 별도의 키로 동기화
+                await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
+
+                # 3. 게임 봇에 설정 다시 불러오기 요청
                 await save_config_to_db("config_reload_request", time.time())
-                logger.info("UI_STRINGS가 데이터베이스에 성공적으로 동기화되었습니다.")
-                await interaction.followup.send("✅ UI 텍스트를 데이터베이스에 성공적으로 동기화했습니다.\n"
-                                                "**게임 봇을 재시작**하면 모든 텍스트가 정상적으로 표시됩니다.")
+                
+                logger.info("UI_STRINGS와 JOB_ADVANCEMENT_DATA가 데이터베이스에 성공적으로 동기화되었습니다.")
+                await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다.\n"
+                                                "**게임 봇을 재시작**하면 모든 설정이 정상적으로 적용됩니다.")
             except Exception as e:
-                logger.error(f"UI_STRINGS 동기화 중 오류: {e}", exc_info=True)
-                await interaction.followup.send("❌ UI 텍스트 동기화 중 오류가 발생했습니다.")
+                logger.error(f"UI 동기화 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
             return
 
-        # [✅✅✅ 신규 추가] 게임 데이터 새로고침 로직
         if action == "game_data_reload":
             try:
-                # 게임 봇에게 DB를 다시 로드하라는 요청을 보냅니다.
                 await save_config_to_db("game_data_reload_request", time.time())
                 logger.info("게임 데이터 새로고침 요청을 DB에 저장했습니다.")
                 await interaction.followup.send("✅ 게임 봇에게 게임 데이터(아이템, 낚시 확률 등)를 새로고침하도록 요청했습니다.\n"
@@ -147,7 +150,7 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 게임 데이터 새로고침 요청 중 오류가 발생했습니다.")
             return
 
-        # --- 이하 로직은 이전과 동일 ---
+        # --- 이하 로직은 동일 ---
         if action == "status_show":
             embed = discord.Embed(title="⚙️ サーバー設定 現況ダッシュボード", color=0x3498DB)
             embed.set_footer(text=f"最終確認: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
