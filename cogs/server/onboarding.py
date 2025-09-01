@@ -362,7 +362,10 @@ class ApprovalView(ui.View):
                 for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
                 embed.add_field(name="거절 사유", value=reason, inline=False); embed.add_field(name="담당자", value=moderator.mention, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-                await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                
+                # [✅✅✅ 핵심 수정 ✅✅✅]
+                # allowed_mentions를 .none() 에서 users=True로 변경하여 사용자 언급이 가능하도록 합니다.
+                await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
             logger.error(f"거절 로그 전송 실패: {e}", exc_info=True); return "거절 로그 채널에 메시지 전송 실패."
         return None
@@ -466,8 +469,6 @@ class OnboardingPanelView(ui.View):
         last_time = await get_cooldown(user_id_str, cooldown_key)
         
         if last_time > 0 and (utc_now - last_time) < cooldown_seconds:
-            # [✅✅✅ 핵심 수정 ✅✅✅]
-            # 남은 시간을 계산하고, 새로 만든 함수로 보기 좋게 포맷합니다.
             time_remaining = cooldown_seconds - (utc_now - last_time)
             formatted_time = format_seconds_to_hms(time_remaining)
             message = f"❌ 다음 안내는 **{formatted_time}** 후에 볼 수 있습니다. 잠시만 기다려주세요."
