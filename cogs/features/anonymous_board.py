@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from utils.database import (
-    get_id, add_anonymous_message, get_embed_from_db, 
+    get_id, add_anonymous_message, get_embed_from_db,
     get_panel_id, save_panel_id, get_panel_components_from_db,
     has_posted_anonymously_today
 )
@@ -16,10 +16,10 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-class AnonymousModal(ui.Modal, title="匿名メッセージ作成"):
+class AnonymousModal(ui.Modal, title="익명 메시지 작성"):
     content = ui.TextInput(
-        label="内容",
-        placeholder="ここにあなたのメッセージを書いてください...",
+        label="내용",
+        placeholder="이곳에 메시지를 작성해주세요...",
         style=discord.TextStyle.paragraph,
         required=True,
         max_length=1500
@@ -44,13 +44,13 @@ class AnonymousModal(ui.Modal, title="匿名メッセージ作成"):
             
             await self.cog.regenerate_panel(interaction.channel, last_anonymous_embed=anonymous_embed)
             
-            message = await interaction.followup.send("✅ あなたの匿名の声が届けられました。", ephemeral=True, wait=True)
+            message = await interaction.followup.send("✅ 당신의 익명 메시지가 성공적으로 전달되었습니다.", ephemeral=True, wait=True)
             await asyncio.sleep(5)
             await message.delete()
 
         except Exception as e:
             logger.error(f"익명 메시지 제출 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ メッセージの投稿中にエラーが発生しました。", ephemeral=True)
+            await interaction.followup.send("❌ 메시지를投稿하는 중 오류가 발생했습니다.", ephemeral=True)
 
 class AnonymousPanelView(ui.View):
     def __init__(self, cog: 'AnonymousBoard'):
@@ -76,7 +76,7 @@ class AnonymousPanelView(ui.View):
         already_posted = await has_posted_anonymously_today(interaction.user.id)
         
         if already_posted:
-            await interaction.response.send_message("❌ 本日の匿名投稿は既に完了しています。明日になると再度投稿できます。", ephemeral=True)
+            await interaction.response.send_message("❌ 오늘은 이미 익명 글을 작성했습니다. 내일 다시 시도해주세요.", ephemeral=True)
             return
             
         await interaction.response.send_modal(AnonymousModal(self.cog))
