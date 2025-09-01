@@ -114,7 +114,7 @@ UI_EMBEDS = {
     "panel_item_usage": {"title": "✅ 경고 차감권 사용", "description": "보유 중인 <@&경고차감권역할ID>을 사용하려면 아래 버튼을 눌러주세요.", "color": 11027200},
     "dm_onboarding_approved": {"title": "✅ 주민 등록 완료 알림", "description": "'{guild_name}' 서버의 주민 등록이 승인되었습니다.\n앞으로 잘 부탁드립니다!", "color": 3066993},
     "dm_onboarding_rejected": {"title": "❌ 주민 등록 거절 알림", "description": "죄송합니다. '{guild_name}' 서버의 주민 등록이 거절되었습니다.", "color": 15548997},
-    "panel_anonymous_board": {"title": "🤫 익명의 소리", "description": "누구에게도 알려지지 않은 당신의 생각이나 마음을 공유해보세요.\n아래 버튼을 눌러 하루에 한 번 메시지를 전송 할 수 있습니다.\n\n**※모든 메시지는 서버 관리자가 기록 및 확인하고 있으며, 문제 발생 시投稿자를 특정하여 조치합니다.**", "color": 4342323},
+    "panel_anonymous_board": {"title": "🤫 익명의 소리", "description": "누구에게도 알려지지 않은 당신의 생각이나 마음을 공유해보세요.\n아래 버튼을 눌러 하루에 한 번 메시지를 전송 할 수 있습니다.\n\n**※모든 메시지는 서버 관리자가 기록 및 확인하고 있으며, 문제 발생 시 전송자를 특정하여 조치합니다.**", "color": 4342323},
     "anonymous_message": {"title": "익명의 메시지가 도착했습니다", "color": 16777215},
     "panel_custom_embed": {"title": "📢 커스텀 메시지 전송 패널", "description": "아래 버튼을 눌러 지정한 채널에 봇이 임베드 메시지를 전송합니다.\n\n**이 기능은 특정 역할을 가진 스태프만 사용할 수 있습니다.**", "color": 0x34495E},
     "log_job_advancement": {"title": "🎉 새로운 전직자!", "description": "{user_mention}님이 드디어 새로운 길을 선택했습니다.", "color": 0xFFD700, "fields": [{"name": "직업", "value": "```\n{job_name}\n```", "inline": True}, {"name": "선택한 능력", "value": "```\n{ability_name}\n```", "inline": True}], "footer": {"text": "앞으로의 활약을 기대합니다!"}},
