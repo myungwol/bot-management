@@ -85,6 +85,86 @@ UI_ROLE_KEY_MAP = {
     "role_warning_level_4":     {"name": "경고 4회", "is_prefix": False, "priority": 0},
 }
 
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 1. 역할 키 맵 (Role Key Map)
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+UI_ROLE_KEY_MAP = {
+    # --- [핵심] 접두사 역할 및 우선순위 ---
+    "role_admin_total":         {"name": "숲의 요정", "is_prefix": True, "priority": 100}, # 봇 역할이지만, 최고 관리자 권한용
+    "role_staff_village_chief": {"name": "촌장", "is_prefix": True, "priority": 90},
+    "role_staff_deputy_chief":  {"name": "부촌장", "is_prefix": True, "priority": 85},
+    "role_approval":            {"name": "직원", "is_prefix": True, "priority": 60},
+    "role_premium_booster":     {"name": "후원자", "is_prefix": True, "priority": 55},
+    "role_resident_elder":      {"name": "장로", "is_prefix": True, "priority": 50},
+    "role_job_master_angler":   {"name": "강태공", "is_prefix": True, "priority": 16},
+    "role_job_master_farmer":   {"name": "대농", "is_prefix": True, "priority": 16},
+    "role_job_fisherman":       {"name": "낚시꾼", "is_prefix": True, "priority": 15},
+    "role_job_farmer":          {"name": "농부", "is_prefix": True, "priority": 15},
+    "role_resident":            {"name": "주민", "is_prefix": True, "priority": 10},
+    "role_guest":               {"name": "여행객", "is_prefix": True, "priority": 5},
+
+    # --- 그 외 접두사가 아닌 역할들 ---
+    "role_staff_police":        {"name": "경찰관", "is_prefix": False, "priority": 0},
+    "role_staff_festival":      {"name": "축제 담당", "is_prefix": False, "priority": 0},
+    "role_staff_pr":            {"name": "홍보 담당", "is_prefix": False, "priority": 0},
+    "role_staff_design":        {"name": "마을 디자이너", "is_prefix": False, "priority": 0},
+    "role_staff_secretary":     {"name": "서기", "is_prefix": False, "priority": 0},
+    "role_staff_newbie_helper": {"name": "도우미", "is_prefix": False, "priority": 0},
+    
+    "role_resident_veteran":    {"name": "베테랑 주민", "is_prefix": False, "priority": 0},
+    "role_resident_regular":    {"name": "단골 주민", "is_prefix": False, "priority": 0},
+    "role_resident_rookie":     {"name": "새내기 주민", "is_prefix": False, "priority": 0},
+
+    # --- 온보딩/역할 패널 구분선 역할 ---
+    "role_onboarding_step_1":   {"name": "════════════게임══════════", "is_prefix": False, "priority": 0},
+    "role_onboarding_step_2":   {"name": "════════════알림════════════", "is_prefix": False, "priority": 0},
+    "role_onboarding_step_3":   {"name": "════════════정보════════════", "is_prefix": False, "priority": 0},
+    "role_onboarding_step_4":   {"name": "════════════등급════════════", "is_prefix": False, "priority": 0},
+    "role_warning_separator":   {"name": "════════════경고════════════", "is_prefix": False, "priority": 0},
+    "role_shop_separator":      {"name": "════════════상점════════════", "is_prefix": False, "priority": 0},
+    
+    # --- 개인 정보 역할 (성별, 연령대) ---
+    "role_info_male":           {"name": "남성", "is_prefix": False, "priority": 0},
+    "role_info_female":         {"name": "여성", "is_prefix": False, "priority": 0},
+    "role_info_age_private":    {"name": "비공개", "is_prefix": False, "priority": 0},
+    "role_info_age_70s":        {"name": "70년대생", "is_prefix": False, "priority": 0},
+    "role_info_age_80s":        {"name": "80년대생", "is_prefix": False, "priority": 0},
+    "role_info_age_90s":        {"name": "90년대생", "is_prefix": False, "priority": 0},
+    "role_info_age_00s":        {"name": "00년대생", "is_prefix": False, "priority": 0},
+    
+    # --- 상점/아이템 역할 ---
+    "role_item_event_priority": {"name": "이벤트 우선권", "is_prefix": False, "priority": 0},
+    "role_item_warning_deduct": {"name": "벌점 1회 차감권", "is_prefix": False, "priority": 0},
+    "role_personal_room_key":   {"name": "개인 방 열쇠", "is_prefix": False, "priority": 0},
+
+    # --- 알림 역할 ---
+    "role_notify_voice":        {"name": "통화모집", "is_prefix": False, "priority": 0},
+    "role_notify_friends":      {"name": "친구모집", "is_prefix": False, "priority": 0},
+    "role_notify_disboard":     {"name": "Disboard", "is_prefix": False, "priority": 0},
+    "role_notify_up":           {"name": "Up", "is_prefix": False, "priority": 0},
+
+    # --- 게임/플랫폼 역할 ---
+    "role_game_minecraft":      {"name": "마인크래프트", "is_prefix": False, "priority": 0},
+    "role_game_valorant":       {"name": "발로란트", "is_prefix": False, "priority": 0},
+    "role_game_overwatch":      {"name": "오버워치", "is_prefix": False, "priority": 0},
+    "role_game_lol":            {"name": "리그 오브 레전드", "is_prefix": False, "priority": 0},
+    "role_game_mahjong":        {"name": "마작", "is_prefix": False, "priority": 0},
+    "role_game_amongus":        {"name": "어몽어스", "is_prefix": False, "priority": 0},
+    "role_game_mh":             {"name": "몬스터 헌터", "is_prefix": False, "priority": 0},
+    "role_game_genshin":        {"name": "원신", "is_prefix": False, "priority": 0},
+    "role_game_apex":           {"name": "에이펙스 레전드", "is_prefix": False, "priority": 0},
+    "role_game_ggd":            {"name": "구스구스덕", "is_prefix": False, "priority": 0},
+    "role_game_gf":             {"name": "갈틱", "is_prefix": False, "priority": 0},
+    "role_platform_steam":      {"name": "스팀", "is_prefix": False, "priority": 0},
+    "role_platform_smartphone": {"name": "스마트폰", "is_prefix": False, "priority": 0},
+    "role_platform_console":    {"name": "콘솔", "is_prefix": False, "priority": 0},
+
+    # --- 경고 역할 ---
+    "role_warning_level_1":     {"name": "벌점 1회", "is_prefix": False, "priority": 0},
+    "role_warning_level_2":     {"name": "벌점 2회", "is_prefix": False, "priority": 0},
+    "role_warning_level_3":     {"name": "벌점 3회", "is_prefix": False, "priority": 0},
+    "role_warning_level_4":     {"name": "벌점 4회", "is_prefix": False, "priority": 0},
+}
 ONBOARDING_CHOICES = {
     "gender": [{"label": "남성", "value": "남성"}, {"label": "여성", "value": "여성"}],
     "birth_year_groups": {
@@ -254,11 +334,11 @@ STATIC_AUTO_ROLE_PANELS = {
                 {"role_id_key": "role_game_mh", "label": "몬스터 헌터"},
                 {"role_id_key": "role_game_genshin", "label": "원신"},
                 {"role_id_key": "role_game_apex", "label": "에이펙스 레전드"},
-                {"role_id_key": "role_game_splatoon", "label": "스플래툰"},
+                {"role_id_key": "role_game_ggd", "label": "구스구스덕"},
                 {"role_id_key": "role_game_gf", "label": "Gartic Phone"},
                 {"role_id_key": "role_platform_steam", "label": "스팀"},
                 {"role_id_key": "role_platform_smartphone", "label": "스마트폰"},
-                {"role_id_key": "role_platform_switch", "label": "닌텐도 스위치"},
+                {"role_id_key": "role_platform_console", "label": "콘솔"},
             ],
         }
     }
