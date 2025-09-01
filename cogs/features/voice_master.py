@@ -225,7 +225,6 @@ class VoiceMaster(commands.Cog):
         await self.load_configs()
         self.bot.loop.create_task(self.sync_channels_from_db())
 
-    # [✅ 추가] 설정을 실시간으로 다시 로드하는 함수
     async def reload_configs(self):
         """데이터베이스에서 최신 설정을 다시 로드하여 Cog에 적용합니다."""
         logger.info("[VoiceMaster] 설정(Config)을 실시간으로 다시 로드합니다...")
@@ -243,7 +242,6 @@ class VoiceMaster(commands.Cog):
         self.creator_channel_configs = {k: v for k, v in self.creator_channel_configs.items() if k is not None}
         self.admin_role_ids = [role_id for key in ADMIN_ROLE_KEYS if (role_id := get_id(key)) is not None]
         self.default_category_id = get_id("temp_vc_category_id")
-        # [✅ 수정] 로그 메시지를 더 명확하게 변경
         logger.info(f"[VoiceMaster] 생성 채널 설정을 로드했습니다: {self.creator_channel_configs}")
 
     async def sync_channels_from_db(self):
@@ -265,17 +263,19 @@ class VoiceMaster(commands.Cog):
         if zombie_channel_ids: await remove_multiple_temp_channels(zombie_channel_ids)
         logger.info(f"[VoiceMaster] 임시 채널 동기화 완료. (활성: {len(self.temp_channels)} / 정리: {len(zombie_channel_ids)})")
 
-# voice_master.py의 on_voice_state_update 함수를 이걸로 교체하세요.
-
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot or before.channel == after.channel: return
         try:
+            # [✅ 순서 변경] 채널 삭제 로직을 생성 로직보다 먼저 실행합니다.
+            if before.channel and before.channel.id in self.temp_channels:
+                await self._delete_temp_channel(before.channel)
+
             # --- 채널 생성 로직 ---
             if after.channel and after.channel.id in self.creator_channel_configs:
                 if member.id in self.active_creations: return
                 if member.id in self.user_channel_map:
-                    try: await member.send("❌ 개인 음성 채널은 한 번에 하나만 소유할 수 있습니다.")
+                    try: await member.send("❌ 개인 음성 채널은 한 번에 하나만 소유할 수 있습니다. 이전 채널이 삭제 처리 중일 수 있으니 잠시 후 다시 시도해주세요.")
                     except discord.Forbidden: pass
                     return await member.move_to(None, reason="이미 다른 개인 채널을 소유 중")
                 
@@ -294,7 +294,8 @@ class VoiceMaster(commands.Cog):
 
             # --- 채널 입장 시 조건 확인 및 강제 퇴장 로직 ---
             if after.channel and after.channel.id in self.temp_channels:
-                channel_info = self.temp_channels[after.channel.id]
+                channel_info = self.temp_channels.get(after.channel.id)
+                if not channel_info: return
                 channel_type = channel_info.get("type")
                 if channel_type == "벤치":
                     is_owner = member.id == channel_info.get("owner_id")
@@ -310,12 +311,6 @@ class VoiceMaster(commands.Cog):
                             except discord.Forbidden: pass
                             await member.move_to(None, reason="벤치 채널 입장 조건 미충족")
                             return
-
-            # --- 채널 삭제 로직 ---
-            # [✅ 수정] 유저가 임시 채널을 '떠났다면' 무조건 삭제 처리 함수를 호출합니다.
-            # 채널이 실제로 비었는지는 _delete_temp_channel 함수 내부에서 지연 시간을 두고 최종 확인합니다.
-            if before.channel and before.channel.id in self.temp_channels:
-                await self._delete_temp_channel(before.channel)
         
         except Exception as e:
             self.active_creations.discard(member.id)
@@ -407,7 +402,7 @@ class VoiceMaster(commands.Cog):
         return await guild.create_voice_channel(name=vc_name, category=target_category, overwrites=overwrites, user_limit=user_limit, position=position, reason=f"{member.display_name}의 요청")
 
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
-        overwrites = {owner: discord.PermissionOverwrite(connect=True, manage_channels=True)}
+        overwrites = {owner: discord.PermissionOverwrite(connect=True)}
         if channel_type in ['마이룸']:
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
         else:
@@ -431,23 +426,14 @@ class VoiceMaster(commands.Cog):
         return await vc.send(f"{owner.mention}", embed=embed, view=view)
 
     async def _delete_temp_channel(self, vc: discord.VoiceChannel):
-        # 유저가 실수로 나갔다가 바로 들어오는 경우를 대비해 1초 대기
         await asyncio.sleep(1)
-        
         try:
-            # [✅ 수정] 채널 객체를 다시 가져와 최신 멤버 목록을 확인합니다.
             vc_refreshed = self.bot.get_channel(vc.id)
-            
-            # 채널이 존재하고, 여전히 임시 채널 목록에 있으며, 멤버가 아무도 없을 때만 삭제
             if vc_refreshed and vc.id in self.temp_channels and not vc_refreshed.members:
                 await vc_refreshed.delete(reason="채널이 비어 자동 삭제됨")
                 logger.info(f"임시 채널 '{vc_refreshed.name}'을(를) 자동 삭제했습니다.")
-                # DB와 메모리에서 채널 정보 정리
                 await self._cleanup_channel_data(vc_refreshed.id)
-                
         except discord.NotFound:
-            # 1초 대기하는 동안 이미 채널이 삭제되었을 수 있습니다.
-            # 이 경우에도 우리 시스템에서는 정보를 정리해야 합니다.
             logger.warning(f"삭제하려던 임시 채널(ID: {vc.id})을 찾을 수 없습니다. 데이터만 정리합니다.")
             await self._cleanup_channel_data(vc.id)
         except Exception as e:
@@ -459,9 +445,9 @@ class VoiceMaster(commands.Cog):
         old_owner = interaction.guild.get_member(info['owner_id'])
         try:
             overwrites = vc.overwrites
-            overwrites[new_owner] = discord.PermissionOverwrite(connect=True, manage_channels=True)
+            overwrites[new_owner] = discord.PermissionOverwrite(connect=True)
             if old_owner and old_owner in overwrites: del overwrites[old_owner]
-            await vc.edit(overwrites=overwrites, reason=f"소유권 이전: {old_owner.display_name} -> {new_owner.display_name}")
+            await vc.edit(overwrites=overwrites, reason=f"소유권 이전: {old_owner.display_name if old_owner else '알 수 없음'} -> {new_owner.display_name}")
             await update_temp_channel_owner(vc.id, new_owner.id)
             self.temp_channels[vc.id]['owner_id'] = new_owner.id
             if old_owner: self.user_channel_map.pop(old_owner.id, None)
