@@ -253,7 +253,7 @@ STATIC_AUTO_ROLE_PANELS = {
                 {"role_id_key": "role_game_genshin", "label": "원신"},
                 {"role_id_key": "role_game_apex", "label": "에이펙스 레전드"},
                 {"role_id_key": "role_game_ggd", "label": "구스구스덕"},
-                {"role_id_key": "role_game_gf", "label": "Gartic Phone"},
+                {"role_id_key": "role_game_gf", "label": "갈틱폰"},
                 {"role_id_key": "role_platform_steam", "label": "스팀"},
                 {"role_id_key": "role_platform_smartphone", "label": "스마트폰"},
                 {"role_id_key": "role_platform_console", "label": "콘솔"},
@@ -279,10 +279,10 @@ JOB_SYSTEM_CONFIG = {
     "LEVEL_TIER_ROLES": [{"level": 150, "role_key": "role_resident_elder"}, {"level": 100, "role_key": "role_resident_veteran"}, {"level": 50,  "role_key": "role_resident_regular"}, {"level": 1,   "role_key": "role_resident_rookie"}]
 }
 AGE_ROLE_MAPPING = [
-    {"key": "role_info_age_00s", "range": [2000, 2100], "name": "00년대생"},
-    {"key": "role_info_age_90s", "range": [1990, 2000], "name": "90년대생"},
-    {"key": "role_info_age_80s", "range": [1980, 1990], "name": "80년대생"},
-    {"key": "role_info_age_70s", "range": [1970, 1980], "name": "70년대생"}
+    {"key": "role_info_age_00s", "range": [2000, 2100], "name": "00년생"},
+    {"key": "role_info_age_90s", "range": [1990, 2000], "name": "90년생"},
+    {"key": "role_info_age_80s", "range": [1980, 1990], "name": "80년생"},
+    {"key": "role_info_age_70s", "range": [1970, 1980], "name": "70년생"}
 ]
 GAME_CONFIG = {
     "CURRENCY_ICON": "🪙", "FISHING_BITE_REACTION_TIME": 3.0, "FISHING_BIG_CATCH_THRESHOLD": 70.0, "FISHING_SEA_REQ_TIER": 3, "FISHING_WAITING_IMAGE_URL": "https://i.imgur.com/AcLgC2g.gif",
