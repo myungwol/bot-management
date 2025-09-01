@@ -14,14 +14,14 @@ REMINDER_CONFIG = {
     'disboard': {
         'bot_id': 302050872383242240,
         'cooltime': 7200,  # 2시간
-        'keyword': "表示順をアップしたにゃ！",
+        'keyword': "서버 순위를 올렸어요!",
         'command': "/bump",
         'name': "Disboard BUMP"
     },
     'dissoku': {
         'bot_id': 603613388292390912,
         'cooltime': 3600,  # 1시간
-        'keyword': "サーバーの表示順位をアップしました",
+        'keyword': "서버 순위를 올렸습니다",
         'command': "/up",
         'name': "Dissoku UP"
     }
@@ -116,7 +116,7 @@ class Reminder(commands.Cog):
                     continue
 
                 try:
-                    message = f"⏰ {role.mention} {config['name']} の時間です！ `{config['command']}` をお願いします！"
+                    message = f"⏰ {role.mention} {config['name']} 시간입니다! `{config['command']}`를 입력해주세요!"
                     await channel.send(message)
                     logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']})")
                 except discord.Forbidden:
