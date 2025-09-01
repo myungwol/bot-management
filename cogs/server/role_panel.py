@@ -35,14 +35,15 @@ class RoleSelectDropdown(ui.Select):
                 logger.warning(f"역할 패널: DB에서 '{role_id_key}'에 해당하는 역할 ID를 찾지 못해 드롭다운에 추가할 수 없었습니다.")
 
         # [✅✅✅ 핵심 수정 ✅✅✅]
-        # 선택지가 없을 때 max_values가 1로 설정되어 발생하던 API 오류를 수정합니다.
-        # len(options)가 0이면 max_values도 0이 되어 min_values=0과 충돌하지 않습니다.
+        # min_values=0과 기본값인 required=True가 충돌하여 발생하는 API 오류를 해결합니다.
+        # required=False를 명시적으로 추가하여 '아무것도 선택하지 않음' 상태를 허용합니다.
         super().__init__(
             placeholder=f"{category_name} 역할을 선택하세요 (다중 선택 가능)",
             min_values=0,
-            max_values=len(options),
+            max_values=len(options) if options else 1, # 선택지가 없으면 비활성화되므로 1로 두어도 안전합니다.
             options=options,
-            disabled=not options
+            disabled=not options,
+            required=False # 이 옵션을 추가하여 오류를 해결합니다.
         )
 
     async def callback(self, interaction: discord.Interaction):
