@@ -33,7 +33,7 @@ TEST_GUILD_ID: Optional[int] = None
 if RAW_TEST_GUILD_ID:
     try:
         TEST_GUILD_ID = int(RAW_TEST_GUILD_ID)
-        logger.info(f"TEST_GUILD_ID가 {TEST_GUILD_ID}로 설정되었습니다.")
+        logger.info(f"테스트 서버 ID가 {TEST_GUILD_ID}로 설정되었습니다.")
     except ValueError:
         logger.error(f"❌ TEST_GUILD_ID 환경 변수가 유효한 숫자가 아닙니다: '{RAW_TEST_GUILD_ID}'")
 
