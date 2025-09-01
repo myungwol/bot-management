@@ -34,10 +34,13 @@ class RoleSelectDropdown(ui.Select):
             else:
                 logger.warning(f"역할 패널: DB에서 '{role_id_key}'에 해당하는 역할 ID를 찾지 못해 드롭다운에 추가할 수 없었습니다.")
 
+        # [✅✅✅ 핵심 수정 ✅✅✅]
+        # 선택지가 없을 때 max_values가 1로 설정되어 발생하던 API 오류를 수정합니다.
+        # len(options)가 0이면 max_values도 0이 되어 min_values=0과 충돌하지 않습니다.
         super().__init__(
             placeholder=f"{category_name} 역할을 선택하세요 (다중 선택 가능)",
             min_values=0,
-            max_values=len(options) if options else 1,
+            max_values=len(options),
             options=options,
             disabled=not options
         )
@@ -99,7 +102,6 @@ class PersistentCategorySelectView(ui.View):
         await interaction.response.defer(ephemeral=True)
         
         panel_configs = get_config("STATIC_AUTO_ROLE_PANELS", {})
-        # [✅ 개선] 설정이 올바른 형식인지 확인하여 예기치 않은 오류를 방지합니다.
         if not panel_configs or not isinstance(panel_configs, dict):
             await interaction.followup.send("❌ 역할 패널 설정이 올바르지 않습니다. 관리자에게 문의해주세요.", ephemeral=True)
             return
