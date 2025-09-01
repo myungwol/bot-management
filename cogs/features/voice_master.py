@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # 채널 타입별 기본 설정값
 CHANNEL_TYPE_INFO = {
     "분수대":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "모두의 분수대", "min_limit": 4},
-    "놀이터":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "게임 채널", "min_limit": 3},
+    "놀이터":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "게임 이름, 노래방 등 적절한 이름으로 바꿔주세요.", "min_limit": 3},
     "벤치":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "새내기의 벤치", "min_limit": 4},
     "마이룸":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 마이룸"},
     "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 채널"} # Fallback
@@ -338,13 +338,30 @@ class VoiceMaster(commands.Cog):
         required_role_key = config.get("required_role_key")
         if required_role_key:
             required_role_id = get_id(required_role_key)
-            if not required_role_id or required_role_id not in {r.id for r in member.roles}:
+            
+            # [✅ 추가] 역할 ID가 DB에 설정되지 않았을 때 명확한 에러 로그를 남깁니다.
+            if not required_role_id:
+                logger.error(f"'{required_role_key}'에 해당하는 역할 ID를 DB에서 찾을 수 없습니다. 관리자 명령어로 역할을 설정해주세요.")
+                try:
+                    await member.send(f"죄송합니다. '{creator_channel.name}' 채널 생성에 필요한 역할 설정이 완료되지 않았습니다. 서버 관리자에게 문의해주세요.")
+                except discord.Forbidden:
+                    pass
+                await member.move_to(None, reason="필요 역할 미설정 오류")
+                return # 함수 종료
+
+            # [✅ 수정] 유저가 역할을 가지고 있는지 확인하는 로직
+            if required_role_id not in {r.id for r in member.roles}:
                 role_name_map = get_config("ROLE_KEY_MAP", {})
-                role_name = role_name_map.get(required_role_key, "특정")
-                try: await member.send(f"❌ '{creator_channel.name}' 채널을 생성하려면 '{role_name}' 역할이 필요합니다.")
-                except discord.Forbidden: pass
-                return await member.move_to(None, reason="요구 역할 없음")
+                role_name = role_name_map.get(required_role_key, "필수")
+                logger.info(f"{member.display_name}님이 '{role_name}' 역할이 없어 '{creator_channel.name}' 채널 생성에 실패했습니다.")
+                try: 
+                    await member.send(f"❌ '{creator_channel.name}' 채널을 생성하려면 '{role_name}' 역할이 필요합니다.")
+                except discord.Forbidden: 
+                    pass
+                await member.move_to(None, reason="요구 역할 없음")
+                return # 함수 종료
         
+        # --- 역할 확인 통과 후 채널 생성 로직 시작 ---
         vc: Optional[discord.VoiceChannel] = None
         try:
             vc = await self._create_discord_channel(member, config, creator_channel)
