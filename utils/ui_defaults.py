@@ -35,7 +35,7 @@ UI_ROLE_KEY_MAP = {
     "role_resident_rookie":     {"name": "새내기 주민", "is_prefix": False, "priority": 0},
 
     # --- 온보딩/역할 패널 구분선 역할 ---
-    "role_onboarding_step_1":   {"name": "════════════게임══════════", "is_prefix": False, "priority": 0},
+    "role_onboarding_step_1":   {"name": "════════════게임════════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_2":   {"name": "════════════알림════════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_3":   {"name": "════════════정보════════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_4":   {"name": "════════════등급════════════", "is_prefix": False, "priority": 0},
@@ -54,11 +54,11 @@ UI_ROLE_KEY_MAP = {
     # --- 상점/아이템 역할 ---
     "role_item_event_priority": {"name": "이벤트 우선권", "is_prefix": False, "priority": 0},
     "role_item_warning_deduct": {"name": "벌점 1회 차감권", "is_prefix": False, "priority": 0},
-    "role_personal_room_key":   {"name": "개인 방 열쇠", "is_prefix": False, "priority": 0},
+    "role_personal_room_key":   {"name": "마이룸 열쇠", "is_prefix": False, "priority": 0},
 
     # --- 알림 역할 ---
     "role_notify_voice":        {"name": "통화 모집", "is_prefix": False, "priority": 0},
-    "role_notify_friends":      {"name": "친구 모집집", "is_prefix": False, "priority": 0},
+    "role_notify_friends":      {"name": "친구 모집", "is_prefix": False, "priority": 0},
     "role_notify_disboard":     {"name": "Disboard", "is_prefix": False, "priority": 0},
     "role_notify_up":           {"name": "Up", "is_prefix": False, "priority": 0},
 
