@@ -14,7 +14,7 @@ class VoiceLogger(commands.Cog):
         self.log_channel_id: int = None
 
     async def load_configs(self):
-        """[수정] main.py의 on_ready 루프에 의해 호출됩니다."""
+        """main.py의 on_ready 루프에 의해 호출됩니다."""
         self.log_channel_id = get_id("log_channel_voice")
         if self.log_channel_id:
             logger.info(f"[VoiceLogger] 음성 로그 채널이 설정되었습니다: #{self.log_channel_id}")
@@ -38,32 +38,29 @@ class VoiceLogger(commands.Cog):
         embed = None
         if before.channel is None and after.channel is not None:
             embed = discord.Embed(
-                title="음성 채널 참여 (ボイスチャンネル参加)",
-                description=f"{member.mention} 님이 **`{after.channel.name}`** 채널에 참여했습니다。\n"
-                            f"{member.mention} さんが **`{after.channel.name}`** チャンネルに参加しました。",
+                title="음성 채널 참여",
+                description=f"{member.mention} 님이 **`{after.channel.name}`** 채널에 참여했습니다.",
                 color=discord.Color.green(),
                 timestamp=datetime.now(timezone.utc)
             )
             embed.set_author(name=f"{member.display_name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
         elif before.channel is not None and after.channel is None:
             embed = discord.Embed(
-                title="음성 채널 퇴장 (ボイスチャンネル退出)",
-                description=f"{member.mention} 님이 **`{before.channel.name}`** 채널에서 나갔습니다。\n"
-                            f"{member.mention} さんが **`{before.channel.name}`** チャンネルから退出しました。",
+                title="음성 채널 퇴장",
+                description=f"{member.mention} 님이 **`{before.channel.name}`** 채널에서 나갔습니다.",
                 color=discord.Color.dark_grey(),
                 timestamp=datetime.now(timezone.utc)
             )
             embed.set_author(name=f"{member.display_name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
         elif before.channel is not None and after.channel is not None:
             embed = discord.Embed(
-                title="음성 채널 이동 (ボイスチャンネル移動)",
-                description=f"{member.mention} 님이 채널을 이동했습니다。\n"
-                            f"{member.mention} さんがチャンネルを移動しました。",
+                title="음성 채널 이동",
+                description=f"{member.mention} 님이 채널을 이동했습니다.",
                 color=discord.Color.blue(),
                 timestamp=datetime.now(timezone.utc)
             )
-            embed.add_field(name="기존 채널 (移動前のチャンネル)", value=f"`{before.channel.name}`", inline=False)
-            embed.add_field(name="새로운 채널 (移動後のチャンネル)", value=f"`{after.channel.name}`", inline=False)
+            embed.add_field(name="기존 채널", value=f"`{before.channel.name}`", inline=False)
+            embed.add_field(name="새로운 채널", value=f"`{after.channel.name}`", inline=False)
             embed.set_author(name=f"{member.display_name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
         
         if embed:
