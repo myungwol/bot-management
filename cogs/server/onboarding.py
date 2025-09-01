@@ -14,7 +14,6 @@ from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
     get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
-# [✅ 수정] 새로 만든 시간 포맷 함수를 임포트합니다.
 from utils.helpers import format_embed_from_db, format_seconds_to_hms
 
 logger = logging.getLogger(__name__)
