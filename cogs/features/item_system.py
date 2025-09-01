@@ -29,7 +29,7 @@ class ItemSelectDropdown(ui.Select):
                 ))
 
         super().__init__(
-            placeholder="使用するアイテムを選択してください...",
+            placeholder="사용할 아이템을 선택해주세요...",
             options=options,
             disabled=not options
         )
@@ -50,7 +50,7 @@ class ItemSelectDropdown(ui.Select):
         item_role = interaction.guild.get_role(get_id(item_key))
 
         if not all([isinstance(member, discord.Member), item_info, item_role]):
-            message = await interaction.followup.send("❌ アイテムの使用中にエラーが発生しました。", ephemeral=True, wait=True)
+            message = await interaction.followup.send("❌ 아이템 사용 중 오류가 발생했습니다.", ephemeral=True, wait=True)
             self.cog.bot.loop.create_task(self.cog.delete_message_after_delay(message, 3))
             return
 
@@ -67,7 +67,7 @@ class ItemSelectDropdown(ui.Select):
             self.cog.bot.loop.create_task(self.cog.delete_message_after_delay(message, 3))
 
         else:
-            message = await interaction.followup.send("❌ このアイテムは現在使用できません。", ephemeral=True, wait=True)
+            message = await interaction.followup.send("❌ 이 아이템은 현재 사용할 수 없습니다.", ephemeral=True, wait=True)
             self.cog.bot.loop.create_task(self.cog.delete_message_after_delay(message, 5))
 
 class ItemUsagePanelView(ui.View):
@@ -98,10 +98,10 @@ class ItemUsagePanelView(ui.View):
         dropdown = ItemSelectDropdown(self.cog, interaction.user)
         
         if not dropdown.options:
-            return await interaction.response.send_message("ℹ️ 使用できるアイテムを所持していません。", ephemeral=True)
+            return await interaction.response.send_message("ℹ️ 사용할 수 있는 아이템이 없습니다.", ephemeral=True)
             
         view.add_item(dropdown)
-        await interaction.response.send_message("どのアイテムを使用しますか？", view=view, ephemeral=True)
+        await interaction.response.send_message("어떤 아이템을 사용하시겠습니까?", view=view, ephemeral=True)
 
 
 class ItemSystem(commands.Cog):
@@ -142,16 +142,16 @@ class ItemSystem(commands.Cog):
     async def use_warning_deduction_ticket(self, interaction: discord.Interaction, member: discord.Member, item_role: discord.Role, item_info: dict) -> Tuple[bool, str]:
         current_warnings = await get_total_warning_count(member.id, interaction.guild_id)
         if current_warnings <= 0:
-            message_content = f"✅ 累積警告が0回なので、「{item_info['name']}」を使用する必要はありません。"
+            message_content = f"✅ 누적 경고가 0회이므로 '{item_info['name']}'을(를) 사용할 필요가 없습니다."
             return False, message_content
             
         try:
-            await member.remove_roles(item_role, reason=f"「{item_info['name']}」アイテム使用")
+            await member.remove_roles(item_role, reason=f"'{item_info['name']}' 아이템 사용")
             await add_warning(
                 guild_id=interaction.guild_id,
                 user_id=member.id,
                 moderator_id=self.bot.user.id,
-                reason=f"「{item_info['name']}」アイテム使用",
+                reason=f"'{item_info['name']}' 아이템 사용",
                 amount=item_info['value']
             )
             new_total = await get_total_warning_count(member.id, interaction.guild_id)
@@ -160,14 +160,14 @@ class ItemSystem(commands.Cog):
             
             await self.send_log_message(member, item_info['name'], new_total)
             
-            message_content = f"✅ アイテム「{item_info['name']}」を使用しました！ (累積警告: {current_warnings}回 → {new_total}回)"
+            message_content = f"✅ 아이템 '{item_info['name']}'을(를) 사용했습니다! (누적 경고: {current_warnings}회 → {new_total}회)"
             return True, message_content
             
         except discord.Forbidden:
-            return False, "❌ 役割の変更中にエラーが発生しました。ボットの権限が不足している可能性があります。"
+            return False, "❌ 역할을 변경하는 중 오류가 발생했습니다. 봇의 권한이 부족할 수 있습니다."
         except Exception as e:
             logger.error(f"아이템 사용 중 오류 발생: {e}", exc_info=True)
-            return False, "❌ アイテムの使用中に予期せぬエラーが発生しました。"
+            return False, "❌ 아이템을 사용하는 중 예기치 않은 오류가 발생했습니다."
 
     async def send_log_message(self, member: discord.Member, item_name: str, new_total_warnings: int):
         if not self.log_channel_id: return
@@ -178,8 +178,8 @@ class ItemSystem(commands.Cog):
         if not embed_data: return
         
         embed = format_embed_from_db(embed_data)
-        embed.description = f"{member.mention}さんが**「{item_name}」**を使用しました。"
-        embed.add_field(name="結果", value=f"累積警告が **{new_total_warnings}回** に変更されました。", inline=False)
+        embed.description = f"{member.mention}님이 **'{item_name}'**을(를) 사용했습니다."
+        embed.add_field(name="결과", value=f"누적 경고가 **{new_total_warnings}회**로 변경되었습니다.", inline=False)
         embed.set_author(name=member.display_name, icon_url=member.display_avatar.url if member.display_avatar else None)
         embed.timestamp = datetime.now(timezone.utc)
         await log_channel.send(embed=embed)
