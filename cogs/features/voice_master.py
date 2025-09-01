@@ -411,19 +411,43 @@ class VoiceMaster(commands.Cog):
         vc_name = f"{type_info['emoji']} ⊹ {base_name}"
         overwrites = self._get_permission_overwrites(guild, member, channel_type)
         
+        # [✅ 최종 수정] 채널 그룹 정렬 로직
         position: Optional[int] = None
         if target_category:
             sorted_channels = sorted(target_category.voice_channels, key=lambda c: c.position)
+            
             all_benches = [ch for ch in sorted_channels if '🪑' in ch.name]
             all_fountains = [ch for ch in sorted_channels if '⛲' in ch.name]
+
             if channel_type == '벤치':
-                if all_benches: position = all_benches[-1].position + 1
-                elif all_fountains: position = all_fountains[0].position
+                # 새로 만드는 '벤치'는 '벤치 그룹'의 맨 아래에 위치해야 합니다.
+                # '벤치 그룹'은 항상 '분수대 그룹'보다 위에 있습니다.
+                if all_benches:
+                    # 마지막 벤치 바로 다음에 위치
+                    position = all_benches[-1].position + 1
+                elif all_fountains:
+                    # 벤치가 하나도 없다면, 첫 번째 분수대 바로 앞에 위치
+                    position = all_fountains[0].position
+                # 둘 다 없으면 기본 위치(맨 아래)
+
             elif channel_type == '분수대':
-                if all_fountains: position = all_fountains[-1].position + 1
-                elif all_benches: position = all_benches[-1].position + 1
+                # 새로 만드는 '분수대'는 '분수대 그룹'의 맨 아래에 위치해야 합니다.
+                if all_fountains:
+                    # 마지막 분수대 바로 다음에 위치
+                    position = all_fountains[-1].position + 1
+                elif all_benches:
+                    # 분수대가 하나도 없다면, 마지막 벤치 바로 다음에 위치
+                    position = all_benches[-1].position + 1
+                # 둘 다 없으면 기본 위치(맨 아래)
         
-        return await guild.create_voice_channel(name=vc_name, category=target_category, overwrites=overwrites, user_limit=user_limit, position=position, reason=f"{member.display_name}의 요청")
+        return await guild.create_voice_channel(
+            name=vc_name, 
+            category=target_category, 
+            overwrites=overwrites, 
+            user_limit=user_limit, 
+            position=position, 
+            reason=f"{member.display_name}의 요청"
+        )
 
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
         overwrites = {owner: discord.PermissionOverwrite(connect=True)}
