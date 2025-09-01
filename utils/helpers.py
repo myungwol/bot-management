@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def format_seconds_to_hms(seconds: float) -> str:
     """초를 시, 분, 초 형식의 문자열로 변환합니다."""
     if seconds <= 0:
-        return "0秒"
+        return "0초"
     
     seconds = int(seconds)
     hours = seconds // 3600
@@ -25,11 +25,11 @@ def format_seconds_to_hms(seconds: float) -> str:
     
     parts = []
     if hours > 0:
-        parts.append(f"{hours}時間")
+        parts.append(f"{hours}시간")
     if minutes > 0:
-        parts.append(f"{minutes}分")
+        parts.append(f"{minutes}분")
     if secs > 0 or not parts: # 남은 시간이 0초이거나, 전체가 1분 미만일 때 초를 표시
-        parts.append(f"{secs}秒")
+        parts.append(f"{secs}초")
         
     return ' '.join(parts)
 
