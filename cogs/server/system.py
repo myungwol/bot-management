@@ -17,115 +17,13 @@ from utils.database import (
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
+# [✅✅✅ 핵심 수정] JOB_ADVANCEMENT_DATA를 ui_defaults에서 직접 import 합니다.
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
     ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA
 )
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------------------------
-# [서버 초기화 설정]
-# ---------------------------------------------------------------------------------------------
-SERVER_STRUCTURE = {
-    "・⎯⎯⎯⎯📜 안내소⎯⎯⎯⎯・": [
-        "┣ 🚪 ⊹ 입구", "┣ ℹ️ ⊹ 안내소", "┣ 📝 ⊹ 주민 신청", "┣ 📋 ⊹ 주민등록표", "┣ ❌ ⊹ 주민등록 거절", "┗ 📤 ⊹ 출구"
-    ],
-    "・⎯⎯⎯⎯🏛️ 마을회관⎯⎯⎯⎯・": [
-        "┣ 📢 ⊹ 안내 사항", "┣ ⚖️ ⊹ 규칙", "┣ 🗺️ ⊹ 마을 지도", "┣ 🎭 ⊹ 역할 안내", "┣ 👑 ⊹ 직원 안내", "┗ 📬 ⊹ 문의-건의함"
-    ],
-    "・⎯⎯⎯⎯🎉 축제⎯⎯⎯⎯・": [
-        "┣ 🎪 ⊹ 축제 안내", "┣ 🏆 ⊹ 축제 결과", "┣ 🎟️ ⊹ 축제 신청", "┗ 🎠 ⊹ 축제장"
-    ],
-    "・⎯⎯⎯⎯🚓 경찰서⎯⎯⎯⎯・": [
-        "┣ 🚫 ⊹ 블랙리스트", "┣ 📜 ⊹ 벌점 내역", "┣ ✨ ⊹ 벌점 차감소", "┣ 🔨 ⊹ 벌점 주기", "┗ 🚨 ⊹ 신고하기"
-    ],
-    "・⎯⎯⎯⎯🌿 산책로⎯⎯⎯⎯・": [
-        "┣ 🤫 ⊹ 대나무 숲", "┣ ✒️ ⊹ 이름 변경소", "┣ 📥 ⊹ 이름 변경신청", "┣ 🎨 ⊹ 역할 지급소", "┣ 👋 ⊹ 친구 모집", "┣ 🔔 ⊹ 범프", "┣ 🆙 ⊹ 업", "┗ 📈 ⊹ 레벨"
-    ],
-    "・⎯⎯⎯⎯💬 광장⎯⎯⎯⎯・": [
-        "┣ 💬 ⊹ 메인채팅", "┣ 🌱 ⊹ 뉴비채팅", "┣ 📸 ⊹ 사진방", "┣ 🔗 ⊹ 링크방", "┣ 📔 ⊹ 일기장", "┗ 💭 ⊹ 혼잣말"
-    ],
-    "・⎯⎯⎯⎯🎤 분수대⎯⎯⎯⎯・": [
-        "┣ ⛲ ⊹ 분수대 규칙", "┣ 📞 ⊹ 통화모집", "VOICE:🔊 🛠️ ⊹ 분수대 만들기", "VOICE:🔊 🛋️ ⊹ 벤치 만들기"
-    ],
-    "・⎯⎯⎯⎯🏠 마이룸⎯⎯⎯⎯・": [
-        "┣ 📜 ⊹ 마이룸 규칙", "VOICE:🔊 🚪 ⊹ 마이룸 만들기"
-    ],
-    "・⎯⎯⎯⎯🎮 놀이터⎯⎯⎯⎯・": [
-        "┣ 📜 ⊹ 놀이터 규칙", "┣ 💬 ⊹ 게임 채팅", "┣ 🤝 ⊹ 게임 모집", "VOICE:🔊 🕹️ ⊹ 놀이터 만들기"
-    ],
-    "・⎯⎯⎯⎯💰 은행⎯⎯⎯⎯・": [
-        "┣ 📖 ⊹ 은행 가이드", "┣ 🏪 ⊹ 가판대", "┣ 🧾 ⊹ 입금 내역", "┣ 💸 ⊹ 송금하기", "┗ 👤 ⊹ 프로필확인"
-    ],
-    "・⎯⎯⎯⎯🐾 펫⎯⎯⎯⎯・": ["┗ 🦴 ⊹ (미정)"],
-    "・⎯⎯⎯⎯🎣 낚시터⎯⎯⎯⎯・": ["┣ 🌊 ⊹ 바다", "┣ 🏞️ ⊹ 강", "┣ 🪣 ⊹ 살림망", "┗ 🐠 ⊹ 물고기 자랑"],
-    "・⎯⎯⎯⎯🌾 농장⎯⎯⎯⎯・": ["┗ 🧑‍🌾 ⊹ 밭 만들기"],
-    "・⎯⎯⎯⎯⛏️ 광산⎯⎯⎯⎯・": ["┗ 💎 ⊹ (미정)"],
-    "・⎯⎯⎯⎯🔥 대장간⎯⎯⎯⎯・": ["┗ ⚔️ ⊹ (미정)"],
-    "・⎯⎯⎯⎯⚗️ 가마솥⎯⎯⎯⎯・": ["┗ 🧪 ⊹ (미정)"],
-    "・⎯⎯⎯⎯🔒 로그⎯⎯⎯⎯・": [
-        "┣ ⌨️ ⊹ 채팅로그", "┣ 🔊 ⊹ 음성로그", "┣ 👤 ⊹ 멤버로그", "┣ ⚙️ ⊹ 서버로그", "┗ #️⃣ ⊹ 채널로그"
-    ]
-}
-
-ROLE_STRUCTURE = {
-    "💎 관리팀": [
-        {"name": "촌장", "color": 0xFFD700}, {"name": "부촌장", "color": 0xC0C0C0}, {"name": "직원", "color": 0xB2B2B2},
-        {"name": "경찰관", "color": 0x3498DB}, {"name": "축제 담당", "color": 0xE91E63}, {"name": "홍보 담당", "color": 0x2ECC71},
-        {"name": "마을 디자이너", "color": 0x9B59B6}, {"name": "서기", "color": 0x71368A}, {"name": "도우미", "color": 0x1ABC9C},
-    ],
-    "✨ 특별 역할": [{"name": "후원자", "color": 0xF47FFF}],
-    "📈 주민 등급": [
-        {"name": "장로", "color": 0x99AAB5}, {"name": "베테랑 주민", "color": 0x607D8B}, {"name": "단골 주민", "color": 0x7289DA},
-        {"name": "새내기 주민", "color": 0x979C9F}, {"name": "주민", "color": 0x22A669}, {"name": "여행객", "color": 0x83909F},
-    ],
-    "🎣 직업 역할": [
-        {"name": "강태공", "color": 0x206694}, {"name": "대농", "color": 0x4E2C2C},
-        {"name": "낚시꾼", "color": 0xADD8E6}, {"name": "농부", "color": 0x964B00},
-    ],
-    "🎨 선택 역할": [
-        {"name": "음성채팅"}, {"name": "친구찾기"}, {"name": "Disboard"}, {"name": "Up"},
-        {"name": "마인크래프트"}, {"name": "발로란트"}, {"name": "오버워치"}, {"name": "리그 오브 레전드"},
-        {"name": "마작"}, {"name": "어몽어스"}, {"name": "몬스터 헌터"}, {"name": "원신"},
-        {"name": "에이펙스 레전드"}, {"name": "구스구스덕"}, {"name": "Gartic Phone"},
-        {"name": "스팀"}, {"name": "스마트폰"}, {"name": "콘솔"},
-        {"name": "남성"}, {"name": "여성"}, {"name": "비공개"},
-        {"name": "00년대생"}, {"name": "90년대생"}, {"name": "80년대생"}, {"name": "70년대생"},
-    ],
-    "⚙️ 시스템 역할": [
-        {"name": "숲의 요정", "color": 0x2ECC71},
-        {"name": "경고 1회", "color": 0xFEE75C}, {"name": "경고 2회", "color": 0xE67E22},
-        {"name": "경고 3회", "color": 0xED4245}, {"name": "경고 4회", "color": 0x992D22},
-        {"name": "이벤트 우선권"}, {"name": "경고 1회 차감권"}, {"name": "개인 방 열쇠"},
-    ]
-}
-
-class InitializerConfirmation(ui.View):
-    def __init__(self, author_id: int):
-        super().__init__(timeout=60)
-        self.value = None
-        self.author_id = author_id
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message("명령어를 실행한 유저만 사용할 수 있습니다.", ephemeral=True)
-            return False
-        return True
-
-    @ui.button(label="실행", style=discord.ButtonStyle.danger)
-    async def confirm(self, interaction: discord.Interaction, button: ui.Button):
-        for child in self.children: child.disabled = True
-        self.value = True
-        await interaction.response.edit_message(content="⏳ 서버 구조 초기화를 시작합니다... (채널과 역할 개수에 따라 최대 몇 분이 소요될 수 있습니다.)", view=self)
-        self.stop()
-
-    @ui.button(label="취소", style=discord.ButtonStyle.secondary)
-    async def cancel(self, interaction: discord.Interaction, button: ui.Button):
-        for child in self.children: child.disabled = True
-        self.value = False
-        await interaction.response.edit_message(content="작업이 취소되었습니다.", view=self)
-        self.stop()
 
 async def is_admin(interaction: discord.Interaction) -> bool:
     if not isinstance(interaction.user, discord.Member): return False
@@ -224,11 +122,18 @@ class ServerSystem(commands.Cog):
     async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
 
+        # [✅✅✅ 핵심 수정] strings_sync 로직을 더 명확하고 올바르게 변경
         if action == "strings_sync":
             try:
+                # 1. 기존 UI 텍스트(strings) 동기화
                 await save_config_to_db("strings", UI_STRINGS)
+                
+                # 2. 전직 데이터(JOB_ADVANCEMENT_DATA)를 별도의 키로 동기화
                 await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
+
+                # 3. 게임 봇에 설정 다시 불러오기 요청
                 await save_config_to_db("config_reload_request", time.time())
+                
                 logger.info("UI_STRINGS와 JOB_ADVANCEMENT_DATA가 데이터베이스에 성공적으로 동기화되었습니다.")
                 await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다.\n"
                                                 "**게임 봇을 재시작**하면 모든 설정이 정상적으로 적용됩니다.")
@@ -236,8 +141,8 @@ class ServerSystem(commands.Cog):
                 logger.error(f"UI 동기화 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
             return
-        
-        # ... (이하 setup 명령어의 나머지 로직은 이전과 동일하며 생략하지 않고 모두 포함합니다) ...
+
+        # --- 이하 로직은 이전과 거의 동일 ---
         if action == "game_data_reload":
             try:
                 await save_config_to_db("game_data_reload_request", time.time())
@@ -538,69 +443,15 @@ class ServerSystem(commands.Cog):
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
 
-    @admin_group.command(name="initialize_server", description="[⚠️ 위험] 서버의 모든 역할과 채널을 설정에 맞게 생성합니다.")
-    @app_commands.check(is_admin)
-    async def initialize_server(self, interaction: discord.Interaction):
-        view = InitializerConfirmation(interaction.user.id)
-        await interaction.response.send_message(
-            "**⚠️ 경고: 이 명령어는 서버의 채널과 역할을 대량으로 생성합니다.**\n"
-            "기존에 같은 이름의 채널/역할이 있으면 건너뛰지만, 예기치 않은 변경이 발생할 수 있습니다.\n"
-            "**반드시 서버 초기 설정 시에만 한 번 사용하세요.**\n\n"
-            "정말로 실행하시겠습니까?",
-            view=view, ephemeral=True
-        )
-        await view.wait()
-        if view.value is True:
-            await self.perform_server_initialization(interaction)
-        else:
-            await interaction.edit_original_response(content="작업이 취소되었습니다.", view=None)
-            
-    # --- [복구용 명령어] ---
-    @admin_group.command(name="fix_missing_roles", description="[복구용] 설정 파일 기준으로 누락된 역할을 모두 생성합니다.")
-    @app_commands.check(is_admin)
-    async def fix_missing_roles(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        guild = interaction.guild
-        
-        results = {"created": [], "existing": [], "failed": []}
-        existing_role_names = {r.name for r in guild.roles}
-
-        for category, roles in ROLE_STRUCTURE.items():
-            for role_info in roles:
-                role_name = role_info["name"]
-                if role_name in existing_role_names:
-                    results["existing"].append(role_name)
-                    continue
-                try:
-                    color = role_info.get("color", discord.Color.default())
-                    await guild.create_role(name=role_name, color=discord.Color(color), reason="누락된 역할 복구")
-                    results["created"].append(role_name)
-                    await asyncio.sleep(0.5)
-                except Exception as e:
-                    results["failed"].append(f"{role_name} ({e})")
-
-        embed = discord.Embed(title="✅ 누락된 역할 복구 완료", description="설정 파일을 기준으로 누락된 역할 생성을 시도했습니다.", color=0x2ECC71)
-        
-        def add_results_to_embed(field_name: str, items: List[str]):
-            if not items: return
-            content = "\n".join(f"- {item}" for item in items)
-            # 1024자 제한에 걸리지 않도록 1000자 단위로 안전하게 자름
-            chunks = [content[i:i+1000] for i in range(0, len(content), 1000)]
-            for i, chunk in enumerate(chunks):
-                name = f"{field_name} ({i+1})" if len(chunks) > 1 else field_name
-                embed.add_field(name=name, value=f"```{chunk}```", inline=False)
-
-        add_results_to_embed("✅ 새로 생성된 역할", results["created"])
-        add_results_to_embed("ℹ️ 이미 존재하는 역할 (건너뜀)", results["existing"])
-        
-        if results["failed"]:
-            embed.color = 0xED4245
-            add_results_to_embed("❌ 생성 실패한 역할", results["failed"])
-        
-        if not results["created"] and not results["failed"]:
-            embed.description = "모든 역할이 이미 존재하여 새로 생성된 역할이 없습니다."
-
-        await interaction.followup.send(embed=embed, ephemeral=True)
+    async def log_coin_admin_action(self, admin: discord.Member, target: discord.Member, amount: int, action: str):
+        log_channel_id = get_id("coin_log_channel_id")
+        if not log_channel_id or not (log_channel := self.bot.get_channel(log_channel_id)): return
+        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+        action_color = 0x3498DB if amount > 0 else 0xE74C3C
+        amount_str = f"+{amount:,}" if amount > 0 else f"{amount:,}"
+        embed = discord.Embed(description=f"⚙️ {admin.mention}님이 {target.mention}님의 코인을 `{amount_str}`{currency_icon} 만큼 **{action}**했습니다.", color=action_color)
+        try: await log_channel.send(embed=embed)
+        except Exception as e: logger.error(f"관리자의 코인 조작 로그 전송에 실패했습니다: {e}", exc_info=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
