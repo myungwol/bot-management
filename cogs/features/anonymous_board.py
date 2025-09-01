@@ -50,7 +50,7 @@ class AnonymousModal(ui.Modal, title="익명 메시지 작성"):
 
         except Exception as e:
             logger.error(f"익명 메시지 제출 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ 메시지를投稿하는 중 오류가 발생했습니다.", ephemeral=True)
+            await interaction.followup.send("❌ 메시지를 투고하는 중 오류가 발생했습니다.", ephemeral=True)
 
 class AnonymousPanelView(ui.View):
     def __init__(self, cog: 'AnonymousBoard'):
@@ -107,6 +107,9 @@ class AnonymousBoard(commands.Cog):
             return self.bot.get_channel(self.panel_channel_id)
         return None
         
+    # [✅✅✅ 핵심 수정 ✅✅✅]
+    # 요청에 따라 로그(익명 메시지)와 패널 생성을 분리하여 안정성을 높입니다.
+    # 익명 메시지를 먼저 보내고, 그 다음에 새 패널을 보냅니다.
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None, panel_key: str = "panel_anonymous_board", last_anonymous_embed: Optional[discord.Embed] = None) -> bool:
         target_channel = channel or self.panel_channel
         if not target_channel:
@@ -116,6 +119,7 @@ class AnonymousBoard(commands.Cog):
         embed_key = panel_key
 
         try:
+            # 1. 이전 패널 메시지 삭제
             panel_info = get_panel_id(base_panel_key)
             if panel_info and (old_id := panel_info.get('message_id')):
                 try:
@@ -123,6 +127,7 @@ class AnonymousBoard(commands.Cog):
                     await old_message.delete()
                 except (discord.NotFound, discord.Forbidden): pass
             
+            # 2. 패널용 임베드 데이터 로드
             embed_data = await get_embed_from_db(embed_key)
             if not embed_data:
                 logger.error(f"DB에서 '{embed_key}' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
@@ -133,29 +138,17 @@ class AnonymousBoard(commands.Cog):
                 await self.register_persistent_views()
             await self.view_instance.setup_buttons()
 
-            tasks = []
+            # 3. 새로운 익명 메시지가 있다면 먼저 전송
             if last_anonymous_embed:
-                tasks.append(target_channel.send(embed=last_anonymous_embed))
+                await target_channel.send(embed=last_anonymous_embed)
             
-            tasks.append(target_channel.send(embed=embed, view=self.view_instance))
+            # 4. 새로운 패널 전송
+            new_panel_message = await target_channel.send(embed=embed, view=self.view_instance)
             
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            new_panel_message = None
-            for result in results:
-                # [✅✅✅ 핵심 수정 ✅✅✅]
-                # .view 대신 .components가 있는지 확인하여 패널 메시지를 찾습니다.
-                if isinstance(result, discord.Message) and result.components:
-                    new_panel_message = result
-                    break
-            
-            if new_panel_message:
-                await save_panel_id(base_panel_key, new_panel_message.id, target_channel.id)
-                logger.info(f"✅ 익명 게시판 패널을 성공적으로 새로 생성/갱신했습니다. (채널: #{target_channel.name})")
-                return True
-            else:
-                logger.error("패널 메시지 전송에 실패하여 ID를 저장할 수 없습니다.")
-                return False
+            # 5. 새 패널 정보 저장
+            await save_panel_id(base_panel_key, new_panel_message.id, target_channel.id)
+            logger.info(f"✅ 익명 게시판 패널을 성공적으로 새로 생성/갱신했습니다. (채널: #{target_channel.name})")
+            return True
             
         except Exception as e:
             logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
