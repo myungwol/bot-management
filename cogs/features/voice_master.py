@@ -48,15 +48,16 @@ class VCInviteSelect(ui.UserSelect):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
-        if not vc: return await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
-        blacklisted = []
+        if not vc:
+            msg = await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+            asyncio.create_task(msg.delete(delay=5))
+            return
+        invited_members = [m.mention for m in self.values if isinstance(m, discord.Member)]
         for member in self.values:
-            if isinstance(member, discord.Member) and member.id != self.panel_view.owner_id:
-                # [✅ 수정] connect=False 대신 view_channel=False 권한을 부여하여 채널을 보이지 않게 합니다.
-                await vc.set_permissions(member, view_channel=False, reason=f"{interaction.user.display_name}에 의한 블랙리스트 추가")
-                if member in vc.members: await member.move_to(None, reason="블랙리스트에 추가됨")
-                blacklisted.append(member.mention)
-        await interaction.followup.send(f"✅ {', '.join(blacklisted)} 님을 블랙리스트에 추가했습니다.", ephemeral=True, delete_after=5)
+            if isinstance(member, discord.Member):
+                await vc.set_permissions(member, connect=True, reason=f"{interaction.user.display_name}의 초대")
+        msg = await interaction.followup.send(f"✅ {', '.join(invited_members)} 님을 채널에 초대했습니다.", ephemeral=True)
+        asyncio.create_task(msg.delete(delay=5))
         try: await interaction.delete_original_response()
         except discord.NotFound: pass
 
@@ -68,7 +69,10 @@ class VCKickSelect(ui.Select):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
-        if not vc or not interaction.guild: return await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+        if not vc or not interaction.guild:
+            msg = await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+            asyncio.create_task(msg.delete(delay=5))
+            return
         kicked_members = []
         for member_id_str in self.values:
             member = interaction.guild.get_member(int(member_id_str))
@@ -76,7 +80,8 @@ class VCKickSelect(ui.Select):
                 await vc.set_permissions(member, overwrite=None, reason=f"{interaction.user.display_name}에 의한 추방")
                 if member in vc.members: await member.move_to(None, reason="채널에서 추방됨")
                 kicked_members.append(member.mention)
-        await interaction.followup.send(f"✅ {', '.join(kicked_members)} 님을 채널에서 내보냈습니다.", ephemeral=True, delete_after=5)
+        msg = await interaction.followup.send(f"✅ {', '.join(kicked_members)} 님을 채널에서 내보냈습니다.", ephemeral=True)
+        asyncio.create_task(msg.delete(delay=5))
         try: await interaction.delete_original_response()
         except discord.NotFound: pass
 
@@ -87,14 +92,18 @@ class VCAddBlacklistSelect(ui.UserSelect):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
-        if not vc: return await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+        if not vc:
+            msg = await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+            asyncio.create_task(msg.delete(delay=5))
+            return
         blacklisted = []
         for member in self.values:
             if isinstance(member, discord.Member) and member.id != self.panel_view.owner_id:
-                await vc.set_permissions(member, connect=False, reason=f"{interaction.user.display_name}에 의한 블랙리스트 추가")
+                await vc.set_permissions(member, view_channel=False, reason=f"{interaction.user.display_name}에 의한 블랙리스트 추가")
                 if member in vc.members: await member.move_to(None, reason="블랙리스트에 추가됨")
                 blacklisted.append(member.mention)
-        await interaction.followup.send(f"✅ {', '.join(blacklisted)} 님을 블랙리스트에 추가했습니다.", ephemeral=True, delete_after=5)
+        msg = await interaction.followup.send(f"✅ {', '.join(blacklisted)} 님을 블랙리스트에 추가했습니다.", ephemeral=True)
+        asyncio.create_task(msg.delete(delay=5))
         try: await interaction.delete_original_response()
         except discord.NotFound: pass
 
@@ -106,14 +115,18 @@ class VCRemoveBlacklistSelect(ui.Select):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
-        if not vc or not interaction.guild: return await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+        if not vc or not interaction.guild:
+            msg = await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+            asyncio.create_task(msg.delete(delay=5))
+            return
         removed = []
         for member_id_str in self.values:
             member = interaction.guild.get_member(int(member_id_str))
             if member:
                 await vc.set_permissions(member, overwrite=None, reason=f"{interaction.user.display_name}에 의한 블랙리스트 해제")
                 removed.append(member.mention)
-        await interaction.followup.send(f"✅ {', '.join(removed)} 님을 블랙리스트에서 해제했습니다.", ephemeral=True, delete_after=5)
+        msg = await interaction.followup.send(f"✅ {', '.join(removed)} 님을 블랙리스트에서 해제했습니다.", ephemeral=True)
+        asyncio.create_task(msg.delete(delay=5))
         try: await interaction.delete_original_response()
         except discord.NotFound: pass
 
@@ -176,7 +189,10 @@ class ControlPanelView(ui.View):
         await modal.wait()
         if modal.submitted:
             vc = self.cog.bot.get_channel(self.vc_id)
-            if not vc: return await interaction.followup.send("❌ 처리 중 채널을 찾을 수 없게 되었습니다.", ephemeral=True)
+            if not vc:
+                msg = await interaction.followup.send("❌ 처리 중 채널을 찾을 수 없게 되었습니다.", ephemeral=True)
+                asyncio.create_task(msg.delete(delay=5))
+                return
             new_name, new_limit = vc.name, vc.user_limit
             if type_info["name_editable"]:
                 base_name = modal.name_input.value if hasattr(modal, 'name_input') and modal.name_input.value else current_name
@@ -188,11 +204,16 @@ class ControlPanelView(ui.View):
                         raise ValueError("인원 제한은 0에서 99 사이여야 합니다.")
                     min_limit = type_info.get("min_limit", 0)
                     if new_limit != 0 and new_limit < min_limit:
-                        await interaction.followup.send(f"❌ 이 채널의 최소 인원은 {min_limit}명입니다. {min_limit}명 이상으로 설정하거나 0(무제한)으로 설정해주세요.", ephemeral=True)
+                        msg = await interaction.followup.send(f"❌ 이 채널의 최소 인원은 {min_limit}명입니다. {min_limit}명 이상으로 설정하거나 0(무제한)으로 설정해주세요.", ephemeral=True)
+                        asyncio.create_task(msg.delete(delay=5))
                         return
                 except ValueError: 
-                    return await interaction.followup.send("❌ 인원 제한은 0에서 99 사이의 숫자로 입력해주세요.", ephemeral=True)
-            await vc.edit(name=new_name, user_limit=new_limit, reason=f"{interaction.user.display_name}의 요청"); await interaction.followup.send("✅ 채널 설정을 업데이트했습니다.", ephemeral=True, delete_after=5)
+                    msg = await interaction.followup.send("❌ 인원 제한은 0에서 99 사이의 숫자로 입력해주세요.", ephemeral=True)
+                    asyncio.create_task(msg.delete(delay=5))
+                    return
+            await vc.edit(name=new_name, user_limit=new_limit, reason=f"{interaction.user.display_name}의 요청")
+            msg = await interaction.followup.send("✅ 채널 설정을 업데이트했습니다.", ephemeral=True)
+            asyncio.create_task(msg.delete(delay=5))
     async def transfer_owner(self, interaction: discord.Interaction):
         view = ui.View(timeout=180).add_item(VCOwnerSelect(self)); await interaction.response.send_message("새로운 소유자를 선택해주세요.", view=view, ephemeral=True)
     async def invite_user(self, interaction: discord.Interaction):
@@ -208,7 +229,6 @@ class ControlPanelView(ui.View):
     async def remove_from_blacklist(self, interaction: discord.Interaction):
         vc = self.cog.bot.get_channel(self.vc_id)
         if not vc or not interaction.guild: return
-        # [✅ 수정] connect가 False인 멤버가 아닌, view_channel이 False인 멤버를 찾도록 조건을 변경합니다.
         blacklisted_members = [target for target, overwrite in vc.overwrites.items() if isinstance(target, discord.Member) and overwrite.view_channel is False]
         if not blacklisted_members: return await interaction.response.send_message("ℹ️ 블랙리스트에 등록된 멤버가 없습니다.", ephemeral=True)
         view = ui.View(timeout=180).add_item(VCRemoveBlacklistSelect(self, blacklisted_members)); await interaction.response.send_message("블랙리스트에서 해제할 멤버를 선택해주세요.", view=view, ephemeral=True)
@@ -271,11 +291,11 @@ class VoiceMaster(commands.Cog):
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot or before.channel == after.channel: return
         try:
-            # [✅ 순서 변경] 채널 삭제 로직을 생성 로직보다 먼저 실행합니다.
+            # 채널 삭제 로직을 생성 로직보다 먼저 실행
             if before.channel and before.channel.id in self.temp_channels:
                 await self._delete_temp_channel(before.channel)
 
-            # --- 채널 생성 로직 ---
+            # 채널 생성 로직
             if after.channel and after.channel.id in self.creator_channel_configs:
                 if member.id in self.active_creations: return
                 if member.id in self.user_channel_map:
@@ -296,7 +316,7 @@ class VoiceMaster(commands.Cog):
                 await self._create_temp_channel_flow(member, self.creator_channel_configs[after.channel.id], after.channel)
                 self.active_creations.discard(member.id)
 
-            # --- 채널 입장 시 조건 확인 및 강제 퇴장 로직 ---
+            # 채널 입장 시 조건 확인 및 강제 퇴장 로직
             if after.channel and after.channel.id in self.temp_channels:
                 channel_info = self.temp_channels.get(after.channel.id)
                 if not channel_info: return
@@ -445,7 +465,10 @@ class VoiceMaster(commands.Cog):
 
     async def _transfer_ownership(self, interaction: discord.Interaction, vc: discord.VoiceChannel, new_owner: discord.Member):
         info = self.temp_channels.get(vc.id)
-        if not info or not interaction.guild: return await interaction.followup.send("❌ 채널 정보를 찾을 수 없습니다.", ephemeral=True)
+        if not info or not interaction.guild:
+            msg = await interaction.followup.send("❌ 채널 정보를 찾을 수 없습니다.", ephemeral=True)
+            asyncio.create_task(msg.delete(delay=5))
+            return
         old_owner = interaction.guild.get_member(info['owner_id'])
         try:
             overwrites = vc.overwrites
@@ -460,10 +483,12 @@ class VoiceMaster(commands.Cog):
             embed = panel_message.embeds[0]; embed.title = f"환영합니다, {get_clean_display_name(new_owner)}님!"
             await panel_message.edit(content=f"{new_owner.mention}", embed=embed, view=ControlPanelView(self, new_owner.id, vc.id, info['type']))
             await vc.send(f"👑 {interaction.user.mention}님이 채널 소유권을 {new_owner.mention}님에게 이전했습니다.")
-            await interaction.followup.send("✅ 소유권을 성공적으로 이전했습니다.", ephemeral=True, delete_after=5)
+            msg = await interaction.followup.send("✅ 소유권을 성공적으로 이전했습니다.", ephemeral=True)
+            asyncio.create_task(msg.delete(delay=5))
         except Exception as e:
             logger.error(f"소유권 이전 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ 소유권 이전 중 오류가 발생했습니다.", ephemeral=True)
+            msg = await interaction.followup.send("❌ 소유권 이전 중 오류가 발생했습니다.", ephemeral=True)
+            asyncio.create_task(msg.delete(delay=5))
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(VoiceMaster(bot))
