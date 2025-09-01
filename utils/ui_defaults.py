@@ -72,11 +72,10 @@ UI_ROLE_KEY_MAP = {
     "role_game_mh":             {"name": "몬스터 헌터", "is_prefix": False, "priority": 0},
     "role_game_genshin":        {"name": "원신", "is_prefix": False, "priority": 0},
     "role_game_apex":           {"name": "에이펙스 레전드", "is_prefix": False, "priority": 0},
-    "role_game_splatoon":       {"name": "스플래툰", "is_prefix": False, "priority": 0},
     "role_game_gf":             {"name": "갈틱폰", "is_prefix": False, "priority": 0},
     "role_platform_steam":      {"name": "스팀", "is_prefix": False, "priority": 0},
     "role_platform_smartphone": {"name": "스마트폰", "is_prefix": False, "priority": 0},
-    "role_platform_switch":     {"name": "닌텐도 스위치", "is_prefix": False, "priority": 0},
+    "role_platform_switch":     {"name": "콘솔", "is_prefix": False, "priority": 0},
 
     # --- 경고 역할 ---
     "role_warning_level_1":     {"name": "벌점 1회", "is_prefix": False, "priority": 0},
