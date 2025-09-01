@@ -13,9 +13,9 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-class WarningModal(ui.Modal, title="警告内容の入力"):
-    amount = ui.TextInput(label="警告回数", placeholder="付与する警告の回数を数字で入力 (例: 1)", required=True, max_length=2)
-    reason = ui.TextInput(label="警告理由", placeholder="警告を発行する理由を具体的に記入してください。", style=discord.TextStyle.paragraph, required=True, max_length=500)
+class WarningModal(ui.Modal, title="경고 내용 입력"):
+    amount = ui.TextInput(label="경고 횟수", placeholder="부여할 경고 횟수를 숫자로 입력 (예: 1)", required=True, max_length=2)
+    reason = ui.TextInput(label="경고 사유", placeholder="경고를 발급하는 이유를 구체적으로 기입해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=500)
 
     def __init__(self, cog: 'WarningSystem', target_member: discord.Member):
         super().__init__()
@@ -28,10 +28,10 @@ class WarningModal(ui.Modal, title="警告内容の入力"):
         try:
             amount_val = int(self.amount.value)
             if amount_val <= 0:
-                await interaction.followup.send("❌ 警告回数は1以上の自然数を入力してください。", ephemeral=True)
+                await interaction.followup.send("❌ 경고 횟수는 1 이상의 자연수를 입력해주세요.", ephemeral=True)
                 return
         except (ValueError, TypeError):
-            await interaction.followup.send("❌ 警告回数は数字で入力してください。", ephemeral=True)
+            await interaction.followup.send("❌ 경고 횟수는 숫자로 입력해주세요.", ephemeral=True)
             return
 
         await add_warning(
@@ -54,16 +54,16 @@ class WarningModal(ui.Modal, title="警告内容の入力"):
         )
         
         try:
-            dm_embed = discord.Embed(title=f"🚨 {interaction.guild.name}にて警告が付与されました", color=0xED4245)
-            dm_embed.add_field(name="理由", value=self.reason.value, inline=False)
-            dm_embed.add_field(name="付与された警告回数", value=f"{amount_val}回", inline=True)
-            dm_embed.add_field(name="累積警告回数", value=f"{new_total}回", inline=True)
-            dm_embed.set_footer(text="ご不明な点がある場合は、お問い合わせチケットをご利用ください。")
+            dm_embed = discord.Embed(title=f"🚨 {interaction.guild.name}에서 경고가 부여되었습니다", color=0xED4245)
+            dm_embed.add_field(name="사유", value=self.reason.value, inline=False)
+            dm_embed.add_field(name="부여된 경고 횟수", value=f"{amount_val}회", inline=True)
+            dm_embed.add_field(name="누적 경고 횟수", value=f"{new_total}회", inline=True)
+            dm_embed.set_footer(text="궁금한 점이 있다면 문의 티켓을 이용해주세요.")
             await self.target_member.send(embed=dm_embed)
         except discord.Forbidden:
             logger.warning(f"{self.target_member.display_name}님에게 DM을 보낼 수 없어 경고 알림을 보내지 못했습니다.")
             
-        await interaction.followup.send(f"✅ {self.target_member.mention} さんに **{amount_val}回** の警告を正常に付与しました。 (累積: {new_total}回)", ephemeral=True)
+        await interaction.followup.send(f"✅ {self.target_member.mention} 님에게 **{amount_val}회** 의 경고를 성공적으로 부여했습니다. (누적: {new_total}회)", ephemeral=True)
 
 
 class TargetUserSelectView(ui.View):
@@ -71,11 +71,11 @@ class TargetUserSelectView(ui.View):
         super().__init__(timeout=180)
         self.cog = cog
 
-    @ui.select(cls=ui.UserSelect, placeholder="警告を与えるユーザーを選択してください。")
+    @ui.select(cls=ui.UserSelect, placeholder="경고를 부여할 유저를 선택하세요.")
     async def select_user(self, interaction: discord.Interaction, select: ui.UserSelect):
         target_user = select.values[0]
         if target_user.bot:
-            await interaction.response.send_message("❌ ボットには警告を与えられません。", ephemeral=True)
+            await interaction.response.send_message("❌ 봇에게는 경고를 부여할 수 없습니다.", ephemeral=True)
             return
             
         modal = WarningModal(self.cog, target_user)
@@ -108,15 +108,15 @@ class WarningPanelView(ui.View):
 
     async def on_button_click(self, interaction: discord.Interaction):
         if not self.cog.police_role_id or not isinstance(interaction.user, discord.Member):
-            return await interaction.response.send_message("❌ 権限がありません。", ephemeral=True)
+            return await interaction.response.send_message("❌ 권한이 없습니다.", ephemeral=True)
             
         if not any(r.id == self.cog.police_role_id for r in interaction.user.roles):
             police_role = interaction.guild.get_role(self.cog.police_role_id)
-            role_name = police_role.name if police_role else "警告担当"
-            return await interaction.response.send_message(f"❌ この機能は`{role_name}`の役割を持つスタッフのみ使用できます。", ephemeral=True)
+            role_name = police_role.name if police_role else "경고 담당"
+            return await interaction.response.send_message(f"❌ 이 기능은 `{role_name}` 역할을 가진 스태프만 사용할 수 있습니다.", ephemeral=True)
             
         view = TargetUserSelectView(self.cog)
-        await interaction.response.send_message("警告を与える対象のユーザーを選択してください。", view=view, ephemeral=True)
+        await interaction.response.send_message("경고를 부여할 대상을 선택하세요.", view=view, ephemeral=True)
 
 
 class WarningSystem(commands.Cog):
@@ -189,11 +189,11 @@ class WarningSystem(commands.Cog):
         
         embed = format_embed_from_db(embed_data)
         embed.set_author(name=f"{moderator.display_name} → {target.display_name}", icon_url=moderator.display_avatar.url)
-        embed.add_field(name="対象者", value=f"{target.mention} (`{target.id}`)", inline=False)
-        embed.add_field(name="担当者", value=f"{moderator.mention} (`{moderator.id}`)", inline=False)
-        embed.add_field(name="理由", value=reason, inline=False)
-        embed.add_field(name="付与回数", value=f"`{amount}`回", inline=True)
-        embed.add_field(name="累積回数", value=f"`{new_total}`回", inline=True)
+        embed.add_field(name="대상자", value=f"{target.mention} (`{target.id}`)", inline=False)
+        embed.add_field(name="담당자", value=f"{moderator.mention} (`{moderator.id}`)", inline=False)
+        embed.add_field(name="사유", value=reason, inline=False)
+        embed.add_field(name="부여 횟수", value=f"`{amount}`회", inline=True)
+        embed.add_field(name="누적 횟수", value=f"`{new_total}`회", inline=True)
         embed.timestamp = datetime.now(timezone.utc)
         
         await log_channel.send(embed=embed)
