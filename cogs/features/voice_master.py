@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 
 # 채널 타입별 기본 설정값
 CHANNEL_TYPE_INFO = {
-    "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "모두의 광장", "min_limit": 4},
+    "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "모두의 분수대", "min_limit": 4},
     "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "게임 이름 등으로 변경해주세요", "min_limit": 3},
-    "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "초심자의 의자", "min_limit": 4},
-    "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}의 마이룸"},
-    "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}의 방"} # Fallback
+    "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "새내기의 벤치", "min_limit": 4},
+    "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 마이룸"},
+    "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 방"} # Fallback
 }
 
 class VCEditModal(ui.Modal, title="🔊 음성 채널 설정"):
