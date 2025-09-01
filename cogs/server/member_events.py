@@ -46,7 +46,7 @@ class MemberEvents(commands.Cog):
                 restored_nick = backup.get('nickname')
 
                 if roles_to_restore or restored_nick:
-                    await member.edit(roles=roles_to_restore, nick=restored_nick, reason="サーバー再参加によるデータ復旧")
+                    await member.edit(roles=roles_to_restore, nick=restored_nick, reason="서버 재참여로 인한 데이터 복구")
                 
                 await delete_member_backup(member.id, member.guild.id)
                 logger.info(f"'{member.display_name}'님의 역할과 닉네임을 성공적으로 복구했습니다.")
@@ -94,7 +94,7 @@ class MemberEvents(commands.Cog):
                 embed = format_embed_from_db(embed_data, member_mention=member.mention, guild_name=member.guild.name)
                 if member.display_avatar:
                     embed.set_thumbnail(url=member.display_avatar.url)
-                await channel.send(f"ようこそ、{member.mention}さん！", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+                await channel.send(f"환영합니다, {member.mention}님!", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
@@ -125,38 +125,38 @@ class MemberEvents(commands.Cog):
 
         key_role_id = get_id("role_personal_room_key")
         if not key_role_id:
-            logger.warning("부스트 감지: '個人部屋の鍵' 역할의 ID가 DB에 설정되지 않았습니다.")
+            logger.warning("부스트 감지: '개인 방 열쇠' 역할의 ID가 DB에 설정되지 않았습니다.")
             return
         
         key_role = after.guild.get_role(key_role_id)
         if not key_role:
-            logger.warning(f"부스트 감지: 서버에서 '個人部屋の鍵' 역할(ID: {key_role_id})을 찾을 수 없습니다.")
+            logger.warning(f"부스트 감지: 서버에서 '개인 방 열쇠' 역할(ID: {key_role_id})을 찾을 수 없습니다.")
             return
 
         if before.premium_since is None and after.premium_since is not None:
             if key_role not in after.roles:
                 try:
-                    await after.add_roles(key_role, reason="支援者開始")
-                    logger.info(f"{after.display_name}님이 서버 부스트를 시작하여 '個人部屋の鍵' 역할을 지급했습니다.")
+                    await after.add_roles(key_role, reason="서버 부스트 시작")
+                    logger.info(f"{after.display_name}님이 서버 부스트를 시작하여 '개인 방 열쇠' 역할을 지급했습니다.")
                     try:
                         await after.send(
-                            f"🎉 **{after.guild.name}** 支援していただきありがとうございます！\n"
-                            "特典として**プライベートボイスチャンネル**を作成できる`個人部屋の鍵`の役割が付与されました。"
+                            f"🎉 **{after.guild.name}** 서버를 부스트해주셔서 감사합니다!\n"
+                            "혜택으로 **개인 음성 채널**을 만들 수 있는 `개인 방 열쇠` 역할이 부여되었습니다."
                         )
                     except discord.Forbidden:
                         logger.warning(f"{after.display_name}님에게 DM을 보낼 수 없어 부스트 감사 메시지를 보내지 못했습니다.")
                 except discord.Forbidden:
-                    logger.error(f"{after.display_name}님에게 '個人部屋の鍵' 역할을 지급하지 못했습니다. (권한 부족)")
+                    logger.error(f"{after.display_name}님에게 '개인 방 열쇠' 역할을 지급하지 못했습니다. (권한 부족)")
                 except Exception as e:
                     logger.error(f"{after.display_name}님에게 역할 지급 중 오류 발생: {e}", exc_info=True)
 
         elif before.premium_since is not None and after.premium_since is None:
             if key_role in after.roles:
                 try:
-                    await after.remove_roles(key_role, reason="サーバーブースト停止")
-                    logger.info(f"{after.display_name}님이 서버 부스트를 중지하여 '個人部屋の鍵' 역할을 회수했습니다.")
+                    await after.remove_roles(key_role, reason="서버 부스트 중지")
+                    logger.info(f"{after.display_name}님이 서버 부스트를 중지하여 '개인 방 열쇠' 역할을 회수했습니다.")
                 except discord.Forbidden:
-                    logger.error(f"{after.display_name}님의 '個人部屋の鍵' 역할을 회수하지 못했습니다. (권한 부족)")
+                    logger.error(f"{after.display_name}님의 '개인 방 열쇠' 역할을 회수하지 못했습니다. (권한 부족)")
                 except Exception as e:
                     logger.error(f"{after.display_name}님의 역할 회수 중 오류 발생: {e}", exc_info=True)
 
