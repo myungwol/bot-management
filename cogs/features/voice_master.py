@@ -49,11 +49,14 @@ class VCInviteSelect(ui.UserSelect):
         await interaction.response.defer(ephemeral=True)
         vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
         if not vc: return await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
-        invited_members = [m.mention for m in self.values if isinstance(m, discord.Member)]
+        blacklisted = []
         for member in self.values:
-            if isinstance(member, discord.Member):
-                await vc.set_permissions(member, connect=True, reason=f"{interaction.user.display_name}의 초대")
-        await interaction.followup.send(f"✅ {', '.join(invited_members)} 님을 채널에 초대했습니다.", ephemeral=True, delete_after=5)
+            if isinstance(member, discord.Member) and member.id != self.panel_view.owner_id:
+                # [✅ 수정] connect=False 대신 view_channel=False 권한을 부여하여 채널을 보이지 않게 합니다.
+                await vc.set_permissions(member, view_channel=False, reason=f"{interaction.user.display_name}에 의한 블랙리스트 추가")
+                if member in vc.members: await member.move_to(None, reason="블랙리스트에 추가됨")
+                blacklisted.append(member.mention)
+        await interaction.followup.send(f"✅ {', '.join(blacklisted)} 님을 블랙리스트에 추가했습니다.", ephemeral=True, delete_after=5)
         try: await interaction.delete_original_response()
         except discord.NotFound: pass
 
@@ -205,7 +208,8 @@ class ControlPanelView(ui.View):
     async def remove_from_blacklist(self, interaction: discord.Interaction):
         vc = self.cog.bot.get_channel(self.vc_id)
         if not vc or not interaction.guild: return
-        blacklisted_members = [target for target, overwrite in vc.overwrites.items() if isinstance(target, discord.Member) and overwrite.connect is False]
+        # [✅ 수정] connect가 False인 멤버가 아닌, view_channel이 False인 멤버를 찾도록 조건을 변경합니다.
+        blacklisted_members = [target for target, overwrite in vc.overwrites.items() if isinstance(target, discord.Member) and overwrite.view_channel is False]
         if not blacklisted_members: return await interaction.response.send_message("ℹ️ 블랙리스트에 등록된 멤버가 없습니다.", ephemeral=True)
         view = ui.View(timeout=180).add_item(VCRemoveBlacklistSelect(self, blacklisted_members)); await interaction.response.send_message("블랙리스트에서 해제할 멤버를 선택해주세요.", view=view, ephemeral=True)
 
