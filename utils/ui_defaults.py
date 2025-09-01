@@ -12,7 +12,7 @@ UI_ROLE_KEY_MAP = {
     "role_admin_total":         {"name": "숲의 요정", "is_prefix": True, "priority": 100},
     "role_staff_village_chief": {"name": "촌장", "is_prefix": True, "priority": 90},
     "role_staff_deputy_chief":  {"name": "부촌장", "is_prefix": True, "priority": 85},
-    "role_approval":            {"name": "마을사무소 직원", "is_prefix": True, "priority": 60},
+    "role_approval":            {"name": "직원", "is_prefix": True, "priority": 60},
     "role_premium_booster":     {"name": "후원자", "is_prefix": True, "priority": 55},
     "role_resident_elder":      {"name": "장로", "is_prefix": True, "priority": 50},
     "role_job_master_angler":   {"name": "강태공", "is_prefix": True, "priority": 16},
@@ -26,7 +26,7 @@ UI_ROLE_KEY_MAP = {
     "role_staff_police":        {"name": "경찰관", "is_prefix": False, "priority": 0},
     "role_staff_festival":      {"name": "축제 담당", "is_prefix": False, "priority": 0},
     "role_staff_pr":            {"name": "홍보 담당", "is_prefix": False, "priority": 0},
-    "role_staff_design":        {"name": "마을 디자이너", "is_prefix": False, "priority": 0},
+    "role_staff_design":        {"name": "디자이너", "is_prefix": False, "priority": 0},
     "role_staff_secretary":     {"name": "서기", "is_prefix": False, "priority": 0},
     "role_staff_newbie_helper": {"name": "도우미", "is_prefix": False, "priority": 0},
     
@@ -46,19 +46,19 @@ UI_ROLE_KEY_MAP = {
     "role_info_male":           {"name": "남성", "is_prefix": False, "priority": 0},
     "role_info_female":         {"name": "여성", "is_prefix": False, "priority": 0},
     "role_info_age_private":    {"name": "비공개", "is_prefix": False, "priority": 0},
-    "role_info_age_70s":        {"name": "70년대생", "is_prefix": False, "priority": 0},
-    "role_info_age_80s":        {"name": "80년대생", "is_prefix": False, "priority": 0},
-    "role_info_age_90s":        {"name": "90년대생", "is_prefix": False, "priority": 0},
-    "role_info_age_00s":        {"name": "00년대생", "is_prefix": False, "priority": 0},
+    "role_info_age_70s":        {"name": "70년생", "is_prefix": False, "priority": 0},
+    "role_info_age_80s":        {"name": "80년생", "is_prefix": False, "priority": 0},
+    "role_info_age_90s":        {"name": "90년생", "is_prefix": False, "priority": 0},
+    "role_info_age_00s":        {"name": "00년생", "is_prefix": False, "priority": 0},
     
     # --- 상점/아이템 역할 ---
     "role_item_event_priority": {"name": "이벤트 우선권", "is_prefix": False, "priority": 0},
-    "role_item_warning_deduct": {"name": "경고 1회 차감권", "is_prefix": False, "priority": 0},
+    "role_item_warning_deduct": {"name": "벌점 1회 차감권", "is_prefix": False, "priority": 0},
     "role_personal_room_key":   {"name": "개인 방 열쇠", "is_prefix": False, "priority": 0},
 
     # --- 알림 역할 ---
-    "role_notify_voice":        {"name": "음성채팅", "is_prefix": False, "priority": 0},
-    "role_notify_friends":      {"name": "친구찾기", "is_prefix": False, "priority": 0},
+    "role_notify_voice":        {"name": "통화 모집", "is_prefix": False, "priority": 0},
+    "role_notify_friends":      {"name": "친구 모집집", "is_prefix": False, "priority": 0},
     "role_notify_disboard":     {"name": "Disboard", "is_prefix": False, "priority": 0},
     "role_notify_up":           {"name": "Up", "is_prefix": False, "priority": 0},
 
@@ -73,7 +73,7 @@ UI_ROLE_KEY_MAP = {
     "role_game_genshin":        {"name": "원신", "is_prefix": False, "priority": 0},
     "role_game_apex":           {"name": "에이펙스 레전드", "is_prefix": False, "priority": 0},
     "role_game_splatoon":       {"name": "스플래툰", "is_prefix": False, "priority": 0},
-    "role_game_gf":             {"name": "Gartic Phone", "is_prefix": False, "priority": 0},
+    "role_game_gf":             {"name": "갈틱폰", "is_prefix": False, "priority": 0},
     "role_platform_steam":      {"name": "스팀", "is_prefix": False, "priority": 0},
     "role_platform_smartphone": {"name": "스마트폰", "is_prefix": False, "priority": 0},
     "role_platform_switch":     {"name": "닌텐도 스위치", "is_prefix": False, "priority": 0},
