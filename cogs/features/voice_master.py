@@ -372,7 +372,6 @@ class VoiceMaster(commands.Cog):
         user_limit = 4 if channel_type == '벤치' else 0
         base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
         
-        # [✅ 수정] 이름 중복 방지 로직 개선
         if not type_info["name_editable"]:
             channels_in_category = target_category.voice_channels if target_category else guild.voice_channels
             prefix_to_check = f"{type_info['emoji']} ⊹ {base_name}"
@@ -391,21 +390,30 @@ class VoiceMaster(commands.Cog):
         vc_name = f"{type_info['emoji']} ⊹ {base_name}"
         overwrites = self._get_permission_overwrites(guild, member, channel_type)
         
-        # [✅ 추가] 채널 위치 정렬 로직
+        # [✅ 수정] 채널 위치 정렬 로직 개선
         position = None
         if target_category:
-            category_channels = target_category.voice_channels
+            # 채널 목록을 현재 위치(position) 기준으로 정렬
+            sorted_channels = sorted(target_category.voice_channels, key=lambda c: c.position)
+            
             if channel_type == '벤치':
-                # '벤치'는 '분수대' 위에 위치
-                for i, ch in enumerate(category_channels):
-                    if '⛲' in ch.name: # 분수대 이모지
-                        position = ch.position
-                        break
+                # '벤치'는 첫 번째 '분수대' 바로 위에 위치해야 함
+                first_fountain = next((ch for ch in sorted_channels if '⛲' in ch.name), None)
+                if first_fountain:
+                    position = first_fountain.position
+                # 분수대가 없다면 맨 끝에 생성됨 (기본 동작)
+
             elif channel_type == '분수대':
-                # '분수대'는 '벤치' 아래에 위치
-                bench_channels = [ch for ch in category_channels if '🪑' in ch.name] # 벤치 이모지
-                if bench_channels:
-                    position = bench_channels[-1].position + 1
+                # '분수대'는 마지막 '분수대' 바로 아래에, 혹은 '벤치'들 아래에 위치해야 함
+                all_fountains = [ch for ch in sorted_channels if '⛲' in ch.name]
+                if all_fountains:
+                    # 이미 분수대가 있다면, 마지막 분수대 바로 다음에 위치
+                    position = all_fountains[-1].position + 1
+                else:
+                    # 분수대가 없다면, 마지막 벤치 바로 다음에 위치
+                    all_benches = [ch for ch in sorted_channels if '🪑' in ch.name]
+                    if all_benches:
+                        position = all_benches[-1].position + 1
         
         return await guild.create_voice_channel(name=vc_name, category=target_category, overwrites=overwrites, user_limit=user_limit, position=position, reason=f"{member.display_name}의 요청")
 
