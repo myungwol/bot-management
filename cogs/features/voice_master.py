@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 # 채널 타입별 기본 설정값
 CHANNEL_TYPE_INFO = {
-    "plaza":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "모두의 분수대", "min_limit": 4},
-    "game":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "게임 이름 등으로 변경해주세요", "min_limit": 3},
-    "newbie":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "새내기의 벤치", "min_limit": 4},
-    "vip":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 마이룸"},
+    "분수대":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "모두의 분수대", "min_limit": 4},
+    "놀이터":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "게임 이름 등으로 변경해주세요", "min_limit": 3},
+    "벤치":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "새내기의 벤치", "min_limit": 4},
+    "마이룸":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 마이룸"},
     "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 방"} # Fallback
 }
 
@@ -136,12 +136,12 @@ class ControlPanelView(ui.View):
         type_info = CHANNEL_TYPE_INFO.get(self.channel_type, CHANNEL_TYPE_INFO["normal"])
         if type_info["name_editable"] or type_info["limit_editable"]:
             self.add_item(ui.Button(label="설정", style=discord.ButtonStyle.primary, emoji="⚙️", custom_id="vc_edit", row=0))
-        if self.channel_type != 'vip':
+        if self.channel_type != '마이룸':
             self.add_item(ui.Button(label="소유권 이전", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="vc_transfer", row=0))
-        if self.channel_type == 'vip':
+        if self.channel_type == '마이룸':
             self.add_item(ui.Button(label="초대", style=discord.ButtonStyle.success, emoji="📨", custom_id="vc_invite", row=1))
             self.add_item(ui.Button(label="추방", style=discord.ButtonStyle.danger, emoji="👢", custom_id="vc_kick", row=1))
-        elif self.channel_type in ['plaza', 'game']:
+        elif self.channel_type in ['분수대', '놀이터']:
             self.add_item(ui.Button(label="블랙리스트 추가", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="vc_add_blacklist", row=0))
             self.add_item(ui.Button(label="블랙리스트 해제", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="vc_remove_blacklist", row=1))
         for item in self.children:
@@ -223,10 +223,10 @@ class VoiceMaster(commands.Cog):
 
     async def load_configs(self):
         self.creator_channel_configs = {
-            get_id("vc_creator_channel_id_4p"): {"type": "plaza"},
-            get_id("vc_creator_channel_id_3p"): {"type": "game"},
-            get_id("vc_creator_channel_id_newbie"): {"type": "newbie", "required_role_key": "role_resident_rookie"},
-            get_id("vc_creator_channel_id_vip"): {"type": "vip", "required_role_key": "role_personal_room_key"},
+            get_id("vc_creator_channel_id_4p"): {"type": "분수대"},
+            get_id("vc_creator_channel_id_3p"): {"type": "놀이터"},
+            get_id("vc_creator_channel_id_벤치"): {"type": "벤치", "required_role_key": "role_resident_rookie"},
+            get_id("vc_creator_channel_id_마이룸"): {"type": "마이룸", "required_role_key": "role_personal_room_key"},
         }
         self.creator_channel_configs = {k: v for k, v in self.creator_channel_configs.items() if k is not None}
         self.admin_role_ids = [role_id for key in ADMIN_ROLE_KEYS if (role_id := get_id(key)) is not None]
@@ -332,7 +332,7 @@ class VoiceMaster(commands.Cog):
         channel_type = config.get("type", "normal")
         type_info = CHANNEL_TYPE_INFO.get(channel_type, CHANNEL_TYPE_INFO["normal"])
         target_category = creator_channel.category or (guild.get_channel(self.default_category_id) if self.default_category_id else None)
-        user_limit = 4 if channel_type == 'newbie' else 0
+        user_limit = 4 if channel_type == '벤치' else 0
         base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
         
         if not type_info["name_editable"]:
@@ -349,11 +349,11 @@ class VoiceMaster(commands.Cog):
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
         overwrites = {owner: discord.PermissionOverwrite(connect=True)}
         
-        if channel_type in ['vip', 'newbie']:
+        if channel_type in ['마이룸', '벤치']:
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
         else:
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=True)
-        if channel_type == 'newbie':
+        if channel_type == '벤치':
             if (role_id := get_id("role_resident_rookie")) and (role := guild.get_role(role_id)):
                  overwrites[role] = discord.PermissionOverwrite(connect=True)
             for admin_role_id in self.admin_role_ids:
