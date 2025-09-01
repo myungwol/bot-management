@@ -230,7 +230,13 @@ class VoiceMaster(commands.Cog):
     async def cog_load(self):
         await self.load_configs() # <--- 봇이 켜질 때 딱 한 번만 실행됨
         self.bot.loop.create_task(self.sync_channels_from_db())
-
+        
+    async def reload_configs(self):
+        """데이터베이스에서 최신 설정을 다시 로드하여 Cog에 적용합니다."""
+        logger.info("[VoiceMaster] 설정(Config)을 실시간으로 다시 로드합니다...")
+        await self.load_configs()
+        logger.info("[VoiceMaster] 설정 리로드가 완료되었습니다.")
+        
     async def load_configs(self):
         self.creator_channel_configs = {
             get_id("vc_creator_channel_id_4p"): {"type": "분수대"},
