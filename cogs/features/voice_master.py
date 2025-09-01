@@ -228,7 +228,7 @@ class VoiceMaster(commands.Cog):
         logger.info("VoiceMaster Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
-        await self.load_configs()
+        await self.load_configs() # <--- 봇이 켜질 때 딱 한 번만 실행됨
         self.bot.loop.create_task(self.sync_channels_from_db())
 
     async def load_configs(self):
