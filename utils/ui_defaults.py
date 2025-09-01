@@ -116,7 +116,7 @@ UI_ROLE_KEY_MAP = {
     "role_resident_rookie":     {"name": "새내기 주민", "is_prefix": False, "priority": 0},
 
     # --- 온보딩/역할 패널 구분선 역할 ---
-    "role_onboarding_step_1":   {"name": "════════════게임══════════", "is_prefix": False, "priority": 0},
+    "role_onboarding_step_1":   {"name": "════════════게임════════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_2":   {"name": "════════════알림════════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_3":   {"name": "════════════정보════════════", "is_prefix": False, "priority": 0},
     "role_onboarding_step_4":   {"name": "════════════등급════════════", "is_prefix": False, "priority": 0},
@@ -319,8 +319,8 @@ STATIC_AUTO_ROLE_PANELS = {
         ],
         "roles": {
             "notifications": [
-                {"role_id_key": "role_notify_voice", "label": "음성채팅"},
-                {"role_id_key": "role_notify_friends", "label": "친구찾기"},
+                {"role_id_key": "role_notify_voice", "label": "통화 모집"},
+                {"role_id_key": "role_notify_friends", "label": "친구 모집"},
                 {"role_id_key": "role_notify_disboard", "label": "Disboard"},
                 {"role_id_key": "role_notify_up", "label": "Up"},
             ],
