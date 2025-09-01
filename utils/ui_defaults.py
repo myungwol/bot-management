@@ -74,6 +74,7 @@ UI_ROLE_KEY_MAP = {
     "role_game_apex":           {"name": "에이펙스 레전드", "is_prefix": False, "priority": 0},
     "role_game_gf":             {"name": "갈틱폰", "is_prefix": False, "priority": 0},
     "role_platform_steam":      {"name": "스팀", "is_prefix": False, "priority": 0},
+    "role_platform_PC":         {"name": "PC", "is_prefix": False, "priority": 0},
     "role_platform_smartphone": {"name": "스마트폰", "is_prefix": False, "priority": 0},
     "role_platform_switch":     {"name": "콘솔", "is_prefix": False, "priority": 0},
 
@@ -256,6 +257,7 @@ STATIC_AUTO_ROLE_PANELS = {
                 {"role_id_key": "role_game_ggd", "label": "구스구스덕"},
                 {"role_id_key": "role_game_gf", "label": "갈틱폰"},
                 {"role_id_key": "role_platform_steam", "label": "스팀"},
+                {"role_id_key": "role_platform_PC", "label": "PC"},
                 {"role_id_key": "role_platform_smartphone", "label": "스마트폰"},
                 {"role_id_key": "role_platform_console", "label": "콘솔"},
             ],
