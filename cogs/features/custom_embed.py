@@ -11,12 +11,12 @@ from utils.ui_defaults import CUSTOM_EMBED_SENDER_ROLES
 
 logger = logging.getLogger(__name__)
 
-class EmbedCreatorModal(ui.Modal, title="カスタム埋め込み作成"):
-    title_input = ui.TextInput(label="タイトル", placeholder="埋め込みのタイトルを入力してください。", required=False, max_length=256)
-    description_input = ui.TextInput(label="説明", placeholder="埋め込みの説明文を入力してください。", style=discord.TextStyle.paragraph, required=False, max_length=4000)
-    color_input = ui.TextInput(label="色 (16進数コード)", placeholder="例: #5865F2 (空欄の場合はデフォルト色)", required=False, max_length=7)
-    image_url_input = ui.TextInput(label="画像URL", placeholder="埋め込みに表示する画像のURLを入力してください。", required=False)
-    thumbnail_url_input = ui.TextInput(label="サムネイルURL", placeholder="右上に表示するサムネイル画像のURLを入力してください。", required=False)
+class EmbedCreatorModal(ui.Modal, title="커스텀 임베드 작성"):
+    title_input = ui.TextInput(label="제목", placeholder="임베드 제목을 입력하세요.", required=False, max_length=256)
+    description_input = ui.TextInput(label="설명", placeholder="임베드 설명을 입력하세요.", style=discord.TextStyle.paragraph, required=False, max_length=4000)
+    color_input = ui.TextInput(label="색상 (16진수 코드)", placeholder="예: #5865F2 (비워두면 기본 색상)", required=False, max_length=7)
+    image_url_input = ui.TextInput(label="이미지 URL", placeholder="임베드에 표시할 이미지 URL을 입력하세요.", required=False)
+    thumbnail_url_input = ui.TextInput(label="썸네일 URL", placeholder="오른쪽 상단에 표시할 썸네일 이미지 URL을 입력하세요.", required=False)
 
     def __init__(self, cog: 'CustomEmbed', existing_embed: Optional[discord.Embed] = None):
         super().__init__()
@@ -24,7 +24,7 @@ class EmbedCreatorModal(ui.Modal, title="カスタム埋め込み作成"):
         self.embed: Optional[discord.Embed] = None
 
         if existing_embed:
-            self.title = "カスタム埋め込み編集"
+            self.title = "커스텀 임베드 편집"
             self.title_input.default = existing_embed.title
             self.description_input.default = existing_embed.description
             
@@ -40,7 +40,7 @@ class EmbedCreatorModal(ui.Modal, title="カスタム埋め込み作成"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if not self.title_input.value and not self.description_input.value and not self.image_url_input.value:
-            await interaction.response.send_message("❌ エラー: タイトル、説明、画像URLのいずれか一つは必ず入力してください。", ephemeral=True)
+            await interaction.response.send_message("❌ 오류: 제목, 설명, 이미지 URL 중 하나는 반드시 입력해야 합니다.", ephemeral=True)
             return
 
         try:
@@ -49,7 +49,7 @@ class EmbedCreatorModal(ui.Modal, title="カスタム埋め込み作成"):
                 try:
                     color = discord.Color(int(self.color_input.value.replace("#", ""), 16))
                 except ValueError:
-                    await interaction.response.send_message("❌ 色コードが無効です。`#RRGGBB`の形式で入力してください。", ephemeral=True)
+                    await interaction.response.send_message("❌ 색상 코드가 유효하지 않습니다. `#RRGGBB` 형식으로 입력해주세요.", ephemeral=True)
                     return
 
             embed = discord.Embed(
@@ -68,7 +68,7 @@ class EmbedCreatorModal(ui.Modal, title="カスタム埋め込み作成"):
         except Exception as e:
             logger.error(f"임베드 생성 중 오류: {e}", exc_info=True)
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ 埋め込みの作成中にエラーが発生しました。", ephemeral=True)
+                await interaction.response.send_message("❌ 임베드를 만드는 중 오류가 발생했습니다.", ephemeral=True)
 
 class ChannelSelectView(ui.View):
     def __init__(self, cog: 'CustomEmbed', embed_to_send: discord.Embed):
@@ -77,7 +77,7 @@ class ChannelSelectView(ui.View):
         self.embed_to_send = embed_to_send
         
         channel_select = ui.ChannelSelect(
-            placeholder="メッセージを送信するチャンネルを選択...",
+            placeholder="메시지를 보낼 채널을 선택하세요...",
             min_values=1, max_values=1,
             channel_types=[discord.ChannelType.text]
         )
@@ -90,20 +90,20 @@ class ChannelSelectView(ui.View):
         channel: discord.TextChannel = interaction.guild.get_channel(int(target_channel_id))
 
         if not channel:
-            return await interaction.followup.send("❌ チャンネルが見つかりませんでした。", ephemeral=True)
+            return await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
         
         if not channel.permissions_for(interaction.guild.me).send_messages or not channel.permissions_for(interaction.guild.me).embed_links:
-            return await interaction.followup.send(f"❌ <#{channel.id}> チャンネルにメッセージを送信する権限がありません。", ephemeral=True)
+            return await interaction.followup.send(f"❌ <#{channel.id}> 채널에 메시지를 보낼 권한이 없습니다.", ephemeral=True)
 
         try:
             await channel.send(embed=self.embed_to_send)
             for item in self.children:
                 item.disabled = True
-            await interaction.edit_original_response(content=f"✅ <#{channel.id}> にメッセージを正常に送信しました。", view=self, embed=None)
+            await interaction.edit_original_response(content=f"✅ <#{channel.id}> 채널에 메시지를 성공적으로 보냈습니다.", view=self, embed=None)
 
         except Exception as e:
             logger.error(f"커스텀 임베드 전송 중 오류: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ <#{channel.id}> へのメッセージ送信中にエラーが発生しました。", ephemeral=True)
+            await interaction.followup.send(f"❌ <#{channel.id}> 채널에 메시지를 보내는 중 오류가 발생했습니다.", ephemeral=True)
 
 class CustomEmbedPanelView(ui.View):
     def __init__(self, cog: 'CustomEmbed'):
@@ -117,7 +117,7 @@ class CustomEmbedPanelView(ui.View):
         
         button_info = components[0]
         button = ui.Button(
-            label=button_info.get('label', '埋め込み作成'),
+            label=button_info.get('label', '임베드 작성'),
             style=discord.ButtonStyle.primary,
             emoji=button_info.get('emoji'),
             custom_id=button_info.get('component_key')
@@ -127,7 +127,7 @@ class CustomEmbedPanelView(ui.View):
 
     async def on_button_click(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not any(role.id in self.cog.sender_role_ids for role in interaction.user.roles):
-            return await interaction.response.send_message("❌ この機能を使用する権限がありません。", ephemeral=True)
+            return await interaction.response.send_message("❌ 이 기능을 사용할 권한이 없습니다.", ephemeral=True)
         
         modal = EmbedCreatorModal(self.cog)
         await interaction.response.send_modal(modal)
@@ -135,7 +135,7 @@ class CustomEmbedPanelView(ui.View):
 
         if modal.embed:
             view = ChannelSelectView(self.cog, modal.embed)
-            await interaction.followup.send("✅ プレビューが作成されました。下のメニューからメッセージを送信するチャンネルを選択してください。", embed=modal.embed, view=view, ephemeral=True)
+            await interaction.followup.send("✅ 미리보기가 만들어졌습니다. 아래 메뉴에서 메시지를 보낼 채널을 선택하세요.", embed=modal.embed, view=view, ephemeral=True)
 
 class CustomEmbed(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -146,7 +146,7 @@ class CustomEmbed(commands.Cog):
         logger.info("CustomEmbed Cog가 성공적으로 초기화되었습니다.")
 
         self.edit_embed_context_menu = app_commands.ContextMenu(
-            name="埋め込み編集",
+            name="임베드 편집",
             callback=self.edit_embed_message,
         )
         self.bot.tree.add_command(self.edit_embed_context_menu)
@@ -170,10 +170,10 @@ class CustomEmbed(commands.Cog):
         
     async def edit_embed_message(self, interaction: discord.Interaction, message: discord.Message):
         if not isinstance(interaction.user, discord.Member) or not any(role.id in self.sender_role_ids for role in interaction.user.roles):
-            return await interaction.response.send_message("❌ この機能を実行する権限がありません。", ephemeral=True)
+            return await interaction.response.send_message("❌ 이 기능을 실행할 권한이 없습니다.", ephemeral=True)
         
         if message.author.id != self.bot.user.id or not message.embeds:
-            return await interaction.response.send_message("❌ Botが送信した埋め込みメッセージでのみ使用できます。", ephemeral=True)
+            return await interaction.response.send_message("❌ 봇이 보낸 임베드 메시지에만 사용할 수 있습니다.", ephemeral=True)
             
         modal = EmbedCreatorModal(self, existing_embed=message.embeds[0])
         await interaction.response.send_modal(modal)
@@ -182,10 +182,10 @@ class CustomEmbed(commands.Cog):
         if modal.embed:
             try:
                 await message.edit(embed=modal.embed)
-                await interaction.followup.send("✅ 埋め込みメッセージを正常に編集しました。", ephemeral=True)
+                await interaction.followup.send("✅ 임베드 메시지를 성공적으로 수정했습니다.", ephemeral=True)
             except Exception as e:
                 logger.error(f"임베드 수정 중 오류: {e}", exc_info=True)
-                await interaction.followup.send("❌ メッセージの編集中にエラーが発生しました。", ephemeral=True)
+                await interaction.followup.send("❌ 메시지를 수정하는 중 오류가 발생했습니다.", ephemeral=True)
                 
     async def regenerate_panel(self, channel: discord.TextChannel) -> bool:
         panel_key = "custom_embed"
