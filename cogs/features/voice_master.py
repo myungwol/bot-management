@@ -172,7 +172,7 @@ class ControlPanelView(ui.View):
             new_name, new_limit = vc.name, vc.user_limit
             if type_info["name_editable"]:
                 base_name = modal.name_input.value if hasattr(modal, 'name_input') else vc.name.split('꒱')[-1].strip()
-                new_name = f"・ {type_info['emoji']} ꒱ {base_name.strip()}"
+                new_name = f"{type_info['emoji']} ⊹ {base_name.strip()}"
             if type_info["limit_editable"] and hasattr(modal, 'limit_input') and modal.limit_input.value:
                 try: 
                     new_limit = int(modal.limit_input.value)
