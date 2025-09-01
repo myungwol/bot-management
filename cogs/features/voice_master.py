@@ -265,6 +265,8 @@ class VoiceMaster(commands.Cog):
         if zombie_channel_ids: await remove_multiple_temp_channels(zombie_channel_ids)
         logger.info(f"[VoiceMaster] 임시 채널 동기화 완료. (활성: {len(self.temp_channels)} / 정리: {len(zombie_channel_ids)})")
 
+# voice_master.py의 on_voice_state_update 함수를 이걸로 교체하세요.
+
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot or before.channel == after.channel: return
@@ -290,7 +292,7 @@ class VoiceMaster(commands.Cog):
                 await self._create_temp_channel_flow(member, self.creator_channel_configs[after.channel.id], after.channel)
                 self.active_creations.discard(member.id)
 
-            # [✅ 추가] 채널 입장 시 조건 확인 및 강제 퇴장 로직
+            # --- 채널 입장 시 조건 확인 및 강제 퇴장 로직 ---
             if after.channel and after.channel.id in self.temp_channels:
                 channel_info = self.temp_channels[after.channel.id]
                 channel_type = channel_info.get("type")
@@ -310,9 +312,10 @@ class VoiceMaster(commands.Cog):
                             return
 
             # --- 채널 삭제 로직 ---
+            # [✅ 수정] 유저가 임시 채널을 '떠났다면' 무조건 삭제 처리 함수를 호출합니다.
+            # 채널이 실제로 비었는지는 _delete_temp_channel 함수 내부에서 지연 시간을 두고 최종 확인합니다.
             if before.channel and before.channel.id in self.temp_channels:
-                if not before.channel.members:
-                    await self._delete_temp_channel(before.channel)
+                await self._delete_temp_channel(before.channel)
         
         except Exception as e:
             self.active_creations.discard(member.id)
@@ -428,14 +431,24 @@ class VoiceMaster(commands.Cog):
         return await vc.send(f"{owner.mention}", embed=embed, view=view)
 
     async def _delete_temp_channel(self, vc: discord.VoiceChannel):
+        # 유저가 실수로 나갔다가 바로 들어오는 경우를 대비해 1초 대기
         await asyncio.sleep(1)
+        
         try:
+            # [✅ 수정] 채널 객체를 다시 가져와 최신 멤버 목록을 확인합니다.
             vc_refreshed = self.bot.get_channel(vc.id)
+            
+            # 채널이 존재하고, 여전히 임시 채널 목록에 있으며, 멤버가 아무도 없을 때만 삭제
             if vc_refreshed and vc.id in self.temp_channels and not vc_refreshed.members:
                 await vc_refreshed.delete(reason="채널이 비어 자동 삭제됨")
                 logger.info(f"임시 채널 '{vc_refreshed.name}'을(를) 자동 삭제했습니다.")
+                # DB와 메모리에서 채널 정보 정리
                 await self._cleanup_channel_data(vc_refreshed.id)
+                
         except discord.NotFound:
+            # 1초 대기하는 동안 이미 채널이 삭제되었을 수 있습니다.
+            # 이 경우에도 우리 시스템에서는 정보를 정리해야 합니다.
+            logger.warning(f"삭제하려던 임시 채널(ID: {vc.id})을 찾을 수 없습니다. 데이터만 정리합니다.")
             await self._cleanup_channel_data(vc.id)
         except Exception as e:
             logger.error(f"임시 채널 '{vc.name}' 삭제 중 오류: {e}", exc_info=True)
