@@ -407,4 +407,4 @@ class VoiceMaster(commands.Cog):
             await interaction.followup.send("❌ 소유권 이전 중 오류가 발생했습니다.", ephemeral=True)
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(VoiceMaster(bot))```
+    await bot.add_cog(VoiceMaster(bot))
