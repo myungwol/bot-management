@@ -420,25 +420,24 @@ class VoiceMaster(commands.Cog):
             all_fountains = [ch for ch in sorted_channels if '⛲' in ch.name]
 
             if channel_type == '벤치':
-                # 새로 만드는 '벤치'는 '벤치 그룹'의 맨 아래에 위치해야 합니다.
-                # '벤치 그룹'은 항상 '분수대 그룹'보다 위에 있습니다.
+                # '벤치'를 만들 때:
                 if all_benches:
-                    # 마지막 벤치 바로 다음에 위치
+                    # 이미 '벤치'가 있다면, 마지막 '벤치' 바로 다음에 위치시킵니다.
                     position = all_benches[-1].position + 1
                 elif all_fountains:
-                    # 벤치가 하나도 없다면, 첫 번째 분수대 바로 앞에 위치
+                    # '벤치'가 하나도 없다면, 첫 번째 '분수대' 바로 앞에 위치시켜 그룹 경계를 만듭니다.
                     position = all_fountains[0].position
-                # 둘 다 없으면 기본 위치(맨 아래)
+                # 둘 다 없으면 기본 위치(맨 아래)에 생성됩니다.
 
             elif channel_type == '분수대':
-                # 새로 만드는 '분수대'는 '분수대 그룹'의 맨 아래에 위치해야 합니다.
+                # '분수대'를 만들 때:
                 if all_fountains:
-                    # 마지막 분수대 바로 다음에 위치
+                    # 이미 '분수대'가 있다면, 마지막 '분수대' 바로 다음에 위치시킵니다.
                     position = all_fountains[-1].position + 1
                 elif all_benches:
-                    # 분수대가 하나도 없다면, 마지막 벤치 바로 다음에 위치
+                    # '분수대'가 하나도 없다면, 마지막 '벤치' 바로 다음에 위치시켜 그룹 경계를 만듭니다.
                     position = all_benches[-1].position + 1
-                # 둘 다 없으면 기본 위치(맨 아래)
+                # 둘 다 없으면 기본 위치(맨 아래)에 생성됩니다.
         
         return await guild.create_voice_channel(
             name=vc_name, 
