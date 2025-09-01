@@ -411,33 +411,24 @@ class VoiceMaster(commands.Cog):
         vc_name = f"{type_info['emoji']} ⊹ {base_name}"
         overwrites = self._get_permission_overwrites(guild, member, channel_type)
         
-        # [✅ 최종 수정] 채널 그룹 정렬 로직
+        # [✅ 최종 수정] 채널 그룹 정렬 로직 (개수 기반으로 변경)
         position: Optional[int] = None
         if target_category:
-            sorted_channels = sorted(target_category.voice_channels, key=lambda c: c.position)
+            # 카테고리 내의 모든 채널 목록을 가져옵니다.
+            all_channels_in_category = target_category.voice_channels
             
-            all_benches = [ch for ch in sorted_channels if '🪑' in ch.name]
-            all_fountains = [ch for ch in sorted_channels if '⛲' in ch.name]
+            # '벤치'와 '분수대' 채널의 개수를 셉니다.
+            benches_count = sum(1 for ch in all_channels_in_category if '🪑' in ch.name)
+            fountains_count = sum(1 for ch in all_channels_in_category if '⛲' in ch.name)
 
             if channel_type == '벤치':
-                # '벤치'를 만들 때:
-                if all_benches:
-                    # 이미 '벤치'가 있다면, 마지막 '벤치' 바로 다음에 위치시킵니다.
-                    position = all_benches[-1].position + 1
-                elif all_fountains:
-                    # '벤치'가 하나도 없다면, 첫 번째 '분수대' 바로 앞에 위치시켜 그룹 경계를 만듭니다.
-                    position = all_fountains[0].position
-                # 둘 다 없으면 기본 위치(맨 아래)에 생성됩니다.
-
+                # 새로운 벤치는 항상 기존 벤치 그룹의 바로 아래에 위치해야 합니다.
+                # 이는 0부터 시작하는 인덱스에서 'benches_count'와 같습니다.
+                position = benches_count
+            
             elif channel_type == '분수대':
-                # '분수대'를 만들 때:
-                if all_fountains:
-                    # 이미 '분수대'가 있다면, 마지막 '분수대' 바로 다음에 위치시킵니다.
-                    position = all_fountains[-1].position + 1
-                elif all_benches:
-                    # '분수대'가 하나도 없다면, 마지막 '벤치' 바로 다음에 위치시켜 그룹 경계를 만듭니다.
-                    position = all_benches[-1].position + 1
-                # 둘 다 없으면 기본 위치(맨 아래)에 생성됩니다.
+                # 새로운 분수대는 모든 벤치와 모든 기존 분수대들의 바로 아래에 위치해야 합니다.
+                position = benches_count + fountains_count
         
         return await guild.create_voice_channel(
             name=vc_name, 
@@ -447,7 +438,7 @@ class VoiceMaster(commands.Cog):
             position=position, 
             reason=f"{member.display_name}의 요청"
         )
-
+        
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
         overwrites = {owner: discord.PermissionOverwrite(connect=True)}
         if channel_type in ['마이룸']:
