@@ -178,7 +178,7 @@ class EmbedTemplateSelectView(ui.View):
             self.add_item(select)
 
     async def select_callback(self, interaction: discord.Interaction):
-        embed_key = interaction.data['values'][0]
+        embed_key = interaction.data['values']
         embed_data = self.all_embeds.get(embed_key)
         if not embed_data: return await interaction.response.send_message("❌ 템플릿을 찾을 수 없습니다.", ephemeral=True)
         modal = TemplateEditModal(discord.Embed.from_dict(embed_data))
@@ -681,8 +681,8 @@ class ServerSystem(commands.Cog):
         def add_results_to_embed(field_name: str, items: List[str]):
             if not items: return
             content = "\n".join(f"- {item}" for item in items)
-            # 1024자 제한에 걸리지 않도록 1020자 단위로 자름
-            chunks = [content[i:i+1020] for i in range(0, len(content), 1020)]
+            # 1024자 제한에 걸리지 않도록 1000자 단위로 안전하게 자름
+            chunks = [content[i:i+1000] for i in range(0, len(content), 1000)]
             for i, chunk in enumerate(chunks):
                 name = f"{field_name} ({i+1})" if len(chunks) > 1 else field_name
                 embed.add_field(name=name, value=f"```{chunk}```", inline=False)
