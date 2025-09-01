@@ -31,15 +31,15 @@ async def is_admin(interaction: discord.Interaction) -> bool:
     user_role_ids = {role.id for role in interaction.user.roles}
     if not user_role_ids.intersection(admin_role_ids):
         if interaction.user.id == interaction.guild.owner_id: return True
-        raise app_commands.CheckFailure("このコマンドを実行するための管理者権限がありません。")
+        raise app_commands.CheckFailure("이 명령어를 실행할 관리자 권한이 없습니다.")
     return True
 
-class TemplateEditModal(ui.Modal, title="埋め込みテンプレート編集"):
-    title_input = ui.TextInput(label="タイトル", placeholder="埋め込みのタイトルを入力してください。", required=False, max_length=256)
-    description_input = ui.TextInput(label="説明", placeholder="埋め込みの説明文を入力してください。", style=discord.TextStyle.paragraph, required=False, max_length=4000)
-    color_input = ui.TextInput(label="色 (16進数コード)", placeholder="例: #5865F2 (空欄の場合はデフォルト色)", required=False, max_length=7)
-    image_url_input = ui.TextInput(label="画像URL", placeholder="埋め込みに表示する画像のURLを入力してください。", required=False)
-    thumbnail_url_input = ui.TextInput(label="サムネイルURL", placeholder="右上に表示するサムネイル画像のURLを入力してください。", required=False)
+class TemplateEditModal(ui.Modal, title="임베드 템플릿 편집"):
+    title_input = ui.TextInput(label="제목", placeholder="임베드 제목을 입력하세요.", required=False, max_length=256)
+    description_input = ui.TextInput(label="설명", placeholder="임베드 설명을 입력하세요.", style=discord.TextStyle.paragraph, required=False, max_length=4000)
+    color_input = ui.TextInput(label="색상 (16진수 코드)", placeholder="예: #5865F2 (비워두면 기본 색상)", required=False, max_length=7)
+    image_url_input = ui.TextInput(label="이미지 URL", placeholder="임베드에 표시할 이미지 URL을 입력하세요.", required=False)
+    thumbnail_url_input = ui.TextInput(label="썸네일 URL", placeholder="오른쪽 상단에 표시할 썸네일 이미지 URL을 입력하세요.", required=False)
 
     def __init__(self, existing_embed: discord.Embed):
         super().__init__()
@@ -52,7 +52,7 @@ class TemplateEditModal(ui.Modal, title="埋め込みテンプレート編集"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if not self.title_input.value and not self.description_input.value and not self.image_url_input.value:
-            return await interaction.response.send_message("❌ タイトル、説明、画像URLのいずれか一つは必ず入力してください。", ephemeral=True)
+            return await interaction.response.send_message("❌ 제목, 설명, 이미지 URL 중 하나는 반드시 입력해야 합니다.", ephemeral=True)
         try:
             color = discord.Color.default()
             if self.color_input.value: color = discord.Color(int(self.color_input.value.replace("#", ""), 16))
@@ -62,22 +62,22 @@ class TemplateEditModal(ui.Modal, title="埋め込みテンプレート編集"):
             self.embed = embed
             await interaction.response.defer(ephemeral=True)
         except Exception:
-            await interaction.response.send_message("❌ 埋め込みの作成中にエラーが発生しました。", ephemeral=True)
+            await interaction.response.send_message("❌ 임베드를 만드는 중 오류가 발생했습니다.", ephemeral=True)
 
 class EmbedTemplateSelectView(ui.View):
     def __init__(self, all_embeds: List[Dict[str, Any]]):
         super().__init__(timeout=300)
         self.all_embeds = {e['embed_key']: e['embed_data'] for e in all_embeds}
-        options = [discord.SelectOption(label=key, description=data.get('title', 'タイトルなし')[:100]) for key, data in self.all_embeds.items()]
+        options = [discord.SelectOption(label=key, description=data.get('title', '제목 없음')[:100]) for key, data in self.all_embeds.items()]
         for i in range(0, len(options), 25):
-            select = ui.Select(placeholder=f"編集する埋め込みテンプレートを選択... ({i//25 + 1})", options=options[i:i+25])
+            select = ui.Select(placeholder=f"편집할 임베드 템플릿을 선택하세요... ({i//25 + 1})", options=options[i:i+25])
             select.callback = self.select_callback
             self.add_item(select)
 
     async def select_callback(self, interaction: discord.Interaction):
         embed_key = interaction.data['values'][0]
         embed_data = self.all_embeds.get(embed_key)
-        if not embed_data: return await interaction.response.send_message("❌ テンプレートが見つかりませんでした。", ephemeral=True)
+        if not embed_data: return await interaction.response.send_message("❌ 템플릿을 찾을 수 없습니다.", ephemeral=True)
         modal = TemplateEditModal(discord.Embed.from_dict(embed_data))
         await interaction.response.send_modal(modal)
         await modal.wait()
@@ -85,22 +85,22 @@ class EmbedTemplateSelectView(ui.View):
             await save_embed_to_db(embed_key, modal.embed.to_dict())
             for item in self.children: item.disabled = True
             await interaction.edit_original_response(view=self)
-            await interaction.followup.send(f"✅ 埋め込みテンプレート`{embed_key}`が正常に更新されました。\n`/admin setup`で関連パネルを再設置すると、変更が反映されます。", embed=modal.embed, ephemeral=True)
+            await interaction.followup.send(f"✅ 임베드 템플릿 `{embed_key}`가 성공적으로 업데이트되었습니다.\n`/admin setup`으로 관련 패널을 재설치하면 변경사항이 적용됩니다.", embed=modal.embed, ephemeral=True)
 
 class ServerSystem(commands.Cog):
-    admin_group = app_commands.Group(name="admin", description="サーバー管理用のコマンドです。", default_permissions=discord.Permissions(manage_guild=True))
+    admin_group = app_commands.Group(name="admin", description="서버 관리용 명령어입니다.", default_permissions=discord.Permissions(manage_guild=True))
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다。")
+        logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.CheckFailure): await interaction.response.send_message(f"❌ {error}", ephemeral=True)
-        elif isinstance(error, app_commands.MissingPermissions): await interaction.response.send_message(f"❌ このコマンドを使用するには、次の権限が必要です: `{', '.join(error.missing_permissions)}`", ephemeral=True)
+        elif isinstance(error, app_commands.MissingPermissions): await interaction.response.send_message(f"❌ 이 명령어를 사용하려면 다음 권한이 필요합니다: `{', '.join(error.missing_permissions)}`", ephemeral=True)
         else:
-            logger.error(f"'{interaction.command.qualified_name}'コマンドの処理中にエラーが発生しました: {error}", exc_info=True)
-            if not interaction.response.is_done(): await interaction.response.send_message("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
-            else: await interaction.followup.send("❌ コマンドの処理中に予期せぬエラーが発生しました。", ephemeral=True)
+            logger.error(f"'{interaction.command.qualified_name}' 명령어 처리 중 오류 발생: {error}", exc_info=True)
+            if not interaction.response.is_done(): await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            else: await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
 
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
@@ -135,11 +135,11 @@ class ServerSystem(commands.Cog):
                 await save_config_to_db("config_reload_request", time.time())
                 
                 logger.info("UI_STRINGS와 JOB_ADVANCEMENT_DATA가 데이터베이스에 성공적으로 동기화되었습니다.")
-                await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다。\n"
-                                                "**게임 봇을 재시작**하면 모든 설정이 정상적으로 적용됩니다。")
+                await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다.\n"
+                                                "**게임 봇을 재시작**하면 모든 설정이 정상적으로 적용됩니다.")
             except Exception as e:
                 logger.error(f"UI 동기화 중 오류: {e}", exc_info=True)
-                await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다。")
+                await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
             return
 
         # --- 이하 로직은 이전과 거의 동일 ---
@@ -155,65 +155,64 @@ class ServerSystem(commands.Cog):
             return
 
         if action == "status_show":
-            embed = discord.Embed(title="⚙️ サーバー設定 現況ダッシュボード", color=0x3498DB)
-            embed.set_footer(text=f"最終確認: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
+            embed = discord.Embed(title="⚙️ 서버 설정 현황 대시보드", color=0x3498DB)
+            embed.set_footer(text=f"최종 확인: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
             channel_lines = []
             for key, info in sorted(SETUP_COMMAND_MAP.items(), key=lambda item: item[1]['friendly_name']):
                 channel_id = _channel_id_cache.get(info['key'])
                 status_emoji = "✅" if channel_id else "❌"
-                channel_mention = f"<#{channel_id}>" if channel_id else "未設定"
+                channel_mention = f"<#{channel_id}>" if channel_id else "미설정"
                 channel_lines.append(f"{status_emoji} **{info['friendly_name']}**: {channel_mention}")
             full_channel_text = "\n".join(channel_lines)
             for i in range(0, len(full_channel_text), 1024):
                 chunk = full_channel_text[i:i+1024]
-                field_name = "チャンネル設定" if i == 0 else "チャンネル設定 (続き)"
+                field_name = "채널 설정" if i == 0 else "채널 설정 (계속)"
                 embed.add_field(name=f"**{field_name}**", value=chunk, inline=False)
             role_lines = []
             for key, info in sorted(UI_ROLE_KEY_MAP.items(), key=lambda item: item[1]['priority'], reverse=True):
                 if info.get('priority', 0) > 0:
                     role_id = _channel_id_cache.get(key)
                     status_emoji = "✅" if role_id else "❌"
-                    role_mention = f"<@&{role_id}>" if role_id else f"`{info['name']}` (未設定)"
-                    role_lines.append(f"{status_emoji} **{info['name']}**: {role_mention if role_id else '未設定'}")
-            if role_lines: embed.add_field(name="**主要な役割設定**", value="\n".join(role_lines)[:1024], inline=False)
+                    role_mention = f"<@&{role_id}>" if role_id else f"`{info['name']}` (미설정)"
+                    role_lines.append(f"{status_emoji} **{info['name']}**: {role_mention if role_id else '미설정'}")
+            if role_lines: embed.add_field(name="**주요 역할 설정**", value="\n".join(role_lines)[:1024], inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
         elif action == "server_id_set":
             server_id = interaction.guild.id
             try:
                 await save_config_to_db("SERVER_ID", str(server_id))
                 logger.info(f"서버 ID가 {server_id}(으)로 성공적으로 설정되었습니다. (요청자: {interaction.user.name})")
-                await interaction.followup.send(f"✅ このサーバーの ID (`{server_id}`) をボットのコア設定として正常に保存しました。\nこれで、ゲームボットは管理者コマンドを正しく処理できます。")
+                await interaction.followup.send(f"✅ 이 서버의 ID (`{server_id}`)를 봇의 핵심 설정으로 저장했습니다.\n이제 게임 봇이 관리자 명령어를 올바르게 처리할 수 있습니다.")
             except Exception as e:
                 logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
-                await interaction.followup.send("❌ サーバーIDをデータベースに保存中にエラーが発生しました。")
+                await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
         elif action in ["coin_give", "coin_take", "xp_give", "level_set"]:
-            if not user: return await interaction.followup.send("❌ このアクションには `user` オプションが必要です。", ephemeral=True)
+            if not user: return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션이 필요합니다.", ephemeral=True)
             if action == "coin_give":
-                if not amount: return await interaction.followup.send("❌ `amount` オプションが必要です。", ephemeral=True)
+                if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
                 currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
                 if await update_wallet(user, amount):
-                    await self.log_coin_admin_action(interaction.user, user, amount, "付与")
-                    await interaction.followup.send(f"✅ {user.mention}さんへ `{amount:,}`{currency_icon}を付与しました。")
-                else: await interaction.followup.send("❌ コイン付与中にエラーが発生しました。")
+                    await self.log_coin_admin_action(interaction.user, user, amount, "지급")
+                    await interaction.followup.send(f"✅ {user.mention}님에게 `{amount:,}`{currency_icon}을 지급했습니다.")
+                else: await interaction.followup.send("❌ 코인 지급 중 오류가 발생했습니다.")
             elif action == "coin_take":
-                if not amount: return await interaction.followup.send("❌ `amount` オプションが必要です。", ephemeral=True)
+                if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
                 currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
                 if await update_wallet(user, -amount):
-                    await self.log_coin_admin_action(interaction.user, user, -amount, "削減")
-                    await interaction.followup.send(f"✅ {user.mention}さんの残高から `{amount:,}`{currency_icon}を削減しました。")
-                else: await interaction.followup.send("❌ コイン削減中にエラーが発生しました。")
+                    await self.log_coin_admin_action(interaction.user, user, -amount, "차감")
+                    await interaction.followup.send(f"✅ {user.mention}님의 잔액에서 `{amount:,}`{currency_icon}을 차감했습니다.")
+                else: await interaction.followup.send("❌ 코인 차감 중 오류가 발생했습니다.")
             elif action == "xp_give":
-                if not amount: return await interaction.followup.send("❌ `amount` オプションが必要です。", ephemeral=True)
+                if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
                 await save_config_to_db(f"xp_admin_update_request_{user.id}", {"xp_to_add": amount, "timestamp": time.time()})
                 await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여하도록 게임 봇에게 요청했습니다.")
             elif action == "level_set":
-                if not level: return await interaction.followup.send("❌ `level` オプションが必要です。", ephemeral=True)
+                if not level: return await interaction.followup.send("❌ `level` 옵션이 필요합니다.", ephemeral=True)
                 await save_config_to_db(f"xp_admin_update_request_{user.id}", {"exact_level": level, "timestamp": time.time()})
-                await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다。")
+                await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다.")
         elif action == "template_edit":
             all_embeds = await get_all_embeds()
-            if not all_embeds: return await interaction.followup.send("❌ DBに編集可能な埋め込みテンプレートがありません。", ephemeral=True)
-            await interaction.followup.send("編集したい埋め込みテンプレートを下のメニューから選択してください。", view=EmbedTemplateSelectView(all_embeds), ephemeral=True)
+            if not all_embeds: return await interaction.followup.send("❌ DB에 편집 가능한 임베드 템플릿이 없습니다.", ephemeral=True)
             view = EmbedTemplateSelectView(all_embeds)
             await interaction.followup.send("편집하고 싶은 임베드 템플릿을 아래 메뉴에서 선택해주세요.", view=view, ephemeral=True)
 
@@ -450,9 +449,9 @@ class ServerSystem(commands.Cog):
         currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
         action_color = 0x3498DB if amount > 0 else 0xE74C3C
         amount_str = f"+{amount:,}" if amount > 0 else f"{amount:,}"
-        embed = discord.Embed(description=f"⚙️ {admin.mention}さんが{target.mention}さんのコインを`{amount_str}`{currency_icon}だけ**{action}**しました。", color=action_color)
+        embed = discord.Embed(description=f"⚙️ {admin.mention}님이 {target.mention}님의 코인을 `{amount_str}`{currency_icon} 만큼 **{action}**했습니다.", color=action_color)
         try: await log_channel.send(embed=embed)
-        except Exception as e: logger.error(f"管理者のコイン操作ログ送信に失敗しました: {e}", exc_info=True)
+        except Exception as e: logger.error(f"관리자의 코인 조작 로그 전송에 실패했습니다: {e}", exc_info=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
