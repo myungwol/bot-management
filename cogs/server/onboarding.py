@@ -269,7 +269,7 @@ class ApprovalView(ui.View):
 
             if birth_year_str and birth_year_str.isdigit():
                 birth_year = int(birth_year_str)
-                age_limit = 20 # 만 19세 이상
+                age_limit = 16 # 만 19세 이상
                 current_year = datetime.now(timezone.utc).year
                 if (current_year - birth_year) < age_limit:
                     return f"연령 제한: 사용자가 {age_limit}세 미만입니다. (출생 연도: {birth_year})"
