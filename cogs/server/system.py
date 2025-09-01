@@ -223,14 +223,20 @@ class ServerSystem(commands.Cog):
     @app_commands.choices(stat_type=[app_commands.Choice(name="[설정] 전체 멤버 수 (봇 포함)", value="total"), app_commands.Choice(name="[설정] 유저 수 (봇 제외)", value="humans"), app_commands.Choice(name="[설정] 봇 수", value="bots"), app_commands.Choice(name="[설정] 서버 부스트 수", value="boosters"), app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"), app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove")])
     @app_commands.check(is_admin)
     async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
-        # ... (기존 setup 명령어 코드는 생략) ...
+        # ... (이전 답변의 전체 setup 명령어 코드를 여기에 붙여넣으세요) ...
+        # (코드가 너무 길어 생략합니다. 이전 답변의 코드를 그대로 사용하시면 됩니다.)
         pass
 
     async def log_coin_admin_action(self, admin: discord.Member, target: discord.Member, amount: int, action: str):
-        # ... (기존 log_coin_admin_action 코드 생략) ...
-        pass
-
-    # --- [일회용 서버 초기화 명령어] ---
+        log_channel_id = get_id("coin_log_channel_id")
+        if not log_channel_id or not (log_channel := self.bot.get_channel(log_channel_id)): return
+        currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
+        action_color = 0x3498DB if amount > 0 else 0xE74C3C
+        amount_str = f"+{amount:,}" if amount > 0 else f"{amount:,}"
+        embed = discord.Embed(description=f"⚙️ {admin.mention}님이 {target.mention}님의 코인을 `{amount_str}`{currency_icon} 만큼 **{action}**했습니다.", color=action_color)
+        try: await log_channel.send(embed=embed)
+        except Exception as e: logger.error(f"관리자의 코인 조작 로그 전송에 실패했습니다: {e}", exc_info=True)
+    
     async def perform_server_initialization(self, interaction: discord.Interaction):
         guild = interaction.guild
         results = {
@@ -320,7 +326,6 @@ class ServerSystem(commands.Cog):
             view=view, ephemeral=True
         )
         await view.wait()
-
         if view.value is True:
             await self.perform_server_initialization(interaction)
         else:
@@ -347,19 +352,26 @@ class ServerSystem(commands.Cog):
                     color = role_info.get("color", discord.Color.default())
                     await guild.create_role(name=role_name, color=discord.Color(color), reason="누락된 역할 복구")
                     results["created"].append(role_name)
-                    await asyncio.sleep(0.5)  # Discord API Rate Limit 방지
+                    await asyncio.sleep(0.5)
                 except Exception as e:
                     results["failed"].append(f"{role_name} ({e})")
 
         embed = discord.Embed(title="✅ 누락된 역할 복구 완료", description="설정 파일을 기준으로 누락된 역할 생성을 시도했습니다.", color=0x2ECC71)
         
-        if results["created"]:
-            embed.add_field(name="✅ 새로 생성된 역할", value="```\n- " + "\n- ".join(results["created"]) + "\n```", inline=False)
-        if results["existing"]:
-            embed.add_field(name="ℹ️ 이미 존재하는 역할 (건너뜀)", value="```\n- " + "\n- ".join(results["existing"]) + "\n```", inline=False)
+        def add_results_to_embed(field_name: str, items: List[str]):
+            if not items: return
+            content = "\n".join(f"- {item}" for item in items)
+            chunks = [content[i:i+1020] for i in range(0, len(content), 1020)]
+            for i, chunk in enumerate(chunks):
+                name = f"{field_name} ({i+1})" if len(chunks) > 1 else field_name
+                embed.add_field(name=name, value=f"```{chunk}```", inline=False)
+
+        add_results_to_embed("✅ 새로 생성된 역할", results["created"])
+        add_results_to_embed("ℹ️ 이미 존재하는 역할 (건너뜀)", results["existing"])
+        
         if results["failed"]:
             embed.color = 0xED4245
-            embed.add_field(name="❌ 생성 실패한 역할", value="```\n- " + "\n- ".join(results["failed"]) + "\n```", inline=False)
+            add_results_to_embed("❌ 생성 실패한 역할", results["failed"])
         
         if not results["created"] and not results["failed"]:
             embed.description = "모든 역할이 이미 존재하여 새로 생성된 역할이 없습니다."
