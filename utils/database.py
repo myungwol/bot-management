@@ -24,7 +24,7 @@ from .ui_defaults import (
 
 logger = logging.getLogger(__name__)
 
-JST = timezone(timedelta(hours=9))
+KST = timezone(timedelta(hours=9))
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 1. 클라이언트 초기화 및 캐시
@@ -289,8 +289,8 @@ async def add_anonymous_message(guild_id: int, user_id: int, content: str):
     await supabase.table('anonymous_messages').insert({"guild_id": guild_id, "user_id": user_id, "message_content": content}).execute()
 @supabase_retry_handler()
 async def has_posted_anonymously_today(user_id: int) -> bool:
-    today_jst_start = datetime.now(JST).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_utc_start = today_jst_start.astimezone(timezone.utc)
+    today_kst_start = datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_utc_start = today_kst_start.astimezone(timezone.utc)
     response = await supabase.table('anonymous_messages').select('id', count='exact').eq('user_id', user_id).gte('created_at', today_utc_start.isoformat()).limit(1).execute()
     return response.count > 0 if response else False
 @supabase_retry_handler()
