@@ -388,6 +388,8 @@ class VoiceMaster(commands.Cog):
             if member.voice and member.voice.channel == creator_channel:
                  await member.move_to(None, reason="임시 채널 생성 오류")
 
+    # voice_master.py 파일의 _create_discord_channel 함수를 아래 코드로 교체하세요.
+
     async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
         guild = member.guild
         channel_type = config.get("type", "normal")
@@ -411,11 +413,18 @@ class VoiceMaster(commands.Cog):
         vc_name = f"{type_info['emoji']} ⊹ {base_name}"
         overwrites = self._get_permission_overwrites(guild, member, channel_type)
         
-        # [✅ 최종 수정] 채널 그룹 정렬 로직 (그룹의 '마지막' 위치를 찾아 그 뒤에 추가하는 방식으로 변경)
+        # [✅ 디버깅 강화] 채널 정렬 로직 (상세 로그 추가)
         position: Optional[int] = None
         if target_category:
+            logger.info("="*50)
+            logger.info(f"채널 위치 계산 시작: [{channel_type}] '{vc_name}'")
+
             # 카테고리 내의 모든 음성 채널을 현재 위치 순서대로 가져옵니다.
             all_channels = target_category.voice_channels
+            
+            # discord.py가 인식하는 현재 채널 순서를 로그로 출력합니다.
+            log_channel_list = [f"  - Index {i} | Pos {ch.position}: {ch.name}" for i, ch in enumerate(all_channels)]
+            logger.info("현재 봇이 인식하는 채널 목록 (위치 순):\n" + "\n".join(log_channel_list))
             
             # 각 그룹의 마지막 채널이 몇 번째 위치(index)에 있는지 찾습니다.
             last_creator_idx = -1
@@ -429,20 +438,23 @@ class VoiceMaster(commands.Cog):
                 elif '🪑' in ch.name:
                     last_bench_idx = i
             
+            logger.info(f"계산된 마지막 인덱스 -> 만들기 채널: {last_creator_idx}, 벤치 채널: {last_bench_idx}")
+
             # 새 채널이 들어갈 위치를 계산합니다.
             if channel_type == '벤치':
-                # 벤치는 '마지막 벤치' 또는 '마지막 만들기 채널' 바로 뒤에 위치해야 합니다.
-                # 둘 중 더 큰 인덱스 값을 기준으로 삼으면 항상 올바른 위치가 됩니다.
                 position = max(last_creator_idx, last_bench_idx) + 1
+                logger.info(f"채널 타입 [벤치] -> 최종 위치는 max({last_creator_idx}, {last_bench_idx}) + 1 = {position} 으로 결정")
             
             elif channel_type == '분수대':
-                # 분수대는 모든 만들기 채널과 모든 벤치 채널들보다 뒤에 위치해야 합니다.
-                # (다른 타입의 채널이 추가될 경우 이 로직은 수정이 필요할 수 있습니다)
                 benches_count = sum(1 for ch in all_channels if '🪑' in ch.name)
                 fountains_count = sum(1 for ch in all_channels if '⛲' in ch.name)
                 creator_count = sum(1 for ch in all_channels if ch.id in creator_channel_ids)
                 position = creator_count + benches_count + fountains_count
-    
+                logger.info(f"채널 타입 [분수대] -> 최종 위치는 {creator_count} + {benches_count} + {fountains_count} = {position} 으로 결정")
+            
+            logger.info(f"Discord API에 '{vc_name}' 채널을 position={position} 으로 생성을 요청합니다.")
+            logger.info("="*50)
+
         return await guild.create_voice_channel(
             name=vc_name, 
             category=target_category, 
