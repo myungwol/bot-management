@@ -388,56 +388,60 @@ class VoiceMaster(commands.Cog):
             if member.voice and member.voice.channel == creator_channel:
                  await member.move_to(None, reason="임시 채널 생성 오류")
 
-    async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
-        guild = member.guild
-        channel_type = config.get("type", "normal")
-        type_info = CHANNEL_TYPE_INFO.get(channel_type, CHANNEL_TYPE_INFO["normal"])
-        target_category = creator_channel.category or (guild.get_channel(self.default_category_id) if self.default_category_id else None)
-        user_limit = 4 if channel_type == '벤치' else 0
-        base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
-        
-        if not type_info["name_editable"]:
-            channels_in_category = target_category.voice_channels if target_category else guild.voice_channels
-            prefix_to_check = f"{type_info['emoji']} ⊹ {base_name}"
-            existing_numbers = []
-            for ch in channels_in_category:
-                if ch.name.startswith(prefix_to_check):
-                    suffix = ch.name.replace(prefix_to_check, "").strip()
-                    if suffix.startswith('-') and suffix[1:].isdigit():
-                        existing_numbers.append(int(suffix[1:]))
-            next_number = max(existing_numbers) + 1 if existing_numbers else 1
-            if next_number > 1: base_name = f"{base_name}-{next_number}"
+async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
+    guild = member.guild
+    channel_type = config.get("type", "normal")
+    type_info = CHANNEL_TYPE_INFO.get(channel_type, CHANNEL_TYPE_INFO["normal"])
+    target_category = creator_channel.category or (guild.get_channel(self.default_category_id) if self.default_category_id else None)
+    user_limit = 4 if channel_type == '벤치' else 0
+    base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
+    
+    if not type_info["name_editable"]:
+        channels_in_category = target_category.voice_channels if target_category else guild.voice_channels
+        prefix_to_check = f"{type_info['emoji']} ⊹ {base_name}"
+        existing_numbers = []
+        for ch in channels_in_category:
+            if ch.name.startswith(prefix_to_check):
+                suffix = ch.name.replace(prefix_to_check, "").strip()
+                if suffix.startswith('-') and suffix[1:].isdigit():
+                    existing_numbers.append(int(suffix[1:]))
+        next_number = max(existing_numbers) + 1 if existing_numbers else 1
+        if next_number > 1: base_name = f"{base_name}-{next_number}"
 
-        vc_name = f"{type_info['emoji']} ⊹ {base_name}"
-        overwrites = self._get_permission_overwrites(guild, member, channel_type)
+    vc_name = f"{type_info['emoji']} ⊹ {base_name}"
+    overwrites = self._get_permission_overwrites(guild, member, channel_type)
+    
+    # [✅ 최종 수정] 채널 그룹 정렬 로직 (생성 채널 오프셋 기반으로 변경)
+    position: Optional[int] = None
+    if target_category:
+        all_channels_in_category = target_category.voice_channels
         
-        # [✅ 최종 수정] 채널 그룹 정렬 로직 (개수 기반으로 변경)
-        position: Optional[int] = None
-        if target_category:
-            # 카테고리 내의 모든 채널 목록을 가져옵니다.
-            all_channels_in_category = target_category.voice_channels
-            
-            # '벤치'와 '분수대' 채널의 개수를 셉니다.
-            benches_count = sum(1 for ch in all_channels_in_category if '🪑' in ch.name)
-            fountains_count = sum(1 for ch in all_channels_in_category if '⛲' in ch.name)
+        # 1. '만들기' 채널들의 ID 목록을 가져옵니다.
+        creator_channel_ids = self.creator_channel_configs.keys()
+        
+        # 2. 카테고리 내에 있는 '만들기' 채널의 총 개수를 셉니다. 이것이 시작 위치(오프셋)가 됩니다.
+        creator_channel_offset = sum(1 for ch in all_channels_in_category if ch.id in creator_channel_ids)
+        
+        # 3. 생성된 '벤치'와 '분수대' 채널의 개수를 셉니다.
+        benches_count = sum(1 for ch in all_channels_in_category if '🪑' in ch.name)
+        fountains_count = sum(1 for ch in all_channels_in_category if '⛲' in ch.name)
 
-            if channel_type == '벤치':
-                # 새로운 벤치는 항상 기존 벤치 그룹의 바로 아래에 위치해야 합니다.
-                # 이는 0부터 시작하는 인덱스에서 'benches_count'와 같습니다.
-                position = benches_count
-            
-            elif channel_type == '분수대':
-                # 새로운 분수대는 모든 벤치와 모든 기존 분수대들의 바로 아래에 위치해야 합니다.
-                position = benches_count + fountains_count
+        if channel_type == '벤치':
+            # 새 벤치 위치 = '만들기 채널' 개수 + 현재 생성된 벤치 개수
+            position = creator_channel_offset + benches_count
         
-        return await guild.create_voice_channel(
-            name=vc_name, 
-            category=target_category, 
-            overwrites=overwrites, 
-            user_limit=user_limit, 
-            position=position, 
-            reason=f"{member.display_name}의 요청"
-        )
+        elif channel_type == '분수대':
+            # 새 분수대 위치 = '만들기 채널' 개수 + 생성된 벤치 개수 + 현재 생성된 분수대 개수
+            position = creator_channel_offset + benches_count + fountains_count
+    
+    return await guild.create_voice_channel(
+        name=vc_name, 
+        category=target_category, 
+        overwrites=overwrites, 
+        user_limit=user_limit, 
+        position=position, 
+        reason=f"{member.display_name}의 요청"
+    )
         
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
         overwrites = {owner: discord.PermissionOverwrite(connect=True)}
