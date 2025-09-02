@@ -21,7 +21,10 @@ UI_ROLE_KEY_MAP = {
     "role_job_farmer":          {"name": "농부", "is_prefix": True, "priority": 15},
     "role_resident":            {"name": "주민", "is_prefix": True, "priority": 10},
     "role_guest":               {"name": "여행객", "is_prefix": True, "priority": 5},
-
+    "role_resident_veteran":    {"name": "베테랑", "is_prefix": True, "priority": 0},
+    "role_resident_regular":    {"name": "단골", "is_prefix": True, "priority": 0},
+    "role_resident_rookie":     {"name": "새내기", "is_prefix": True, "priority": 0},
+    
     # --- 그 외 접두사가 아닌 역할들 ---
     "role_staff_police":        {"name": "경찰관", "is_prefix": False, "priority": 0},
     "role_staff_festival":      {"name": "축제 담당", "is_prefix": False, "priority": 0},
@@ -29,10 +32,6 @@ UI_ROLE_KEY_MAP = {
     "role_staff_design":        {"name": "디자이너", "is_prefix": False, "priority": 0},
     "role_staff_secretary":     {"name": "서기", "is_prefix": False, "priority": 0},
     "role_staff_newbie_helper": {"name": "도우미", "is_prefix": False, "priority": 0},
-    
-    "role_resident_veteran":    {"name": "베테랑 주민", "is_prefix": False, "priority": 0},
-    "role_resident_regular":    {"name": "단골 주민", "is_prefix": False, "priority": 0},
-    "role_resident_rookie":     {"name": "새내기 주민", "is_prefix": False, "priority": 0},
 
     # --- 온보딩/역할 패널 구분선 역할 ---
     "role_onboarding_step_1":   {"name": "════════════게임════════════", "is_prefix": False, "priority": 0},
