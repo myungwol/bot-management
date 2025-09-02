@@ -187,12 +187,15 @@ class CustomEmbed(commands.Cog):
                 logger.error(f"임베드 수정 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 메시지를 수정하는 중 오류가 발생했습니다.", ephemeral=True)
                 
-    async def regenerate_panel(self, channel: discord.TextChannel) -> bool:
-        panel_key = "custom_embed"
+    # [✅✅✅ 핵심 수정 부분]
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = None) -> bool:
+        # panel_key = "custom_embed" # panel_key를 인수로 받으므로 이 줄은 더 이상 필요 없을 수 있습니다.
+        # 하지만 이 Cog는 오직 "custom_embed" 패널만 다루므로, 명시적으로 유지하는 것이 안전합니다.
+        current_panel_key = "custom_embed"
         embed_key = "panel_custom_embed"
 
         try:
-            panel_info = get_panel_id(panel_key)
+            panel_info = get_panel_id(current_panel_key)
             if panel_info and (old_id := panel_info.get('message_id')):
                 try:
                     old_message = await channel.fetch_message(old_id)
@@ -210,11 +213,11 @@ class CustomEmbed(commands.Cog):
             
             await self.view_instance.setup_buttons()
             new_message = await channel.send(embed=embed, view=self.view_instance)
-            await save_panel_id(panel_key, new_message.id, channel.id)
+            await save_panel_id(current_panel_key, new_message.id, channel.id)
             logger.info(f"✅ 커스텀 임베드 패널을 성공적으로 새로 생성했습니다. (채널: #{channel.name})")
             return True
         except Exception as e:
-            logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
+            logger.error(f"❌ {current_panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
             return False
 
 async def setup(bot: commands.Bot):
