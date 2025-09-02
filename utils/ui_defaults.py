@@ -162,7 +162,6 @@ UI_PANEL_COMPONENTS = [
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "이름 변경 신청", "style": "primary", "emoji": "✒️", "row": 0, "order_in_row": 0},
     {"component_key": "issue_warning_button", "panel_key": "warning", "component_type": "button", "label": "경고 발급하기", "style": "danger", "emoji": "🚨", "row": 0, "order_in_row": 0},
     {"component_key": "use_item_button", "panel_key": "item_usage", "component_type": "button", "label": "아이템 사용하기", "style": "success", "emoji": "✨", "row": 0, "order_in_row": 0},
-    # [✅ 수정] 일본어 '投稿'를 한글 '투고'로 변경합니다.
     {"component_key": "post_anonymous_message_button", "panel_key": "anonymous_board", "component_type": "button", "label": "익명으로 작성하기", "style": "secondary", "emoji": "✍️", "row": 0, "order_in_row": 0},
     {"component_key": "create_custom_embed", "panel_key": "custom_embed", "component_type": "button", "label": "임베드 메시지 작성", "style": "primary", "emoji": "✉️", "row": 0, "order_in_row": 0},
     {"component_key": "open_shop", "panel_key": "commerce", "component_type": "button", "label": "상점 (아이템 구매)", "style": "success", "emoji": "🏪", "row": 0, "order_in_row": 0},
@@ -306,6 +305,7 @@ ADMIN_ACTION_MAP = {
     "xp_give": "[XP] 유저에게 XP 지급", "level_set": "[레벨] 유저 레벨 설정",
 }
 
+# [핵심 수정] UI_STRINGS의 profile_view 부분을 전체적으로 한국어로 번역하고 수정합니다.
 UI_STRINGS = {
     "commerce": {
         "item_view_desc": "현재 소지금: `{balance}`{currency_icon}\n구매하고 싶은 상품을 선택하세요.",
