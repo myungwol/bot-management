@@ -395,7 +395,7 @@ class VoiceMaster(commands.Cog):
         target_category = creator_channel.category or (guild.get_channel(self.default_category_id) if self.default_category_id else None)
         user_limit = 4 if channel_type == '벤치' else 0
         base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
-    
+        
         if not type_info["name_editable"]:
             channels_in_category = target_category.voice_channels if target_category else guild.voice_channels
             prefix_to_check = f"{type_info['emoji']} ⊹ {base_name}"
@@ -407,32 +407,41 @@ class VoiceMaster(commands.Cog):
                         existing_numbers.append(int(suffix[1:]))
             next_number = max(existing_numbers) + 1 if existing_numbers else 1
             if next_number > 1: base_name = f"{base_name}-{next_number}"
-
+    
         vc_name = f"{type_info['emoji']} ⊹ {base_name}"
         overwrites = self._get_permission_overwrites(guild, member, channel_type)
-    
-        # [✅ 최종 수정] 채널 그룹 정렬 로직 (생성 채널 오프셋 기반으로 변경)
+        
+        # [✅ 최종 수정] 채널 그룹 정렬 로직 (그룹의 '마지막' 위치를 찾아 그 뒤에 추가하는 방식으로 변경)
         position: Optional[int] = None
         if target_category:
-            all_channels_in_category = target_category.voice_channels
-        
-            # 1. '만들기' 채널들의 ID 목록을 가져옵니다.
+            # 카테고리 내의 모든 음성 채널을 현재 위치 순서대로 가져옵니다.
+            all_channels = target_category.voice_channels
+            
+            # 각 그룹의 마지막 채널이 몇 번째 위치(index)에 있는지 찾습니다.
+            last_creator_idx = -1
+            last_bench_idx = -1
+            
             creator_channel_ids = self.creator_channel_configs.keys()
-        
-            # 2. 카테고리 내에 있는 '만들기' 채널의 총 개수를 셉니다. 이것이 시작 위치(오프셋)가 됩니다.
-            creator_channel_offset = sum(1 for ch in all_channels_in_category if ch.id in creator_channel_ids)
-        
-            # 3. 생성된 '벤치'와 '분수대' 채널의 개수를 셉니다.
-            benches_count = sum(1 for ch in all_channels_in_category if '🪑' in ch.name)
-            fountains_count = sum(1 for ch in all_channels_in_category if '⛲' in ch.name)
-
+            
+            for i, ch in enumerate(all_channels):
+                if ch.id in creator_channel_ids:
+                    last_creator_idx = i
+                elif '🪑' in ch.name:
+                    last_bench_idx = i
+            
+            # 새 채널이 들어갈 위치를 계산합니다.
             if channel_type == '벤치':
-                # 새 벤치 위치 = '만들기 채널' 개수 + 현재 생성된 벤치 개수
-                position = creator_channel_offset + benches_count
-        
+                # 벤치는 '마지막 벤치' 또는 '마지막 만들기 채널' 바로 뒤에 위치해야 합니다.
+                # 둘 중 더 큰 인덱스 값을 기준으로 삼으면 항상 올바른 위치가 됩니다.
+                position = max(last_creator_idx, last_bench_idx) + 1
+            
             elif channel_type == '분수대':
-                # 새 분수대 위치 = '만들기 채널' 개수 + 생성된 벤치 개수 + 현재 생성된 분수대 개수
-                position = creator_channel_offset + benches_count + fountains_count
+                # 분수대는 모든 만들기 채널과 모든 벤치 채널들보다 뒤에 위치해야 합니다.
+                # (다른 타입의 채널이 추가될 경우 이 로직은 수정이 필요할 수 있습니다)
+                benches_count = sum(1 for ch in all_channels if '🪑' in ch.name)
+                fountains_count = sum(1 for ch in all_channels if '⛲' in ch.name)
+                creator_count = sum(1 for ch in all_channels if ch.id in creator_channel_ids)
+                position = creator_count + benches_count + fountains_count
     
         return await guild.create_voice_channel(
             name=vc_name, 
