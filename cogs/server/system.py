@@ -102,6 +102,50 @@ class ServerSystem(commands.Cog):
             if not interaction.response.is_done(): await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
             else: await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
 
+    # [✅ 신규 추가] 메시지 삭제(purge) 명령어
+    @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
+    @app_commands.rename(amount='개수', user='유저')
+    @app_commands.describe(
+        amount="삭제할 메시지의 개수를 입력하세요. (최대 100개)",
+        user="특정 유저의 메시지만 삭제하려면 선택하세요."
+    )
+    @app_commands.check(is_admin)
+    async def purge(self, interaction: discord.Interaction, amount: app_commands.Range[int, 1, 100], user: Optional[discord.Member] = None):
+        """채널의 메시지를 삭제하는 관리자용 명령어입니다."""
+        await interaction.response.defer(ephemeral=True)
+
+        # 현재 interaction이 발생한 채널을 대상으로 합니다.
+        # TextChannel 타입이 아닐 경우(예: 스레드)를 대비해 isinstance로 확인합니다.
+        channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.followup.send("❌ 이 명령어는 일반 텍스트 채널에서만 사용할 수 있습니다.", ephemeral=True)
+            return
+
+        try:
+            # 특정 유저가 지정된 경우, 해당 유저의 메시지만 삭제하도록 check 함수를 정의합니다.
+            check_func = lambda m: m.author == user if user else lambda m: True
+
+            # 메시지를 실제로 삭제합니다.
+            deleted_messages = await channel.purge(limit=amount, check=check_func)
+
+            # 결과 메시지를 생성합니다.
+            if user:
+                response_message = f"✅ {user.mention}님의 메시지 {len(deleted_messages)}개를 삭제했습니다."
+            else:
+                response_message = f"✅ 메시지 {len(deleted_messages)}개를 삭제했습니다."
+            
+            # 14일이 지난 메시지는 대량 삭제가 불가능하므로, 요청한 수보다 적게 삭제될 수 있음을 알립니다.
+            if len(deleted_messages) < amount:
+                response_message += "\nℹ️ 14일이 지난 메시지는 삭제할 수 없습니다."
+
+            await interaction.followup.send(response_message, ephemeral=True)
+
+        except discord.Forbidden:
+            await interaction.followup.send("❌ 봇에게 '메시지 관리' 권한이 없습니다. 서버 설정에서 권한을 확인해주세요.", ephemeral=True)
+        except Exception as e:
+            logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
+            await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
+
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         for key, name in ADMIN_ACTION_MAP.items():
