@@ -1,4 +1,4 @@
-# utils/database.py (양쪽 봇 공용)
+# bot-management/utils/database.py
 """
 Supabase 데이터베이스와의 모든 상호작용을 관리하는 중앙 파일입니다.
 """
