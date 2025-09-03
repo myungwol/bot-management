@@ -38,9 +38,9 @@ class WarningModal(ui.Modal, title="경고 내용 입력"):
 
         try:
             rpc_params = {
-                'p_guild_id': str(interaction.guild_id),
-                'p_user_id': str(self.target_member.id),
-                'p_moderator_id': str(interaction.user.id),
+                'p_guild_id': interaction.guild_id,
+                'p_user_id': self.target_member.id,
+                'p_moderator_id': interaction.user.id,
                 'p_reason': self.reason.value,
                 'p_amount': amount_val
             }
