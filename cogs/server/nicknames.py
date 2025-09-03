@@ -32,12 +32,28 @@ class NicknameApprovalView(ui.View):
         self.nicknames_cog = cog_instance
         self.original_name = member.display_name
     
+    # --- ▼ 핵심 수정 부분 1: 권한 확인 로직 변경 ▼ ---
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
+        # Cog에서 모든 관련 역할 ID를 가져옵니다.
         approval_role_id = self.nicknames_cog.approval_role_id
-        if not approval_role_id or not isinstance(interaction.user, discord.Member) or not any(r.id == approval_role_id for r in interaction.user.roles):
+        master_role_id = self.nicknames_cog.master_role_id
+        vice_master_role_id = self.nicknames_cog.vice_master_role_id
+
+        # 허용된 역할 ID 목록을 만듭니다.
+        allowed_role_ids = {rid for rid in [approval_role_id, master_role_id, vice_master_role_id] if rid is not None}
+
+        if not isinstance(interaction.user, discord.Member) or not allowed_role_ids:
+            await interaction.response.send_message("❌ 이 버튼을 누를 권한이 없거나, 권한 역할이 설정되지 않았습니다.", ephemeral=True)
+            return False
+
+        # 사용자가 가진 역할과 허용된 역할을 비교합니다.
+        user_role_ids = {role.id for role in interaction.user.roles}
+        if not user_role_ids.intersection(allowed_role_ids):
             await interaction.response.send_message("❌ 이 버튼을 누를 권한이 없습니다.", ephemeral=True)
             return False
+            
         return True
+    # --- ▲ 핵심 수정 부분 1 ▲ ---
 
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
@@ -218,6 +234,10 @@ class Nicknames(commands.Cog):
         self.approval_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None
         self.nickname_log_channel_id: Optional[int] = None
+        # --- ▼ 핵심 수정 부분 2: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
+        self.master_role_id: Optional[int] = None
+        self.vice_master_role_id: Optional[int] = None
+        # --- ▲ 핵심 수정 부분 2 ▲ ---
         self.view_instance = None
         self.panel_regeneration_lock = asyncio.Lock()
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
@@ -245,6 +265,10 @@ class Nicknames(commands.Cog):
         self.approval_channel_id = get_id("nickname_approval_channel_id")
         self.nickname_log_channel_id = get_id("nickname_log_channel_id")
         self.approval_role_id = get_id("role_approval")
+        # --- ▼ 핵심 수정 부분 3: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
+        self.master_role_id = get_id("role_master")
+        self.vice_master_role_id = get_id("role_vice_master")
+        # --- ▲ 핵심 수정 부분 3 ▲ ---
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
