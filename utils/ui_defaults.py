@@ -52,6 +52,9 @@ UI_ROLE_KEY_MAP = {
     
     # --- 상점/아이템 역할 ---
     "role_personal_room_key":   {"name": "마이룸 열쇠", "is_prefix": False, "priority": 0},
+    "role_item_warning_deduct": {"name": "벌점 1회 차감권", "is_prefix": False, "priority": 0},
+    "role_item_event_priority": {"name": "이벤트 우선 참여권", "is_prefix": False, "priority": 0},
+    "role_item_farm_expansion": {"name": "밭 확장 허가증", "is_prefix": False, "priority": 0},
 
     # --- 알림 역할 ---
     "role_notify_voice":        {"name": "통화 모집", "is_prefix": False, "priority": 0},
@@ -91,28 +94,27 @@ ONBOARDING_CHOICES = {
         "private": [{"label": "비공개", "value": "비공개"}]
     }
 }
-# [핵심 수정] USABLE_ITEMS에 사용 가능한 모든 액티브 아이템을 정의합니다.
+# [✅✅✅ 핵심 수정 ✅✅✅] 중복 정의를 제거하고, 벌점 차감권의 타입을 변경했습니다.
 USABLE_ITEMS = {
     "role_item_warning_deduct": {
         "name": "벌점 1회 차감권",
-        "type": "request_to_admin",
+        "type": "deduct_warning",
         "value": -1,
         "description": "누적된 벌점을 1회 차감합니다.",
-        "log_channel_key": "log_item_warning_deduct", # ◀ 고유한 키로 변경
-        "log_embed_key": "log_item_use_warning_deduct" # ◀ 고유한 키로 변경
+        "log_channel_key": "log_item_warning_deduct",
+        "log_embed_key": "log_item_use_warning_deduct"
     },
     "role_item_event_priority": {
         "name": "이벤트 우선 참여권",
         "type": "consume_with_reason",
         "description": "이벤트 참가 신청 시 우선권을 행사합니다.",
-        "log_channel_key": "log_item_event_priority", # ◀ 고유한 키로 변경
-        "log_embed_key": "log_item_use_event_priority" # ◀ 고유한 키로 변경
+        "log_channel_key": "log_item_event_priority",
+        "log_embed_key": "log_item_use_event_priority"
     },
-    "role_item_farm_expansion": { 
+    "role_item_farm_expansion": {
         "name": "밭 확장 허가증",
         "type": "farm_expansion",
         "description": "자신의 농장을 1칸 확장합니다."
-        # 로그가 필요 없으므로 log_channel_key를 정의하지 않음
     }
 }
 UI_EMBEDS = {
@@ -165,7 +167,6 @@ UI_EMBEDS = {
     "embed_whale_reset_announcement": { "title": "🐋 바다에서 온 소문...", "description": "이번 달, 바다 깊은 곳에서 거대한 무언가를 목격했다는 소문이 돌고 있다...\n아무래도 실력 좋은 낚시꾼을 기다리고 있는 것 같다.", "color": 0x3498DB, "footer": {"text": "이달의 주인이 바다로 돌아왔습니다."} },
     "log_item_use_warning_deduct": {"title": "🎫 벌점 차감권 사용 알림", "color": 3066993}, # 초록색
     "log_item_use_event_priority": {"title": "✨ 이벤트 우선권 사용 알림", "color": 16776960}, # 노란색
-    "log_item_use": {"title": "🛒 아이템 사용 알림", "color": 11027200},
     
     "panel_champion_board": {
         "title": "🏆 종합 챔피언 보드 🏆",
@@ -306,31 +307,6 @@ WARNING_THRESHOLDS = [
     {"count": 3, "role_key": "role_warning_level_3"},
     {"count": 4, "role_key": "role_warning_level_4"},
 ]
-# [핵심 수정] USABLE_ITEMS에 '밭 확장 허가증' 추가 및 타입 세분화
-USABLE_ITEMS = {
-    "role_item_warning_deduct": {
-        "name": "벌점 1회 차감권", 
-        "type": "request_to_admin", # 관리 봇에 요청하는 타입
-        "value": -1, 
-        "description": "누적된 벌점을 1회 차감합니다.",
-        "log_channel_key": "log_warning", # 경고 로그 채널을 사용
-        "log_embed_key": "log_warning"    # 경고 로그 임베드를 사용
-    },
-    "role_item_event_priority": {
-        "name": "이벤트 우선 참여권",
-        "type": "consume_with_reason", # 사유를 입력받고 소모하는 타입
-        "description": "이벤트 참가 신청 시 우선권을 행사합니다.",
-        "log_channel_key": "log_item_usage", # 아이템 사용 로그 채널을 사용
-        "log_embed_key": "log_item_use"      # 기본 아이템 사용 임베드를 사용
-    },
-    # DB에 '밭 확장 허가증'에 해당하는 역할 키가 'role_item_farm_expansion'이라고 가정
-    "role_item_farm_expansion": { 
-        "name": "밭 확장 허가증",
-        "type": "farm_expansion", # 농장 확장 전용 타입
-        "description": "자신의 농장을 1칸 확장합니다."
-        # 로그가 필요 없으므로 log_channel_key를 정의하지 않음
-    }
-}
 CUSTOM_EMBED_SENDER_ROLES = ["role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief"]
 JOB_SYSTEM_CONFIG = {
     "JOB_ROLE_MAP": {"fisherman": "role_job_fisherman", "farmer": "role_job_farmer", "master_angler": "role_job_master_angler", "master_farmer": "role_job_master_farmer"},
