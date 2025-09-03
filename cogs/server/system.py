@@ -8,8 +8,6 @@ from datetime import datetime, timezone
 import asyncio
 import time
 
-# [✅✅✅ 핵심 수정 ✅✅✅]
-# 게임 봇 전용 함수(update_wallet)를 import 목록에서 제거합니다.
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel,
@@ -18,6 +16,7 @@ from utils.database import (
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
+# [✅ 최종 수정] ADMIN_ACTION_MAP을 ui_defaults에서 직접 가져옵니다.
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
     ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
@@ -267,8 +266,6 @@ class ServerSystem(commands.Cog):
                 logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
                 await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
         
-        # [✅✅✅ 핵심 수정 ✅✅✅]
-        # 코인/XP/레벨 관련 명령어는 직접 DB를 수정하는 대신, 게임 봇에게 요청을 보냅니다.
         elif action in ["coin_give", "coin_take", "xp_give", "level_set"]:
             if not user: return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션이 필요합니다.", ephemeral=True)
             if action == "coin_give":
