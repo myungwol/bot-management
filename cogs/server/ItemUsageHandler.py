@@ -32,29 +32,22 @@ class ItemUsageHandler(commands.Cog):
     async def process_request(self, request: dict):
         request_id = request['id']
         try:
-            guild_id = int(request['guild_id'])
-            user_id = int(request['user_id'])
+            guild = self.bot.get_guild(int(request['guild_id']))
+            member = guild.get_member(int(request['user_id'])) if guild else None
             item_key = request['item_key']
-
-            guild = self.bot.get_guild(guild_id)
-            if not guild:
-                raise Exception(f"서버(ID: {guild_id})를 찾을 수 없습니다.")
             
-            member = guild.get_member(user_id)
             if not member:
-                raise Exception(f"멤버(ID: {user_id})를 서버에서 찾을 수 없습니다.")
+                raise Exception(f"멤버(ID: {request['user_id']})를 서버(ID: {request['guild_id']})에서 찾을 수 없습니다.")
 
             usable_items_config = get_config("USABLE_ITEMS", {})
             item_info = usable_items_config.get(item_key)
-            item_role_id = get_id(item_key)
+            item_role = guild.get_role(get_id(item_key))
 
-            if not item_info or not item_role_id:
+            if not item_info or not item_role:
                 raise Exception(f"'{item_key}'는 유효하지 않은 아이템입니다.")
 
-            item_type = item_info.get("type")
             success = False
-
-            if item_type == "warning_deduction":
+            if item_info['type'] == 'request_to_admin':
                 warning_cog = self.bot.get_cog("WarningSystem")
                 if warning_cog and hasattr(warning_cog, 'deduct_warning_points'):
                     success = await warning_cog.deduct_warning_points(
@@ -64,29 +57,20 @@ class ItemUsageHandler(commands.Cog):
                         reason=f"'{item_info['name']}' 아이템 사용"
                     )
             
-            # 향후 다른 아이템 타입 추가 가능
-            # elif item_type == "some_other_type":
-            #     success = await some_other_cog.do_something()
-
             if success:
-                role_to_remove = guild.get_role(item_role_id)
-                if role_to_remove:
-                    await member.remove_roles(role_to_remove, reason="아이템 사용 완료")
-                
+                await member.remove_roles(item_role, reason="아이템 사용 완료")
                 try:
                     await member.send(f"✅ **{guild.name}** 서버에서 사용하신 '{item_info['name']}' 아이템의 효과가 적용되었습니다.")
                 except discord.Forbidden:
-                    pass # DM 실패는 괜찮음
+                    pass
                 
                 await supabase.table('item_usage_requests').update({'processed': True}).eq('id', request_id).execute()
                 logger.info(f"'{member.display_name}'님의 '{item_info['name']}' 아이템 사용 요청을 성공적으로 처리했습니다.")
-
             else:
                 raise Exception("아이템 효과 적용에 실패했습니다.")
 
         except Exception as e:
             logger.error(f"아이템 사용 요청(ID: {request_id}) 처리 중 오류: {e}")
-            # 실패한 요청은 processed를 True로 설정하여 무한 루프 방지
             await supabase.table('item_usage_requests').update({'processed': True}).eq('id', request_id).execute()
 
     @check_for_requests.before_loop
