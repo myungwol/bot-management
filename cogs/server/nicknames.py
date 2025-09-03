@@ -18,7 +18,8 @@ from utils.helpers import get_clean_display_name, format_embed_from_db, format_s
 
 logger = logging.getLogger(__name__)
 
-# --- 다른 클래스들은 변경사항이 없으므로 생략합니다 ---
+# --- 파일 최상단에 있던 calculate_weighted_length 함수는 Nicknames Cog 내부로 이동했습니다. ---
+
 class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -122,6 +123,8 @@ class NicknameApprovalView(ui.View):
     @ui.button(label="거절", style=discord.ButtonStyle.danger, custom_id="nick_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
+
+# --- ▼ NicknameChangeModal 클래스 수정 ▼ ---
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     new_name = ui.TextInput(label="새로운 이름", placeholder="이모티콘, 특수문자 사용 불가. 한글 4자/영문 8자까지", required=True, max_length=12)
 
@@ -132,13 +135,18 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     async def on_submit(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True)
         name = self.new_name.value
+        # 한글, 영어, 숫자만 허용
         pattern_str = get_config("NICKNAME_ALLOWED_PATTERN", r"^[a-zA-Z0-9\u3131-\u3163\uac00-\ud7a3]+$")
         max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
 
         if not re.match(pattern_str, name):
             return await i.followup.send("❌ 오류: 이름에 이모티콘이나 특수문자는 사용할 수 없습니다.", ephemeral=True)
-        if (length := calculate_weighted_length(name)) > max_length:
+        
+        # --- ▼ 핵심 수정 부분 1: 함수 호출 방식 변경 ▼ ---
+        if (length := self.nicknames_cog.calculate_weighted_length(name)) > max_length:
             return await i.followup.send(f"❌ 오류: 이름 길이가 규칙을 초과했습니다. (현재: **{length}/{max_length}**)", ephemeral=True)
+        # --- ▲ 핵심 수정 부분 1 ▲ ---
+
         if not self.nicknames_cog.approval_channel_id or not self.nicknames_cog.approval_role_id:
             return await i.followup.send("오류: 닉네임 기능이 올바르게 설정되지 않았습니다.", ephemeral=True)
         if not (ch := i.guild.get_channel(self.nicknames_cog.approval_channel_id)):
@@ -154,6 +162,8 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
         message = await i.followup.send("이름 변경 신청서를 제출했습니다.", ephemeral=True, wait=True)
         await asyncio.sleep(5)
         await message.delete()
+# --- ▲ NicknameChangeModal 클래스 수정 ▲ ---
+
 
 class NicknameChangerPanelView(ui.View):
     def __init__(self, cog_instance: 'Nicknames'):
@@ -201,7 +211,7 @@ class NicknameChangerPanelView(ui.View):
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
 
-# --- Nicknames Cog (수정된 부분) ---
+# --- ▼ Nicknames Cog 클래스 수정 ▼ ---
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -209,10 +219,19 @@ class Nicknames(commands.Cog):
         self.approval_role_id: Optional[int] = None
         self.nickname_log_channel_id: Optional[int] = None
         self.view_instance = None
-        # --- ▼ 핵심 수정 부분 1: Lock 객체 초기화 ▼ ---
         self.panel_regeneration_lock = asyncio.Lock()
-        # --- ▲ 핵심 수정 부분 1 ▲ ---
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
+
+    # --- ▼ 핵심 수정 부분 2: 함수를 클래스 내부로 이동 및 @staticmethod 추가 ▼ ---
+    @staticmethod
+    def calculate_weighted_length(name: str) -> int:
+        total_length = 0
+        # 한글 및 한자 포함
+        pattern = re.compile(r'[\u3131-\u3163\uac00-\ud7a3\u4e00-\u9faf]')
+        for char in name:
+            total_length += 2 if pattern.match(char) else 1
+        return total_length
+    # --- ▲ 핵심 수정 부분 2 ▲ ---
 
     async def register_persistent_views(self):
         self.view_instance = NicknameChangerPanelView(self)
@@ -279,9 +298,7 @@ class Nicknames(commands.Cog):
                 pass
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames", log_embed: Optional[discord.Embed] = None) -> bool:
-        # --- ▼ 핵심 수정 부분 2: Lock 적용 ▼ ---
         async with self.panel_regeneration_lock:
-        # --- ▲ 핵심 수정 부분 2 ▲ ---
             base_panel_key = panel_key.replace("panel_", "")
             embed_key = panel_key
 
@@ -326,6 +343,7 @@ class Nicknames(commands.Cog):
             except Exception as e:
                 logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
                 return False
+# --- ▲ Nicknames Cog 클래스 수정 ▲ ---
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Nicknames(bot))
