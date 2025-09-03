@@ -48,10 +48,11 @@ class MemberEvents(commands.Cog):
                 if roles_to_restore or restored_nick:
                     await member.edit(roles=roles_to_restore, nick=restored_nick, reason="서버 재참여로 인한 데이터 복구")
                 
+                # [수정] 모든 복구 작업이 성공적으로 끝난 후에 백업을 삭제합니다.
                 await delete_member_backup(member.id, member.guild.id)
-                logger.info(f"'{member.display_name}'님의 역할과 닉네임을 성공적으로 복구했습니다.")
+                logger.info(f"'{member.display_name}'님의 역할과 닉네임을 성공적으로 복구하고 백업 데이터를 삭제했습니다.")
             except discord.Forbidden:
-                logger.error(f"'{member.display_name}'님의 데이터 복구에 실패했습니다. (권한 부족)")
+                logger.error(f"'{member.display_name}'님의 데이터 복구에 실패했습니다. (권한 부족) 백업 데이터는 유지됩니다.")
             except Exception as e:
                 logger.error(f"'{member.display_name}'님 데이터 복구 중 예기치 않은 오류 발생: {e}", exc_info=True)
             return
@@ -111,8 +112,6 @@ class MemberEvents(commands.Cog):
         if self.farewell_channel_id and (channel := self.bot.get_channel(self.farewell_channel_id)):
             embed_data = await get_embed_from_db('farewell_embed')
             if embed_data:
-                # [✅✅✅ 핵심 수정 ✅✅✅]
-                # member.display_name (닉네임) 대신 member.name (사용자명)을 사용합니다.
                 embed = format_embed_from_db(embed_data, member_name=member.name)
                 if member.display_avatar:
                     embed.set_thumbnail(url=member.display_avatar.url)
