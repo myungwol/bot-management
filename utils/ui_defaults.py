@@ -1516,6 +1516,8 @@ ADMIN_ACTION_MAP = {
     "coin_take": "[코인] 유저의 코인 차감",
     "xp_give": "[XP] 유저에게 XP 지급",
     "level_set": "[레벨] 유저 레벨 설정",
+    "eventpass_enable": "[이벤트] 이벤트 활성화",
+    "eventpass_disable": "[이벤트] 이벤트 비활성화",
 }
 
 PROFILE_RANK_ROLES = [{
