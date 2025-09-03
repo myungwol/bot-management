@@ -17,10 +17,10 @@ from utils.database import (
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
-# [✅✅✅ 핵심 수정] JOB_ADVANCEMENT_DATA를 ui_defaults에서 직접 import 합니다.
+# [핵심 수정] PROFILE_RANK_ROLES를 import 목록에 추가
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
-    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA
+    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES
 )
 
 logger = logging.getLogger(__name__)
@@ -166,19 +166,22 @@ class ServerSystem(commands.Cog):
     async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
 
-        # [✅✅✅ 핵심 수정] strings_sync 로직을 더 명확하고 올바르게 변경
+        # [핵심 수정] strings_sync 로직에 PROFILE_RANK_ROLES 동기화 추가
         if action == "strings_sync":
             try:
-                # 1. 기존 UI 텍스트(strings) 동기화
+                # 1. UI 텍스트 동기화
                 await save_config_to_db("strings", UI_STRINGS)
                 
-                # 2. 전직 데이터(JOB_ADVANCEMENT_DATA)를 별도의 키로 동기화
+                # 2. 전직 데이터 동기화
                 await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
 
-                # 3. 게임 봇에 설정 다시 불러오기 요청
+                # 3. 프로필 등급 역할 목록 동기화
+                await save_config_to_db("PROFILE_RANK_ROLES", PROFILE_RANK_ROLES)
+
+                # 4. 게임 봇에 설정 다시 불러오기 요청
                 await save_config_to_db("config_reload_request", time.time())
                 
-                logger.info("UI_STRINGS와 JOB_ADVANCEMENT_DATA가 데이터베이스에 성공적으로 동기화되었습니다.")
+                logger.info("UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES가 데이터베이스에 성공적으로 동기화되었습니다.")
                 await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다.\n"
                                                 "**게임 봇을 재시작**하면 모든 설정이 정상적으로 적용됩니다.")
             except Exception as e:
