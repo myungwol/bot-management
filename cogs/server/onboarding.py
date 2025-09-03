@@ -1,6 +1,5 @@
 # cogs/server/onboarding.py
 
-# --- 다른 import 및 클래스 선언은 그대로 유지 ---
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
@@ -23,7 +22,6 @@ class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
-# --- ▼ IntroductionModal 클래스 수정 ▼ ---
 class IntroductionModal(ui.Modal, title="주민 등록증"):
     name = ui.TextInput(label="이름", placeholder="마을에서 사용할 이름을 적어주세요", required=True, max_length=12)
     hobby = ui.TextInput(label="취미/좋아하는 것", placeholder="취미나 좋아하는 것을 자유롭게 적어주세요", style=discord.TextStyle.paragraph, required=True, max_length=500)
@@ -37,13 +35,11 @@ class IntroductionModal(ui.Modal, title="주민 등록증"):
         
         self.private_birth_year_input: Optional[ui.TextInput] = None
         if self.public_birth_year_display == "비공개":
-            # --- ▼ 핵심 수정 부분 1: 문구 변경 ▼ ---
             self.private_birth_year_input = ui.TextInput(
                 label="출생 연도 (촌장/부촌장 확인용)",
                 placeholder="YYYY 형식으로 입력해주세요. 비공개 처리됩니다.",
                 required=True, min_length=4, max_length=4
             )
-            # --- ▲ 핵심 수정 부분 1 ▲ ---
             self.add_item(self.private_birth_year_input)
     
     async def on_submit(self, interaction: discord.Interaction):
@@ -57,11 +53,9 @@ class IntroductionModal(ui.Modal, title="주민 등록증"):
                 try:
                     year = int(private_year_str)
                     current_year = datetime.now(timezone.utc).year
-                    # --- ▼ 핵심 수정 부분 2: 나이 제한 기준 변경 (만 16세) ▼ ---
                     if not (1940 <= year <= current_year - 16):
                         await interaction.followup.send("❌ 유효하지 않은 출생 연도입니다. 만 16세 이상만 가입할 수 있습니다.", ephemeral=True)
                         return
-                    # --- ▲ 핵심 수정 부분 2 ▲ ---
                     actual_birth_year_for_validation = str(year)
                 except ValueError:
                     await interaction.followup.send("❌ 출생 연도는 숫자로 입력해주세요 (예: 2001).", ephemeral=True)
@@ -109,7 +103,6 @@ class IntroductionModal(ui.Modal, title="주민 등록증"):
             logger.error(f"자기소개서 제출 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 예기치 않은 오류가 발생했습니다.", ephemeral=True)
 
-# --- GenderAgeSelectView는 변경사항 없음 ---
 class GenderAgeSelectView(ui.View):
     def __init__(self, cog: 'Onboarding'):
         super().__init__(timeout=300)
@@ -194,7 +187,6 @@ class GenderAgeSelectView(ui.View):
         await interaction.response.send_modal(modal)
         await interaction.delete_original_response()
 
-# --- ▼ ApprovalView 클래스 수정 ▼ ---
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding', actual_birth_year: str):
         super().__init__(timeout=None)
@@ -210,7 +202,7 @@ class ApprovalView(ui.View):
     @ui.button(label="거절", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
     
-    # --- ▼ 핵심 수정 부분 1: 권한 확인 로직 변경 ▼ ---
+    # --- ▼ 핵심 수정 부분: 권한 확인 로직 변경 ▼ ---
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         # Cog에서 모든 관련 역할 ID를 가져옵니다.
         approval_role_id = self.onboarding_cog.approval_role_id
@@ -231,7 +223,7 @@ class ApprovalView(ui.View):
             return False
             
         return True
-    # --- ▲ 핵심 수정 부분 1 ▲ ---
+    # --- ▲ 핵심 수정 부분 ▲ ---
     
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
@@ -338,9 +330,7 @@ class ApprovalView(ui.View):
 
             if birth_year_str.isdigit():
                 birth_year = int(birth_year_str)
-                # --- ▼ 핵심 수정 부분 3: 나이 제한 기준 변경 (만 16세) ▼ ---
                 age_limit = 16
-                # --- ▲ 핵심 수정 부분 3 ▲ ---
                 current_year = datetime.now(timezone.utc).year
                 if (current_year - birth_year) < age_limit:
                     return f"연령 제한: 사용자가 만 {age_limit}세 미만입니다. (출생 연도: {birth_year})"
@@ -573,10 +563,10 @@ class Onboarding(commands.Cog):
         self.approval_role_id: Optional[int] = None
         self.main_chat_channel_id: Optional[int] = None
         self.private_age_log_channel_id: Optional[int] = None
-        # --- ▼ 핵심 수정 부분 2: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
+        # --- ▼ 핵심 수정 부분: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
         self.master_role_id: Optional[int] = None
         self.vice_master_role_id: Optional[int] = None
-        # --- ▲ 핵심 수정 부분 2 ▲ ---
+        # --- ▲ 핵심 수정 부분 ▲ ---
         self.view_instance = None
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
         self._user_locks: Dict[int, asyncio.Lock] = {}
@@ -612,9 +602,10 @@ class Onboarding(commands.Cog):
         self.approval_role_id = get_id("role_approval")
         self.main_chat_channel_id = get_id("main_chat_channel_id")
         self.private_age_log_channel_id = get_id("onboarding_private_age_log_channel_id")
-        # --- ▼ 핵심 수정 부분 3: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
-        self.master_role_id = get_id("role_master")
-        self.vice_master_role_id = get_id("role_vice_master")
+        # --- ▼ 핵심 수정 부분: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
+        self.master_role_id = get_id("role_staff_village_chief")
+        self.vice_master_role_id = get_id("role_staff_deputy_chief")
+        logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
     
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_onboarding") -> bool:
         base_panel_key = panel_key.replace("panel_", "")
