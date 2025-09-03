@@ -1,7 +1,7 @@
 # main.py (관리 봇)
 
 import discord
-from discord.ext import commands
+from discord.ext import commands import commands, tasks
 import os
 import asyncio
 import logging
@@ -80,6 +80,24 @@ class MyBot(commands.Bot):
         
         if registered_views_count > 0:
             logger.info(f"✅ 총 {registered_views_count}개의 Cog에서 영구 View를 성공적으로 등록했습니다.")
+
+    async def on_ready(self):
+        # on_ready로 이동하여 봇이 완전히 준비된 후에 루프를 시작하도록 합니다.
+        if not self.refresh_cache_periodically.is_running():
+            self.refresh_cache_periodically.start()
+            logger.info("✅ 주기적인 DB 캐시 새로고침 루프를 시작합니다.")
+
+    @tasks.loop(minutes=5)
+    async def refresh_cache_periodically(self):
+        """5분마다 DB에서 최신 설정을 불러와 캐시를 갱신합니다."""
+        logger.info("🔄 주기적인 DB 캐시 새로고침을 시작합니다...")
+        await load_all_data_from_db()
+        logger.info("🔄 주기적인 DB 캐시 새로고침이 완료되었습니다.")
+
+    @refresh_cache_periodically.before_loop
+    async def before_refresh_cache(self):
+        """봇이 완전히 준비될 때까지 기다립니다."""
+        await self.wait_until_ready()
 
     async def load_all_extensions(self):
         logger.info("------ [ Cog 로드 시작 ] ------")
