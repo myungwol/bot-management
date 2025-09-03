@@ -17,10 +17,11 @@ from utils.database import (
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
-# [수정] USABLE_ITEMS 임포트 제거 (더 이상 자동완성에서 직접 사용하지 않음)
+# [핵심 수정] 빠뜨렸던 USABLE_ITEMS를 다시 import 합니다.
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
-    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES
+    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
+    USABLE_ITEMS
 )
 
 logger = logging.getLogger(__name__)
@@ -137,7 +138,6 @@ class ServerSystem(commands.Cog):
             logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
 
-    # [핵심 수정] 자동완성 로직을 단순하고 정확하게 변경
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         for key, name in ADMIN_ACTION_MAP.items():
@@ -145,11 +145,9 @@ class ServerSystem(commands.Cog):
                 choices.append(app_commands.Choice(name=name, value=key))
         
         for key, info in SETUP_COMMAND_MAP.items():
-            # 'type'에 따라 '패널' 또는 '채널' 접두사 추가
             prefix = "[패널]" if info.get("type") == "panel" else "[채널]"
             choice_name = f"{prefix} {info.get('friendly_name', key)} 설정"
             if current.lower() in choice_name.lower():
-                # value에는 'channel_setup:' 접두사와 함께 SETUP_COMMAND_MAP의 키(key)를 전달
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
         role_setup_actions = {"role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정"}
@@ -181,8 +179,7 @@ class ServerSystem(commands.Cog):
                 logger.error(f"UI 동기화 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
             return
-        
-        # [핵심 수정] 채널 설정 로직을 자동완성에서 받은 키로 바로 찾도록 변경
+
         if action.startswith("channel_setup:"):
             setting_key = action.split(":", 1)[1]
             config = SETUP_COMMAND_MAP.get(setting_key)
