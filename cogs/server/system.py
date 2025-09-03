@@ -17,7 +17,6 @@ from utils.database import (
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
-# [✅✅✅ 핵심 수정 ✅✅✅] WARNING_THRESHOLDS 설정을 가져옵니다.
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
     ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
@@ -25,6 +24,22 @@ from utils.ui_defaults import (
 )
 
 logger = logging.getLogger(__name__)
+
+# [✅✅✅ 핵심 수정 ✅✅✅] ADMIN_ACTION_MAP에 새로운 관리자 명령어를 추가합니다.
+ADMIN_ACTION_MAP = {
+    "status_show": "[현황] 설정 대시보드 표시", "server_id_set": "[중요] 서버 ID 설정",
+    "panels_regenerate_all": "[패널] 모든 관리 패널 재설치", "template_edit": "[템플릿] 임베드 템플릿 편집",
+    "request_regenerate_all_game_panels": "[게임] 모든 게임 패널 재설치 요청",
+    "roles_sync": "[역할] 모든 역할 DB와 동기화",
+    "strings_sync": "[UI] 모든 UI 텍스트 DB와 동기화",
+    "game_data_reload": "[게임] 게임 데이터 새로고침",
+    "eventpass_enable": "[이벤트] 우선 참여권 사용 활성화",
+    "eventpass_disable": "[이벤트] 우선 참여권 사용 비활성화",
+    "stats_set": "[통계] 통계 채널 설정/제거", "stats_refresh": "[통계] 모든 통계 채널 새로고침", "stats_list": "[통계] 설정된 통계 채널 목록",
+    "coin_give": "[코인] 유저에게 코인 지급", "coin_take": "[코인] 유저의 코인 차감",
+    "xp_give": "[XP] 유저에게 XP 지급", "level_set": "[레벨] 유저 레벨 설정",
+}
+
 
 async def is_admin(interaction: discord.Interaction) -> bool:
     if not isinstance(interaction.user, discord.Member): return False
@@ -171,7 +186,6 @@ class ServerSystem(commands.Cog):
                 await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
                 await save_config_to_db("PROFILE_RANK_ROLES", PROFILE_RANK_ROLES)
                 await save_config_to_db("USABLE_ITEMS", USABLE_ITEMS)
-                # [✅✅✅ 핵심 수정 ✅✅✅] WARNING_THRESHOLDS 설정을 DB에 저장합니다.
                 await save_config_to_db("WARNING_THRESHOLDS", WARNING_THRESHOLDS)
                 await save_config_to_db("config_reload_request", time.time())
                 logger.info("UI 텍스트 및 게임 관련 주요 설정이 데이터베이스에 성공적으로 동기화되었습니다.")
@@ -180,6 +194,21 @@ class ServerSystem(commands.Cog):
             except Exception as e:
                 logger.error(f"UI 동기화 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
+            return
+
+        # [✅✅✅ 핵심 수정 ✅✅✅] 새로운 관리자 명령어를 처리하는 로직을 추가합니다.
+        elif action == 'eventpass_enable':
+            await save_config_to_db('event_priority_pass_active', True)
+            # 새로운 이벤트를 위해 이전에 사용했던 유저 목록을 초기화합니다.
+            await save_config_to_db('event_priority_pass_users', [])
+            await save_config_to_db("config_reload_request", time.time())
+            await interaction.followup.send("✅ **이벤트 우선 참여권** 사용을 **활성화**했습니다.\n이제 유저들이 아이템을 사용할 수 있습니다.")
+            return
+        
+        elif action == 'eventpass_disable':
+            await save_config_to_db('event_priority_pass_active', False)
+            await save_config_to_db("config_reload_request", time.time())
+            await interaction.followup.send("✅ **이벤트 우선 참여권** 사용을 **비활성화**했습니다.")
             return
 
         if action.startswith("channel_setup:"):
@@ -211,8 +240,8 @@ class ServerSystem(commands.Cog):
             
             await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
             return
-
-        # --- 이하 로직은 제공된 파일의 원본과 동일하게 유지 ---
+        
+        # ... (이하 나머지 코드는 동일하게 유지) ...
         if action == "game_data_reload":
             try:
                 await save_config_to_db("game_data_reload_request", time.time())
