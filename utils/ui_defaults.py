@@ -483,10 +483,217 @@ UI_EMBEDS = {
         "서버 규칙을 위반한 유저에게 아래 버튼을 통해 벌점을 부여할 수 있습니다.\n\n**이 기능은 `경찰관`만 사용할 수 있습니다.**",
         "color": 15548997
     },
-    "panel_item_usage": {
-        "title": "✅ 경고 차감권 사용",
-        "description": "보유 중인 <@&경고차감권역할ID>을 사용하려면 아래 버튼을 눌러주세요.",
-     무 괭이'와 '씨앗'을 구매합니다.\n2. 아래 버튼으로 밭을 갈고 씨앗을 심어보세요!",
+    "log_warning": {
+        "title": "🚨 벌 발급 알림",
+        "color": 15548997
+    },
+    "dm_onboarding_approved": {
+        "title": "✅ 주민 등록 완료 알림",
+        "description": "'{guild_name}' 서버의 주민 등록이 승인되었습니다.\n앞으로 잘 부탁드립니다!",
+        "color": 3066993
+    },
+    "dm_onboarding_rejected": {
+        "title": "❌ 주민 등록 거절 알림",
+        "description": "죄송합니다. '{guild_name}' 서버의 주민 등록이 거절되었습니다.",
+        "color": 15548997
+    },
+    "panel_anonymous_board": {
+        "title": "🤫 익명의 소리",
+        "description":
+        "누구에게도 알려지지 않은 당신의 생각이나 마음을 공유해보세요.\n아래 버튼을 눌러 하루에 한 번 메시지를 작성 할 수 있습니다.\n\n**※모든 메시지는 서버 관리자가 기록 및 확인하고 있으며, 문제 발생 시 작성자를 특정하여 조치합니다.**",
+        "color": 4342323
+    },
+    "anonymous_message": {
+        "title": "익명의 메시지가 도착했습니다",
+        "color": 16777215
+    },
+    "panel_custom_embed": {
+        "title": "📢 커스텀 메시지 전송 패널",
+        "description":
+        "아래 버튼을 눌러 지정한 채널에 봇이 임베드 메시지를 전송합니다.\n\n**이 기능은 특정 역할을 가진 스태프만 사용할 수 있습니다.**",
+        "color": 0x34495E
+    },
+    "log_job_advancement": {
+        "title":
+        "🎉 새로운 전직자!",
+        "description":
+        "{user_mention}님이 드디어 새로운 길을 선택했습니다.",
+        "color":
+        0xFFD700,
+        "fields": [{
+            "name": "직업",
+            "value": "```\n{job_name}\n```",
+            "inline": True
+        }, {
+            "name": "선택한 능력",
+            "value": "```\n{ability_name}\n```",
+            "inline": True
+        }],
+        "footer": {
+            "text": "앞으로의 활약을 기대합니다!"
+        }
+    },
+    "panel_commerce": {
+        "title":
+        "🏪 구매 & 판매함",
+        "description":
+        "> 아이템을 사거나, 잡은 물고기 등을 팔 수 있습니다.",
+        "color":
+        0x5865F2,
+        "fields": [{
+            "name": "📢 오늘의 주요 시세 변동",
+            "value": "{market_updates}",
+            "inline": False
+        }]
+    },
+    "panel_fishing_river": {
+        "title": "🏞️ 강의 낚시터",
+        "description": "> 강가에서 여유롭게 낚시를 즐겨보세요.\n> 아래 버튼을 눌러 낚시를 시작합니다.",
+        "color": 0x5865F2
+    },
+    "panel_fishing_sea": {
+        "title": "🌊 바다의 낚시터",
+        "description": "> 넓은 바다에서 월척의 꿈을 쫓아보세요!\n> 아래 버튼을 눌러 낚시를 시작합니다.",
+        "color": 0x3498DB
+    },
+    "panel_atm": {
+        "title": "🏧 ATM",
+        "description": "> 아래 버튼으로 다른 주민에게 코인을 보낼 수 있습니다.",
+        "color": 0x2ECC71
+    },
+    "panel_profile": {
+        "title": "📦 소지품",
+        "description": "> 자신의 소지금, 아이템, 장비 등을 확인할 수 있습니다.",
+        "color": 0x5865F2
+    },
+    "panel_dice_game": {
+        "title": "🎲 주사위 게임",
+        "description":
+        "> 운을 시험해보시겠어요?\n> 아래 버튼으로 게임을 시작하고, 10코인 단위로 베팅할 수 있습니다.",
+        "color": 0xE91E63
+    },
+    "log_dice_game_win": {
+        "title":
+        "🎉 **주사위 게임 승리!** 🎉",
+        "description":
+        "**{user_mention}** 님이 예측에 성공했습니다!\n> ✨ **`+{reward_amount:,}`** {currency_icon} 를 획득했습니다!",
+        "color":
+        0x2ECC71,
+        "fields": [{
+            "name": "베팅액",
+            "value": "`{bet_amount:,}` {currency_icon}",
+            "inline": True
+        }, {
+            "name": "선택한 숫자 / 결과",
+            "value": "`{chosen_number}` / `🎲 {dice_result}`",
+            "inline": True
+        }]
+    },
+    "log_dice_game_lose": {
+        "title":
+        "💧 **주사위 게임 패배** 💧",
+        "description":
+        "**{user_mention}** 님은 예측에 실패하여 **`{bet_amount:,}`** {currency_icon} 를 잃었습니다.",
+        "color":
+        0xE74C3C,
+        "fields": [{
+            "name": "베팅액",
+            "value": "`{bet_amount:,}` {currency_icon}",
+            "inline": True
+        }, {
+            "name": "선택한 숫자 / 결과",
+            "value": "`{chosen_number}` / `🎲 {dice_result}`",
+            "inline": True
+        }]
+    },
+    "panel_slot_machine": {
+        "title": "🎰 슬롯머신",
+        "description":
+        "> 오늘의 운세를 시험해보세요!\n> 아래 버튼으로 게임을 시작하고, 100코인 단위로 베팅할 수 있습니다.",
+        "color": 0xFF9800
+    },
+    "log_slot_machine_win": {
+        "title":
+        "🎉 **슬롯머신 잭팟!** 🎉",
+        "description":
+        "**{user_mention}** 님이 멋지게 그림을 맞췄습니다!\n> 💰 **`+{payout_amount:,}`** {currency_icon} 를 획득했습니다!",
+        "color":
+        0x4CAF50,
+        "fields": [{
+            "name": "베팅액",
+            "value": "`{bet_amount:,}` {currency_icon}",
+            "inline": True
+        }, {
+            "name": "결과 / 족보",
+            "value": "**{result_text}**\n`{payout_name}` (`x{payout_rate}`)",
+            "inline": True
+        }]
+    },
+    "log_slot_machine_lose": {
+        "title":
+        "💧 **슬롯머신** 💧",
+        "description":
+        "**{user_mention}** 님은 **`{bet_amount:,}`** {currency_icon} 를 잃었습니다.\n> 다음 행운을 빌어요!",
+        "color":
+        0xF44336,
+        "fields": [{
+            "name": "베팅액",
+            "value": "`{bet_amount:,}` {currency_icon}",
+            "inline": True
+        }, {
+            "name": "결과",
+            "value": "**{result_text}**",
+            "inline": True
+        }]
+    },
+    "panel_rps_game": {
+        "title": "✊✌️✋ 가위바위보 방",
+        "description":
+        "> 다른 주민과 가위바위보 승부!\n> 아래 버튼을 눌러 방을 만들고, 참가자와 승부할 수 있습니다.",
+        "color": 0x9B59B6
+    },
+    "log_rps_game_end": {
+        "title":
+        "🏆 **가위바위보 승부 종료!** 🏆",
+        "description":
+        "**{winner_mention}** 님이 최종 승자가 되었습니다!",
+        "color":
+        0xFFD700,
+        "fields": [{
+            "name": "💰 총상금",
+            "value": "> **`{total_pot:,}`** {currency_icon}",
+            "inline": False
+        }, {
+            "name": "베팅액 (1인당)",
+            "value": "`{bet_amount:,}` {currency_icon}",
+            "inline": True
+        }, {
+            "name": "👥 참가자",
+            "value": "{participants_list}",
+            "inline": False
+        }]
+    },
+    "panel_tasks": {
+        "title": "✅ 오늘의 할 일",
+        "description": "> 아래 버튼을 눌러 매일 출석 보상을 받거나 퀘스트를 확인할 수 있습니다!",
+        "color": 0x4CAF50
+    },
+    "log_daily_check": {
+        "title": "✅ 출석 체크 완료",
+        "description":
+        "{user_mention}님이 출석하고 **`{reward}`**{currency_icon}을 받았습니다.",
+        "color": 0x8BC34A
+    },
+    "panel_farm_creation": {
+        "title": "🌾 나만의 농장 만들기!",
+        "description":
+        "> 아래 버튼을 눌러 당신만의 농장(개인 스레드)을 만듭니다.\n> 자신만의 공간에서 작물을 키워보세요!",
+        "color": 0x8BC34A
+    },
+    "farm_thread_welcome": {
+        "title": "{user_name}님의 농장",
+        "description":
+        "환영합니다! 이곳은 당신만의 농장입니다.\n\n**시작하는 법:**\n1. 먼저 상점에서 '나무 괭이'와 '씨앗'을 구매합니다.\n2. 아래 버튼으로 밭을 갈고 씨앗을 심어보세요!",
         "color": 0x4CAF50
     },
     "log_coin_gain": {
