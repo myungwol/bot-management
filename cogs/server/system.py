@@ -25,7 +25,7 @@ from utils.ui_defaults import (
 
 logger = logging.getLogger(__name__)
 
-# [✅✅✅ 핵심 수정 ✅✅✅] ADMIN_ACTION_MAP에 새로운 관리자 명령어를 추가합니다.
+# ADMIN_ACTION_MAP은 변경할 필요 없으므로 이전 버전 그대로 사용합니다.
 ADMIN_ACTION_MAP = {
     "status_show": "[현황] 설정 대시보드 표시", "server_id_set": "[중요] 서버 ID 설정",
     "panels_regenerate_all": "[패널] 모든 관리 패널 재설치", "template_edit": "[템플릿] 임베드 템플릿 편집",
@@ -126,7 +126,6 @@ class ServerSystem(commands.Cog):
     )
     @app_commands.check(is_admin)
     async def purge(self, interaction: discord.Interaction, amount: app_commands.Range[int, 1, 100], user: Optional[discord.Member] = None):
-        """채널의 메시지를 삭제하는 관리자용 명령어입니다."""
         await interaction.response.defer(ephemeral=True)
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
@@ -196,17 +195,17 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
             return
 
-        # [✅✅✅ 핵심 수정 ✅✅✅] 새로운 관리자 명령어를 처리하는 로직을 추가합니다.
         elif action == 'eventpass_enable':
             await save_config_to_db('event_priority_pass_active', True)
-            # 새로운 이벤트를 위해 이전에 사용했던 유저 목록을 초기화합니다.
             await save_config_to_db('event_priority_pass_users', [])
+            # [✅✅✅ 핵심 수정 ✅✅✅] 게임 봇에게 설정을 다시 불러오라는 신호를 보냅니다.
             await save_config_to_db("config_reload_request", time.time())
             await interaction.followup.send("✅ **이벤트 우선 참여권** 사용을 **활성화**했습니다.\n이제 유저들이 아이템을 사용할 수 있습니다.")
             return
         
         elif action == 'eventpass_disable':
             await save_config_to_db('event_priority_pass_active', False)
+            # [✅✅✅ 핵심 수정 ✅✅✅] 게임 봇에게 설정을 다시 불러오라는 신호를 보냅니다.
             await save_config_to_db("config_reload_request", time.time())
             await interaction.followup.send("✅ **이벤트 우선 참여권** 사용을 **비활성화**했습니다.")
             return
@@ -241,7 +240,7 @@ class ServerSystem(commands.Cog):
             await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
             return
         
-        # ... (이하 나머지 코드는 동일하게 유지) ...
+        # ... (이하 나머지 코드는 이전 답변과 동일하게 유지) ...
         if action == "game_data_reload":
             try:
                 await save_config_to_db("game_data_reload_request", time.time())
