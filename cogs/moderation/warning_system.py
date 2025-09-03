@@ -115,7 +115,7 @@ class WarningPanelView(ui.View):
         self.add_item(button)
 
     async def on_button_click(self, interaction: discord.Interaction):
-        # --- ▼ 핵심 수정 부분 1: 권한 확인 로직 변경 ▼ ---
+        # --- ▼ 핵심 수정 부분: 권한 확인 로직 변경 ▼ ---
         if not isinstance(interaction.user, discord.Member):
             return await interaction.response.send_message("❌ 권한이 없습니다.", ephemeral=True)
 
@@ -137,19 +137,18 @@ class WarningPanelView(ui.View):
             
         view = TargetUserSelectView(self.cog)
         await interaction.response.send_message("벌점을 부여할 대상을 선택하세요.", view=view, ephemeral=True)
-        # --- ▲ 핵심 수정 부분 1 ▲ ---
+        # --- ▲ 핵심 수정 부분 ▲ ---
 
-# --- ▼ WarningSystem Cog 클래스 수정 ▼ ---
 class WarningSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.panel_channel_id: Optional[int] = None
         self.log_channel_id: Optional[int] = None
         self.police_role_id: Optional[int] = None
-        # --- ▼ 핵심 수정 부분 2: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
+        # --- ▼ 핵심 수정 부분: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
         self.master_role_id: Optional[int] = None
         self.vice_master_role_id: Optional[int] = None
-        # --- ▲ 핵심 수정 부분 2 ▲ ---
+        # --- ▲ 핵심 수정 부분 ▲ ---
         self.view_instance: Optional[WarningPanelView] = None
         logger.info("WarningSystem Cog가 성공적으로 초기화되었습니다.")
 
@@ -166,10 +165,10 @@ class WarningSystem(commands.Cog):
         self.panel_channel_id = get_id("warning_panel_channel_id")
         self.log_channel_id = get_id("warning_log_channel_id")
         self.police_role_id = get_id(POLICE_ROLE_KEY)
-        # --- ▼ 핵심 수정 부분 3: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
-        self.master_role_id = get_id("role_master")
-        self.vice_master_role_id = get_id("role_vice_master")
-        # --- ▲ 핵심 수정 부분 3 ▲ ---
+        # --- ▼ 핵심 수정 부분: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
+        self.master_role_id = get_id("role_staff_village_chief")
+        self.vice_master_role_id = get_id("role_staff_deputy_chief")
+        # --- ▲ 핵심 수정 부분 ▲ ---
         logger.info("[WarningSystem Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
     async def update_warning_roles(self, member: discord.Member, total_count: int):
@@ -225,15 +224,11 @@ class WarningSystem(commands.Cog):
         embed.add_field(name="누적 횟수", value=f"`{new_total}`회", inline=True)
         embed.timestamp = datetime.now(timezone.utc)
         
-        # --- ▼ 핵심 수정 부분 ▼ ---
-        # content 인자에 사용자 멘션을 추가하고, allowed_mentions를 설정하여 알림이 가도록 합니다.
-        # 스포일러(||)로 멘션을 감싸면 채널에서는 보이지 않으면서 알림은 정상적으로 갑니다.
         await log_channel.send(
             content=f"||{target.mention}||", 
             embed=embed, 
             allowed_mentions=discord.AllowedMentions(users=True)
         )
-        # --- ▲ 핵심 수정 부분 ▲ ---
         
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_warning") -> bool:
         base_panel_key = panel_key.replace("panel_", "") # "warning"
