@@ -7,13 +7,13 @@ from typing import Optional, List, Dict
 import asyncio
 from datetime import datetime, timezone
 
-# [✅✅✅ 핵심 수정 ✅✅✅] supabase 클라이언트를 가져오고, 불필요한 함수 import를 제거합니다.
 from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, get_panel_components_from_db, supabase
 from utils.ui_defaults import POLICE_ROLE_KEY, WARNING_THRESHOLDS
 from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
+# --- 다른 클래스들은 변경사항이 없으므로 생략합니다 ---
 class WarningModal(ui.Modal, title="벌점 내용 입력"):
     amount = ui.TextInput(label="벌점 횟수", placeholder="부여할 벌점 횟수를 숫자로 입력 (예: 1)", required=True, max_length=2)
     reason = ui.TextInput(label="벌점 사유", placeholder="벌점을 발급하는 이유를 구체적으로 기입해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=500)
@@ -23,7 +23,6 @@ class WarningModal(ui.Modal, title="벌점 내용 입력"):
         self.cog = cog
         self.target_member = target_member
 
-    # [✅✅✅ 핵심 수정 ✅✅✅] DB 함수를 호출하여 경쟁 상태를 방지하고 로직을 단순화합니다.
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
@@ -127,6 +126,7 @@ class WarningPanelView(ui.View):
         await interaction.response.send_message("벌점를 부여할 대상을 선택하세요.", view=view, ephemeral=True)
 
 
+# --- ▼ WarningSystem 클래스 수정 ▼ ---
 class WarningSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -204,10 +204,16 @@ class WarningSystem(commands.Cog):
         embed.add_field(name="누적 횟수", value=f"`{new_total}`회", inline=True)
         embed.timestamp = datetime.now(timezone.utc)
         
-        await log_channel.send(embed=embed)
+        # --- ▼ 핵심 수정 부분 ▼ ---
+        # content 인자에 사용자 멘션을 추가하고, allowed_mentions를 설정하여 알림이 가도록 합니다.
+        # 스포일러(||)로 멘션을 감싸면 채널에서는 보이지 않으면서 알림은 정상적으로 갑니다.
+        await log_channel.send(
+            content=f"||{target.mention}||", 
+            embed=embed, 
+            allowed_mentions=discord.AllowedMentions(users=True)
+        )
+        # --- ▲ 핵심 수정 부분 ▲ ---
         
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 함수가 panel_key를 인자로 받도록 변경하고, 내부 로직을 수정합니다.
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_warning") -> bool:
         base_panel_key = panel_key.replace("panel_", "") # "warning"
         embed_key = panel_key # "panel_warning"
