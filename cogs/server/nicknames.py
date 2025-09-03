@@ -60,8 +60,7 @@ class NicknameApprovalView(ui.View):
             # modal.wait()는 타임아웃 시 True, 제출 시 False를 반환합니다.
             # 타임아웃되었거나 제출되었지만 사유가 비어있는 경우 작업을 취소합니다.
             if await modal.wait() is True or not modal.reason.value:
-                if not interaction.response.is_done():
-                    await interaction.followup.send("❌ 거절 사유 입력이 취소되었습니다. 작업을 재개하려면 다시 시도해주세요.", ephemeral=True)
+                await interaction.followup.send("❌ 거절 사유 입력이 취소되었습니다. 작업을 재개하려면 다시 시도해주세요.", ephemeral=True)
                 return
             rejection_reason = modal.reason.value
         else:
@@ -81,29 +80,39 @@ class NicknameApprovalView(ui.View):
         log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
         
         status_text = "승인" if is_approved else "거절"
-        moderator_confirmation_message = None
-
-        if error_report:
-            moderator_confirmation_message = await interaction.followup.send(f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}", ephemeral=True, wait=True)
-        else:
-            moderator_confirmation_message = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
+        confirmation_text = ""
         
-        # 관리자에게 확인 메시지를 보낸 후 패널 재생성 작업을 시작합니다.
-        original_panel_channel_id = get_id("nickname_panel_channel_id")
-        if original_panel_channel_id:
-            original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
-            if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
-                await self.nicknames_cog.regenerate_panel(
-                    original_panel_channel, 
-                    panel_key="panel_nicknames", 
-                    log_embed=log_embed
-                )
+        if is_approved:
+            if error_report:
+                confirmation_text = f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}"
             else:
-                logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다. 로그만 전송합니다.")
+                confirmation_text = f"✅ {status_text} 처리가 정상적으로 완료되었습니다."
+        else: # 거절의 경우
+            confirmation_text = f"✅ {status_text} 처리가 정상적으로 완료되었습니다."
+            # 거절 시도 자체에 대한 실패 보고는 없음 (닉네임 변경 시도가 없으므로)
+
+        # 관리자에게 즉각적인 확인 메시지를 먼저 보냅니다.
+        moderator_confirmation_message = await interaction.followup.send(confirmation_text, ephemeral=True, wait=True)
+        
+        # 이제 잠재적으로 시간이 걸리는 패널 재생성 및 로그 전송 작업을 백그라운드에서 실행합니다.
+        async def run_panel_update_and_log():
+            original_panel_channel_id = get_id("nickname_panel_channel_id")
+            if original_panel_channel_id:
+                original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
+                if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
+                    await self.nicknames_cog.regenerate_panel(
+                        original_panel_channel, 
+                        panel_key="panel_nicknames", 
+                        log_embed=log_embed
+                    )
+                else:
+                    logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다. 로그만 전송합니다.")
+                    await self._send_log_message_fallback(log_embed)
+            else:
+                logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
                 await self._send_log_message_fallback(log_embed)
-        else:
-            logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
-            await self._send_log_message_fallback(log_embed)
+        
+        asyncio.create_task(run_panel_update_and_log())
 
         # ephemeral 확인 메시지를 3초 뒤에 삭제합니다.
         if moderator_confirmation_message:
