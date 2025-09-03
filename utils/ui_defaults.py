@@ -192,21 +192,6 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": False,
         "priority": 0
     },
-    "role_item_warning_deduct": {
-        "name": "벌점 1회 차감권",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_item_event_priority": {
-        "name": "이벤트 우선 참여권",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_item_farm_expansion": {
-        "name": "밭 확장 허가증",
-        "is_prefix": False,
-        "priority": 0
-    },
 
     # --- 알림 역할 ---
     "role_notify_voice": {
