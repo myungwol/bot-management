@@ -462,4 +462,4 @@ class VoiceMaster(commands.Cog):
             asyncio.create_task(msg.delete(delay=5))
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(VoiceMaster(bot))```
+    await bot.add_cog(VoiceMaster(bot))
