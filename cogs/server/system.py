@@ -11,16 +11,14 @@ import time
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel,
-    _channel_id_cache,
-    update_wallet,
-    supabase,
+    _channel_id_cache, update_wallet, supabase,
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
-# [핵심 수정] PROFILE_RANK_ROLES를 import 목록에 추가
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
-    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES
+    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
+    USABLE_ITEMS
 )
 
 logger = logging.getLogger(__name__)
@@ -102,7 +100,6 @@ class ServerSystem(commands.Cog):
             if not interaction.response.is_done(): await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
             else: await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
 
-    # [✅ 신규 추가] 메시지 삭제(purge) 명령어
     @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
     @app_commands.rename(amount='개수', user='유저')
     @app_commands.describe(
@@ -114,27 +111,20 @@ class ServerSystem(commands.Cog):
         """채널의 메시지를 삭제하는 관리자용 명령어입니다."""
         await interaction.response.defer(ephemeral=True)
 
-        # 현재 interaction이 발생한 채널을 대상으로 합니다.
-        # TextChannel 타입이 아닐 경우(예: 스레드)를 대비해 isinstance로 확인합니다.
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
             await interaction.followup.send("❌ 이 명령어는 일반 텍스트 채널에서만 사용할 수 있습니다.", ephemeral=True)
             return
 
         try:
-            # 특정 유저가 지정된 경우, 해당 유저의 메시지만 삭제하도록 check 함수를 정의합니다.
             check_func = lambda m: m.author == user if user else lambda m: True
-
-            # 메시지를 실제로 삭제합니다.
             deleted_messages = await channel.purge(limit=amount, check=check_func)
 
-            # 결과 메시지를 생성합니다.
             if user:
                 response_message = f"✅ {user.mention}님의 메시지 {len(deleted_messages)}개를 삭제했습니다."
             else:
                 response_message = f"✅ 메시지 {len(deleted_messages)}개를 삭제했습니다."
             
-            # 14일이 지난 메시지는 대량 삭제가 불가능하므로, 요청한 수보다 적게 삭제될 수 있음을 알립니다.
             if len(deleted_messages) < amount:
                 response_message += "\nℹ️ 14일이 지난 메시지는 삭제할 수 없습니다."
 
@@ -149,13 +139,26 @@ class ServerSystem(commands.Cog):
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         for key, name in ADMIN_ACTION_MAP.items():
-            if current.lower() in name.lower(): choices.append(app_commands.Choice(name=name, value=key))
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
+        
         for key, info in SETUP_COMMAND_MAP.items():
-            choice_name = f"[채널] {info.get('friendly_name', key)} 설정"
-            if current.lower() in choice_name.lower(): choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
+            choice_name = f"[{'패널' if info['type'] == 'panel' else '채널'}] {info.get('friendly_name', key)} 설정"
+            if current.lower() in choice_name.lower():
+                choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{info['key']}"))
+
+        for item_info in USABLE_ITEMS.values():
+            if log_key := item_info.get("log_channel_key"):
+                if not any(log_key == info.get('key') for info in SETUP_COMMAND_MAP.values()):
+                    choice_name = f"[로그] '{item_info['name']}' 사용 기록"
+                    if current.lower() in choice_name.lower():
+                        choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{log_key}"))
+
         role_setup_actions = {"role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정"}
         for key, name in role_setup_actions.items():
-            if current.lower() in name.lower(): choices.append(app_commands.Choice(name=name, value=key))
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
+        
         return sorted(choices, key=lambda c: c.name)[:25]
 
     @admin_group.command(name="setup", description="봇의 모든 설정을 관리합니다.")
@@ -166,27 +169,55 @@ class ServerSystem(commands.Cog):
     async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
 
-        # [핵심 수정] strings_sync 로직에 PROFILE_RANK_ROLES 동기화 추가
         if action == "strings_sync":
             try:
-                # 1. UI 텍스트 동기화
                 await save_config_to_db("strings", UI_STRINGS)
-                
-                # 2. 전직 데이터 동기화
                 await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
-
-                # 3. 프로필 등급 역할 목록 동기화
                 await save_config_to_db("PROFILE_RANK_ROLES", PROFILE_RANK_ROLES)
+                await save_config_to_db("USABLE_ITEMS", USABLE_ITEMS)
 
-                # 4. 게임 봇에 설정 다시 불러오기 요청
                 await save_config_to_db("config_reload_request", time.time())
                 
-                logger.info("UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES가 데이터베이스에 성공적으로 동기화되었습니다.")
+                logger.info("UI 텍스트 및 게임 관련 주요 설정이 데이터베이스에 성공적으로 동기화되었습니다.")
                 await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다.\n"
                                                 "**게임 봇을 재시작**하면 모든 설정이 정상적으로 적용됩니다.")
             except Exception as e:
                 logger.error(f"UI 동기화 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
+            return
+
+        if action.startswith("channel_setup:"):
+            db_key = action.split(":", 1)[1]
+            
+            # SETUP_COMMAND_MAP에서 정보 찾기
+            config = SETUP_COMMAND_MAP.get(db_key) or next((info for key, info in SETUP_COMMAND_MAP.items() if info.get('key') == db_key), None)
+
+            if config:
+                 required_channel_type = config.get("channel_type", "text")
+                 friendly_name = config.get("friendly_name", db_key)
+            else: # 동적으로 생성된 로그 채널의 경우
+                required_channel_type = "text"
+                friendly_name = next((f"'{item['name']}' 사용 기록" for item in USABLE_ITEMS.values() if item.get("log_channel_key") == db_key), db_key)
+
+            error_msg = None
+            if not channel:
+                error_msg = f"❌ 이 작업을 실행하려면 `channel` 옵션에 **{required_channel_type} 채널**을 지정해야 합니다."
+            elif (required_channel_type == "text" and not isinstance(channel, discord.TextChannel)) or \
+                 (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)) or \
+                 (required_channel_type == "forum" and not isinstance(channel, discord.ForumChannel)):
+                error_msg = f"❌ 이 작업에는 **{required_channel_type} 채널**이 필요합니다. 올바른 타입의 채널을 선택해주세요."
+            
+            if error_msg:
+                return await interaction.followup.send(error_msg, ephemeral=True)
+
+            save_success = await save_id_to_db(db_key, channel.id)
+            if not save_success:
+                return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다.", ephemeral=True)
+            
+            if config and (cog_to_reload := self.bot.get_cog(config["cog_name"])) and hasattr(cog_to_reload, 'load_configs'):
+                await cog_to_reload.load_configs()
+            
+            await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
             return
 
         # --- 이하 로직은 이전과 거의 동일 ---
