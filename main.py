@@ -57,7 +57,6 @@ class MyBot(commands.Bot):
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "ItemSystem", "AnonymousBoard", 
             "WarningSystem", "VoiceMaster"
-            "ItemUsageHandler" # [핵심 추가]
         ]
         
         registered_views_count = 0
