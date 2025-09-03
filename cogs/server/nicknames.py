@@ -18,14 +18,7 @@ from utils.helpers import get_clean_display_name, format_embed_from_db, format_s
 
 logger = logging.getLogger(__name__)
 
-def calculate_weighted_length(name: str) -> int:
-    total_length = 0
-    # 한글 및 한자 포함
-    pattern = re.compile(r'[\u3131-\u3163\uac00-\ud7a3\u4e00-\u9faf]')
-    for char in name:
-        total_length += 2 if pattern.match(char) else 1
-    return total_length
-
+# --- 다른 클래스들은 변경사항이 없으므로 생략합니다 ---
 class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -139,7 +132,6 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     async def on_submit(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True)
         name = self.new_name.value
-        # 한글, 영어, 숫자만 허용
         pattern_str = get_config("NICKNAME_ALLOWED_PATTERN", r"^[a-zA-Z0-9\u3131-\u3163\uac00-\ud7a3]+$")
         max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
 
@@ -208,6 +200,7 @@ class NicknameChangerPanelView(ui.View):
             
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
+
 # --- Nicknames Cog (수정된 부분) ---
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -216,6 +209,9 @@ class Nicknames(commands.Cog):
         self.approval_role_id: Optional[int] = None
         self.nickname_log_channel_id: Optional[int] = None
         self.view_instance = None
+        # --- ▼ 핵심 수정 부분 1: Lock 객체 초기화 ▼ ---
+        self.panel_regeneration_lock = asyncio.Lock()
+        # --- ▲ 핵심 수정 부분 1 ▲ ---
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
 
     async def register_persistent_views(self):
@@ -283,55 +279,53 @@ class Nicknames(commands.Cog):
                 pass
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames", log_embed: Optional[discord.Embed] = None) -> bool:
-        base_panel_key = panel_key.replace("panel_", "")
-        embed_key = panel_key
+        # --- ▼ 핵심 수정 부분 2: Lock 적용 ▼ ---
+        async with self.panel_regeneration_lock:
+        # --- ▲ 핵심 수정 부분 2 ▲ ---
+            base_panel_key = panel_key.replace("panel_", "")
+            embed_key = panel_key
 
-        try:
-            panel_info = get_panel_id(base_panel_key)
-            if panel_info and (old_id := panel_info.get('message_id')):
-                try:
-                    old_message = await channel.fetch_message(old_id)
-                    await old_message.delete()
-                except (discord.NotFound, discord.Forbidden): pass
-            
-            embed_data = await get_embed_from_db(embed_key)
-            if not embed_data:
-                logger.warning(f"DB에서 '{embed_key}' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
-                if log_embed and self.nickname_log_channel_id:
-                    if log_channel := self.bot.get_channel(self.nickname_log_channel_id):
-                        await log_channel.send(embed=log_embed)
-                return False
+            try:
+                panel_info = get_panel_id(base_panel_key)
+                if panel_info and (old_id := panel_info.get('message_id')):
+                    try:
+                        old_message = await channel.fetch_message(old_id)
+                        await old_message.delete()
+                    except (discord.NotFound, discord.Forbidden): pass
                 
-            embed = discord.Embed.from_dict(embed_data)
-            if self.view_instance is None:
-                await self.register_persistent_views()
+                embed_data = await get_embed_from_db(embed_key)
+                if not embed_data:
+                    logger.warning(f"DB에서 '{embed_key}' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
+                    if log_embed and self.nickname_log_channel_id:
+                        if log_channel := self.bot.get_channel(self.nickname_log_channel_id):
+                            await log_channel.send(embed=log_embed)
+                    return False
+                    
+                embed = discord.Embed.from_dict(embed_data)
+                if self.view_instance is None:
+                    await self.register_persistent_views()
 
-            await self.view_instance.setup_buttons()
+                await self.view_instance.setup_buttons()
 
-            # --- ▼ 핵심 수정 부분 ▼ ---
-            # 1. 확인 메시지(log_embed)가 있으면 먼저 전송합니다.
-            if log_embed:
-                await channel.send(embed=log_embed)
-            
-            # 2. 그 후에 새로운 패널을 전송하고 메시지 객체를 저장합니다.
-            new_panel_message = await channel.send(embed=embed, view=self.view_instance)
-            # --- ▲ 핵심 수정 부분 ▲ ---
-            
-            if new_panel_message:
-                await save_panel_id(base_panel_key, new_panel_message.id, channel.id)
-                logger.info(f"✅ {panel_key} 패널을 성공적으로 새로 생성/갱신했습니다. (채널: #{channel.name})")
-                return True
-            else:
-                logger.error("닉네임 패널 메시지 전송에 실패하여 ID를 저장할 수 없습니다.")
-                # 비상시 로그 채널에만 로그 전송 (위에서 이미 보냈을 수 있지만, 만약 패널만 실패한 경우를 대비)
-                if log_embed and self.nickname_log_channel_id:
-                     if log_channel := self.bot.get_channel(self.nickname_log_channel_id):
-                        await log_channel.send(embed=log_embed)
+                if log_embed:
+                    await channel.send(embed=log_embed)
+                
+                new_panel_message = await channel.send(embed=embed, view=self.view_instance)
+                
+                if new_panel_message:
+                    await save_panel_id(base_panel_key, new_panel_message.id, channel.id)
+                    logger.info(f"✅ {panel_key} 패널을 성공적으로 새로 생성/갱신했습니다. (채널: #{channel.name})")
+                    return True
+                else:
+                    logger.error("닉네임 패널 메시지 전송에 실패하여 ID를 저장할 수 없습니다.")
+                    if log_embed and self.nickname_log_channel_id:
+                         if log_channel := self.bot.get_channel(self.nickname_log_channel_id):
+                            await log_channel.send(embed=log_embed)
+                    return False
+
+            except Exception as e:
+                logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
                 return False
-
-        except Exception as e:
-            logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
-            return False
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Nicknames(bot))
