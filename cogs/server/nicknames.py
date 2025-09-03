@@ -1,3 +1,5 @@
+# cogs/server/nicknames.py
+
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
@@ -57,11 +59,7 @@ class NicknameApprovalView(ui.View):
         if not is_approved:
             modal = RejectionReasonModal()
             await interaction.response.send_modal(modal)
-            # modal.wait()는 타임아웃 시 True, 제출 시 False를 반환합니다.
-            # 타임아웃되었거나 제출되었지만 사유가 비어있는 경우 작업을 취소합니다.
-            if await modal.wait() is True or not modal.reason.value:
-                await interaction.followup.send("❌ 거절 사유 입력이 취소되었습니다. 작업을 재개하려면 다시 시도해주세요.", ephemeral=True)
-                return
+            if await modal.wait() or not modal.reason.value: return
             rejection_reason = modal.reason.value
         else:
             await interaction.response.defer()
@@ -79,46 +77,29 @@ class NicknameApprovalView(ui.View):
         
         log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
         
-        status_text = "승인" if is_approved else "거절"
-        confirmation_text = ""
-        
-        if is_approved:
-            if error_report:
-                confirmation_text = f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}"
+        original_panel_channel_id = get_id("nickname_panel_channel_id")
+        if original_panel_channel_id:
+            original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
+            if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
+                await self.nicknames_cog.regenerate_panel(
+                    original_panel_channel, 
+                    panel_key="panel_nicknames", 
+                    log_embed=log_embed
+                )
             else:
-                confirmation_text = f"✅ {status_text} 처리가 정상적으로 완료되었습니다."
-        else: # 거절의 경우
-            confirmation_text = f"✅ {status_text} 처리가 정상적으로 완료되었습니다."
-            # 거절 시도 자체에 대한 실패 보고는 없음 (닉네임 변경 시도가 없으므로)
-
-        # 관리자에게 즉각적인 확인 메시지를 먼저 보냅니다.
-        moderator_confirmation_message = await interaction.followup.send(confirmation_text, ephemeral=True, wait=True)
-        
-        # 이제 잠재적으로 시간이 걸리는 패널 재생성 및 로그 전송 작업을 백그라운드에서 실행합니다.
-        async def run_panel_update_and_log():
-            original_panel_channel_id = get_id("nickname_panel_channel_id")
-            if original_panel_channel_id:
-                original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
-                if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
-                    await self.nicknames_cog.regenerate_panel(
-                        original_panel_channel, 
-                        panel_key="panel_nicknames", 
-                        log_embed=log_embed
-                    )
-                else:
-                    logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다. 로그만 전송합니다.")
-                    await self._send_log_message_fallback(log_embed)
-            else:
-                logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
+                logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다. 로그만 전송합니다.")
                 await self._send_log_message_fallback(log_embed)
-        
-        asyncio.create_task(run_panel_update_and_log())
+        else:
+            logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
+            await self._send_log_message_fallback(log_embed)
 
-        # ephemeral 확인 메시지를 3초 뒤에 삭제합니다.
-        if moderator_confirmation_message:
+        status_text = "승인" if is_approved else "거절"
+        if error_report:
+            await interaction.followup.send(f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}", ephemeral=True)
+        else:
+            message = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
             await asyncio.sleep(3)
-            try: await moderator_confirmation_message.delete()
-            except discord.NotFound: pass
+            await message.delete()
         
         try: await interaction.message.delete()
         except discord.NotFound: pass
@@ -227,7 +208,7 @@ class NicknameChangerPanelView(ui.View):
             
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
-# --- Nicknames Cog ---
+# --- Nicknames Cog (수정된 부분) ---
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -327,18 +308,14 @@ class Nicknames(commands.Cog):
 
             await self.view_instance.setup_buttons()
 
-            tasks = []
+            # --- ▼ 핵심 수정 부분 ▼ ---
+            # 1. 확인 메시지(log_embed)가 있으면 먼저 전송합니다.
             if log_embed:
-                tasks.append(channel.send(embed=log_embed))
-            tasks.append(channel.send(embed=embed, view=self.view_instance))
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+                await channel.send(embed=log_embed)
             
-            new_panel_message = None
-            for res in results:
-                # .view 대신 .components가 있는지 확인하여 패널 메시지를 찾습니다.
-                if isinstance(res, discord.Message) and res.components:
-                    new_panel_message = res
-                    break
+            # 2. 그 후에 새로운 패널을 전송하고 메시지 객체를 저장합니다.
+            new_panel_message = await channel.send(embed=embed, view=self.view_instance)
+            # --- ▲ 핵심 수정 부분 ▲ ---
             
             if new_panel_message:
                 await save_panel_id(base_panel_key, new_panel_message.id, channel.id)
@@ -346,7 +323,7 @@ class Nicknames(commands.Cog):
                 return True
             else:
                 logger.error("닉네임 패널 메시지 전송에 실패하여 ID를 저장할 수 없습니다.")
-                # 비상시 로그 채널에만 로그 전송
+                # 비상시 로그 채널에만 로그 전송 (위에서 이미 보냈을 수 있지만, 만약 패널만 실패한 경우를 대비)
                 if log_embed and self.nickname_log_channel_id:
                      if log_channel := self.bot.get_channel(self.nickname_log_channel_id):
                         await log_channel.send(embed=log_embed)
