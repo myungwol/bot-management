@@ -32,87 +32,92 @@ class NicknameApprovalView(ui.View):
         self.nicknames_cog = cog_instance
         self.original_name = member.display_name
     
-    # --- ▼ 핵심 수정 부분: 권한 확인 로직 변경 ▼ ---
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
-        # Cog에서 모든 관련 역할 ID를 가져옵니다.
         approval_role_id = self.nicknames_cog.approval_role_id
         master_role_id = self.nicknames_cog.master_role_id
         vice_master_role_id = self.nicknames_cog.vice_master_role_id
 
-        # 허용된 역할 ID 목록을 만듭니다.
         allowed_role_ids = {rid for rid in [approval_role_id, master_role_id, vice_master_role_id] if rid is not None}
 
         if not isinstance(interaction.user, discord.Member) or not allowed_role_ids:
             await interaction.response.send_message("❌ 이 버튼을 누를 권한이 없거나, 권한 역할이 설정되지 않았습니다.", ephemeral=True)
             return False
 
-        # 사용자가 가진 역할과 허용된 역할을 비교합니다.
         user_role_ids = {role.id for role in interaction.user.roles}
         if not user_role_ids.intersection(allowed_role_ids):
             await interaction.response.send_message("❌ 이 버튼을 누를 권한이 없습니다.", ephemeral=True)
             return False
             
         return True
-    # --- ▲ 핵심 수정 부분 ▲ ---
 
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
+
+        # [수정] 경합 상태 방지를 위한 Lock 추가
+        user_process_lock = self.nicknames_cog.get_user_lock(self.target_member_id)
+        if user_process_lock.locked():
+            await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
+            return
         
-        member = interaction.guild.get_member(self.target_member_id)
-        if not member:
+        async with user_process_lock:
+            member = interaction.guild.get_member(self.target_member_id)
+            if not member:
+                try: await interaction.message.delete()
+                except discord.NotFound: pass
+                await interaction.response.send_message("❌ 오류: 대상 멤버를 서버에서 찾을 수 없습니다.", ephemeral=True)
+                return
+
+            rejection_reason = None
+            if not is_approved:
+                modal = RejectionReasonModal()
+                await interaction.response.send_modal(modal)
+                if await modal.wait() or not modal.reason.value: return
+                rejection_reason = modal.reason.value
+            else:
+                await interaction.response.defer()
+            
+            for item in self.children: item.disabled = True
+            try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
+            except (discord.NotFound, discord.HTTPException): pass
+
+            final_name = await self.nicknames_cog.get_final_nickname(member, base_name=self.new_name)
+            error_report = ""
+            if is_approved:
+                try:
+                    await member.edit(nick=final_name, reason=f"관리자가 승인 ({interaction.user})")
+                except Exception as e: error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
+            
+            log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
+            
+            original_panel_channel_id = get_id("nickname_panel_channel_id")
+            if original_panel_channel_id:
+                original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
+                if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
+                    await self.nicknames_cog.regenerate_panel(
+                        original_panel_channel, 
+                        panel_key="panel_nicknames", 
+                        log_embed=log_embed
+                    )
+                else:
+                    logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다. 로그만 전송합니다.")
+                    await self._send_log_message_fallback(log_embed)
+            else:
+                logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
+                await self._send_log_message_fallback(log_embed)
+
+            status_text = "승인" if is_approved else "거절"
+            if error_report:
+                await interaction.followup.send(f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}", ephemeral=True)
+            else:
+                message = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
+                await asyncio.sleep(3)
+                await message.delete()
+            
             try: await interaction.message.delete()
             except discord.NotFound: pass
-            await interaction.response.send_message("❌ 오류: 대상 멤버를 서버에서 찾을 수 없습니다.", ephemeral=True)
-            return
-
-        rejection_reason = None
-        if not is_approved:
-            modal = RejectionReasonModal()
-            await interaction.response.send_modal(modal)
-            if await modal.wait() or not modal.reason.value: return
-            rejection_reason = modal.reason.value
-        else:
-            await interaction.response.defer()
         
-        for item in self.children: item.disabled = True
-        try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
-        except (discord.NotFound, discord.HTTPException): pass
-
-        final_name = await self.nicknames_cog.get_final_nickname(member, base_name=self.new_name)
-        error_report = ""
-        if is_approved:
-            try:
-                await member.edit(nick=final_name, reason=f"관리자가 승인 ({interaction.user})")
-            except Exception as e: error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
-        
-        log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
-        
-        original_panel_channel_id = get_id("nickname_panel_channel_id")
-        if original_panel_channel_id:
-            original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
-            if original_panel_channel and isinstance(original_panel_channel, discord.TextChannel):
-                await self.nicknames_cog.regenerate_panel(
-                    original_panel_channel, 
-                    panel_key="panel_nicknames", 
-                    log_embed=log_embed
-                )
-            else:
-                logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다. 로그만 전송합니다.")
-                await self._send_log_message_fallback(log_embed)
-        else:
-            logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
-            await self._send_log_message_fallback(log_embed)
-
-        status_text = "승인" if is_approved else "거절"
-        if error_report:
-            await interaction.followup.send(f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}", ephemeral=True)
-        else:
-            message = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
-            await asyncio.sleep(3)
-            await message.delete()
-        
-        try: await interaction.message.delete()
-        except discord.NotFound: pass
+        # [수정] 처리가 끝난 후 Lock을 제거
+        self.nicknames_cog.release_user_lock(self.target_member_id)
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
@@ -138,7 +143,6 @@ class NicknameApprovalView(ui.View):
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label="거절", style=discord.ButtonStyle.danger, custom_id="nick_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
-
 
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     new_name = ui.TextInput(label="새로운 이름", placeholder="이모티콘, 특수문자 사용 불가. 한글 4자/영문 8자까지", required=True, max_length=12)
@@ -227,13 +231,24 @@ class Nicknames(commands.Cog):
         self.approval_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None
         self.nickname_log_channel_id: Optional[int] = None
-        # --- ▼ 핵심 수정 부분: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
         self.master_role_id: Optional[int] = None
         self.vice_master_role_id: Optional[int] = None
-        # --- ▲ 핵심 수정 부분 ▲ ---
         self.view_instance = None
         self.panel_regeneration_lock = asyncio.Lock()
+        # [수정] 사용자별 Lock을 관리하기 위한 딕셔너리 추가
+        self._user_locks: Dict[int, asyncio.Lock] = {}
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
+
+    # [수정] Lock을 가져오는 헬퍼 함수 추가
+    def get_user_lock(self, user_id: int) -> asyncio.Lock:
+        if user_id not in self._user_locks:
+            self._user_locks[user_id] = asyncio.Lock()
+        return self._user_locks[user_id]
+    
+    # [수정] 사용이 끝난 Lock을 제거하는 헬퍼 함수 추가
+    def release_user_lock(self, user_id: int):
+        if user_id in self._user_locks:
+            del self._user_locks[user_id]
 
     @staticmethod
     def calculate_weighted_length(name: str) -> int:
@@ -255,10 +270,8 @@ class Nicknames(commands.Cog):
         self.approval_channel_id = get_id("nickname_approval_channel_id")
         self.nickname_log_channel_id = get_id("nickname_log_channel_id")
         self.approval_role_id = get_id("role_approval")
-        # --- ▼ 핵심 수정 부분: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
         self.master_role_id = get_id("role_staff_village_chief")
         self.vice_master_role_id = get_id("role_staff_deputy_chief")
-        # --- ▲ 핵심 수정 부분 ▲ ---
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
