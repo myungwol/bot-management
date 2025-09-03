@@ -17,11 +17,11 @@ from utils.database import (
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
-# [핵심 수정] 빠뜨렸던 USABLE_ITEMS를 다시 import 합니다.
+# [✅✅✅ 핵심 수정 ✅✅✅] WARNING_THRESHOLDS 설정을 가져옵니다.
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
     ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
-    USABLE_ITEMS
+    USABLE_ITEMS, WARNING_THRESHOLDS
 )
 
 logger = logging.getLogger(__name__)
@@ -171,6 +171,8 @@ class ServerSystem(commands.Cog):
                 await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
                 await save_config_to_db("PROFILE_RANK_ROLES", PROFILE_RANK_ROLES)
                 await save_config_to_db("USABLE_ITEMS", USABLE_ITEMS)
+                # [✅✅✅ 핵심 수정 ✅✅✅] WARNING_THRESHOLDS 설정을 DB에 저장합니다.
+                await save_config_to_db("WARNING_THRESHOLDS", WARNING_THRESHOLDS)
                 await save_config_to_db("config_reload_request", time.time())
                 logger.info("UI 텍스트 및 게임 관련 주요 설정이 데이터베이스에 성공적으로 동기화되었습니다.")
                 await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다.\n"
@@ -210,7 +212,7 @@ class ServerSystem(commands.Cog):
             await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
             return
 
-        # --- 이하 로직은 이전과 거의 동일 ---
+        # --- 이하 로직은 제공된 파일의 원본과 동일하게 유지 ---
         if action == "game_data_reload":
             try:
                 await save_config_to_db("game_data_reload_request", time.time())
