@@ -51,8 +51,6 @@ UI_ROLE_KEY_MAP = {
     "role_info_age_00s":        {"name": "00년생", "is_prefix": False, "priority": 0},
     
     # --- 상점/아이템 역할 ---
-    "role_item_event_priority": {"name": "이벤트 우선권", "is_prefix": False, "priority": 0},
-    "role_item_warning_deduct": {"name": "벌점 1회 차감권", "is_prefix": False, "priority": 0},
     "role_personal_room_key":   {"name": "마이룸 열쇠", "is_prefix": False, "priority": 0},
 
     # --- 알림 역할 ---
