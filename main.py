@@ -1,14 +1,14 @@
 # main.py (관리 봇)
 
 import discord
-from discord.ext import commands import commands, tasks
+from discord.ext import commands
 import os
 import asyncio
 import logging
 import logging.handlers
 from datetime import datetime, timezone
 from typing import Optional
-
+from discord.ext import commands, tasks
 # [✅ 수정] 두 함수 모두 사용하므로 그대로 둡니다.
 from utils.database import load_all_data_from_db, sync_defaults_to_db
 
