@@ -165,6 +165,9 @@ UI_EMBEDS = {
     "embed_weather_forecast": { "title": "{emoji} 오늘의 날씨 예보", "description": "오늘의 날씨는 「**{weather_name}**」입니다!\n\n> {description}", "color": "{color}", "fields": [ {"name": "💡 오늘의 팁", "value": "> {tip}", "inline": False} ], "footer": { "text": "날씨는 매일 자정에 바뀝니다." } },
     "log_whale_catch": { "title": "🐋 이달의 주인을 잡다! 🐋", "description": "이번 달, 단 한 번만 모습을 드러낸다는 환상의 **고래**가 **{user_mention}**님의 손에 잡혔습니다!\n\n거대한 그림자는 다음 달까지 다시 깊은 바닷속으로 모습을 감춥니다...", "color": "0x206694", "fields": [ {"name": "잡힌 주인", "value": "{emoji} **{name}**\n**크기**: `{size}`cm\n**가치**: `{value}`{currency_icon}", "inline": False} ], "footer": {"text": "다음 달의 도전자여, 오라!"} },
     "embed_whale_reset_announcement": { "title": "🐋 바다에서 온 소문...", "description": "이번 달, 바다 깊은 곳에서 거대한 무언가를 목격했다는 소문이 돌고 있다...\n아무래도 실력 좋은 낚시꾼을 기다리고 있는 것 같다.", "color": 0x3498DB, "footer": {"text": "이달의 주인이 바다로 돌아왔습니다."} },
+    "log_item_use_warning_deduct": {"title": "🎫 벌점 차감권 사용 알림", "color": 3066993}, # 초록색
+    "log_item_use_event_priority": {"title": "✨ 이벤트 우선권 사용 알림", "color": 16776960}, # 노란색
+    "log_item_use": {"title": "🛒 아이템 사용 알림", "color": 11027200},
     
     "panel_champion_board": {
         "title": "🏆 종합 챔피언 보드 🏆",
@@ -179,15 +182,6 @@ UI_EMBEDS = {
         ],
         "footer": {"text": "매주 월요일 0시에 갱신됩니다."}
     }
-    "log_item_use": {"title": "🛒 아이템 사용 알림", "color": 11027200},
-    
-    # --- [여기에 새로운 임베드 템플릿 2개 추가] ---
-    "log_item_use_warning_deduct": {"title": "🎫 벌점 차감권 사용 알림", "color": 3066993}, # 초록색
-    "log_item_use_event_priority": {"title": "✨ 이벤트 우선권 사용 알림", "color": 16776960}, # 노란색
-    # ---------------------------------------------
-    
-    "panel_item_usage": {"title": "✅ 경고 차감권 사용", "description": "보유 중인 <@&경고차감권역할ID>을 사용하려면 아래 버튼을 눌러주세요.", "color": 11027200},
-    # ... (이후 임베드들)
 }
 
 UI_PANEL_COMPONENTS = [
