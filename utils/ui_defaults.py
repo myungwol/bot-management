@@ -119,22 +119,22 @@ UI_ROLE_KEY_MAP = {
 
     # --- 온보딩/역할 패널 구분선 역할 ---
     "role_onboarding_step_1": {
-        "name": "════════════게임════════════",
+        "name": "════════════등급════════════",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_2": {
-        "name": "════════════알림════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_onboarding_step_3": {
         "name": "════════════정보════════════",
         "is_prefix": False,
         "priority": 0
     },
+    "role_onboarding_step_3": {
+        "name": "═════════════상점═══════════",
+        "is_prefix": False,
+        "priority": 0
+    },
     "role_onboarding_step_4": {
-        "name": "════════════등급════════════",
+        "name": "═════════════알림═══════════",
         "is_prefix": False,
         "priority": 0
     },
@@ -144,7 +144,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_shop_separator": {
-        "name": "════════════상점════════════",
+        "name": "══════════════게임══════════",
         "is_prefix": False,
         "priority": 0
     },
