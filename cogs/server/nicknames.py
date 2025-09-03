@@ -1,5 +1,3 @@
-# cogs/server/nicknames.py
-
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
@@ -59,7 +57,12 @@ class NicknameApprovalView(ui.View):
         if not is_approved:
             modal = RejectionReasonModal()
             await interaction.response.send_modal(modal)
-            if await modal.wait() or not modal.reason.value: return
+            # modal.wait()는 타임아웃 시 True, 제출 시 False를 반환합니다.
+            # 타임아웃되었거나 제출되었지만 사유가 비어있는 경우 작업을 취소합니다.
+            if await modal.wait() is True or not modal.reason.value:
+                if not interaction.response.is_done():
+                    await interaction.followup.send("❌ 거절 사유 입력이 취소되었습니다. 작업을 재개하려면 다시 시도해주세요.", ephemeral=True)
+                return
             rejection_reason = modal.reason.value
         else:
             await interaction.response.defer()
@@ -77,6 +80,15 @@ class NicknameApprovalView(ui.View):
         
         log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
         
+        status_text = "승인" if is_approved else "거절"
+        moderator_confirmation_message = None
+
+        if error_report:
+            moderator_confirmation_message = await interaction.followup.send(f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}", ephemeral=True, wait=True)
+        else:
+            moderator_confirmation_message = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
+        
+        # 관리자에게 확인 메시지를 보낸 후 패널 재생성 작업을 시작합니다.
         original_panel_channel_id = get_id("nickname_panel_channel_id")
         if original_panel_channel_id:
             original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
@@ -93,13 +105,11 @@ class NicknameApprovalView(ui.View):
             logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
             await self._send_log_message_fallback(log_embed)
 
-        status_text = "승인" if is_approved else "거절"
-        if error_report:
-            await interaction.followup.send(f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}", ephemeral=True)
-        else:
-            message = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
+        # ephemeral 확인 메시지를 3초 뒤에 삭제합니다.
+        if moderator_confirmation_message:
             await asyncio.sleep(3)
-            await message.delete()
+            try: await moderator_confirmation_message.delete()
+            except discord.NotFound: pass
         
         try: await interaction.message.delete()
         except discord.NotFound: pass
@@ -316,7 +326,6 @@ class Nicknames(commands.Cog):
             
             new_panel_message = None
             for res in results:
-                # [✅✅✅ 핵심 수정 ✅✅✅]
                 # .view 대신 .components가 있는지 확인하여 패널 메시지를 찾습니다.
                 if isinstance(res, discord.Message) and res.components:
                     new_panel_message = res
