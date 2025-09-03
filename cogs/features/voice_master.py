@@ -17,6 +17,16 @@ from utils.ui_defaults import ADMIN_ROLE_KEYS
 
 logger = logging.getLogger(__name__)
 
+# --- 다른 클래스들은 변경사항이 없으므로 생략합니다 ---
+CHANNEL_TYPE_INFO = {
+    "분수대":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "모두의 분수대", "min_limit": 4},
+    "놀이터":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "게임 채널", "min_limit": 3},
+    "벤치":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "새내기의 벤치", "min_limit": 4},
+    "마이룸":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 마이룸"},
+    "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}님의 채널"} # Fallback
+}
+
+
 class VCEditModal(ui.Modal, title="🔊 음성 채널 설정"):
     def __init__(self, name_editable: bool, limit_editable: bool, current_name: str, current_limit: int):
         super().__init__()
@@ -384,6 +394,64 @@ class VoiceMaster(commands.Cog):
             except discord.Forbidden: pass
             if member.voice and member.voice.channel == creator_channel:
                  await member.move_to(None, reason="임시 채널 생성 오류")
+
+    # --- ▼ 핵심 수정 부분: 누락된 메서드 추가 및 버그 수정 ▼ ---
+    async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
+        guild = member.guild
+        channel_type = config.get("type", "normal")
+        type_info = CHANNEL_TYPE_INFO.get(channel_type, CHANNEL_TYPE_INFO["normal"])
+        target_category = creator_channel.category or (guild.get_channel(self.default_category_id) if self.default_category_id else None)
+        user_limit = 4 if channel_type == '벤치' else 0
+        base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
+        
+        if not type_info["name_editable"]:
+            channels_in_category = target_category.voice_channels if target_category else guild.voice_channels
+            prefix_to_check = f"{type_info['emoji']} ⊹ {base_name}"
+            existing_numbers = []
+            for ch in channels_in_category:
+                if ch.name.startswith(prefix_to_check):
+                    suffix = ch.name.replace(prefix_to_check, "").strip()
+                    if suffix.startswith('-') and suffix[1:].isdigit():
+                        existing_numbers.append(int(suffix[1:]))
+            next_number = max(existing_numbers) + 1 if existing_numbers else 1
+            if next_number > 1: base_name = f"{base_name}-{next_number}"
+    
+        vc_name = f"{type_info['emoji']} ⊹ {base_name}"
+        overwrites = self._get_permission_overwrites(guild, member, channel_type)
+        
+        position: Optional[int] = None
+        if target_category:
+            all_channels = target_category.voice_channels
+            
+            last_creator_idx = -1
+            last_bench_idx = -1
+            
+            creator_channel_ids = self.creator_channel_configs.keys()
+            
+            for i, ch in enumerate(all_channels):
+                if ch.id in creator_channel_ids:
+                    last_creator_idx = i
+                elif '🪑' in ch.name:
+                    last_bench_idx = i
+            
+            if channel_type == '벤치':
+                position = max(last_creator_idx, last_bench_idx)
+            
+            elif channel_type == '분수대':
+                benches_count = sum(1 for ch in all_channels if '🪑' in ch.name)
+                fountains_count = sum(1 for ch in all_channels if '⛲' in ch.name)
+                creator_count = sum(1 for ch in all_channels if ch.id in creator_channel_ids)
+                position = creator_count + benches_count + fountains_count
+    
+        return await guild.create_voice_channel(
+            name=vc_name, 
+            category=target_category, 
+            overwrites=overwrites, 
+            user_limit=user_limit, 
+            position=position, 
+            reason=f"{member.display_name}의 요청"
+        )
+    # --- ▲ 핵심 수정 부분 ▲ ---
 
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
         overwrites = {owner: discord.PermissionOverwrite(connect=True)}
