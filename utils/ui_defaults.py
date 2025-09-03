@@ -1302,6 +1302,7 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[알림] 날씨 예보 채널",
         "channel_type": "text"
     },
+    'onboarding_private_age_log_channel_id': {'key': 'onboarding_private_age_log_channel_id', 'friendly_name': '[온보딩] 비공개 나이 기록 채널', 'cog_name': 'Onboarding', 'type': 'channel', 'channel_type': 'text'},
 }
 ADMIN_ROLE_KEYS = [
     "role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief",
