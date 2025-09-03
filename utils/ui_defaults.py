@@ -93,6 +93,20 @@ ONBOARDING_CHOICES = {
         "private": [{"label": "비공개", "value": "비공개"}]
     }
 }
+# [핵심 수정] USABLE_ITEMS에 사용 가능한 모든 액티브 아이템을 정의합니다.
+USABLE_ITEMS = {
+    "role_item_warning_deduct": {
+        "name": "벌점 1회 차감권", 
+        "type": "warning_deduction", 
+        "value": -1, 
+        "description": "누적된 벌점을 1회 차감합니다. (관리 봇이 처리)"
+    },
+    "role_item_event_priority": {
+        "name": "이벤트 우선권",
+        "type": "simple_consume",
+        "description": "이 아이템을 사용하여 역할을 소모합니다."
+    }
+}
 UI_EMBEDS = {
     "onboarding_guide_server": {"title": "① 서버에 오신 것을 환영합니다!", "description": "이곳은 게임을 하거나, 이야기를 나누며 자유롭게 지낼 수 있는 공간입니다.\n모두가 쾌적하게 지낼 수 있도록 몇 가지 안내와 규칙이 있습니다.\n\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.", "color": 0x5865F2, "footer": {"text": "1/7 단계"}},
     "onboarding_guide_bots": {"title": "② 봇 소개", "description": "이 서버에는 생활을 편리하게 해주는 여러 봇이 있습니다.\n\n- **관리 봇**: 역할 부여나 닉네임 변경 등 서버 관리 전반을 담당합니다.\n- **게임 봇**: 낚시, 농장, 카지노 등 미니게임을 즐길 수 있습니다.\n\n각 기능은 해당 채널의 '패널'을 통해 이용할 수 있습니다.", "color": 0x5865F2, "footer": {"text": "2/7 단계"}},
@@ -340,7 +354,18 @@ UI_STRINGS = {
             "field_rank": "등급",
             "default_rank_name": "새내기 주민"
         },
-        "item_tab": {"no_items": "보유 중인 아이템이 없습니다."},
+        "item_tab": {
+            "no_items": "보유 중인 아이템이 없습니다.",
+            # [핵심 추가] 아이템 사용 버튼 텍스트 추가
+            "use_item_button_label": "아이템 사용" 
+        },
+        "gear_select_view": {
+            "embed_title": "{category_name} 변경",
+            "embed_description": "장착할 아이템을 선택하세요.",
+            "placeholder": "{category_name} 선택...",
+            "unequip_prefix": "✋",
+            "back_button": "뒤로"
+        },
         "gear_tab": {"no_owned_gear": "보유 중인 장비가 없습니다."},
         "fish_tab": {
             "no_fish": "어항에 물고기가 없습니다.",
