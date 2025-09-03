@@ -267,9 +267,9 @@ class VoiceMaster(commands.Cog):
         self.creator_channel_configs = {k: v for k, v in self.creator_channel_configs.items() if k is not None}
         self.admin_role_ids = [role_id for key in ADMIN_ROLE_KEYS if (role_id := get_id(key)) is not None]
         self.default_category_id = get_id("temp_vc_category_id")
-        self.master_role_id = get_id("role_master")
-        self.vice_master_role_id = get_id("role_vice_master")
-        self.helper_role_id = get_id("role_helper")
+        self.master_role_id = get_id("role_staff_village_chief")
+        self.vice_master_role_id = get_id("role_staff_deputy_chief")
+        self.helper_role_id = get_id("role_staff_newbie_helper")
         logger.info(f"[VoiceMaster] 생성 채널 설정을 로드했습니다: {self.creator_channel_configs}")
 
     async def sync_channels_from_db(self):
@@ -334,8 +334,8 @@ class VoiceMaster(commands.Cog):
                         if required_role_id not in user_role_ids:
                             try:
                                 role_name_map = get_config("ROLE_KEY_MAP", {})
-                                newbie_role_name = role_name_map.get("role_resident_rookie", "새내기 주민")
-                                helper_role_name = role_name_map.get("role_helper", "도우미")
+                                newbie_role_name = role_name_map.get("role_resident_rookie", "새내기")
+                                helper_role_name = role_name_map.get("role_staff_newbie_helper", "도우미")
                                 await member.send(f"❌ '{after.channel.name}' 채널에 입장하려면 '{newbie_role_name}' 또는 '{helper_role_name}' 역할이 필요합니다.")
                             except discord.Forbidden: pass
                             await member.move_to(None, reason="벤치 채널 입장 조건 미충족")
@@ -395,7 +395,6 @@ class VoiceMaster(commands.Cog):
             if member.voice and member.voice.channel == creator_channel:
                  await member.move_to(None, reason="임시 채널 생성 오류")
 
-    # --- ▼ 핵심 수정 부분: 누락된 메서드 추가 및 버그 수정 ▼ ---
     async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
         guild = member.guild
         channel_type = config.get("type", "normal")
@@ -451,7 +450,6 @@ class VoiceMaster(commands.Cog):
             position=position, 
             reason=f"{member.display_name}의 요청"
         )
-    # --- ▲ 핵심 수정 부분 ▲ ---
 
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
         overwrites = {owner: discord.PermissionOverwrite(connect=True)}
@@ -463,10 +461,8 @@ class VoiceMaster(commands.Cog):
                 overwrites[master_role] = discord.PermissionOverwrite(connect=True)
             if self.vice_master_role_id and (vice_master_role := guild.get_role(self.vice_master_role_id)):
                 overwrites[vice_master_role] = discord.PermissionOverwrite(connect=True)
-        else:
-            overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=True)
         
-        if channel_type == '벤치':
+        elif channel_type == '벤치':
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
             if (role_id := get_id("role_resident_rookie")) and (role := guild.get_role(role_id)):
                  overwrites[role] = discord.PermissionOverwrite(connect=True)
@@ -477,6 +473,8 @@ class VoiceMaster(commands.Cog):
             for admin_role_id in self.admin_role_ids:
                 if admin_role := guild.get_role(admin_role_id):
                     overwrites[admin_role] = discord.PermissionOverwrite(connect=True)
+        else:
+            overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=True)
         return overwrites
 
     async def _send_control_panel(self, vc: discord.VoiceChannel, owner: discord.Member, channel_type: str) -> discord.Message:
