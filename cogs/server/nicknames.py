@@ -32,7 +32,7 @@ class NicknameApprovalView(ui.View):
         self.nicknames_cog = cog_instance
         self.original_name = member.display_name
     
-    # --- ▼ 핵심 수정 부분 1: 권한 확인 로직 변경 ▼ ---
+    # --- ▼ 핵심 수정 부분: 권한 확인 로직 변경 ▼ ---
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         # Cog에서 모든 관련 역할 ID를 가져옵니다.
         approval_role_id = self.nicknames_cog.approval_role_id
@@ -53,7 +53,7 @@ class NicknameApprovalView(ui.View):
             return False
             
         return True
-    # --- ▲ 핵심 수정 부분 1 ▲ ---
+    # --- ▲ 핵심 수정 부분 ▲ ---
 
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
@@ -140,7 +140,6 @@ class NicknameApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
 
-# --- ▼ NicknameChangeModal 클래스 수정 ▼ ---
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     new_name = ui.TextInput(label="새로운 이름", placeholder="이모티콘, 특수문자 사용 불가. 한글 4자/영문 8자까지", required=True, max_length=12)
 
@@ -151,17 +150,14 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     async def on_submit(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True)
         name = self.new_name.value
-        # 한글, 영어, 숫자만 허용
         pattern_str = get_config("NICKNAME_ALLOWED_PATTERN", r"^[a-zA-Z0-9\u3131-\u3163\uac00-\ud7a3]+$")
         max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
 
         if not re.match(pattern_str, name):
             return await i.followup.send("❌ 오류: 이름에 이모티콘이나 특수문자는 사용할 수 없습니다.", ephemeral=True)
         
-        # --- ▼ 핵심 수정 부분 1: 함수 호출 방식 변경 ▼ ---
         if (length := self.nicknames_cog.calculate_weighted_length(name)) > max_length:
             return await i.followup.send(f"❌ 오류: 이름 길이가 규칙을 초과했습니다. (현재: **{length}/{max_length}**)", ephemeral=True)
-        # --- ▲ 핵심 수정 부분 1 ▲ ---
 
         if not self.nicknames_cog.approval_channel_id or not self.nicknames_cog.approval_role_id:
             return await i.followup.send("오류: 닉네임 기능이 올바르게 설정되지 않았습니다.", ephemeral=True)
@@ -178,8 +174,6 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
         message = await i.followup.send("이름 변경 신청서를 제출했습니다.", ephemeral=True, wait=True)
         await asyncio.sleep(5)
         await message.delete()
-# --- ▲ NicknameChangeModal 클래스 수정 ▲ ---
-
 
 class NicknameChangerPanelView(ui.View):
     def __init__(self, cog_instance: 'Nicknames'):
@@ -227,31 +221,27 @@ class NicknameChangerPanelView(ui.View):
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
 
-# --- ▼ Nicknames Cog 클래스 수정 ▼ ---
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.approval_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None
         self.nickname_log_channel_id: Optional[int] = None
-        # --- ▼ 핵심 수정 부분 2: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
+        # --- ▼ 핵심 수정 부분: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
         self.master_role_id: Optional[int] = None
         self.vice_master_role_id: Optional[int] = None
-        # --- ▲ 핵심 수정 부분 2 ▲ ---
+        # --- ▲ 핵심 수정 부분 ▲ ---
         self.view_instance = None
         self.panel_regeneration_lock = asyncio.Lock()
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
 
-    # --- ▼ 핵심 수정 부분 2: 함수를 클래스 내부로 이동 및 @staticmethod 추가 ▼ ---
     @staticmethod
     def calculate_weighted_length(name: str) -> int:
         total_length = 0
-        # 한글 및 한자 포함
         pattern = re.compile(r'[\u3131-\u3163\uac00-\ud7a3\u4e00-\u9faf]')
         for char in name:
             total_length += 2 if pattern.match(char) else 1
         return total_length
-    # --- ▲ 핵심 수정 부분 2 ▲ ---
 
     async def register_persistent_views(self):
         self.view_instance = NicknameChangerPanelView(self)
@@ -265,10 +255,10 @@ class Nicknames(commands.Cog):
         self.approval_channel_id = get_id("nickname_approval_channel_id")
         self.nickname_log_channel_id = get_id("nickname_log_channel_id")
         self.approval_role_id = get_id("role_approval")
-        # --- ▼ 핵심 수정 부분 3: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
-        self.master_role_id = get_id("role_master")
-        self.vice_master_role_id = get_id("role_vice_master")
-        # --- ▲ 핵심 수정 부분 3 ▲ ---
+        # --- ▼ 핵심 수정 부분: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
+        self.master_role_id = get_id("role_staff_village_chief")
+        self.vice_master_role_id = get_id("role_staff_deputy_chief")
+        # --- ▲ 핵심 수정 부분 ▲ ---
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
@@ -367,7 +357,6 @@ class Nicknames(commands.Cog):
             except Exception as e:
                 logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
                 return False
-# --- ▲ Nicknames Cog 클래스 수정 ▲ ---
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Nicknames(bot))
