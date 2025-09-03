@@ -226,7 +226,7 @@ SETUP_COMMAND_MAP = {
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
     "channel_weather": {"type": "channel", "cog_name": "WorldSystem", "key": "weather_channel_id", "friendly_name": "[알림] 날씨 예보 채널", "channel_type": "text"},
 }
-ADMIN_ROLE_KEYS = ["role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief", "role_staff_police", "role_staff_festival", "role_staff_pr", "role_staff_design", "role_staff_secretary", "role_staff_newbie_helper", "role_approval"]
+ADMIN_ROLE_KEYS = ["role_staff_village_chief", "role_staff_deputy_chief"]
 STATIC_AUTO_ROLE_PANELS = {
     "panel_roles": {
         "panel_key": "panel_roles",
@@ -277,7 +277,10 @@ USABLE_ITEMS = { "role_item_warning_deduct": {"name": "경고 1회 차감권", "
 CUSTOM_EMBED_SENDER_ROLES = ["role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief"]
 JOB_SYSTEM_CONFIG = {
     "JOB_ROLE_MAP": {"fisherman": "role_job_fisherman", "farmer": "role_job_farmer", "master_angler": "role_job_master_angler", "master_farmer": "role_job_master_farmer"},
-    "LEVEL_TIER_ROLES": [{"level": 150, "role_key": "role_resident_elder"}, {"level": 100, "role_key": "role_resident_veteran"}, {"level": 50,  "role_key": "role_resident_regular"}, {"level": 1,   "role_key": "role_resident_rookie"}]
+    "LEVEL_TIER_ROLES": [{"level": 150, "role_key": "role_resident_elder"}, 
+                         {"level": 100, "role_key": "role_resident_veteran"}, 
+                         {"level": 50,  "role_key": "role_resident_regular"}, 
+                         {"level": 1,   "role_key": "role_resident_rookie"}]
 }
 AGE_ROLE_MAPPING = [
     {"key": "role_info_age_00s", "range": [2000, 2100], "name": "00년생"},
@@ -303,6 +306,17 @@ ADMIN_ACTION_MAP = {
     "coin_give": "[코인] 유저에게 코인 지급", "coin_take": "[코인] 유저의 코인 차감",
     "xp_give": "[XP] 유저에게 XP 지급", "level_set": "[레벨] 유저 레벨 설정",
 }
+
+PROFILE_RANK_ROLES = [
+    {"role_key": "role_staff_village_chief", "priority": 100},
+    {"role_key": "role_staff_deputy_chief",  "priority": 95},
+    {"role_key": "role_approval",            "priority": 90},
+    {"role_key": "role_premium_booster",     "priority": 80},
+    {"role_key": "role_resident_elder",      "priority": 70}, # Lv.150
+    {"role_key": "role_resident_veteran",    "priority": 60}, # Lv.100
+    {"role_key": "role_resident_regular",    "priority": 50}, # Lv.50
+    {"role_key": "role_resident_rookie",     "priority": 10}  # Lv.1
+]
 
 # [핵심 수정] UI_STRINGS의 profile_view 부분을 전체적으로 한국어로 번역하고 수정합니다.
 UI_STRINGS = {
