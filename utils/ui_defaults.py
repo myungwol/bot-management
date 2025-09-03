@@ -97,14 +97,20 @@ ONBOARDING_CHOICES = {
 USABLE_ITEMS = {
     "role_item_warning_deduct": {
         "name": "벌점 1회 차감권", 
-        "type": "warning_deduction", 
+        "type": "request_to_admin", # 관리 봇에 요청하는 타입
         "value": -1, 
-        "description": "누적된 벌점을 1회 차감합니다. (관리 봇이 처리)"
+        "description": "누적된 벌점을 1회 차감합니다."
     },
     "role_item_event_priority": {
-        "name": "이벤트 우선권",
-        "type": "simple_consume",
-        "description": "이 아이템을 사용하여 역할을 소모합니다."
+        "name": "이벤트 우선 참여권",
+        "type": "consume_with_reason", # 사유를 입력받고 소모하는 타입
+        "description": "이벤트 참가 신청 시 우선권을 행사합니다."
+    },
+    # DB에 '밭 확장 허가증'에 해당하는 역할 키가 'role_item_farm_expansion'이라고 가정
+    "role_item_farm_expansion": { 
+        "name": "밭 확장 허가증",
+        "type": "farm_expansion", # 농장 확장 전용 타입
+        "description": "자신의 농장을 1칸 확장합니다."
     }
 }
 UI_EMBEDS = {
@@ -356,15 +362,26 @@ UI_STRINGS = {
         },
         "item_tab": {
             "no_items": "보유 중인 아이템이 없습니다.",
-            # [핵심 추가] 아이템 사용 버튼 텍스트 추가
             "use_item_button_label": "아이템 사용" 
         },
-        "gear_select_view": {
-            "embed_title": "{category_name} 변경",
-            "embed_description": "장착할 아이템을 선택하세요.",
-            "placeholder": "{category_name} 선택...",
-            "unequip_prefix": "✋",
-            "back_button": "뒤로"
+        # [핵심 추가] 아이템 사용 관련 UI 텍스트 추가
+        "item_usage_view": {
+            "embed_title": "✨ 아이템 사용",
+            "embed_description": "인벤토리에서 사용할 아이템을 선택해주세요.",
+            "select_placeholder": "사용할 아이템을 선택하세요...",
+            "back_button": "뒤로",
+            "no_usable_items": "사용할 수 있는 아이템이 없습니다.",
+            "reason_modal_title": "{item_name} 사용",
+            "reason_modal_label": "사용 사유 (예: 이벤트 이름)",
+            "reason_modal_placeholder": "어떤 이벤트에 사용하시나요?",
+            "request_success": "✅ '{item_name}' 사용을 요청했습니다. 잠시 후 처리됩니다.",
+            "consume_success": "✅ '{item_name}'을(를) 사용했습니다.",
+            "farm_expand_success": "✅ 농장이 1칸 확장되었습니다! (현재 크기: {plot_count}/25)",
+            "farm_expand_fail_max": "❌ 농장이 이미 최대 크기(25칸)입니다.",
+            "farm_expand_fail_no_farm": "❌ 농장을 먼저 만들어주세요.",
+            "error_generic": "❌ 아이템을 사용하는 중 오류가 발생했습니다.",
+            "error_invalid_item": "❌ 잘못된 아이템 정보입니다.",
+            "error_role_not_found": "❌ 아이템에 해당하는 역할을 찾을 수 없습니다."
         },
         "gear_tab": {"no_owned_gear": "보유 중인 장비가 없습니다."},
         "fish_tab": {
