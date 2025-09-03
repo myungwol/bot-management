@@ -1,566 +1,469 @@
-# cogs/games/user_profile.py
-
+# cogs/server/system.py
 import discord
 from discord.ext import commands
-from discord import ui
+from discord import app_commands, ui
 import logging
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone
 import asyncio
-import math
-from typing import Optional, Dict, List, Any
+import time
 
+# [✅✅✅ 핵심 수정 ✅✅✅]
+# 게임 봇 전용 함수(update_wallet)를 import 목록에서 제거합니다.
 from utils.database import (
-    get_inventory, get_wallet, get_aquarium, set_user_gear, get_user_gear,
-    save_panel_id, get_panel_id, get_id, get_embed_from_db,
-    get_item_database, get_config, get_string, BARE_HANDS,
-    supabase, get_farm_data, expand_farm_db, update_inventory, save_config_to_db
+    get_config, save_id_to_db, save_config_to_db, get_id,
+    get_all_stats_channels, add_stats_channel, remove_stats_channel,
+    _channel_id_cache,
+    supabase,
+    get_all_embeds, get_embed_from_db, save_embed_to_db
 )
-from utils.helpers import format_embed_from_db
+from utils.helpers import calculate_xp_for_level
+from utils.ui_defaults import (
+    UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
+    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
+    USABLE_ITEMS, WARNING_THRESHOLDS
+)
 
 logger = logging.getLogger(__name__)
 
-GEAR_CATEGORY = "장비"
-BAIT_CATEGORY = "미끼"
-FARM_TOOL_CATEGORY = "장비"
+async def is_admin(interaction: discord.Interaction) -> bool:
+    if not isinstance(interaction.user, discord.Member): return False
+    admin_role_ids = {get_id(key) for key in ADMIN_ROLE_KEYS if get_id(key)}
+    user_role_ids = {role.id for role in interaction.user.roles}
+    if not user_role_ids.intersection(admin_role_ids):
+        if interaction.user.id == interaction.guild.owner_id: return True
+        raise app_commands.CheckFailure("이 명령어를 실행할 관리자 권한이 없습니다.")
+    return True
 
-class ReasonModal(ui.Modal):
-    def __init__(self, item_name: str):
-        super().__init__(title="이벤트 우선 참여권 사용")
-        self.reason_input = ui.TextInput(
-            label="이벤트 양식",
-            placeholder="이벤트 양식을 적어서 보내주세요.",
-            style=discord.TextStyle.paragraph
-        )
-        self.add_item(self.reason_input)
-        self.reason: Optional[str] = None
+class TemplateEditModal(ui.Modal, title="임베드 템플릿 편집"):
+    title_input = ui.TextInput(label="제목", placeholder="임베드 제목을 입력하세요.", required=False, max_length=256)
+    description_input = ui.TextInput(label="설명", placeholder="임베드 설명을 입력하세요.", style=discord.TextStyle.paragraph, required=False, max_length=4000)
+    color_input = ui.TextInput(label="색상 (16진수 코드)", placeholder="예: #5865F2 (비워두면 기본 색상)", required=False, max_length=7)
+    image_url_input = ui.TextInput(label="이미지 URL", placeholder="임베드에 표시할 이미지 URL을 입력하세요.", required=False)
+    thumbnail_url_input = ui.TextInput(label="썸네일 URL", placeholder="오른쪽 상단에 표시할 썸네일 이미지 URL을 입력하세요.", required=False)
+
+    def __init__(self, existing_embed: discord.Embed):
+        super().__init__()
+        self.embed: Optional[discord.Embed] = None
+        self.title_input.default = existing_embed.title
+        self.description_input.default = existing_embed.description
+        if existing_embed.color: self.color_input.default = str(existing_embed.color)
+        if existing_embed.image and existing_embed.image.url: self.image_url_input.default = existing_embed.image.url
+        if existing_embed.thumbnail and existing_embed.thumbnail.url: self.thumbnail_url_input.default = existing_embed.thumbnail.url
 
     async def on_submit(self, interaction: discord.Interaction):
-        self.reason = self.reason_input.value
-        await interaction.response.defer(ephemeral=True)
-        self.stop()
-
-class ItemUsageView(ui.View):
-    def __init__(self, parent_view: 'ProfileView'):
-        super().__init__(timeout=180)
-        self.parent_view = parent_view
-        self.user = parent_view.user
-        self.message: Optional[discord.WebhookMessage] = None
-    
-    async def get_item_name_by_id_key(self, id_key: str) -> Optional[str]:
+        if not self.title_input.value and not self.description_input.value and not self.image_url_input.value:
+            return await interaction.response.send_message("❌ 제목, 설명, 이미지 URL 중 하나는 반드시 입력해야 합니다.", ephemeral=True)
         try:
-            res = await supabase.table('items').select('name').eq('id_key', id_key).single().execute()
-            return res.data.get('name') if res.data else None
+            color = discord.Color.default()
+            if self.color_input.value: color = discord.Color(int(self.color_input.value.replace("#", ""), 16))
+            embed = discord.Embed(title=self.title_input.value or None, description=self.description_input.value or None, color=color)
+            if self.image_url_input.value: embed.set_image(url=self.image_url_input.value)
+            if self.thumbnail_url_input.value: embed.set_thumbnail(url=self.thumbnail_url_input.value)
+            self.embed = embed
+            await interaction.response.defer(ephemeral=True)
         except Exception:
-            return None
+            await interaction.response.send_message("❌ 임베드를 만드는 중 오류가 발생했습니다.", ephemeral=True)
 
-    async def _update_warning_roles(self, member: discord.Member, total_count: int):
-        guild = member.guild
-        warning_thresholds = get_config("WARNING_THRESHOLDS", [])
-        if not warning_thresholds:
-            logger.error("DB에서 WARNING_THRESHOLDS 설정을 찾을 수 없어 역할 업데이트를 건너뜁니다.")
-            return
-
-        all_warning_role_ids = {get_id(t['role_key']) for t in warning_thresholds if get_id(t['role_key'])}
-        current_warning_roles = [role for role in member.roles if role.id in all_warning_role_ids]
-        
-        target_role_id = None
-        for threshold in sorted(warning_thresholds, key=lambda x: x['count'], reverse=True):
-            if total_count >= threshold['count']:
-                target_role_id = get_id(threshold['role_key'])
-                break
-        
-        target_role = guild.get_role(target_role_id) if target_role_id else None
-
-        try:
-            roles_to_add = [target_role] if target_role and target_role not in current_warning_roles else []
-            roles_to_remove = [role for role in current_warning_roles if not target_role or role.id != target_role.id]
-            
-            if roles_to_add: await member.add_roles(*roles_to_add, reason=f"누적 경고 {total_count}회 달성 (아이템 사용)")
-            if roles_to_remove: await member.remove_roles(*roles_to_remove, reason="경고 역할 업데이트 (아이템 사용)")
-        except discord.Forbidden:
-            logger.error(f"경고 역할 업데이트 실패: {member.display_name}님의 역할을 변경할 권한이 없습니다.")
-        except Exception as e:
-            logger.error(f"경고 역할 업데이트 중 오류: {e}", exc_info=True)
-
-    async def on_item_select(self, interaction: discord.Interaction):
-        selected_item_key = interaction.data["values"][0]
-        
-        usable_items_config = get_config("USABLE_ITEMS", {})
-        item_info = usable_items_config.get(selected_item_key)
-
-        if not item_info:
-            await interaction.response.defer()
-            self.parent_view.status_message = get_string("profile_view.item_usage_view.error_invalid_item")
-            return await self.on_back(interaction, reload_data=True)
-            
-        item_name_from_db = await self.get_item_name_by_id_key(selected_item_key)
-        if not item_name_from_db:
-            await interaction.response.defer()
-            self.parent_view.status_message = "❌ 아이템 정보를 DB에서 찾을 수 없습니다."
-            return await self.on_back(interaction, reload_data=True)
-
-        item_type = item_info.get("type")
-        
-        if item_type == "consume_with_reason":
-            if selected_item_key == "role_item_event_priority":
-                is_active = get_config("event_priority_pass_active", False)
-                if not is_active:
-                    await interaction.response.send_message("❌ 현재 우선 참여권을 사용할 수 있는 이벤트가 없습니다.", ephemeral=True, delete_after=5)
-                    return
-
-                used_users = get_config("event_priority_pass_users", [])
-                if self.user.id in used_users:
-                    await interaction.response.send_message("❌ 이미 이 이벤트에 우선 참여권을 사용했습니다.", ephemeral=True, delete_after=5)
-                    return
-
-            modal = ReasonModal(item_name_from_db)
-            await interaction.response.send_modal(modal)
-            await modal.wait()
-            
-            if not modal.reason: return
-            
-            try:
-                await self.log_item_usage(item_info, modal.reason)
-                await update_inventory(self.user.id, item_name_from_db, -1)
-                
-                if selected_item_key == "role_item_event_priority":
-                    used_users.append(self.user.id)
-                    await save_config_to_db("event_priority_pass_users", used_users)
-
-                self.parent_view.status_message = get_string("profile_view.item_usage_view.consume_success", item_name=item_name_from_db)
-            except Exception as e:
-                logger.error(f"아이템 사용 처리 중 오류 (아이템: {selected_item_key}): {e}", exc_info=True)
-                self.parent_view.status_message = get_string("profile_view.item_usage_view.error_generic")
-
-            return await self.on_back(None, reload_data=True)
-
-        await interaction.response.defer()
-        try:
-            if item_type == "deduct_warning":
-                current_warnings_res = await supabase.rpc('get_total_warnings', {'p_user_id': self.user.id, 'p_guild_id': self.user.guild.id}).execute()
-                current_warnings = current_warnings_res.data
-
-                if current_warnings <= 0:
-                    self.parent_view.status_message = "ℹ️ 차감할 벌점이 없습니다. 아이템을 사용할 수 없습니다."
-                    return await self.on_back(interaction, reload_data=False)
-
-                rpc_params = {'p_guild_id': self.user.guild.id, 'p_user_id': self.user.id, 'p_moderator_id': self.user.id, 'p_reason': f"'{item_name_from_db}' 아이템 사용", 'p_amount': -1}
-                response = await supabase.rpc('add_warning_and_get_total', rpc_params).execute()
-                new_total = response.data
-
-                await update_inventory(self.user.id, item_name_from_db, -1)
-                await self.log_item_usage(item_info, f"'{item_name_from_db}'을(를) 사용하여 벌점을 1회 차감했습니다. (현재 벌점: {new_total}회)")
-                await self._update_warning_roles(self.user, new_total)
-                self.parent_view.status_message = f"✅ '{item_name_from_db}'을(를) 사용했습니다. (현재 벌점: {new_total}회)"
-            
-            elif item_type == "farm_expansion":
-                farm_data = await get_farm_data(self.user.id)
-                if not farm_data:
-                    self.parent_view.status_message = get_string("profile_view.item_usage_view.farm_expand_fail_no_farm")
-                else:
-                    current_plots = len(farm_data.get('farm_plots', []))
-                    if current_plots >= 25:
-                        self.parent_view.status_message = get_string("profile_view.item_usage_view.farm_expand_fail_max")
-                    else:
-                        success = await expand_farm_db(farm_data['id'], current_plots)
-                        if success:
-                            await update_inventory(self.user.id, item_name_from_db, -1)
-                            self.parent_view.status_message = get_string("profile_view.item_usage_view.farm_expand_success", plot_count=current_plots + 1)
-                        else:
-                            raise Exception("DB 농장 확장 실패")
-        except Exception as e:
-            logger.error(f"아이템 사용 처리 중 오류 (아이템: {selected_item_key}): {e}", exc_info=True)
-            self.parent_view.status_message = get_string("profile_view.item_usage_view.error_generic")
-
-        await self.on_back(interaction, reload_data=True)
-
-    async def log_item_usage(self, item_info: dict, reason: str):
-        if not (log_channel_key := item_info.get("log_channel_key")): return
-
-        log_channel_id = get_id(log_channel_key)
-        if not log_channel_id or not (log_channel := self.user.guild.get_channel(log_channel_id)):
-            logger.warning(f"'{log_channel_key}'에 해당하는 로그 채널을 찾을 수 없습니다.")
-            return
-
-        log_embed_key = item_info.get("log_embed_key", "log_item_use")
-        embed_data = await get_embed_from_db(log_embed_key)
-        if not embed_data:
-            logger.warning(f"DB에서 '{log_embed_key}' 임베드를 찾을 수 없습니다.")
-            return
-        
-        embed = format_embed_from_db(embed_data)
-        item_display_name = item_info.get('name', '알 수 없는 아이템')
-        
-        if item_info.get("type") == "consume_with_reason":
-            embed.title = f"{self.user.display_name}님이 {item_display_name}을(를) 사용했습니다."
-            embed.add_field(name="이벤트 양식", value=reason, inline=False)
-        else:
-            embed.description=f"{self.user.mention}님이 **'{item_display_name}'**을(를) 사용했습니다."
-            embed.add_field(name="처리 내용", value=reason, inline=False)
-            
-        embed.set_author(name=self.user.display_name, icon_url=self.user.display_avatar.url if self.user.display_avatar else None)
-        await log_channel.send(embed=embed)
-
-    async def on_back(self, interaction: Optional[discord.Interaction], reload_data: bool = False):
-        await self.parent_view.update_display(interaction, reload_data=reload_data)
-
-
-class ProfileView(ui.View):
-    def __init__(self, user: discord.Member, cog_instance: 'UserProfile'):
+class EmbedTemplateSelectView(ui.View):
+    def __init__(self, all_embeds: List[Dict[str, Any]]):
         super().__init__(timeout=300)
-        self.user: discord.Member = user
-        self.cog = cog_instance
-        self.message: Optional[discord.WebhookMessage] = None
-        self.currency_icon = get_config("GAME_CONFIG", {}).get("CURRENCY_ICON", "🪙")
-        self.current_page = "info"
-        self.fish_page_index = 0
-        self.cached_data = {}
-        self.status_message: Optional[str] = None
-
-    async def build_and_send(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.load_data(self.user)
-        embed = await self.build_embed()
-        self.build_components()
-        self.message = await interaction.followup.send(embed=embed, view=self, ephemeral=True)
-
-    async def update_display(self, interaction: Optional[discord.Interaction], reload_data: bool = False):
-        if interaction and not interaction.response.is_done():
-            await interaction.response.defer()
-
-        if reload_data:
-            await self.load_data(self.user)
-            
-        embed = await self.build_embed()
-        self.build_components()
-
-        target_message_editor = None
-        if interaction:
-            target_message_editor = interaction.edit_original_response
-        elif self.message:
-            target_message_editor = self.message.edit
-
-        if target_message_editor:
-            try:
-                await target_message_editor(embed=embed, view=self)
-            except discord.NotFound:
-                logger.warning("프로필 메시지를 수정하려 했으나 찾을 수 없습니다.")
-        
-        self.status_message = None
-        
-    async def load_data(self, user: discord.Member):
-        wallet_data, inventory, aquarium, gear = await asyncio.gather(
-            get_wallet(user.id),
-            get_inventory(user),
-            get_aquarium(str(user.id)),
-            get_user_gear(user)
-        )
-        self.cached_data = {"wallet": wallet_data, "inventory": inventory, "aquarium": aquarium, "gear": gear}
-
-    def _get_current_tab_config(self) -> Dict:
-        tabs_config = get_string("profile_view.tabs", [])
-        return next((tab for tab in tabs_config if tab.get("key") == self.current_page), {})
-
-    async def build_embed(self) -> discord.Embed:
-        inventory = self.cached_data.get("inventory", {})
-        gear = self.cached_data.get("gear", {})
-        balance = self.cached_data.get("wallet", {}).get('balance', 0)
-        item_db = get_item_database()
-        
-        base_title = get_string("profile_view.base_title", "{user_name}의 소지품", user_name=self.user.display_name)
-        
-        current_tab_config = self._get_current_tab_config()
-        title_suffix = current_tab_config.get("title_suffix", "")
-
-        embed = discord.Embed(title=f"{base_title}{title_suffix}", color=self.user.color or discord.Color.blue())
-        if self.user.display_avatar:
-            embed.set_thumbnail(url=self.user.display_avatar.url)
-        description = ""
-        if self.status_message:
-            description += f"**{self.status_message}**\n\n"
-        
-        if self.current_page == "info":
-            embed.add_field(name=get_string("profile_view.info_tab.field_balance", "소지금"), value=f"`{balance:,}`{self.currency_icon}", inline=True)
-            
-            job_mention = "`없음`"
-            job_system_config = get_config("JOB_SYSTEM_CONFIG", {})
-            job_role_map = job_system_config.get("JOB_ROLE_MAP", {})
-            try:
-                job_res = await supabase.table('user_jobs').select('jobs(job_key, job_name)').eq('user_id', self.user.id).maybe_single().execute()
-                if job_res and job_res.data and job_res.data.get('jobs'):
-                    job_info = job_res.data['jobs']
-                    job_key = job_info['job_key']
-                    job_name = job_info['job_name']
-                    
-                    if (role_key := job_role_map.get(job_key)) and (role_id := get_id(role_key)):
-                        job_mention = f"<@&{role_id}>"
-                    else:
-                        job_mention = f"`{job_name}`"
-            except Exception as e:
-                logger.error(f"직업 정보 조회 중 오류 발생 (유저: {self.user.id}): {e}")
-            embed.add_field(name="직업", value=job_mention, inline=True)
-
-            user_rank_mention = get_string("profile_view.info_tab.default_rank_name", "새내기 주민")
-            rank_roles_config = get_config("PROFILE_RANK_ROLES", []) 
-            
-            if rank_roles_config:
-                user_role_ids = {role.id for role in self.user.roles}
-                for rank_info in rank_roles_config:
-                    if (role_key := rank_info.get("role_key")) and (rank_role_id := get_id(role_key)) and rank_role_id in user_role_ids:
-                        user_rank_mention = f"<@&{rank_role_id}>"
-                        break
-            
-            embed.add_field(name=get_string("profile_view.info_tab.field_rank", "등급"), value=user_rank_mention, inline=True)
-            description += get_string("profile_view.info_tab.description", "아래 탭을 선택하여 상세 정보를 확인하세요.")
-            embed.description = description
-        
-        elif self.current_page == "item":
-            excluded_categories = [GEAR_CATEGORY, FARM_TOOL_CATEGORY, "농장_씨앗", "농장_작물", BAIT_CATEGORY]
-            general_items = {name: count for name, count in inventory.items() if item_db.get(name, {}).get('category') not in excluded_categories}
-            item_list = [f"{item_db.get(n,{}).get('emoji','📦')} **{n}**: `{c}`개" for n, c in general_items.items()]
-            embed.description = description + ("\n".join(item_list) or get_string("profile_view.item_tab.no_items", "보유 중인 아이템이 없습니다."))
-        
-        elif self.current_page == "gear":
-            gear_categories = {"낚시": {"rod": "🎣 낚싯대", "bait": "🐛 미끼"}, "농장": {"hoe": "🪓 괭이", "watering_can": "💧 물뿌리개"}}
-            for category_name, items in gear_categories.items():
-                field_lines = [f"**{label}:** `{gear.get(key, BARE_HANDS)}`" for key, label in items.items()]
-                embed.add_field(name=f"**[ 현재 장비: {category_name} ]**", value="\n".join(field_lines), inline=False)
-            
-            owned_gear_categories = [GEAR_CATEGORY, BAIT_CATEGORY]
-            owned_gear_items = {name: count for name, count in inventory.items() if item_db.get(name, {}).get('category') in owned_gear_categories}
-
-            if owned_gear_items:
-                gear_list = [f"{item_db.get(n,{}).get('emoji','🔧')} **{n}**: `{c}`개" for n, c in sorted(owned_gear_items.items())]
-                embed.add_field(name="\n**[ 보유 중인 장비 ]**", value="\n".join(gear_list), inline=False)
-            else:
-                embed.add_field(name="\n**[ 보유 중인 장비 ]**", value=get_string("profile_view.gear_tab.no_owned_gear", "보유 중인 장비가 없습니다."), inline=False)
-            embed.description = description
-        
-        elif self.current_page == "fish":
-            aquarium = self.cached_data.get("aquarium", [])
-            if not aquarium:
-                embed.description = description + get_string("profile_view.fish_tab.no_fish", "어항에 물고기가 없습니다.")
-            else:
-                total_pages = math.ceil(len(aquarium) / 10)
-                self.fish_page_index = max(0, min(self.fish_page_index, total_pages - 1))
-                fish_on_page = aquarium[self.fish_page_index * 10 : self.fish_page_index * 10 + 10]
-                embed.description = description + "\n".join([f"{f['emoji']} **{f['name']}**: `{f['size']}`cm" for f in fish_on_page])
-                embed.set_footer(text=get_string("profile_view.fish_tab.pagination_footer", "페이지 {current_page} / {total_pages}", current_page=self.fish_page_index + 1, total_pages=total_pages))
-        
-        elif self.current_page == "seed":
-            seed_items = {name: count for name, count in inventory.items() if item_db.get(name, {}).get('category') == "농장_씨앗"}
-            item_list = [f"{item_db.get(n,{}).get('emoji','🌱')} **{n}**: `{c}`개" for n, c in seed_items.items()]
-            embed.description = description + ("\n".join(item_list) or get_string("profile_view.seed_tab.no_items", "보유 중인 씨앗이 없습니다."))
-        
-        elif self.current_page == "crop":
-            crop_items = {name: count for name, count in inventory.items() if item_db.get(name, {}).get('category') == "농장_작물"}
-            item_list = [f"{item_db.get(n,{}).get('emoji','🌾')} **{n}**: `{c}`개" for n, c in crop_items.items()]
-            embed.description = description + ("\n".join(item_list) or get_string("profile_view.crop_tab.no_items", "보유 중인 작물이 없습니다."))
-        
-        else:
-            embed.description = description + get_string("profile_view.wip_tab.description", "이 기능은 현재 준비 중입니다.")
-        return embed
-
-    def build_components(self):
-        self.clear_items()
-        tabs_config = get_string("profile_view.tabs", [])
-        
-        row_counter, tab_buttons_in_row = 0, 0
-        for config in tabs_config:
-            if not (key := config.get("key")): continue
-            if tab_buttons_in_row >= 5:
-                row_counter += 1; tab_buttons_in_row = 0
-            style = discord.ButtonStyle.primary if self.current_page == key else discord.ButtonStyle.secondary
-            self.add_item(ui.Button(label=config.get("label"), style=style, custom_id=f"profile_tab_{key}", emoji=config.get("emoji"), row=row_counter))
-            tab_buttons_in_row += 1
-        
-        row_counter += 1
-        if self.current_page == "item":
-            use_item_label = get_string("profile_view.item_tab.use_item_button_label", "아이템 사용")
-            self.add_item(ui.Button(label=use_item_label, style=discord.ButtonStyle.success, emoji="✨", custom_id="profile_use_item", row=row_counter))
-
-        if self.current_page == "gear":
-            self.add_item(ui.Button(label="낚싯대 변경", style=discord.ButtonStyle.blurple, custom_id="profile_change_rod", emoji="🎣", row=row_counter))
-            self.add_item(ui.Button(label="미끼 변경", style=discord.ButtonStyle.blurple, custom_id="profile_change_bait", emoji="🐛", row=row_counter))
-            row_counter += 1
-            self.add_item(ui.Button(label="괭이 변경", style=discord.ButtonStyle.success, custom_id="profile_change_hoe", emoji="🪓", row=row_counter))
-            self.add_item(ui.Button(label="물뿌리개 변경", style=discord.ButtonStyle.success, custom_id="profile_change_watering_can", emoji="💧", row=row_counter))
-        
-        row_counter += 1
-        if self.current_page == "fish" and self.cached_data.get("aquarium"):
-            total_pages = math.ceil(len(self.cached_data["aquarium"]) / 10)
-            if total_pages > 1:
-                prev_label = get_string("profile_view.pagination_buttons.prev", "◀")
-                next_label = get_string("profile_view.pagination_buttons.next", "▶")
-                self.add_item(ui.Button(label=prev_label, custom_id="profile_fish_prev", disabled=self.fish_page_index == 0, row=row_counter))
-                self.add_item(ui.Button(label=next_label, custom_id="profile_fish_next", disabled=self.fish_page_index >= total_pages - 1, row=row_counter))
-        
-        for child in self.children:
-            if isinstance(child, ui.Button):
-                child.callback = self.button_callback
-                
-    async def button_callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.user.id:
-            return await interaction.response.send_message("자신 전용 메뉴를 조작해주세요.", ephemeral=True, delete_after=5)
-        
-        custom_id = interaction.data['custom_id']
-        if custom_id.startswith("profile_tab_"):
-            self.current_page = custom_id.split("_")[-1]
-            if self.current_page == 'fish': self.fish_page_index = 0
-            await self.update_display(interaction) 
-            
-        elif custom_id == "profile_use_item":
-            usage_view = ItemUsageView(self)
-            
-            usable_items_config = get_config("USABLE_ITEMS", {})
-            user_inventory = await get_inventory(self.user)
-            item_db = get_item_database()
-            
-            owned_usable_items = []
-            for item_name, quantity in user_inventory.items():
-                if quantity <= 0: continue
-                
-                item_data_from_db = item_db.get(item_name)
-                if not item_data_from_db: continue
-                
-                item_id_key = item_data_from_db.get('id_key')
-                if item_id_key and item_id_key in usable_items_config:
-                    item_info_from_config = usable_items_config[item_id_key]
-                    owned_usable_items.append({
-                        "key": item_id_key,
-                        "name": item_info_from_config.get('name', item_name),
-                        "description": item_info_from_config.get('description', '설명 없음')
-                    })
-
-            if not owned_usable_items:
-                await interaction.response.send_message(get_string("profile_view.item_usage_view.no_usable_items"), ephemeral=True, delete_after=5)
-                return
-
-            options = [discord.SelectOption(label=item["name"], value=item["key"], description=item["description"]) for item in owned_usable_items]
-            select = ui.Select(placeholder=get_string("profile_view.item_usage_view.select_placeholder"), options=options)
-            select.callback = usage_view.on_item_select
-            usage_view.add_item(select)
-
-            back_button = ui.Button(label=get_string("profile_view.item_usage_view.back_button"), style=discord.ButtonStyle.grey)
-            back_button.callback = usage_view.on_back
-            usage_view.add_item(back_button)
-
-            embed = discord.Embed(title=get_string("profile_view.item_usage_view.embed_title"), description=get_string("profile_view.item_usage_view.embed_description"), color=discord.Color.gold())
-            
-            await interaction.response.edit_message(embed=embed, view=usage_view)
-
-        elif custom_id.startswith("profile_change_"):
-            gear_key = custom_id.replace("profile_change_", "", 1)
-            await GearSelectView(self, gear_key).setup_and_update(interaction)
-        elif custom_id.startswith("profile_fish_"):
-            if custom_id.endswith("prev"): self.fish_page_index -= 1
-            else: self.fish_page_index += 1
-            await self.update_display(interaction)
-            
-class GearSelectView(ui.View):
-    def __init__(self, parent_view: ProfileView, gear_key: str):
-        super().__init__(timeout=180)
-        self.parent_view = parent_view
-        self.user = parent_view.user
-        self.gear_key = gear_key 
-        
-        GEAR_SETTINGS = {
-            "rod":          {"display_name": "낚싯대", "gear_type_db": "낚싯대", "unequip_label": "낚싯대 해제", "default_item": BARE_HANDS},
-            "bait":         {"display_name": "낚시 미끼", "gear_type_db": "미끼", "unequip_label": "미끼 해제", "default_item": "미끼 없음"},
-            "hoe":          {"display_name": "괭이", "gear_type_db": "괭이", "unequip_label": "괭이 해제", "default_item": BARE_HANDS},
-            "watering_can": {"display_name": "물뿌리개", "gear_type_db": "물뿌리개", "unequip_label": "물뿌리개 해제", "default_item": BARE_HANDS}
-        }
-        
-        settings = GEAR_SETTINGS.get(self.gear_key)
-        if settings:
-            self.display_name = settings["display_name"]
-            self.gear_type_db = settings["gear_type_db"]
-            self.unequip_label = settings["unequip_label"]
-            self.default_item = settings["default_item"]
-        else:
-            self.display_name, self.gear_type_db, self.unequip_label, self.default_item = ("알 수 없음", "", "해제", "없음")
-
-    async def setup_and_update(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        inventory, item_db = self.parent_view.cached_data.get("inventory", {}), get_item_database()
-        
-        options = [discord.SelectOption(label=f'{get_string("profile_view.gear_select_view.unequip_prefix", "✋")} {self.unequip_label}', value="unequip")]
-        
-        for name, count in inventory.items():
-            item_data = item_db.get(name)
-            if item_data and item_data.get('gear_type') == self.gear_type_db:
-                 options.append(discord.SelectOption(label=f"{name} ({count}개)", value=name, emoji=item_data.get('emoji')))
-
-        select = ui.Select(placeholder=get_string("profile_view.gear_select_view.placeholder", "{category_name} 선택...", category_name=self.display_name), options=options)
-        select.callback = self.select_callback
-        self.add_item(select)
-
-        back_button = ui.Button(label=get_string("profile_view.gear_select_view.back_button", "뒤로"), style=discord.ButtonStyle.grey, row=1)
-        back_button.callback = self.back_callback
-        self.add_item(back_button)
-
-        embed = discord.Embed(
-            title=get_string("profile_view.gear_select_view.embed_title", "{category_name} 변경", category_name=self.display_name), 
-            description=get_string("profile_view.gear_select_view.embed_description", "장착할 아이템을 선택하세요."), 
-            color=self.user.color
-        )
-        await interaction.edit_original_response(embed=embed, view=self)
+        self.all_embeds = {e['embed_key']: e['embed_data'] for e in all_embeds}
+        options = [discord.SelectOption(label=key, description=data.get('title', '제목 없음')[:100]) for key, data in self.all_embeds.items()]
+        for i in range(0, len(options), 25):
+            select = ui.Select(placeholder=f"편집할 임베드 템플릿을 선택하세요... ({i//25 + 1})", options=options[i:i+25])
+            select.callback = self.select_callback
+            self.add_item(select)
 
     async def select_callback(self, interaction: discord.Interaction):
-        selected_option = interaction.data['values'][0]
-        if selected_option == "unequip":
-            selected_item_name = self.default_item
-            self.parent_view.status_message = f"✅ {self.display_name}을(를) 해제했습니다."
-        else:
-            selected_item_name = selected_option
-            self.parent_view.status_message = f"✅ 장비를 **{selected_item_name}**(으)로 변경했습니다."
-        await set_user_gear(self.user.id, **{self.gear_key: selected_item_name})
-        await self.go_back_to_profile(interaction, reload_data=True)
+        embed_key = interaction.data['values'][0]
+        embed_data = self.all_embeds.get(embed_key)
+        if not embed_data: return await interaction.response.send_message("❌ 템플릿을 찾을 수 없습니다.", ephemeral=True)
+        modal = TemplateEditModal(discord.Embed.from_dict(embed_data))
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        if modal.embed:
+            await save_embed_to_db(embed_key, modal.embed.to_dict())
+            for item in self.children: item.disabled = True
+            await interaction.edit_original_response(view=self)
+            await interaction.followup.send(f"✅ 임베드 템플릿 `{embed_key}`가 성공적으로 업데이트되었습니다.\n`/admin setup`으로 관련 패널을 재설치하면 변경사항이 적용됩니다.", embed=modal.embed, ephemeral=True)
 
-    async def back_callback(self, interaction: discord.Interaction):
-        await self.go_back_to_profile(interaction)
+class ServerSystem(commands.Cog):
+    admin_group = app_commands.Group(name="admin", description="서버 관리용 명령어입니다.", default_permissions=discord.Permissions(manage_guild=True))
 
-    async def go_back_to_profile(self, interaction: discord.Interaction, reload_data: bool = False):
-        self.parent_view.current_page = "gear"
-        await self.parent_view.update_display(interaction, reload_data=reload_data)
-
-class UserProfilePanelView(ui.View):
-    def __init__(self, cog_instance: 'UserProfile'):
-        super().__init__(timeout=None)
-        self.cog = cog_instance
-        profile_button = ui.Button(label="소지품 보기", style=discord.ButtonStyle.primary, emoji="📦", custom_id="user_profile_open_button")
-        profile_button.callback = self.open_profile
-        self.add_item(profile_button)
-
-    async def open_profile(self, interaction: discord.Interaction):
-        view = ProfileView(interaction.user, self.cog)
-        await view.build_and_send(interaction)
-
-class UserProfile(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
 
-    async def register_persistent_views(self):
-        self.bot.add_view(UserProfilePanelView(self))
+    async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.CheckFailure): await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+        elif isinstance(error, app_commands.MissingPermissions): await interaction.response.send_message(f"❌ 이 명령어를 사용하려면 다음 권한이 필요합니다: `{', '.join(error.missing_permissions)}`", ephemeral=True)
+        else:
+            logger.error(f"'{interaction.command.qualified_name}' 명령어 처리 중 오류 발생: {error}", exc_info=True)
+            if not interaction.response.is_done(): await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            else: await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
 
-    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_profile"):
-        panel_name = panel_key.replace("panel_", "")
-        if (panel_info := get_panel_id(panel_name)):
-            if (old_channel_id := panel_info.get("channel_id")) and (old_channel := self.bot.get_channel(old_channel_id)):
-                try:
-                    old_message = await old_channel.fetch_message(panel_info["message_id"])
-                    await old_message.delete()
-                except (discord.NotFound, discord.Forbidden): pass
-        
-        if not (embed_data := await get_embed_from_db(panel_key)): 
-            logger.warning(f"DB에서 '{panel_key}' 임베드 데이터를 찾지 못해 패널 생성을 건너뜁니다.")
+    @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
+    @app_commands.rename(amount='개수', user='유저')
+    @app_commands.describe(
+        amount="삭제할 메시지의 개수를 입력하세요. (최대 100개)",
+        user="특정 유저의 메시지만 삭제하려면 선택하세요."
+    )
+    @app_commands.check(is_admin)
+    async def purge(self, interaction: discord.Interaction, amount: app_commands.Range[int, 1, 100], user: Optional[discord.Member] = None):
+        await interaction.response.defer(ephemeral=True)
+        channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.followup.send("❌ 이 명령어는 일반 텍스트 채널에서만 사용할 수 있습니다.", ephemeral=True)
             return
+
+        try:
+            check_func = lambda m: m.author == user if user else lambda m: True
+            deleted_messages = await channel.purge(limit=amount, check=check_func)
+
+            if user:
+                response_message = f"✅ {user.mention}님의 메시지 {len(deleted_messages)}개를 삭제했습니다."
+            else:
+                response_message = f"✅ 메시지 {len(deleted_messages)}개를 삭제했습니다."
             
-        embed = discord.Embed.from_dict(embed_data)
-        view = UserProfilePanelView(self)
+            if len(deleted_messages) < amount:
+                response_message += "\nℹ️ 14일이 지난 메시지는 삭제할 수 없습니다."
+
+            await interaction.followup.send(response_message, ephemeral=True)
+
+        except discord.Forbidden:
+            await interaction.followup.send("❌ 봇에게 '메시지 관리' 권한이 없습니다. 서버 설정에서 권한을 확인해주세요.", ephemeral=True)
+        except Exception as e:
+            logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
+            await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
+
+    async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        choices = []
+        for key, name in ADMIN_ACTION_MAP.items():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
         
-        new_message = await channel.send(embed=embed, view=view)
-        await save_panel_id(panel_name, new_message.id, channel.id)
-        logger.info(f"✅ {panel_key} 패널을 성공적으로 생성했습니다. (채널: #{channel.name})")
+        for key, info in SETUP_COMMAND_MAP.items():
+            prefix = "[패널]" if info.get("type") == "panel" else "[채널]"
+            choice_name = f"{prefix} {info.get('friendly_name', key)} 설정"
+            if current.lower() in choice_name.lower():
+                choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
+        
+        role_setup_actions = {"role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정"}
+        for key, name in role_setup_actions.items():
+            if current.lower() in name.lower():
+                choices.append(app_commands.Choice(name=name, value=key))
+        
+        return sorted(choices, key=lambda c: c.name)[:25]
+
+    @admin_group.command(name="setup", description="봇의 모든 설정을 관리합니다.")
+    @app_commands.describe(action="실행할 작업을 선택하세요.", channel="[채널/통계] 작업에 필요한 채널을 선택하세요.", role="[역할/통계] 작업에 필요한 역할을 선택하세요.", user="[코인/XP/레벨] 대상을 지정하세요.", amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.", level="[레벨] 설정할 레벨을 입력하세요.", stat_type="[통계] 표시할 통계 유형을 선택하세요.", template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)")
+    @app_commands.autocomplete(action=setup_action_autocomplete)
+    @app_commands.choices(stat_type=[app_commands.Choice(name="[설정] 전체 멤버 수 (봇 포함)", value="total"), app_commands.Choice(name="[설정] 유저 수 (봇 제외)", value="humans"), app_commands.Choice(name="[설정] 봇 수", value="bots"), app_commands.Choice(name="[설정] 서버 부스트 수", value="boosters"), app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"), app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove")])
+    @app_commands.check(is_admin)
+    async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
+        await interaction.response.defer(ephemeral=True)
+
+        if action == "strings_sync":
+            try:
+                await save_config_to_db("strings", UI_STRINGS)
+                await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
+                await save_config_to_db("PROFILE_RANK_ROLES", PROFILE_RANK_ROLES)
+                await save_config_to_db("USABLE_ITEMS", USABLE_ITEMS)
+                await save_config_to_db("WARNING_THRESHOLDS", WARNING_THRESHOLDS)
+                await save_config_to_db("config_reload_request", time.time())
+                logger.info("UI 텍스트 및 게임 관련 주요 설정이 데이터베이스에 성공적으로 동기화되었습니다.")
+                await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다.\n"
+                                                "**게임 봇을 재시작**하면 모든 설정이 정상적으로 적용됩니다.")
+            except Exception as e:
+                logger.error(f"UI 동기화 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
+            return
+
+        elif action == 'eventpass_enable':
+            await save_config_to_db('event_priority_pass_active', True)
+            await save_config_to_db('event_priority_pass_users', [])
+            await save_config_to_db("config_reload_request", time.time())
+            await interaction.followup.send("✅ **이벤트 우선 참여권** 사용을 **활성화**했습니다.\n이제 유저들이 아이템을 사용할 수 있습니다.")
+            return
+        
+        elif action == 'eventpass_disable':
+            await save_config_to_db('event_priority_pass_active', False)
+            await save_config_to_db("config_reload_request", time.time())
+            await interaction.followup.send("✅ **이벤트 우선 참여권** 사용을 **비활성화**했습니다.")
+            return
+
+        if action.startswith("channel_setup:"):
+            setting_key = action.split(":", 1)[1]
+            config = SETUP_COMMAND_MAP.get(setting_key)
+            if not config:
+                return await interaction.followup.send(f"❌ 유효하지 않은 설정 키입니다: {setting_key}", ephemeral=True)
+            
+            required_channel_type = config.get("channel_type", "text")
+            error_msg = None
+            if not channel:
+                error_msg = f"❌ 이 작업을 실행하려면 `channel` 옵션에 **{required_channel_type} 채널**을 지정해야 합니다."
+            elif (required_channel_type == "text" and not isinstance(channel, discord.TextChannel)) or \
+                 (required_channel_type == "voice" and not isinstance(channel, discord.VoiceChannel)) or \
+                 (required_channel_type == "forum" and not isinstance(channel, discord.ForumChannel)):
+                error_msg = f"❌ 이 작업에는 **{required_channel_type} 채널**이 필요합니다. 올바른 타입의 채널을 선택해주세요."
+            
+            if error_msg:
+                return await interaction.followup.send(error_msg, ephemeral=True)
+
+            db_key, friendly_name = config['key'], config['friendly_name']
+            
+            save_success = await save_id_to_db(db_key, channel.id)
+            if not save_success:
+                return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다.", ephemeral=True)
+
+            if (cog_to_reload := self.bot.get_cog(config["cog_name"])) and hasattr(cog_to_reload, 'load_configs'):
+                await cog_to_reload.load_configs()
+            
+            await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
+            return
+        
+        if action == "game_data_reload":
+            try:
+                await save_config_to_db("game_data_reload_request", time.time())
+                logger.info("게임 데이터 새로고침 요청을 DB에 저장했습니다.")
+                await interaction.followup.send("✅ 게임 봇에게 게임 데이터(아이템, 낚시 확률 등)를 새로고침하도록 요청했습니다.\n"
+                                                "약 10초 내에 변경사항이 적용됩니다.")
+            except Exception as e:
+                logger.error(f"게임 데이터 새로고침 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 게임 데이터 새로고침 요청 중 오류가 발생했습니다.")
+            return
+
+        if action == "status_show":
+            embed = discord.Embed(title="⚙️ 서버 설정 현황 대시보드", color=0x3498DB)
+            embed.set_footer(text=f"최종 확인: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
+            channel_lines = []
+            for key, info in sorted(SETUP_COMMAND_MAP.items(), key=lambda item: item[1]['friendly_name']):
+                channel_id = _channel_id_cache.get(info['key'])
+                status_emoji = "✅" if channel_id else "❌"
+                channel_mention = f"<#{channel_id}>" if channel_id else "미설정"
+                channel_lines.append(f"{status_emoji} **{info['friendly_name']}**: {channel_mention}")
+            full_channel_text = "\n".join(channel_lines)
+            for i in range(0, len(full_channel_text), 1024):
+                chunk = full_channel_text[i:i+1024]
+                field_name = "채널 설정" if i == 0 else "채널 설정 (계속)"
+                embed.add_field(name=f"**{field_name}**", value=chunk, inline=False)
+            role_lines = []
+            for key, info in sorted(UI_ROLE_KEY_MAP.items(), key=lambda item: item[1]['priority'], reverse=True):
+                if info.get('priority', 0) > 0:
+                    role_id = _channel_id_cache.get(key)
+                    status_emoji = "✅" if role_id else "❌"
+                    role_mention = f"<@&{role_id}>" if role_id else f"`{info['name']}` (미설정)"
+                    role_lines.append(f"{status_emoji} **{info['name']}**: {role_mention if role_id else '미설정'}")
+            if role_lines: embed.add_field(name="**주요 역할 설정**", value="\n".join(role_lines)[:1024], inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        elif action == "server_id_set":
+            server_id = interaction.guild.id
+            try:
+                await save_config_to_db("SERVER_ID", str(server_id))
+                logger.info(f"서버 ID가 {server_id}(으)로 성공적으로 설정되었습니다. (요청자: {interaction.user.name})")
+                await interaction.followup.send(f"✅ 이 서버의 ID (`{server_id}`)를 봇의 핵심 설정으로 저장했습니다.\n이제 게임 봇이 관리자 명령어를 올바르게 처리할 수 있습니다.")
+            except Exception as e:
+                logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
+                await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
+        
+        # [✅✅✅ 핵심 수정 ✅✅✅]
+        # 코인/XP/레벨 관련 명령어는 직접 DB를 수정하는 대신, 게임 봇에게 요청을 보냅니다.
+        elif action in ["coin_give", "coin_take", "xp_give", "level_set"]:
+            if not user: return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션이 필요합니다.", ephemeral=True)
+            if action == "coin_give":
+                if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
+                await save_config_to_db(f"coin_admin_update_request_{user.id}", {"amount": amount, "timestamp": time.time()})
+                await interaction.followup.send(f"✅ {user.mention}님에게 코인 `{amount}`를 지급하도록 게임 봇에게 요청했습니다.")
+            elif action == "coin_take":
+                if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
+                await save_config_to_db(f"coin_admin_update_request_{user.id}", {"amount": -amount, "timestamp": time.time()})
+                await interaction.followup.send(f"✅ {user.mention}님의 코인 `{amount}`를 차감하도록 게임 봇에게 요청했습니다.")
+            elif action == "xp_give":
+                if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
+                await save_config_to_db(f"xp_admin_update_request_{user.id}", {"xp_to_add": amount, "timestamp": time.time()})
+                await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여하도록 게임 봇에게 요청했습니다.")
+            elif action == "level_set":
+                if not level: return await interaction.followup.send("❌ `level` 옵션이 필요합니다.", ephemeral=True)
+                await save_config_to_db(f"xp_admin_update_request_{user.id}", {"exact_level": level, "timestamp": time.time()})
+                await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다.")
+
+        elif action == "template_edit":
+            all_embeds = await get_all_embeds()
+            if not all_embeds: return await interaction.followup.send("❌ DB에 편집 가능한 임베드 템플릿이 없습니다.", ephemeral=True)
+            view = EmbedTemplateSelectView(all_embeds)
+            await interaction.followup.send("편집하고 싶은 임베드 템플릿을 아래 메뉴에서 선택해주세요.", view=view, ephemeral=True)
+
+        elif action == "request_regenerate_all_game_panels":
+            game_panel_keys = [key for key, info in SETUP_COMMAND_MAP.items() if "[게임]" in info.get("friendly_name", "")]
+            if not game_panel_keys:
+                return await interaction.followup.send("❌ 설정 파일에서 게임 패널을 찾을 수 없습니다.", ephemeral=True)
+            
+            timestamp = datetime.now(timezone.utc).timestamp()
+            tasks = []
+            for panel_key in game_panel_keys:
+                db_key = f"panel_regenerate_request_{panel_key}"
+                tasks.append(save_config_to_db(db_key, timestamp))
+            
+            await asyncio.gather(*tasks)
+            
+            return await interaction.followup.send(
+                f"✅ {len(game_panel_keys)}개의 게임 패널에 대해 일괄 재설치를 요청했습니다.\n"
+                "게임 봇이 온라인 상태라면 약 10초 내에 패널이 업데이트됩니다.",
+                ephemeral=True
+            )
+
+        elif action.startswith("role_setup:"):
+            db_key = action.split(":", 1)[1]
+            if not role:
+                return await interaction.followup.send("❌ 이 작업을 실행하려면 `role` 옵션에 역할을 지정해야 합니다.", ephemeral=True)
+            
+            friendly_name = "알림 역할"
+            for choice in await self.setup_action_autocomplete(interaction, ""):
+                if choice.value == action:
+                    friendly_name = choice.name.replace(" 설정", "")
+            
+            save_success = await save_id_to_db(db_key, role.id)
+            if not save_success:
+                 return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다. Supabase RLS 정책을 확인해주세요.", ephemeral=True)
+
+            cog_to_reload = self.bot.get_cog("Reminder")
+            if cog_to_reload and hasattr(cog_to_reload, 'load_configs'):
+                await cog_to_reload.load_configs()
+            
+            await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{role.mention}` 역할로 설정했습니다.", ephemeral=True)
+
+        elif action == "panels_regenerate_all":
+            setup_map = get_config("SETUP_COMMAND_MAP", {})
+            success_list, failure_list = [], []
+
+            await interaction.followup.send("⏳ 모든 패널의 재설치를 시작합니다...", ephemeral=True)
+
+            for key, info in setup_map.items():
+                if info.get("type") == "panel":
+                    friendly_name = info.get("friendly_name", key)
+                    try:
+                        cog_name, channel_db_key = info.get("cog_name"), info.get("key")
+                        if not all([cog_name, channel_db_key]):
+                            failure_list.append(f"・`{friendly_name}`: 설정 정보가 불완전합니다.")
+                            continue
+
+                        is_game_panel = "[게임]" in friendly_name
+                        if is_game_panel:
+                            timestamp = datetime.now(timezone.utc).timestamp()
+                            await save_config_to_db(f"panel_regenerate_request_{key}", timestamp)
+                            success_list.append(f"・`{friendly_name}`: 게임 봇에게 재설치를 요청했습니다.")
+                            continue
+
+                        cog = self.bot.get_cog(cog_name)
+                        if not cog or not hasattr(cog, 'regenerate_panel'):
+                            failure_list.append(f"・`{friendly_name}`: Cog를 찾을 수 없거나 재설치 기능이 없습니다.")
+                            continue
+                        channel_id = get_id(channel_db_key)
+                        if not channel_id or not (target_channel := self.bot.get_channel(channel_id)):
+                            failure_list.append(f"・`{friendly_name}`: 채널이 설정되지 않았거나 찾을 수 없습니다.")
+                            continue
+                        
+                        success = False
+                        if cog_name == "TicketSystem":
+                            panel_type = key.replace("panel_", "")
+                            success = await cog.regenerate_panel(target_channel, panel_type=panel_type)
+                        else:
+                            success = await cog.regenerate_panel(target_channel, panel_key=key)
+                        
+                        if success: success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
+                        else: failure_list.append(f"・`{friendly_name}`: 재설치 중 알 수 없는 오류가 발생했습니다.")
+
+                    except Exception as e:
+                        logger.error(f"'{friendly_name}' 패널 일괄 재설치 중 오류: {e}", exc_info=True)
+                        failure_list.append(f"・`{friendly_name}`: 스크립트 오류 발생.")
+
+            embed = discord.Embed(title="⚙️ 모든 패널 재설치 결과", color=0x3498DB, timestamp=discord.utils.utcnow())
+            if success_list: embed.add_field(name="✅ 성공/요청", value="\n".join(success_list), inline=False)
+            if failure_list:
+                embed.color = 0xED4245
+                embed.add_field(name="❌ 실패", value="\n".join(failure_list), inline=False)
+            
+            await interaction.edit_original_response(content="모든 패널 재설치가 완료되었습니다.", embed=embed)
+
+        elif action == "roles_sync":
+            role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
+            await save_config_to_db("ROLE_KEY_MAP", role_name_map)
+            
+            synced_roles, missing_roles, error_roles = [], [], []
+            server_roles_by_name = {r.name: r.id for r in interaction.guild.roles}
+            
+            for db_key, role_info in UI_ROLE_KEY_MAP.items():
+                if not (role_name := role_info.get('name')): continue
+                if role_id := server_roles_by_name.get(role_name):
+                    if await save_id_to_db(db_key, role_id): synced_roles.append(f"・`{role_name}`")
+                    else: error_roles.append(f"・`{role_name}`: DB 저장 실패")
+                else: missing_roles.append(f"・`{role_name}`")
+            
+            embed = discord.Embed(title="⚙️ 역할 데이터베이스 전체 동기화 결과", color=0x2ECC71)
+            embed.set_footer(text=f"총 {len(UI_ROLE_KEY_MAP)}개 중 | 성공: {len(synced_roles)} / 실패: {len(missing_roles) + len(error_roles)}")
+
+            if synced_roles: embed.add_field(name=f"✅ 동기화 성공 ({len(synced_roles)}개)", value="\n".join(synced_roles)[:1024], inline=False)
+            if missing_roles:
+                embed.color = 0xFEE75C
+                embed.add_field(name=f"⚠️ 서버에 해당 역할 없음 ({len(missing_roles)}개)", value="\n".join(missing_roles)[:1024], inline=False)
+            if error_roles:
+                embed.color = 0xED4245
+                embed.add_field(name=f"❌ DB 저장 오류 ({len(error_roles)}개)", value="\n".join(error_roles)[:1024], inline=False)
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+        elif action == "stats_set":
+            if not channel or not isinstance(channel, discord.VoiceChannel):
+                return await interaction.followup.send("❌ 이 작업을 실행하려면 `channel` 옵션에 음성 채널을 지정해야 합니다.", ephemeral=True)
+            if not stat_type:
+                return await interaction.followup.send("❌ 이 작업을 실행하려면 `stat_type` 옵션을 선택해야 합니다.", ephemeral=True)
+            
+            if stat_type == "remove":
+                await remove_stats_channel(channel.id)
+                await interaction.followup.send(f"✅ `{channel.name}` 채널의 통계 설정을 삭제했습니다.", ephemeral=True)
+            else:
+                current_template = template or f"정보: {{count}}"
+                if "{count}" not in current_template:
+                    return await interaction.followup.send("❌ 이름 형식(`template`)에는 반드시 `{count}`를 포함해야 합니다.", ephemeral=True)
+                if stat_type == "role" and not role:
+                    return await interaction.followup.send("❌ '특정 역할 멤버 수'를 선택한 경우, `role` 옵션을 지정해야 합니다.", ephemeral=True)
+                
+                await add_stats_channel(channel.id, interaction.guild_id, stat_type, current_template, role.id if role else None)
+                
+                if (stats_cog := self.bot.get_cog("StatsUpdater")) and hasattr(stats_cog, 'update_stats_loop') and stats_cog.update_stats_loop.is_running():
+                    stats_cog.update_stats_loop.restart()
+                
+                await interaction.followup.send(f"✅ `{channel.name}` 채널에 통계 설정을 추가/수정했습니다. 곧 업데이트됩니다.", ephemeral=True)
+
+        elif action == "stats_refresh":
+            if (stats_cog := self.bot.get_cog("StatsUpdater")) and hasattr(stats_cog, 'update_stats_loop') and stats_cog.update_stats_loop.is_running():
+                stats_cog.update_stats_loop.restart()
+                await interaction.followup.send("✅ 모든 통계 채널의 업데이트를 요청했습니다.", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ 통계 업데이트 기능을 찾을 수 없거나, 실행 중이 아닙니다.", ephemeral=True)
+
+        elif action == "stats_list":
+            configs = await get_all_stats_channels()
+            guild_configs = [c for c in configs if c.get('guild_id') == interaction.guild_id]
+            if not guild_configs:
+                return await interaction.followup.send("ℹ️ 설정된 통계 채널이 없습니다.", ephemeral=True)
+            
+            embed = discord.Embed(title="📊 설정된 통계 채널 목록", color=0x3498DB)
+            description = []
+            for config in guild_configs:
+                ch_mention = f"<#{config['channel_id']}>" if self.bot.get_channel(config['channel_id']) else f"삭제된 채널({config['channel_id']})"
+                role_info = ""
+                if config['stat_type'] == 'role' and config.get('role_id'):
+                    role_obj = interaction.guild.get_role(config['role_id'])
+                    role_info = f"\n**대상 역할:** {role_obj.mention if role_obj else '알 수 없는 역할'}"
+                description.append(f"**채널:** {ch_mention}\n**종류:** `{config['stat_type']}`{role_info}\n**이름 형식:** `{config['channel_name_template']}`")
+            
+            embed.description = "\n\n".join(description)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        
+        else:
+            await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(UserProfile(bot))
+    await bot.add_cog(ServerSystem(bot))
