@@ -129,12 +129,12 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_onboarding_step_3": {
-        "name": "═════════════상점═══════════",
+        "name": "════════════상점════════════",
         "is_prefix": False,
         "priority": 0
     },
     "role_onboarding_step_4": {
-        "name": "═════════════알림═══════════",
+        "name": "════════════알림════════════",
         "is_prefix": False,
         "priority": 0
     },
@@ -144,7 +144,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_shop_separator": {
-        "name": "══════════════게임══════════",
+        "name": "════════════게임════════════",
         "is_prefix": False,
         "priority": 0
     },
