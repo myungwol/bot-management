@@ -1,4 +1,3 @@
-# cogs/server/system.py
 import discord
 from discord.ext import commands
 from discord import app_commands, ui
@@ -16,11 +15,10 @@ from utils.database import (
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
-# [✅ 최종 수정] ADMIN_ACTION_MAP을 ui_defaults에서 직접 가져옵니다.
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
     ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
-    USABLE_ITEMS, WARNING_THRESHOLDS, JOB_SYSTEM_CONFIG  # ▼ JOB_SYSTEM_CONFIG 추가
+    USABLE_ITEMS, WARNING_THRESHOLDS, JOB_SYSTEM_CONFIG
 )
 
 logger = logging.getLogger(__name__)
@@ -167,7 +165,7 @@ class ServerSystem(commands.Cog):
             try:
                 await save_config_to_db("strings", UI_STRINGS)
                 await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
-                await save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG) # ▼ JOB_SYSTEM_CONFIG 저장 추가
+                await save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG)
                 await save_config_to_db("PROFILE_RANK_ROLES", PROFILE_RANK_ROLES)
                 await save_config_to_db("USABLE_ITEMS", USABLE_ITEMS)
                 await save_config_to_db("WARNING_THRESHOLDS", WARNING_THRESHOLDS)
@@ -340,6 +338,12 @@ class ServerSystem(commands.Cog):
             for key, info in setup_map.items():
                 if info.get("type") == "panel":
                     friendly_name = info.get("friendly_name", key)
+                    
+                    # 아이템 사용 패널은 이제 게임 봇에서 관리하므로 서버 봇에서 재생성하지 않습니다.
+                    if key == "panel_item_usage":
+                        success_list.append(f"・`{friendly_name}`: 아이템 패널은 게임 봇에서 관리합니다. 서버 봇에서는 재생성하지 않습니다.")
+                        continue
+
                     try:
                         cog_name, channel_db_key = info.get("cog_name"), info.get("key")
                         if not all([cog_name, channel_db_key]):
