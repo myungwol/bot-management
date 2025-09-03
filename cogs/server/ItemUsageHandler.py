@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands, tasks
 import logging
 
-from utils.database import supabase, get_config, get_id
+from utils.database import supabase, get_config, get_id, update_inventory # [핵심 수정] update_inventory 추가
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +41,8 @@ class ItemUsageHandler(commands.Cog):
 
             usable_items_config = get_config("USABLE_ITEMS", {})
             item_info = usable_items_config.get(item_key)
-            item_role = guild.get_role(get_id(item_key))
-
-            if not item_info or not item_role:
+            
+            if not item_info:
                 raise Exception(f"'{item_key}'는 유효하지 않은 아이템입니다.")
 
             success = False
@@ -58,7 +57,7 @@ class ItemUsageHandler(commands.Cog):
                     )
             
             if success:
-                await member.remove_roles(item_role, reason="아이템 사용 완료")
+                await update_inventory(member.id, item_info['name'], -1) # [핵심 수정] 역할 제거 대신 DB 수량 차감
                 try:
                     await member.send(f"✅ **{guild.name}** 서버에서 사용하신 '{item_info['name']}' 아이템의 효과가 적용되었습니다.")
                 except discord.Forbidden:
