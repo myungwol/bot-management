@@ -96,19 +96,19 @@ ONBOARDING_CHOICES = {
 # [핵심 수정] USABLE_ITEMS에 사용 가능한 모든 액티브 아이템을 정의합니다.
 USABLE_ITEMS = {
     "role_item_warning_deduct": {
-        "name": "벌점 1회 차감권", 
+        "name": "벌점 1회 차감권",
         "type": "request_to_admin",
-        "value": -1, 
+        "value": -1,
         "description": "누적된 벌점을 1회 차감합니다.",
-        "log_channel_key": "log_warning", # 경고 로그 채널을 사용
-        "log_embed_key": "log_warning"    # 경고 로그 임베드를 사용
+        "log_channel_key": "log_item_warning_deduct", # ◀ 고유한 키로 변경
+        "log_embed_key": "log_item_use_warning_deduct" # ◀ 고유한 키로 변경
     },
     "role_item_event_priority": {
         "name": "이벤트 우선 참여권",
         "type": "consume_with_reason",
         "description": "이벤트 참가 신청 시 우선권을 행사합니다.",
-        "log_channel_key": "log_item_usage", # 아이템 사용 로그 채널을 사용
-        "log_embed_key": "log_item_use"      # 기본 아이템 사용 임베드를 사용
+        "log_channel_key": "log_item_event_priority", # ◀ 고유한 키로 변경
+        "log_embed_key": "log_item_use_event_priority" # ◀ 고유한 키로 변경
     },
     "role_item_farm_expansion": { 
         "name": "밭 확장 허가증",
@@ -179,7 +179,17 @@ UI_EMBEDS = {
         ],
         "footer": {"text": "매주 월요일 0시에 갱신됩니다."}
     }
+    "log_item_use": {"title": "🛒 아이템 사용 알림", "color": 11027200},
+    
+    # --- [여기에 새로운 임베드 템플릿 2개 추가] ---
+    "log_item_use_warning_deduct": {"title": "🎫 벌점 차감권 사용 알림", "color": 3066993}, # 초록색
+    "log_item_use_event_priority": {"title": "✨ 이벤트 우선권 사용 알림", "color": 16776960}, # 노란색
+    # ---------------------------------------------
+    
+    "panel_item_usage": {"title": "✅ 경고 차감권 사용", "description": "보유 중인 <@&경고차감권역할ID>을 사용하려면 아래 버튼을 눌러주세요.", "color": 11027200},
+    # ... (이후 임베드들)
 }
+
 UI_PANEL_COMPONENTS = [
     {"component_key": "start_onboarding_guide", "panel_key": "onboarding", "component_type": "button", "label": "안내 읽기", "style": "success", "emoji": "📖", "row": 0, "order_in_row": 0},
     {"component_key": "request_nickname_change", "panel_key": "nicknames", "component_type": "button", "label": "이름 변경 신청", "style": "primary", "emoji": "✒️", "row": 0, "order_in_row": 0},
