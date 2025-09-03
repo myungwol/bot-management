@@ -49,9 +49,6 @@ class MyBot(commands.Bot):
         super().__init__(*args, **kwargs)
 
     async def setup_hook(self):
-        # [✅✅✅ 핵심 수정 ✅✅✅]
-        # 봇이 시작될 때마다 ui_defaults.py의 최신 설정을 DB에 강제로 덮어씁니다.
-        # 이로써 코드와 DB의 불일치 문제가 원천적으로 해결됩니다.
         await sync_defaults_to_db()
 
         await self.load_all_extensions()
@@ -60,7 +57,7 @@ class MyBot(commands.Bot):
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "ItemSystem", "AnonymousBoard", 
             "WarningSystem", "VoiceMaster"
-            # 게임 봇 관련 Cog들은 서버 관리 봇에 없으므로 목록에서 제외합니다.
+            "ItemUsageHandler" # [핵심 추가]
         ]
         
         registered_views_count = 0
