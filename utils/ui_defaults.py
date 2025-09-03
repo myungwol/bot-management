@@ -250,7 +250,7 @@ SETUP_COMMAND_MAP = {
     "channel_dissoku_reminder": {"type": "channel", "cog_name": "Reminder", "key": "dissoku_reminder_channel_id", "friendly_name": "[알림] Dissoku UP 채널", "channel_type": "text"},
     "channel_weather": {"type": "channel", "cog_name": "WorldSystem", "key": "weather_channel_id", "friendly_name": "[알림] 날씨 예보 채널", "channel_type": "text"},
 }
-ADMIN_ROLE_KEYS = ["role_staff_village_chief", "role_staff_deputy_chief"]
+ADMIN_ROLE_KEYS = ["role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief", "role_staff_police", "role_staff_festival", "role_staff_pr", "role_staff_design", "role_staff_secretary", "role_staff_newbie_helper", "role_approval"]
 STATIC_AUTO_ROLE_PANELS = {
     "panel_roles": {
         "panel_key": "panel_roles",
@@ -297,14 +297,35 @@ WARNING_THRESHOLDS = [
     {"count": 3, "role_key": "role_warning_level_3"},
     {"count": 4, "role_key": "role_warning_level_4"},
 ]
-USABLE_ITEMS = { "role_item_warning_deduct": {"name": "경고 1회 차감권", "type": "warning_deduction", "value": -1, "description": "누적 경고를 1회 줄입니다."} }
+# [핵심 수정] USABLE_ITEMS에 '밭 확장 허가증' 추가 및 타입 세분화
+USABLE_ITEMS = {
+    "role_item_warning_deduct": {
+        "name": "벌점 1회 차감권", 
+        "type": "request_to_admin", # 관리 봇에 요청하는 타입
+        "value": -1, 
+        "description": "누적된 벌점을 1회 차감합니다.",
+        "log_channel_key": "log_warning", # 경고 로그 채널을 사용
+        "log_embed_key": "log_warning"    # 경고 로그 임베드를 사용
+    },
+    "role_item_event_priority": {
+        "name": "이벤트 우선 참여권",
+        "type": "consume_with_reason", # 사유를 입력받고 소모하는 타입
+        "description": "이벤트 참가 신청 시 우선권을 행사합니다.",
+        "log_channel_key": "log_item_usage", # 아이템 사용 로그 채널을 사용
+        "log_embed_key": "log_item_use"      # 기본 아이템 사용 임베드를 사용
+    },
+    # DB에 '밭 확장 허가증'에 해당하는 역할 키가 'role_item_farm_expansion'이라고 가정
+    "role_item_farm_expansion": { 
+        "name": "밭 확장 허가증",
+        "type": "farm_expansion", # 농장 확장 전용 타입
+        "description": "자신의 농장을 1칸 확장합니다."
+        # 로그가 필요 없으므로 log_channel_key를 정의하지 않음
+    }
+}
 CUSTOM_EMBED_SENDER_ROLES = ["role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief"]
 JOB_SYSTEM_CONFIG = {
     "JOB_ROLE_MAP": {"fisherman": "role_job_fisherman", "farmer": "role_job_farmer", "master_angler": "role_job_master_angler", "master_farmer": "role_job_master_farmer"},
-    "LEVEL_TIER_ROLES": [{"level": 150, "role_key": "role_resident_elder"}, 
-                         {"level": 100, "role_key": "role_resident_veteran"}, 
-                         {"level": 50,  "role_key": "role_resident_regular"}, 
-                         {"level": 1,   "role_key": "role_resident_rookie"}]
+    "LEVEL_TIER_ROLES": [{"level": 150, "role_key": "role_resident_elder"}, {"level": 100, "role_key": "role_resident_veteran"}, {"level": 50,  "role_key": "role_resident_regular"}, {"level": 1,   "role_key": "role_resident_rookie"}]
 }
 AGE_ROLE_MAPPING = [
     {"key": "role_info_age_00s", "range": [2000, 2100], "name": "00년생"},
@@ -336,13 +357,12 @@ PROFILE_RANK_ROLES = [
     {"role_key": "role_staff_deputy_chief",  "priority": 95},
     {"role_key": "role_approval",            "priority": 90},
     {"role_key": "role_premium_booster",     "priority": 80},
-    {"role_key": "role_resident_elder",      "priority": 70}, # Lv.150
-    {"role_key": "role_resident_veteran",    "priority": 60}, # Lv.100
-    {"role_key": "role_resident_regular",    "priority": 50}, # Lv.50
-    {"role_key": "role_resident_rookie",     "priority": 10}  # Lv.1
+    {"role_key": "role_resident_elder",      "priority": 70},
+    {"role_key": "role_resident_veteran",    "priority": 60},
+    {"role_key": "role_resident_regular",    "priority": 50},
+    {"role_key": "role_resident_rookie",     "priority": 10}
 ]
 
-# [핵심 수정] UI_STRINGS의 profile_view 부분을 전체적으로 한국어로 번역하고 수정합니다.
 UI_STRINGS = {
     "commerce": {
         "item_view_desc": "현재 소지금: `{balance}`{currency_icon}\n구매하고 싶은 상품을 선택하세요.",
@@ -366,9 +386,8 @@ UI_STRINGS = {
         },
         "item_tab": {
             "no_items": "보유 중인 아이템이 없습니다.",
-            "use_item_button_label": "아이템 사용" 
+            "use_item_button_label": "아이템 사용"
         },
-        # [핵심 추가] 아이템 사용 관련 UI 텍스트 추가
         "item_usage_view": {
             "embed_title": "✨ 아이템 사용",
             "embed_description": "인벤토리에서 사용할 아이템을 선택해주세요.",
@@ -405,7 +424,6 @@ UI_STRINGS = {
         }
     }
 }
-
 JOB_ADVANCEMENT_DATA = {
     "50": [
         {"job_key": "fisherman", "job_name": "낚시꾼", "role_key": "role_job_fisherman", "description": "물고기를 낚는 데 특화된 전문가입니다.", "abilities": [{"ability_key": "fish_bait_saver_1", "ability_name": "미끼 절약 (확률)", "description": "낚시할 때 일정 확률로 미끼를 소모하지 않습니다."}, {"ability_key": "fish_bite_time_down_1", "ability_name": "입질 시간 단축", "description": "물고기가 미끼를 무는 데 걸리는 시간이 전체적으로 2초 단축됩니다."}]},
