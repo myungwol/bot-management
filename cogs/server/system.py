@@ -11,14 +11,16 @@ import time
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
     get_all_stats_channels, add_stats_channel, remove_stats_channel,
-    _channel_id_cache, update_wallet, supabase,
+    _channel_id_cache,
+    update_wallet,
+    supabase,
     get_all_embeds, get_embed_from_db, save_embed_to_db
 )
 from utils.helpers import calculate_xp_for_level
+# [수정] USABLE_ITEMS 임포트 제거 (더 이상 자동완성에서 직접 사용하지 않음)
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
-    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
-    USABLE_ITEMS
+    ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES
 )
 
 logger = logging.getLogger(__name__)
@@ -110,7 +112,6 @@ class ServerSystem(commands.Cog):
     async def purge(self, interaction: discord.Interaction, amount: app_commands.Range[int, 1, 100], user: Optional[discord.Member] = None):
         """채널의 메시지를 삭제하는 관리자용 명령어입니다."""
         await interaction.response.defer(ephemeral=True)
-
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
             await interaction.followup.send("❌ 이 명령어는 일반 텍스트 채널에서만 사용할 수 있습니다.", ephemeral=True)
@@ -136,6 +137,7 @@ class ServerSystem(commands.Cog):
             logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
 
+    # [핵심 수정] 자동완성 로직을 단순하고 정확하게 변경
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         for key, name in ADMIN_ACTION_MAP.items():
@@ -143,17 +145,13 @@ class ServerSystem(commands.Cog):
                 choices.append(app_commands.Choice(name=name, value=key))
         
         for key, info in SETUP_COMMAND_MAP.items():
-            choice_name = f"[{'패널' if info['type'] == 'panel' else '채널'}] {info.get('friendly_name', key)} 설정"
+            # 'type'에 따라 '패널' 또는 '채널' 접두사 추가
+            prefix = "[패널]" if info.get("type") == "panel" else "[채널]"
+            choice_name = f"{prefix} {info.get('friendly_name', key)} 설정"
             if current.lower() in choice_name.lower():
-                choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{info['key']}"))
-
-        for item_info in USABLE_ITEMS.values():
-            if log_key := item_info.get("log_channel_key"):
-                if not any(log_key == info.get('key') for info in SETUP_COMMAND_MAP.values()):
-                    choice_name = f"[로그] '{item_info['name']}' 사용 기록"
-                    if current.lower() in choice_name.lower():
-                        choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{log_key}"))
-
+                # value에는 'channel_setup:' 접두사와 함께 SETUP_COMMAND_MAP의 키(key)를 전달
+                choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
+        
         role_setup_actions = {"role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정"}
         for key, name in role_setup_actions.items():
             if current.lower() in name.lower():
@@ -175,9 +173,7 @@ class ServerSystem(commands.Cog):
                 await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
                 await save_config_to_db("PROFILE_RANK_ROLES", PROFILE_RANK_ROLES)
                 await save_config_to_db("USABLE_ITEMS", USABLE_ITEMS)
-
                 await save_config_to_db("config_reload_request", time.time())
-                
                 logger.info("UI 텍스트 및 게임 관련 주요 설정이 데이터베이스에 성공적으로 동기화되었습니다.")
                 await interaction.followup.send("✅ UI 텍스트와 게임 데이터를 데이터베이스에 성공적으로 동기화했습니다.\n"
                                                 "**게임 봇을 재시작**하면 모든 설정이 정상적으로 적용됩니다.")
@@ -185,20 +181,15 @@ class ServerSystem(commands.Cog):
                 logger.error(f"UI 동기화 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ UI 동기화 중 오류가 발생했습니다.")
             return
-
+        
+        # [핵심 수정] 채널 설정 로직을 자동완성에서 받은 키로 바로 찾도록 변경
         if action.startswith("channel_setup:"):
-            db_key = action.split(":", 1)[1]
+            setting_key = action.split(":", 1)[1]
+            config = SETUP_COMMAND_MAP.get(setting_key)
+            if not config:
+                return await interaction.followup.send(f"❌ 유효하지 않은 설정 키입니다: {setting_key}", ephemeral=True)
             
-            # SETUP_COMMAND_MAP에서 정보 찾기
-            config = SETUP_COMMAND_MAP.get(db_key) or next((info for key, info in SETUP_COMMAND_MAP.items() if info.get('key') == db_key), None)
-
-            if config:
-                 required_channel_type = config.get("channel_type", "text")
-                 friendly_name = config.get("friendly_name", db_key)
-            else: # 동적으로 생성된 로그 채널의 경우
-                required_channel_type = "text"
-                friendly_name = next((f"'{item['name']}' 사용 기록" for item in USABLE_ITEMS.values() if item.get("log_channel_key") == db_key), db_key)
-
+            required_channel_type = config.get("channel_type", "text")
             error_msg = None
             if not channel:
                 error_msg = f"❌ 이 작업을 실행하려면 `channel` 옵션에 **{required_channel_type} 채널**을 지정해야 합니다."
@@ -210,11 +201,13 @@ class ServerSystem(commands.Cog):
             if error_msg:
                 return await interaction.followup.send(error_msg, ephemeral=True)
 
+            db_key, friendly_name = config['key'], config['friendly_name']
+            
             save_success = await save_id_to_db(db_key, channel.id)
             if not save_success:
                 return await interaction.followup.send(f"❌ **{friendly_name}** 설정 중 DB 저장에 실패했습니다.", ephemeral=True)
-            
-            if config and (cog_to_reload := self.bot.get_cog(config["cog_name"])) and hasattr(cog_to_reload, 'load_configs'):
+
+            if (cog_to_reload := self.bot.get_cog(config["cog_name"])) and hasattr(cog_to_reload, 'load_configs'):
                 await cog_to_reload.load_configs()
             
             await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
