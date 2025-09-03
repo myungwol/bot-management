@@ -20,7 +20,7 @@ from utils.helpers import calculate_xp_for_level
 from utils.ui_defaults import (
     UI_ROLE_KEY_MAP, SETUP_COMMAND_MAP, ADMIN_ROLE_KEYS, 
     ADMIN_ACTION_MAP, UI_STRINGS, JOB_ADVANCEMENT_DATA, PROFILE_RANK_ROLES,
-    USABLE_ITEMS, WARNING_THRESHOLDS
+    USABLE_ITEMS, WARNING_THRESHOLDS, JOB_SYSTEM_CONFIG  # ▼ JOB_SYSTEM_CONFIG 추가
 )
 
 logger = logging.getLogger(__name__)
@@ -167,6 +167,7 @@ class ServerSystem(commands.Cog):
             try:
                 await save_config_to_db("strings", UI_STRINGS)
                 await save_config_to_db("JOB_ADVANCEMENT_DATA", JOB_ADVANCEMENT_DATA)
+                await save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG) # ▼ JOB_SYSTEM_CONFIG 저장 추가
                 await save_config_to_db("PROFILE_RANK_ROLES", PROFILE_RANK_ROLES)
                 await save_config_to_db("USABLE_ITEMS", USABLE_ITEMS)
                 await save_config_to_db("WARNING_THRESHOLDS", WARNING_THRESHOLDS)
