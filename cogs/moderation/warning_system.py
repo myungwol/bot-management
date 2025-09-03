@@ -1,4 +1,5 @@
 # cogs/moderation/warning_system.py
+
 import discord
 from discord import ui
 from discord.ext import commands
@@ -114,25 +115,41 @@ class WarningPanelView(ui.View):
         self.add_item(button)
 
     async def on_button_click(self, interaction: discord.Interaction):
-        if not self.cog.police_role_id or not isinstance(interaction.user, discord.Member):
+        # --- ▼ 핵심 수정 부분 1: 권한 확인 로직 변경 ▼ ---
+        if not isinstance(interaction.user, discord.Member):
             return await interaction.response.send_message("❌ 권한이 없습니다.", ephemeral=True)
-            
-        if not any(r.id == self.cog.police_role_id for r in interaction.user.roles):
-            police_role = interaction.guild.get_role(self.cog.police_role_id)
-            role_name = police_role.name if police_role else "벌점 담당"
-            return await interaction.response.send_message(f"❌ 이 기능은 `{role_name}` 역할을 가진 스태프만 사용할 수 있습니다.", ephemeral=True)
+
+        # Cog에서 모든 관련 역할 ID를 가져옵니다.
+        police_role_id = self.cog.police_role_id
+        master_role_id = self.cog.master_role_id
+        vice_master_role_id = self.cog.vice_master_role_id
+        
+        # 허용된 역할 ID 목록을 만듭니다.
+        allowed_role_ids = {rid for rid in [police_role_id, master_role_id, vice_master_role_id] if rid is not None}
+
+        if not allowed_role_ids:
+             return await interaction.response.send_message("❌ 이 기능을 사용할 수 있는 역할이 서버에 설정되지 않았습니다.", ephemeral=True)
+
+        # 사용자가 가진 역할과 허용된 역할을 비교합니다.
+        user_role_ids = {role.id for role in interaction.user.roles}
+        if not user_role_ids.intersection(allowed_role_ids):
+            return await interaction.response.send_message("❌ 이 기능은 `촌장`, `부촌장`, `경찰관` 역할만 사용할 수 있습니다.", ephemeral=True)
             
         view = TargetUserSelectView(self.cog)
-        await interaction.response.send_message("벌점를 부여할 대상을 선택하세요.", view=view, ephemeral=True)
+        await interaction.response.send_message("벌점을 부여할 대상을 선택하세요.", view=view, ephemeral=True)
+        # --- ▲ 핵심 수정 부분 1 ▲ ---
 
-
-# --- ▼ WarningSystem 클래스 수정 ▼ ---
+# --- ▼ WarningSystem Cog 클래스 수정 ▼ ---
 class WarningSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.panel_channel_id: Optional[int] = None
         self.log_channel_id: Optional[int] = None
         self.police_role_id: Optional[int] = None
+        # --- ▼ 핵심 수정 부분 2: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
+        self.master_role_id: Optional[int] = None
+        self.vice_master_role_id: Optional[int] = None
+        # --- ▲ 핵심 수정 부분 2 ▲ ---
         self.view_instance: Optional[WarningPanelView] = None
         logger.info("WarningSystem Cog가 성공적으로 초기화되었습니다.")
 
@@ -149,6 +166,10 @@ class WarningSystem(commands.Cog):
         self.panel_channel_id = get_id("warning_panel_channel_id")
         self.log_channel_id = get_id("warning_log_channel_id")
         self.police_role_id = get_id(POLICE_ROLE_KEY)
+        # --- ▼ 핵심 수정 부분 3: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
+        self.master_role_id = get_id("role_master")
+        self.vice_master_role_id = get_id("role_vice_master")
+        # --- ▲ 핵심 수정 부분 3 ▲ ---
         logger.info("[WarningSystem Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
     async def update_warning_roles(self, member: discord.Member, total_count: int):
