@@ -178,7 +178,37 @@ class WarningSystem(commands.Cog):
             logger.error(f"경고 역할 업데이트 실패: {member.display_name}님의 역할을 변경할 권한이 없습니다.")
         except Exception as e:
             logger.error(f"경고 역할 업데이트 중 오류: {e}", exc_info=True)
+            
+    async def deduct_warning_points(self, moderator: discord.User, target: discord.Member, amount: int, reason: str) -> bool:
+        """아이템 사용 등으로 경고 점수를 차감하고 로그를 남깁니다."""
+        try:
+            # DB에 음수 값으로 경고 기록을 추가하여 차감을 구현합니다.
+            await add_warning(
+                guild_id=target.guild.id,
+                user_id=target.id,
+                moderator_id=moderator.id,
+                reason=reason,
+                amount=amount  # amount는 음수 값 (예: -1)이어야 합니다.
+            )
 
+            # 새로운 누적 경고 횟수를 가져옵니다.
+            new_total = await get_total_warning_count(target.id, target.guild.id)
+            # 누적 횟수에 따라 역할을 업데이트합니다.
+            await self.update_warning_roles(target, new_total)
+
+            # 로그 채널에 메시지를 보냅니다.
+            await self.send_log_message(
+                moderator=moderator,
+                target=target,
+                reason=reason,
+                amount=amount,
+                new_total=new_total
+            )
+            return True
+        except Exception as e:
+            logger.error(f"경고 점수 차감 중 오류 발생 (대상: {target.id}): {e}", exc_info=True)
+            return False
+    
     async def send_log_message(self, moderator: discord.Member, target: discord.Member, reason: str, amount: int, new_total: int):
         if not self.log_channel_id: return
         log_channel = self.bot.get_channel(self.log_channel_id)
