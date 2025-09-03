@@ -97,20 +97,24 @@ ONBOARDING_CHOICES = {
 USABLE_ITEMS = {
     "role_item_warning_deduct": {
         "name": "벌점 1회 차감권", 
-        "type": "request_to_admin", # 관리 봇에 요청하는 타입
+        "type": "request_to_admin",
         "value": -1, 
-        "description": "누적된 벌점을 1회 차감합니다."
+        "description": "누적된 벌점을 1회 차감합니다.",
+        "log_channel_key": "log_warning", # 경고 로그 채널을 사용
+        "log_embed_key": "log_warning"    # 경고 로그 임베드를 사용
     },
     "role_item_event_priority": {
         "name": "이벤트 우선 참여권",
-        "type": "consume_with_reason", # 사유를 입력받고 소모하는 타입
-        "description": "이벤트 참가 신청 시 우선권을 행사합니다."
+        "type": "consume_with_reason",
+        "description": "이벤트 참가 신청 시 우선권을 행사합니다.",
+        "log_channel_key": "log_item_usage", # 아이템 사용 로그 채널을 사용
+        "log_embed_key": "log_item_use"      # 기본 아이템 사용 임베드를 사용
     },
-    # DB에 '밭 확장 허가증'에 해당하는 역할 키가 'role_item_farm_expansion'이라고 가정
     "role_item_farm_expansion": { 
         "name": "밭 확장 허가증",
-        "type": "farm_expansion", # 농장 확장 전용 타입
+        "type": "farm_expansion",
         "description": "자신의 농장을 1칸 확장합니다."
+        # 로그가 필요 없으므로 log_channel_key를 정의하지 않음
     }
 }
 UI_EMBEDS = {
