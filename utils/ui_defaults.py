@@ -139,7 +139,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_warning_separator": {
-        "name": "════════════경고════════════",
+        "name": "════════════벌점════════════",
         "is_prefix": False,
         "priority": 0
     },
@@ -302,7 +302,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
 
-    # --- 경고 역할 ---
+    # --- 벌점 역할 ---
     "role_warning_level_1": {
         "name": "벌점 1회",
         "is_prefix": False,
@@ -460,7 +460,7 @@ UI_EMBEDS = {
     },
     "panel_onboarding": {
         "title": "📝 마을사무소・안내소",
-        "description": "처음 오신 분은 먼저 '안내 읽기' 버튼을 눌러 서버 이용 방법을 읽고 자기소개를 작성해주세요.",
+        "description": "처음 오신 분은 먼저 '안내 읽기' 버튼을 눌러 서버 이용 방법을 확인해주세요.",
         "color": 0x5865F2
     },
     "embed_onboarding_approval": {
@@ -484,7 +484,7 @@ UI_EMBEDS = {
         "color": 15548997
     },
     "log_warning": {
-        "title": "🚨 벌 발급 알림",
+        "title": "🚨 벌점 발급 알림",
         "color": 15548997
     },
     "dm_onboarding_approved": {
@@ -535,7 +535,7 @@ UI_EMBEDS = {
     },
     "panel_commerce": {
         "title":
-        "🏪 구매 & 판매함",
+        "🏪 구매함 & 판매함",
         "description":
         "> 아이템을 사거나, 잡은 물고기 등을 팔 수 있습니다.",
         "color":
@@ -1027,7 +1027,7 @@ SETUP_COMMAND_MAP = {
         "type": "panel",
         "cog_name": "WarningSystem",
         "key": "warning_panel_channel_id",
-        "friendly_name": "[패널] 경고 관리",
+        "friendly_name": "[패널] 벌점 관리",
         "channel_type": "text"
     },
     "panel_custom_embed": {
@@ -1258,7 +1258,7 @@ SETUP_COMMAND_MAP = {
         "type": "channel",
         "cog_name": "WarningSystem",
         "key": "warning_log_channel_id",
-        "friendly_name": "[로그] 경고 발급 기록",
+        "friendly_name": "[로그] 벌점 발급 기록",
         "channel_type": "text"
     },
     "log_daily_check": {
