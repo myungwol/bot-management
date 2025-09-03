@@ -339,7 +339,6 @@ class ServerSystem(commands.Cog):
                 if info.get("type") == "panel":
                     friendly_name = info.get("friendly_name", key)
                     
-                    # 아이템 사용 패널은 이제 게임 봇에서 관리하므로 서버 봇에서 재생성하지 않습니다.
                     if key == "panel_item_usage":
                         success_list.append(f"・`{friendly_name}`: 아이템 패널은 게임 봇에서 관리합니다. 서버 봇에서는 재생성하지 않습니다.")
                         continue
@@ -375,6 +374,9 @@ class ServerSystem(commands.Cog):
                         
                         if success: success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
                         else: failure_list.append(f"・`{friendly_name}`: 재설치 중 알 수 없는 오류가 발생했습니다.")
+                        
+                        # [수정] Rate Limit 방지를 위해 각 패널 재생성 후 1초 대기
+                        await asyncio.sleep(1)
 
                     except Exception as e:
                         logger.error(f"'{friendly_name}' 패널 일괄 재설치 중 오류: {e}", exc_info=True)
@@ -401,6 +403,9 @@ class ServerSystem(commands.Cog):
                     if await save_id_to_db(db_key, role_id): synced_roles.append(f"・`{role_name}`")
                     else: error_roles.append(f"・`{role_name}`: DB 저장 실패")
                 else: missing_roles.append(f"・`{role_name}`")
+                
+                # [수정] Rate Limit 방지를 위해 각 DB 쓰기 작업 후 짧게 대기
+                await asyncio.sleep(0.1)
             
             embed = discord.Embed(title="⚙️ 역할 데이터베이스 전체 동기화 결과", color=0x2ECC71)
             embed.set_footer(text=f"총 {len(UI_ROLE_KEY_MAP)}개 중 | 성공: {len(synced_roles)} / 실패: {len(missing_roles) + len(error_roles)}")
