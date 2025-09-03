@@ -261,6 +261,11 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": False,
         "priority": 0
     },
+    "role_game_ggd": {
+        "name": "구스구스덕",
+        "is_prefix": False,
+        "priority": 0
+    },
     "role_game_gf": {
         "name": "갈틱폰",
         "is_prefix": False,
