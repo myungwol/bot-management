@@ -17,7 +17,6 @@ from utils.ui_defaults import ADMIN_ROLE_KEYS
 
 logger = logging.getLogger(__name__)
 
-# --- 다른 클래스들은 변경사항이 없으므로 생략합니다 ---
 CHANNEL_TYPE_INFO = {
     "분수대":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "모두의 분수대", "min_limit": 4},
     "놀이터":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "게임 채널", "min_limit": 3},
@@ -418,29 +417,10 @@ class VoiceMaster(commands.Cog):
         vc_name = f"{type_info['emoji']} ⊹ {base_name}"
         overwrites = self._get_permission_overwrites(guild, member, channel_type)
         
-        position: Optional[int] = None
-        if target_category:
-            all_channels = target_category.voice_channels
-            
-            last_creator_idx = -1
-            last_bench_idx = -1
-            
-            creator_channel_ids = self.creator_channel_configs.keys()
-            
-            for i, ch in enumerate(all_channels):
-                if ch.id in creator_channel_ids:
-                    last_creator_idx = i
-                elif '🪑' in ch.name:
-                    last_bench_idx = i
-            
-            if channel_type == '벤치':
-                position = max(last_creator_idx, last_bench_idx)
-            
-            elif channel_type == '분수대':
-                benches_count = sum(1 for ch in all_channels if '🪑' in ch.name)
-                fountains_count = sum(1 for ch in all_channels if '⛲' in ch.name)
-                creator_count = sum(1 for ch in all_channels if ch.id in creator_channel_ids)
-                position = creator_count + benches_count + fountains_count
+        # --- ▼ 핵심 수정 부분: 채널 위치 계산 로직 변경 ▼ ---
+        # 사용자가 입장한 '만들기 채널' 바로 아래에 생성되도록 위치를 지정합니다.
+        position = creator_channel.position + 1
+        # --- ▲ 핵심 수정 부분 ▲ ---
     
         return await guild.create_voice_channel(
             name=vc_name, 
