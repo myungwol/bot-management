@@ -7,7 +7,8 @@ from typing import Optional, List, Dict
 import asyncio
 from datetime import datetime, timezone
 
-from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, get_panel_components_from_db, add_warning, get_total_warning_count
+# [✅✅✅ 핵심 수정 ✅✅✅] supabase 클라이언트를 가져오고, 불필요한 함수 import를 제거합니다.
+from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, get_panel_components_from_db, supabase
 from utils.ui_defaults import POLICE_ROLE_KEY, WARNING_THRESHOLDS
 from utils.helpers import format_embed_from_db
 
@@ -22,6 +23,7 @@ class WarningModal(ui.Modal, title="경고 내용 입력"):
         self.cog = cog
         self.target_member = target_member
 
+    # [✅✅✅ 핵심 수정 ✅✅✅] DB 함수를 호출하여 경쟁 상태를 방지하고 로직을 단순화합니다.
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
@@ -34,15 +36,21 @@ class WarningModal(ui.Modal, title="경고 내용 입력"):
             await interaction.followup.send("❌ 경고 횟수는 숫자로 입력해주세요.", ephemeral=True)
             return
 
-        await add_warning(
-            guild_id=interaction.guild_id,
-            user_id=self.target_member.id,
-            moderator_id=interaction.user.id,
-            reason=self.reason.value,
-            amount=amount_val
-        )
+        try:
+            rpc_params = {
+                'p_guild_id': str(interaction.guild_id),
+                'p_user_id': str(self.target_member.id),
+                'p_moderator_id': str(interaction.user.id),
+                'p_reason': self.reason.value,
+                'p_amount': amount_val
+            }
+            response = await supabase.rpc('add_warning_and_get_total', rpc_params).execute()
+            new_total = response.data
+        except Exception as e:
+            logger.error(f"add_warning_and_get_total RPC 호출 실패: {e}", exc_info=True)
+            await interaction.followup.send("❌ 경고 처리 중 데이터베이스 오류가 발생했습니다.", ephemeral=True)
+            return
 
-        new_total = await get_total_warning_count(self.target_member.id, interaction.guild_id)
         await self.cog.update_warning_roles(self.target_member, new_total)
 
         await self.cog.send_log_message(
@@ -219,7 +227,7 @@ class WarningSystem(commands.Cog):
             
             embed_data = await get_embed_from_db(embed_key)
             if not embed_data:
-                logger.error("DB에서 'panel_warning' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
+                logger.error(f"DB에서 '{embed_key}' 임베드를 찾을 수 없어 패널을 생성할 수 없습니다.")
                 return False
                 
             embed = discord.Embed.from_dict(embed_data)
