@@ -32,11 +32,54 @@ class IntroductionModal(ui.Modal, title="주민 등록증"):
         super().__init__()
         self.onboarding_cog = cog_instance
         self.gender = gender
-        self.birth_year = birth_year
+        self.public_birth_year_display = birth_year # '비공개' 또는 실제 연도
+        
+        self.private_birth_year_input: Optional[ui.TextInput] = None
+        if self.public_birth_year_display == "비공개":
+            self.private_birth_year_input = ui.TextInput(
+                label="출생 연도 (관리자 확인용)",
+                placeholder="YYYY 형식으로 입력해주세요. 비공개 처리됩니다.",
+                required=True, min_length=4, max_length=4
+            )
+            self.add_item(self.private_birth_year_input)
     
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
+            actual_birth_year_for_validation = self.public_birth_year_display
+            birth_year_for_approval_channel = self.public_birth_year_display
+
+            # '비공개' 선택 시 로직 처리
+            if self.private_birth_year_input:
+                private_year_str = self.private_birth_year_input.value
+                try:
+                    year = int(private_year_str)
+                    current_year = datetime.now(timezone.utc).year
+                    if not (1940 <= year <= current_year - 14):
+                        await interaction.followup.send("❌ 유효하지 않은 출생 연도입니다. 만 14세 이상만 가입할 수 있습니다.", ephemeral=True)
+                        return
+                    actual_birth_year_for_validation = str(year)
+                except ValueError:
+                    await interaction.followup.send("❌ 출생 연도는 숫자로 입력해주세요 (예: 2001).", ephemeral=True)
+                    return
+                
+                # 최고 관리자용 로그 채널에 실제 나이 정보 전송
+                private_log_channel = self.onboarding_cog.private_age_log_channel
+                if private_log_channel:
+                    log_embed = discord.Embed(
+                        title="📝 비공개 나이 제출 기록",
+                        description=f"{interaction.user.mention} 님이 비공개 옵션을 선택하고 실제 출생 연도를 제출했습니다.",
+                        color=discord.Color.blurple()
+                    )
+                    log_embed.add_field(name="제출자", value=f"{interaction.user.mention} (`{interaction.user.id}`)")
+                    log_embed.add_field(name="제출된 연도", value=f"`{actual_birth_year_for_validation}`년")
+                    log_embed.set_footer(text="이 정보는 나이 제한 확인 목적으로만 사용됩니다.")
+                    await private_log_channel.send(embed=log_embed)
+                
+                # 승인 채널에는 '비공개'로 표시되도록 유지
+                birth_year_for_approval_channel = "비공개"
+
+            # --- 승인 채널로 요청서 전송 ---
             approval_channel = self.onboarding_cog.approval_channel
             if not approval_channel: await interaction.followup.send("❌ 오류: 승인 채널을 찾을 수 없습니다.", ephemeral=True); return
             embed_data = await get_embed_from_db("embed_onboarding_approval")
@@ -46,12 +89,17 @@ class IntroductionModal(ui.Modal, title="주민 등록증"):
             if interaction.user.display_avatar: embed.set_thumbnail(url=interaction.user.display_avatar.url)
             
             embed.add_field(name="이름", value=self.name.value, inline=False)
-            embed.add_field(name="출생 연도", value=self.birth_year, inline=False)
+            embed.add_field(name="출생 연도", value=birth_year_for_approval_channel, inline=False) # 승인 채널용 값 사용
             embed.add_field(name="성별", value=self.gender, inline=False)
             embed.add_field(name="취미/좋아하는 것", value=self.hobby.value, inline=False)
             embed.add_field(name="가입 경로", value=self.path.value, inline=False)
             
-            view = ApprovalView(author=interaction.user, original_embed=embed, cog_instance=self.onboarding_cog)
+            view = ApprovalView(
+                author=interaction.user, 
+                original_embed=embed, 
+                cog_instance=self.onboarding_cog,
+                actual_birth_year=actual_birth_year_for_validation # 역할 부여를 위한 실제 나이 값 전달
+            )
             approval_role_id = self.onboarding_cog.approval_role_id
             content = f"<@&{approval_role_id}> 새로운 주민 등록 신청서가 제출되었습니다." if approval_role_id else "새로운 주민 등록 신청서가 제출되었습니다."
             await approval_channel.send(content=content, embed=embed, view=view, allowed_mentions=discord.AllowedMentions(roles=True))
@@ -145,12 +193,13 @@ class GenderAgeSelectView(ui.View):
         await interaction.delete_original_response()
 
 class ApprovalView(ui.View):
-    def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding'):
+    def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding', actual_birth_year: str):
         super().__init__(timeout=None)
         self.author_id = author.id
         self.original_embed = copy.deepcopy(original_embed)
         self.onboarding_cog = cog_instance
         self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
+        self.actual_birth_year = actual_birth_year # 역할 부여에 사용할 실제 나이
     
     @ui.button(label="승인", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
@@ -265,11 +314,13 @@ class ApprovalView(ui.View):
                 if (rid := get_id("role_info_female")) and (r := guild.get_role(rid)): roles_to_add.append(r)
 
             age_role_mapping = get_config("AGE_ROLE_MAPPING", [])
-            birth_year_str = self._get_field_value(self.original_embed, "출생 연도")
+            
+            # --- 역할 부여 시에는 실제 나이(self.actual_birth_year)를 사용 ---
+            birth_year_str = self.actual_birth_year
 
-            if birth_year_str and birth_year_str.isdigit():
+            if birth_year_str.isdigit():
                 birth_year = int(birth_year_str)
-                age_limit = 16 # 만 19세 이상
+                age_limit = 16
                 current_year = datetime.now(timezone.utc).year
                 if (current_year - birth_year) < age_limit:
                     return f"연령 제한: 사용자가 {age_limit}세 미만입니다. (출생 연도: {birth_year})"
@@ -309,6 +360,8 @@ class ApprovalView(ui.View):
             if ch_id and (ch := member.guild.get_channel(ch_id)):
                 embed = discord.Embed(title="📝 자기소개", color=discord.Color.green())
                 embed.add_field(name="주민", value=member.mention, inline=False)
+                
+                # 공개 자기소개에는 승인 채널의 embed 내용을 그대로 사용 (나이가 '비공개'로 되어 있음)
                 for field in self.original_embed.fields: 
                     embed.add_field(name=field.name, value=field.value, inline=False)
                 
@@ -363,8 +416,6 @@ class ApprovalView(ui.View):
                 embed.add_field(name="거절 사유", value=reason, inline=False); embed.add_field(name="담당자", value=moderator.mention, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 
-                # [✅✅✅ 핵심 수정 ✅✅✅]
-                # allowed_mentions를 .none() 에서 users=True로 변경하여 사용자 언급이 가능하도록 합니다.
                 await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
             logger.error(f"거절 로그 전송 실패: {e}", exc_info=True); return "거절 로그 채널에 메시지 전송 실패."
@@ -502,6 +553,7 @@ class Onboarding(commands.Cog):
         self.rejection_log_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None
         self.main_chat_channel_id: Optional[int] = None
+        self.private_age_log_channel_id: Optional[int] = None
         self.view_instance = None
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
         self._user_locks: Dict[int, asyncio.Lock] = {}
@@ -514,6 +566,11 @@ class Onboarding(commands.Cog):
     @property
     def approval_channel(self) -> Optional[discord.TextChannel]:
         if self.approval_channel_id: return self.bot.get_channel(self.approval_channel_id)
+        return None
+
+    @property
+    def private_age_log_channel(self) -> Optional[discord.TextChannel]:
+        if self.private_age_log_channel_id: return self.bot.get_channel(self.private_age_log_channel_id)
         return None
 
     async def register_persistent_views(self):
@@ -531,6 +588,7 @@ class Onboarding(commands.Cog):
         self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
         self.approval_role_id = get_id("role_approval")
         self.main_chat_channel_id = get_id("main_chat_channel_id")
+        self.private_age_log_channel_id = get_id("onboarding_private_age_log_channel_id")
     
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_onboarding") -> bool:
         base_panel_key = panel_key.replace("panel_", "")
