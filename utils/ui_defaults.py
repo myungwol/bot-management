@@ -366,6 +366,14 @@ USABLE_ITEMS = {
         "name": "밭 확장 허가증",
         "type": "farm_expansion",
         "description": "자신의 농장을 1칸 확장합니다."
+    },
+    # ▼▼▼ 아래 내용 추가 ▼▼▼
+    "item_mine_pass": {
+        "name": "광산 입장권",
+        "type": "mine_entry",
+        "description": "광산에 10분 동안 입장할 수 있는 티켓입니다.",
+        "log_channel_key": "log_item_mine_pass",
+        "log_embed_key": "log_item_use_mine_pass"
     }
 }
 UI_EMBEDS = {
@@ -795,6 +803,21 @@ UI_EMBEDS = {
         "footer": {
             "text": "매주 월요일 0시에 갱신됩니다."
         }
+    },
+    # ▼▼▼ 아래 내용 추가 ▼▼▼
+    "panel_mining": {
+        "title": "⛏️ 광산 입구",
+        "description": "> 광산에 들어가려면 '광산 입장권'이 필요합니다.\n> 입장권은 상점에서 구매할 수 있습니다.",
+        "color": 0x607D8B
+    },
+    "mine_thread_welcome": {
+        "title": "{user_name}님의 광산 채굴",
+        "description": "10분 동안 채굴을 시작합니다!\n\n아래 '채굴하기' 버튼을 눌러 광석을 찾아보세요.\n채굴은 10초에 한 번씩 가능합니다.",
+        "color": 0x607D8B
+    },
+    "log_item_use_mine_pass": {
+        "title": "🎟️ 광산 입장권 사용 알림",
+        "color": 0x607D8B
     }
 }
 
