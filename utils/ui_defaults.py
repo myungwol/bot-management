@@ -1743,6 +1743,25 @@ JOB_ADVANCEMENT_DATA = {
             "ability_name": "수분 유지력 UP",
             "description": "작물이 수분을 더 오래 머금어 물을 주는 간격이 길어집니다."
         }]
+    }, { # <--- 쉼표(,)를 꼭 추가해주세요.
+        # ▼▼▼ [핵심 수정] 아래 50레벨 광부 직업 블록 전체를 추가하세요. ▼▼▼
+        "job_key":
+        "miner",
+        "job_name":
+        "광부",
+        "role_key":
+        "role_job_miner",
+        "description":
+        "광물 채굴에 특화된 전문가입니다.",
+        "abilities": [{
+            "ability_key": "mine_time_down_1",
+            "ability_name": "신속한 채굴",
+            "description": "광석 채굴에 필요한 시간이 3초 단축됩니다."
+        }, {
+            "ability_key": "mine_duration_up_1",
+            "ability_name": "집중 탐사",
+            "description": "광산 입장 시 15% 확률로 제한 시간이 2배(20분)로 늘어납니다."
+        }]
     }],
     "100": [{
         "job_key":
@@ -1783,6 +1802,27 @@ JOB_ADVANCEMENT_DATA = {
             "ability_key": "farm_growth_speed_up_2",
             "ability_name": "성장 속도 UP (대)",
             "description": "작물의 성장 시간이 단축됩니다."
+        }]
+    }, { # <--- 쉼표(,)를 꼭 추가해주세요.
+        # ▼▼▼ [핵심 수정] 아래 100레벨 전문 광부 직업 블록 전체를 추가하세요. ▼▼▼
+        "job_key":
+        "expert_miner",
+        "job_name":
+        "전문 광부",
+        "role_key":
+        "role_job_expert_miner",
+        "description":
+        "광맥의 흐름을 읽어 희귀한 광물을 찾아내는 베테랑입니다. 광부의 상위 직업입니다.",
+        "prerequisite_job":
+        "miner",
+        "abilities": [{
+            "ability_key": "mine_rare_up_2",
+            "ability_name": "노다지 발견",
+            "description": "희귀한 광물을 발견할 확률이 대폭 증가합니다."
+        }, {
+            "ability_key": "mine_double_yield_2",
+            "ability_name": "풍부한 광맥",
+            "description": "광석 채굴 시 20% 확률로 광석을 2개 획득합니다."
         }]
     }]
 }
