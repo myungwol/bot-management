@@ -822,7 +822,7 @@ UI_EMBEDS = {
     },
     "mine_thread_welcome": {
         "title": "{user_name}님의 광산 채굴",
-        "description": "10분 동안 채굴을 시작합니다!\n\n아래 '채굴하기' 버튼을 눌러 광석을 찾아보세요.\n채굴은 10초에 한 번씩 가능합니다.",
+        "description": "환영합니다! 이 광산은 10분 동안 유지됩니다.\n\n아래 '광석 찾기' 버튼을 눌러 주변을 탐색하세요.\n탐색 및 채굴에는 약간의 시간이 소요됩니다.",
         "color": 0x607D8B
     },
     "log_item_use_mine_pass": {
