@@ -1637,6 +1637,12 @@ UI_STRINGS = {
             "title_suffix": " - 작물",
             "label": "작물",
             "emoji": "🌾"
+        }, {
+            # ▼▼▼ [핵심 수정] 아래 딕셔너리 블록을 새로 추가하세요. ▼▼▼
+            "key": "mineral",
+            "title_suffix": " - 광물",
+            "label": "광물",
+            "emoji": "💎"
         }],
         "info_tab": {
             "description": "아래 탭을 선택하여 상세 정보를 확인하세요.",
@@ -1679,6 +1685,10 @@ UI_STRINGS = {
         },
         "crop_tab": {
             "no_items": "보유 중인 작물이 없습니다."
+        },
+        # ▼▼▼ [핵심 수정] 아래 딕셔너리 블록을 새로 추가하세요. ▼▼▼
+        "mineral_tab": {
+            "no_items": "보유 중인 광물이 없습니다."
         },
         "wip_tab": {
             "description": "이 기능은 현재 준비 중입니다."
