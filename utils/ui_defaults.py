@@ -992,6 +992,17 @@ UI_PANEL_COMPONENTS = [
         "row": 0,
         "order_in_row": 0
     },
+    # ▼▼▼ 아래 내용 추가 ▼▼▼
+    {
+        "component_key": "enter_mine",
+        "panel_key": "panel_mining",
+        "component_type": "button",
+        "label": "입장하기",
+        "style": "secondary",
+        "emoji": "⛏️",
+        "row": 0,
+        "order_in_row": 0
+    }
 ]
 SETUP_COMMAND_MAP = {
     "panel_roles": {
@@ -1118,6 +1129,13 @@ SETUP_COMMAND_MAP = {
         "cog_name": "Farm",
         "key": "farm_creation_panel_channel_id",
         "friendly_name": "[게임] 농장 생성 패널",
+        "channel_type": "text"
+    },
+    "panel_mining": {
+        "type": "panel",
+        "cog_name": "Mining",
+        "key": "mining_panel_channel_id",
+        "friendly_name": "[게임] 광산 패널",
         "channel_type": "text"
     },
     "panel_inquiry": {
@@ -1307,6 +1325,13 @@ SETUP_COMMAND_MAP = {
         "cog_name": "Fishing",
         "key": "fishing_log_channel_id",
         "friendly_name": "[로그] 낚시 성공 기록",
+        "channel_type": "text"
+    },
+        "log_item_mine_pass": {
+        "type": "channel",
+        "cog_name": "ItemSystem",
+        "key": "log_item_mine_pass",
+        "friendly_name": "[로그] 광산 입장권 사용 내역",
         "channel_type": "text"
     },
     "channel_bump_reminder": {
