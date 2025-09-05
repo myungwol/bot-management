@@ -49,6 +49,11 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": True,
         "priority": 16
     },
+    "role_job_expert_miner": {
+        "name": "전문 광부",
+        "is_prefix": True,
+        "priority": 16
+    },
     "role_job_fisherman": {
         "name": "낚시꾼",
         "is_prefix": True,
@@ -56,6 +61,11 @@ UI_ROLE_KEY_MAP = {
     },
     "role_job_farmer": {
         "name": "농부",
+        "is_prefix": True,
+        "priority": 15
+    },
+    "role_job_miner": {
+        "name": "광부",
         "is_prefix": True,
         "priority": 15
     },
