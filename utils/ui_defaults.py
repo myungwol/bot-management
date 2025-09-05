@@ -1510,8 +1510,10 @@ JOB_SYSTEM_CONFIG = {
     "JOB_ROLE_MAP": {
         "fisherman": "role_job_fisherman",
         "farmer": "role_job_farmer",
+        "miner": "role_job_miner",
         "master_angler": "role_job_master_angler",
-        "master_farmer": "role_job_master_farmer"
+        "master_farmer": "role_job_master_farmer",
+        "expert_miner": "role_job_expert_miner"
     },
     "LEVEL_TIER_ROLES": [{
         "level": 150,
