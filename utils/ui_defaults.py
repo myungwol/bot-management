@@ -809,9 +809,14 @@ UI_EMBEDS = {
             "name": "🌾 수확",
             "value": "{harvest_champion}",
             "inline": False
+        }, {
+            # ▼▼▼ [핵심 수정] 아래 채광 필드를 추가합니다. ▼▼▼
+            "name": "⛏️ 채광",
+            "value": "{mining_champion}",
+            "inline": False
         }],
         "footer": {
-            "text": "매주 월요일 0시에 갱신됩니다."
+            "text": "매일 00:05 KST에 갱신됩니다."
         }
     },
     # ▼▼▼ 아래 내용 추가 ▼▼▼
