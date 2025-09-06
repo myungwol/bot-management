@@ -843,7 +843,25 @@ UI_EMBEDS = {
         "title": "🛠️ 대장간",
         "description": "> 각종 도구를 업그레이드하여 성능을 향상시킬 수 있습니다.\n> 업그레이드에는 재료와 시간, 코인이 필요합니다.",
         "color": 0x964B00 # 갈색
-    }
+    },
+    "panel_trade": {
+        "title": "🤝 거래소",
+        "description": "> 다른 유저와 아이템을 교환하거나 우편을 보낼 수 있습니다.",
+        "color": 0x3498DB
+    },
+    "log_trade_success": {
+        "title": "✅ 거래 성사",
+        "description": "{user1_mention}님과 {user2_mention}님의 거래가 성공적으로 완료되었습니다.",
+        "color": 0x2ECC71,
+        "footer": {
+            "text": "거래세: {commission}{currency_icon}"
+        }
+    },
+    "dm_new_mail": {
+        "title": "📫 새로운 우편 도착",
+        "description": "{sender_name}님으로부터 새로운 우편이 도착했습니다.\n`/거래소` 패널의 우편함에서 확인해주세요.",
+        "color": 0x3498DB
+    },
 }
 
 UI_PANEL_COMPONENTS = [
@@ -1161,6 +1179,20 @@ SETUP_COMMAND_MAP = {
         "cog_name": "Mining",
         "key": "mining_panel_channel_id",
         "friendly_name": "[게임] 광산 패널",
+        "channel_type": "text"
+    },
+    "panel_trade": {
+        "type": "panel",
+        "cog_name": "Trade",
+        "key": "trade_panel_channel_id",
+        "friendly_name": "[게임] 거래소 패널",
+        "channel_type": "text"
+    },
+    "log_trade": {
+        "type": "channel",
+        "cog_name": "Trade",
+        "key": "trade_log_channel_id",
+        "friendly_name": "[로그] 거래 기록",
         "channel_type": "text"
     },
     "panel_inquiry": {
