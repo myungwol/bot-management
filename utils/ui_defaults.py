@@ -828,6 +828,16 @@ UI_EMBEDS = {
     "log_item_use_mine_pass": {
         "title": "🎟️ 광산 입장권 사용 알림",
         "color": 0x607D8B
+    },
+    "log_item_use_mine_pass": {
+        "title": "🎟️ 광산 입장권 사용 알림",
+        "color": 0x607D8B
+    },
+    # ▼▼▼ 아래 내용 추가 ▼▼▼
+    "panel_blacksmith": {
+        "title": "🛠️ 대장간",
+        "description": "> 각종 도구를 업그레이드하여 성능을 향상시킬 수 있습니다.\n> 업그레이드에는 재료와 시간, 코인이 필요합니다.",
+        "color": 0x964B00 # 갈색
     }
 }
 
@@ -1365,7 +1375,28 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[알림] 날씨 예보 채널",
         "channel_type": "text"
     },
-    'onboarding_private_age_log_channel_id': {'key': 'onboarding_private_age_log_channel_id', 'friendly_name': '[온보딩] 비공개 나이 기록 채널', 'cog_name': 'Onboarding', 'type': 'channel', 'channel_type': 'text'},
+    "onboarding_private_age_log_channel_id": {
+        "type": "channel", 
+        "cog_name": "Onboarding", 
+        "key": "onboarding_private_age_log_channel_id", 
+        "friendly_name": "[온보딩] 비공개 나이 기록 채널", 
+        "channel_type": "text"
+    },
+    "panel_mining": {
+        "type": "panel",
+        "cog_name": "Mining",
+        "key": "mining_panel_channel_id",
+        "friendly_name": "[게임] 광산 패널",
+        "channel_type": "text"
+    },
+    # ▼▼▼ 아래 내용 추가 ▼▼▼
+    "panel_blacksmith": {
+        "type": "panel",
+        "cog_name": "Blacksmith",
+        "key": "blacksmith_panel_channel_id",
+        "friendly_name": "[게임] 대장간 패널",
+        "channel_type": "text"
+    },
 }
 ADMIN_ROLE_KEYS = [
     "role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief",
