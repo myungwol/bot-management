@@ -14,7 +14,8 @@ from utils.database import (
     get_id, get_embed_from_db, get_panel_components_from_db,
     get_config
 )
-from utils.helpers import get_clean_display_name, format_embed_from_db, format_seconds_to_hms
+# ▼▼▼ [핵심 수정] helpers.py에서 get_clean_display_name 함수는 더 이상 사용하지 않으므로 import 목록에서 제거합니다. ▼▼▼
+from utils.helpers import format_embed_from_db, format_seconds_to_hms
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,6 @@ class NicknameApprovalView(ui.View):
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
 
-        # [수정] 경합 상태 방지를 위한 Lock 추가
         user_process_lock = self.nicknames_cog.get_user_lock(self.target_member_id)
         if user_process_lock.locked():
             await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
@@ -65,13 +65,20 @@ class NicknameApprovalView(ui.View):
                 try: await interaction.message.delete()
                 except discord.NotFound: pass
                 await interaction.response.send_message("❌ 오류: 대상 멤버를 서버에서 찾을 수 없습니다.", ephemeral=True)
+                # ▼▼▼ [핵심 수정] 멤버를 찾을 수 없는 경우에도 Lock을 해제합니다. ▼▼▼
+                self.nicknames_cog.release_user_lock(self.target_member_id)
                 return
 
             rejection_reason = None
             if not is_approved:
                 modal = RejectionReasonModal()
                 await interaction.response.send_modal(modal)
-                if await modal.wait() or not modal.reason.value: return
+                # ▼▼▼ [핵심 수정] 모달이 타임아웃되거나 사용자가 취소했을 때 Lock을 해제하는 로직 ▼▼▼
+                timed_out = await modal.wait()
+                if timed_out or not modal.reason:
+                    # 사용자가 모달을 닫거나 타임아웃된 경우, Lock을 풀어 다른 관리자가 작업할 수 있게 합니다.
+                    self.nicknames_cog.release_user_lock(self.target_member_id)
+                    return
                 rejection_reason = modal.reason.value
             else:
                 await interaction.response.defer()
@@ -116,7 +123,7 @@ class NicknameApprovalView(ui.View):
             try: await interaction.message.delete()
             except discord.NotFound: pass
         
-        # [수정] 처리가 끝난 후 Lock을 제거
+        # 처리가 정상적으로 끝난 후에도 Lock을 제거합니다.
         self.nicknames_cog.release_user_lock(self.target_member_id)
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
@@ -154,7 +161,11 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     async def on_submit(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True)
         name = self.new_name.value
-        pattern_str = get_config("NICKNAME_ALLOWED_PATTERN", r"^[a-zA-Z0-9\u3131-\u3163\uac00-\ud7a3]+$")
+        
+        # ▼▼▼ [핵심 수정] 한글을 포함하도록 정규식 패턴 수정 ▼▼▼
+        # DB에서 가져오는 대신, 직접 코드에 명시하여 실수를 방지합니다.
+        # \uAC00-\uD7A3: 완성형 한글 음절 전체 범위를 의미합니다.
+        pattern_str = r"^[a-zA-Z0-9\uAC00-\uD7A3]+$"
         max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
 
         if not re.match(pattern_str, name):
@@ -235,17 +246,14 @@ class Nicknames(commands.Cog):
         self.vice_master_role_id: Optional[int] = None
         self.view_instance = None
         self.panel_regeneration_lock = asyncio.Lock()
-        # [수정] 사용자별 Lock을 관리하기 위한 딕셔너리 추가
         self._user_locks: Dict[int, asyncio.Lock] = {}
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
 
-    # [수정] Lock을 가져오는 헬퍼 함수 추가
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
         if user_id not in self._user_locks:
             self._user_locks[user_id] = asyncio.Lock()
         return self._user_locks[user_id]
     
-    # [수정] 사용이 끝난 Lock을 제거하는 헬퍼 함수 추가
     def release_user_lock(self, user_id: int):
         if user_id in self._user_locks:
             del self._user_locks[user_id]
@@ -253,7 +261,8 @@ class Nicknames(commands.Cog):
     @staticmethod
     def calculate_weighted_length(name: str) -> int:
         total_length = 0
-        pattern = re.compile(r'[\u3131-\u3163\uac00-\ud7a3\u4e00-\u9faf]')
+        # ▼▼▼ [핵심 수정] 한글 완성형 음절 범위를 정규식에 추가합니다. ▼▼▼
+        pattern = re.compile(r'[\uAC00-\uD7A3]')
         for char in name:
             total_length += 2 if pattern.match(char) else 1
         return total_length
