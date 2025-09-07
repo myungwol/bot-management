@@ -862,6 +862,11 @@ UI_EMBEDS = {
         "description": "{sender_name}님으로부터 새로운 우편이 도착했습니다.\n`/거래소` 패널의 우편함에서 확인해주세요.",
         "color": 0x3498DB
     },
+    "log_new_mail": {
+        "title": "📫 새로운 우편 도착",
+        "description": "{sender_mention}님이 {recipient_mention}님에게 우편을 보냈습니다.",
+        "color": 0x3498DB
+    },
     "log_blacksmith_complete": {
         "title": "🎉 도구 업그레이드 완료!",
         "description": "{user_mention}님의 **{tool_name}** 업그레이드가 완료되었습니다! 인벤토리를 확인해주세요.",
