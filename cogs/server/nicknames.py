@@ -14,10 +14,11 @@ from utils.database import (
     get_id, get_embed_from_db, get_panel_components_from_db,
     get_config
 )
-# ▼▼▼ [핵심 수정] has_required_roles 함수를 import 합니다. ▼▼▼
 from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_required_roles
 
 logger = logging.getLogger(__name__)
+
+# --- 파일 최상단에 있던 calculate_weighted_length 함수는 Nicknames Cog 내부로 이동했습니다. ---
 
 class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
@@ -31,11 +32,9 @@ class NicknameApprovalView(ui.View):
         self.nicknames_cog = cog_instance
         self.original_name = member.display_name
     
-    # ▼▼▼ [핵심 수정] 권한 확인 로직을 중앙 함수 호출로 변경 ▼▼▼
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
         return await has_required_roles(interaction, required_keys)
-    # ▲▲▲ [핵심 수정] ▲▲▲
 
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
@@ -59,7 +58,6 @@ class NicknameApprovalView(ui.View):
                 await interaction.response.send_modal(modal)
                 timed_out = await modal.wait()
                 
-                # ▼▼▼ [핵심 수정] 모달이 타임아웃되거나 사용자가 취소했을 때 피드백을 보내고 Lock을 해제하는 로직 ▼▼▼
                 if timed_out or not modal.reason.value:
                     try:
                         msg = await interaction.followup.send("⏳ 닉네임 변경 처리가 취소되었습니다.", ephemeral=True, wait=True)
@@ -67,8 +65,7 @@ class NicknameApprovalView(ui.View):
                         await msg.delete()
                     except (discord.NotFound, discord.HTTPException):
                         pass
-                    return # Lock은 async with 구문이 끝나며 자동으로 해제됩니다.
-                # ▲▲▲ [핵심 수정] ▲▲▲
+                    return
                 rejection_reason = modal.reason.value
             else:
                 await interaction.response.defer()
@@ -113,7 +110,6 @@ class NicknameApprovalView(ui.View):
             try: await interaction.message.delete()
             except discord.NotFound: pass
         
-        # 처리가 끝나면 Lock을 제거합니다.
         self.nicknames_cog.release_user_lock(self.target_member_id)
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
@@ -215,10 +211,12 @@ class NicknameChangerPanelView(ui.View):
             utc_now = datetime.now(timezone.utc).timestamp()
 
             if last_time and utc_now - last_time < cooldown_seconds:
+                # ▼▼▼ [핵심 수정] 쿨타임 메시지를 시/분/초 형식으로 변경 ▼▼▼
                 time_remaining = cooldown_seconds - (utc_now - last_time)
                 formatted_time = format_seconds_to_hms(time_remaining)
                 message = f"❌ 다음 신청까지 **{formatted_time}** 남았습니다."
                 return await i.response.send_message(message, ephemeral=True)
+                # ▲▲▲ [핵심 수정] ▲▲▲
             
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
