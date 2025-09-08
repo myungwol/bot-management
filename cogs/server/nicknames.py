@@ -34,7 +34,7 @@ class NicknameApprovalView(ui.View):
         required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
         return await has_required_roles(interaction, required_keys)
 
-    # ▼▼▼ [핵심 수정] 올바른 Lock 관리 로직으로 변경 ▼▼▼
+    # ▼▼▼ [핵심 수정] 올바르고 안전한 Lock 관리 로직으로 최종 수정 ▼▼▼
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction):
             return
@@ -62,13 +62,16 @@ class NicknameApprovalView(ui.View):
                 timed_out = await modal.wait()
                 
                 if timed_out or not modal.reason.value:
-                    # 모달 취소 시, Lock 해제를 위해 조기 리턴
-                    return 
+                    # 모달이 취소된 경우, 아무것도 하지 않고 함수를 종료합니다.
+                    # finally 블록에서 Lock이 안전하게 해제됩니다.
+                    return
                 
                 rejection_reason = modal.reason.value
             else:
+                # 승인 시에는 모달이 없으므로 defer를 먼저 호출합니다.
                 await interaction.response.defer(ephemeral=True)
 
+            # 모달이 성공적으로 제출되었거나, 승인 버튼을 누른 경우에만 버튼을 비활성화합니다.
             for item in self.children:
                 item.disabled = True
             await interaction.edit_original_response(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
@@ -83,6 +86,7 @@ class NicknameApprovalView(ui.View):
             
             log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
             
+            # 패널 및 로그 처리 로직 (기존과 동일)
             original_panel_channel_id = get_id("nickname_panel_channel_id")
             if original_panel_channel_id:
                 original_panel_channel = self.nicknames_cog.bot.get_channel(original_panel_channel_id)
@@ -93,10 +97,8 @@ class NicknameApprovalView(ui.View):
                         log_embed=log_embed
                     )
                 else:
-                    logger.warning(f"닉네임 패널 재생성 실패: 채널 ID({original_panel_channel_id})를 찾을 수 없거나 텍스트 채널이 아닙니다. 로그만 전송합니다.")
                     await self._send_log_message_fallback(log_embed)
             else:
-                logger.warning("닉네임 패널 재생성 실패: DB에 'nickname_panel_channel_id'가 설정되지 않았습니다. 로그만 전송합니다.")
                 await self._send_log_message_fallback(log_embed)
 
             status_text = "승인" if is_approved else "거절"
@@ -108,9 +110,9 @@ class NicknameApprovalView(ui.View):
                 await message.delete()
             
             await interaction.delete_original_response()
-
+        
         finally:
-            # 모든 경우에 Lock을 해제하도록 보장
+            # 이 함수가 어떤 경로로 종료되든, Lock은 반드시 해제됩니다.
             lock.release()
     # ▲▲▲ [핵심 수정] ▲▲▲
 
@@ -131,14 +133,18 @@ class NicknameApprovalView(ui.View):
         return embed
 
     async def _send_log_message_fallback(self, result_embed: discord.Embed):
-        if (log_ch_id := self.nicknames_cog.nickname_log_channel_id) and (log_ch := self.nicknames_cog.bot.get_channel(log_ch_id)):
-            await log_ch.send(embed=result_embed)
+        log_channel_id = self.nicknames_cog.nickname_log_channel_id
+        if log_channel_id:
+            log_channel = self.nicknames_cog.bot.get_channel(log_channel_id)
+            if log_channel and isinstance(log_channel, discord.TextChannel):
+                await log_channel.send(embed=result_embed)
 
     @ui.button(label="승인", style=discord.ButtonStyle.success, custom_id="nick_approve")
     async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
     @ui.button(label="거절", style=discord.ButtonStyle.danger, custom_id="nick_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
+# ... 나머지 NicknameChangeModal, NicknameChangerPanelView, Nicknames Cog 클래스는 이전과 동일 ...
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     new_name = ui.TextInput(label="새로운 이름", placeholder="이모티콘, 특수문자 사용 불가. 한글 4자/영문 8자까지", required=True, max_length=12)
 
