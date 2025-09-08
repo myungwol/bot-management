@@ -249,7 +249,7 @@ class ApprovalView(ui.View):
             if is_approved:
                 success, results = await self._process_approval(moderator, member)
             else:
-                success, results = await self._process_rejection(moderator, member, rejection_reason)
+                success, results = await self._process_rejection(moderator, member, reason)
 
             status_text = "승인" if is_approved else "거절"
             if success:
@@ -265,40 +265,33 @@ class ApprovalView(ui.View):
         finally:
             lock.release()
 
-    # ▼▼▼ [핵심 수정] 작업들을 순차적으로 실행하도록 변경 ▼▼▼
     async def _process_approval(self, moderator: discord.Member, member: discord.Member) -> (bool, List[str]):
         errors: List[str] = []
 
-        # 1. 역할 부여
         role_grant_error = await self._grant_roles(member)
         if role_grant_error:
             logger.error(f"자기소개 승인 실패 (1/4): 역할 부여 중 오류 - {role_grant_error}")
             errors.append(role_grant_error)
             return False, errors
 
-        # 2. 닉네임 업데이트
         nickname_update_error = await self._update_nickname(member)
         if nickname_update_error:
             logger.warning(f"자기소개 승인 중 경고 (2/4): 닉네임 업데이트 실패 - {nickname_update_error}")
             errors.append(nickname_update_error)
 
-        # 3. 공개 채널에 환영 메시지 전송
         public_welcome_error = await self._send_public_welcome(moderator, member)
         if public_welcome_error:
             logger.warning(f"자기소개 승인 중 경고 (3/4): 공개 환영 메시지 실패 - {public_welcome_error}")
             errors.append(public_welcome_error)
             
-        # 4. 메인 채팅 채널에 환영 메시지 전송
         main_chat_error = await self._send_main_chat_welcome(member)
         if main_chat_error:
             logger.warning(f"자기소개 승인 중 경고 (4/4): 메인 채팅 환영 실패 - {main_chat_error}")
             errors.append(main_chat_error)
 
-        # 5. DM 알림 전송 (이건 실패해도 전체 실패로 간주하지 않음)
         await self._send_dm_notification(member, is_approved=True)
 
         return True, errors
-    # ▲▲▲ [핵심 수정] ▲▲▲
 
     async def _process_rejection(self, moderator: discord.Member, member: discord.Member, reason: str) -> (bool, List[str]):
         tasks = [ self._send_rejection_log(moderator, member, reason), self._send_dm_notification(member, is_approved=False, reason=reason) ]
@@ -386,7 +379,6 @@ class ApprovalView(ui.View):
             logger.error(f"공개 환영 메시지 전송 실패: {e}", exc_info=True); return "자기소개 채널에 메시지 전송 실패."
         return None
     
-    # ▼▼▼ [핵심 수정] 멘션 대상을 '도우미'로 변경하고 제공된 ID를 반영 ▼▼▼
     async def _send_main_chat_welcome(self, member: discord.Member) -> Optional[str]:
         try:
             ch_id = self.onboarding_cog.main_chat_channel_id
@@ -394,7 +386,6 @@ class ApprovalView(ui.View):
                 embed_data = await get_embed_from_db("embed_main_chat_welcome")
                 if not embed_data: return "메인 채팅 환영 임베드를 찾을 수 없음."
                 
-                # 템플릿에 필요한 데이터 준비 (DB에 없으면 제공된 ID를 사용)
                 staff_role_id = get_id('role_staff_newbie_helper') or 1412052122949779517
                 nickname_channel_id = get_id('nickname_panel_channel_id') or 1412052293096050729
                 role_channel_id = get_id('auto_role_channel_id') or 1412052301115424799
@@ -417,7 +408,6 @@ class ApprovalView(ui.View):
         except Exception as e:
             logger.error(f"메인 채팅 환영 메시지 전송 실패: {e}", exc_info=True); return "메인 채팅 채널에 메시지 전송 실패."
         return None
-    # ▲▲▲ [핵심 수정] ▲▲▲
     
     async def _send_dm_notification(self, member: discord.Member, is_approved: bool, reason: str = "") -> None:
         try:
@@ -477,6 +467,7 @@ class OnboardingGuideView(ui.View):
         else:
             next_button = ui.Button(label="다음 ▶", style=discord.ButtonStyle.primary, custom_id="onboarding_next", disabled=is_last)
             next_button.callback = self.go_next; self.add_item(next_button)
+
     async def _grant_step_role(self, interaction: discord.Interaction, role_key_to_add: str):
         role_id = get_id(role_key_to_add)
         if role_id and isinstance(interaction.user, discord.Member):
@@ -485,6 +476,7 @@ class OnboardingGuideView(ui.View):
                     if role not in interaction.user.roles: await interaction.user.add_roles(role, reason="온보딩 진행")
                 except Exception as e: logger.error(f"온보딩 가이드 중 역할 부여 실패: {e}")
             else: logger.warning(f"온보딩: DB에 설정된 역할 ID({role_id})를 서버에서 찾을 수 없습니다. ({role_key_to_add})")
+    
     def _prepare_next_step_message_content(self) -> dict:
         step_info = self.steps_data[self.current_step]
         embed_data = step_info.get("embed_data", {}).get("embed_data")
@@ -492,16 +484,29 @@ class OnboardingGuideView(ui.View):
         else: embed = format_embed_from_db(embed_data, member_mention=self.user.mention)
         self._update_components()
         return {"embed": embed, "view": self}
+
+    # ▼▼▼ [핵심 수정] 작업 순서를 보장하도록 로직 변경 ▼▼▼
     async def go_next(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        tasks = []
+
+        # 1. 현재 단계에 부여할 역할이 있다면, 먼저 부여하고 기다립니다.
         step_info = self.steps_data[self.current_step]
         role_key_to_add = step_info.get("role_key_to_add")
-        if role_key_to_add: tasks.append(self._grant_step_role(interaction, role_key_to_add))
-        if self.current_step < len(self.steps_data) - 1: self.current_step += 1
+        if role_key_to_add:
+            await self._grant_step_role(interaction, role_key_to_add)
+
+        # 2. 다음 단계로 인덱스를 이동합니다.
+        if self.current_step < len(self.steps_data) - 1:
+            self.current_step += 1
+        
+        # 3. 새로운 단계의 콘텐츠를 준비합니다.
         content = self._prepare_next_step_message_content()
-        tasks.append(self.message.edit(**content))
-        await asyncio.gather(*tasks)
+        
+        # 4. 모든 작업이 끝난 후, 메시지를 수정합니다.
+        if self.message:
+            await self.message.edit(**content)
+    # ▲▲▲ [핵심 수정] ▲▲▲
+
     async def go_previous(self, interaction: discord.Interaction):
         await interaction.response.defer()
         if self.current_step > 0: self.current_step -= 1
