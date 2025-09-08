@@ -18,7 +18,6 @@ from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_requi
 
 logger = logging.getLogger(__name__)
 
-# --- RejectionReasonModal, IntroductionModal, GenderAgeSelectView 클래스는 이전과 동일하므로 생략 ---
 class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -188,7 +187,6 @@ class GenderAgeSelectView(ui.View):
         await interaction.response.send_modal(modal)
         await interaction.delete_original_response()
 
-
 class ApprovalView(ui.View):
     def __init__(self, author: discord.Member, original_embed: discord.Embed, cog_instance: 'Onboarding', actual_birth_year: str):
         super().__init__(timeout=None)
@@ -210,6 +208,7 @@ class ApprovalView(ui.View):
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
         
+    # ▼▼▼ [핵심 수정] 올바른 Lock 관리 로직으로 변경 ▼▼▼
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction):
             return
@@ -219,31 +218,38 @@ class ApprovalView(ui.View):
             await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
             return
         
+        rejection_reason = None
+        if not is_approved:
+            rejection_modal = RejectionReasonModal()
+            await interaction.response.send_modal(rejection_modal)
+            timed_out = await rejection_modal.wait()
+            
+            # 모달이 취소되었거나 내용이 없으면 잠금을 걸지 않고 그대로 종료합니다.
+            if timed_out or not rejection_modal.reason.value:
+                return 
+            
+            rejection_reason = rejection_modal.reason.value
+        else:
+            # 승인 시에는 모달이 없으므로 defer를 먼저 호출합니다.
+            await interaction.response.defer(ephemeral=True)
+
+        # 실제 처리를 시작하기 직전에 잠금을 획득합니다.
         await lock.acquire()
         try:
+            # 버튼을 비활성화하고 처리 중 메시지를 표시합니다.
+            for item in self.children:
+                item.disabled = True
+            await interaction.edit_original_response(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
+            
             member = interaction.guild.get_member(self.author_id)
             if not member:
-                await interaction.response.send_message("❌ 대상 멤버를 찾을 수 없습니다. 서버에서 나간 것 같습니다.", ephemeral=True)
-                try: await interaction.message.delete()
-                except (discord.NotFound, discord.HTTPException): pass
+                await interaction.followup.send("❌ 대상 멤버를 찾을 수 없습니다. 서버에서 나간 것 같습니다.", ephemeral=True)
+                try:
+                    await interaction.message.delete()
+                except (discord.NotFound, discord.HTTPException):
+                    pass
                 return
 
-            rejection_reason = None
-            if not is_approved:
-                rejection_modal = RejectionReasonModal()
-                await interaction.response.send_modal(rejection_modal)
-                timed_out = await rejection_modal.wait()
-                
-                if timed_out or not rejection_modal.reason.value:
-                    return 
-                
-                rejection_reason = rejection_modal.reason.value
-            else:
-                await interaction.response.defer(ephemeral=True)
-
-            for item in self.children: item.disabled = True
-            await interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
-            
             moderator = interaction.user
             if is_approved:
                 success, results = await self._process_approval(moderator, member)
@@ -251,20 +257,20 @@ class ApprovalView(ui.View):
                 success, results = await self._process_rejection(moderator, member, rejection_reason)
 
             status_text = "승인" if is_approved else "거절"
-            
-            response_method = interaction.followup.send
-            
             if success:
-                await response_method(f"✅ **{status_text}** 처리가 완료되었습니다.", ephemeral=True)
+                message = await interaction.followup.send(f"✅ **{status_text}** 처리가 완료되었습니다.", ephemeral=True, wait=True)
+                await asyncio.sleep(3)
+                await message.delete()
             else:
                 error_report = f"❌ **{status_text}** 처리 중 오류가 발생했습니다:\n" + "\n".join(f"- {res}" for res in results)
-                await response_method(error_report, ephemeral=True)
+                await interaction.followup.send(error_report, ephemeral=True)
 
-            await interaction.message.delete()
+            await interaction.delete_original_response()
         
         finally:
-            if lock.locked():
-                lock.release()
+            # 모든 경우에 Lock을 해제하도록 보장합니다.
+            lock.release()
+    # ▲▲▲ [핵심 수정] ▲▲▲
 
     async def _process_approval(self, moderator: discord.Member, member: discord.Member) -> (bool, List[str]):
         role_grant_error = await self._grant_roles(member)
@@ -273,12 +279,10 @@ class ApprovalView(ui.View):
             logger.error(f"자기소개 승인 실패: 역할 부여 중 오류 발생 - {role_grant_error}")
             return False, [role_grant_error]
         
-        # ▼▼▼ [수정] _send_main_chat_welcome을 최우선으로 실행하도록 변경 ▼▼▼
-        # (채널이 삭제되거나 하는 경우를 대비)
         remaining_tasks = [
-            self._send_main_chat_welcome(member),
             self._update_nickname(member),
             self._send_public_welcome(moderator, member),
+            self._send_main_chat_welcome(member),
             self._send_dm_notification(member, is_approved=True)
         ]
         results = await asyncio.gather(*remaining_tasks, return_exceptions=True)
@@ -300,9 +304,15 @@ class ApprovalView(ui.View):
         try:
             guild = member.guild; roles_to_add: List[discord.Role] = []; failed_to_find_roles: List[str] = []
             
-            role_keys_to_grant = [ "role_resident", "role_resident_rookie", "role_warning_separator", "role_shop_separator" ]
+            role_keys_to_grant = [
+                "role_resident", 
+                "role_resident_rookie", 
+                "role_warning_separator",
+                "role_shop_separator"
+            ]
             for key in role_keys_to_grant:
-                if (rid := get_id(key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
+                if (rid := get_id(key)) and (r := guild.get_role(rid)):
+                    roles_to_add.append(r)
                 else: failed_to_find_roles.append(key)
             
             gender_field = self._get_field_value(self.original_embed, "성별")
@@ -312,24 +322,31 @@ class ApprovalView(ui.View):
                 if (rid := get_id("role_info_female")) and (r := guild.get_role(rid)): roles_to_add.append(r)
 
             age_role_mapping = get_config("AGE_ROLE_MAPPING", [])
+            
             birth_year_str = self.actual_birth_year
+
             if birth_year_str.isdigit():
                 birth_year = int(birth_year_str)
                 age_limit = 16
                 current_year = datetime.now(timezone.utc).year
                 if (current_year - birth_year) < age_limit:
                     return f"연령 제한: 사용자가 만 {age_limit}세 미만입니다. (출생 연도: {birth_year})"
+
                 for mapping in age_role_mapping:
                     if mapping["range"][0] <= birth_year < mapping["range"][1]:
-                        if (rid := get_id(mapping["key"])) and (r := guild.get_role(rid)): roles_to_add.append(r)
-                        else: failed_to_find_roles.append(mapping["key"])
+                        if (rid := get_id(mapping["key"])) and (r := guild.get_role(rid)):
+                            roles_to_add.append(r)
+                        else:
+                            failed_to_find_roles.append(mapping["key"])
                         break
             
             if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="자기소개 승인")
             if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="자기소개 승인 완료")
             
-            if failed_to_find_roles: return f"역할을 찾을 수 없음: `{', '.join(failed_to_find_roles)}`. `/setup` 명령어로 역할을 동기화해주세요."
-        except discord.Forbidden: return "봇 권한 부족: 역할을 부여/제거할 권한이 없습니다."
+            if failed_to_find_roles: 
+                return f"역할을 찾을 수 없음: `{', '.join(failed_to_find_roles)}`. `/setup` 명령어로 역할을 동기화해주세요."
+        except discord.Forbidden: 
+            return "봇 권한 부족: 역할을 부여/제거할 권한이 없습니다."
         except Exception as e:
             logger.error(f"역할 부여 중 오류: {e}", exc_info=True)
             return "역할 부여 중 알 수 없는 오류가 발생했습니다."
@@ -350,15 +367,20 @@ class ApprovalView(ui.View):
             if ch_id and (ch := member.guild.get_channel(ch_id)):
                 embed = discord.Embed(title="📝 자기소개", color=discord.Color.green())
                 embed.add_field(name="주민", value=member.mention, inline=False)
-                for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
+                
+                for field in self.original_embed.fields: 
+                    embed.add_field(name=field.name, value=field.value, inline=False)
+                
                 embed.add_field(name="담당자", value=moderator.mention, inline=False)
-                if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
+                
+                if member.display_avatar: 
+                    embed.set_thumbnail(url=member.display_avatar.url)
                 await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
             logger.error(f"공개 환영 메시지 전송 실패: {e}", exc_info=True); return "자기소개 채널에 메시지 전송 실패."
         return None
     
-    # ▼▼▼ [핵심 수정] 환영 메시지 생성 로직 수정 ▼▼▼
+    # ▼▼▼ [핵심 수정] 멘션이 제대로 되도록 요청하신 ID를 반영한 로직 ▼▼▼
     async def _send_main_chat_welcome(self, member: discord.Member) -> Optional[str]:
         try:
             ch_id = self.onboarding_cog.main_chat_channel_id
@@ -366,31 +388,31 @@ class ApprovalView(ui.View):
                 embed_data = await get_embed_from_db("embed_main_chat_welcome")
                 if not embed_data: return "메인 채팅 환영 임베드를 찾을 수 없음."
                 
-                # Onboarding Cog에 저장된 ID들을 사용하여 format_args 딕셔너리를 만듭니다.
-                format_args = {
-                    "staff_role_mention": f"<@&{self.onboarding_cog.staff_role_id}>" if self.onboarding_cog.staff_role_id else "**직원**",
-                    "nickname_channel_mention": f"<#{self.onboarding_cog.nickname_channel_id}>" if self.onboarding_cog.nickname_channel_id else "**이름변경**",
-                    "role_channel_mention": f"<#{self.onboarding_cog.role_channel_id}>" if self.onboarding_cog.role_channel_id else "**역할받기**",
-                    "inquiry_channel_mention": f"<#{self.onboarding_cog.inquiry_channel_id}>" if self.onboarding_cog.inquiry_channel_id else "**건의하기**",
-                    "bot_guide_channel_mention": f"<#{self.onboarding_cog.bot_guide_channel_id}>" if self.onboarding_cog.bot_guide_channel_id else "**서버안내**",
-                    "festival_channel_mention": f"<#{self.onboarding_cog.festival_channel_id}>" if self.onboarding_cog.festival_channel_id else "**축제-안내**" 
-                }
-                
-                embed = format_embed_from_db(embed_data, **format_args)
-                if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-                
-                content = f"### :sparkles: **{member.mention}**님의 입주를 온 마을이 환영합니다! :sparkles:"
-                
-                await ch.send(
-                    content=content,
-                    embed=embed,
-                    allowed_mentions=discord.AllowedMentions(users=True, roles=True)
-                )
+                # 템플릿에 필요한 데이터 준비 (DB에 없으면 제공된 ID를 사용)
+                staff_role_id = get_id('role_approval') or 1412052122949779517
+                nickname_channel_id = get_id('nickname_panel_channel_id') or 1412052293096050729
+                role_channel_id = get_id('auto_role_channel_id') or 1412052301115424799
+                inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1412052236736925737
+                # ui_defaults.py에 아직 없을 수 있는 키들을 위해 DB 조회 후 제공된 ID를 사용
+                bot_guide_channel_id = get_id('bot_guide_channel_id') or 1412052405477970040
+                festival_channel_id = get_id('festival_channel_id') or 1412052244349845627
 
+                format_args = {
+                    "member_mention": member.mention,
+                    "staff_role_mention": f"<@&{staff_role_id}>",
+                    "nickname_channel_mention": f"<#{nickname_channel_id}>",
+                    "role_channel_mention": f"<#{role_channel_id}>",
+                    "inquiry_channel_mention": f"<#{inquiry_channel_id}>",
+                    "bot_guide_channel_mention": f"<#{bot_guide_channel_id}>",
+                    "festival_channel_mention": f"<#{festival_channel_id}>"
+                }
+
+                embed = format_embed_from_db(embed_data, **format_args)
+                await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
-            logger.error(f"메인 채팅 환영 메시지 전송 실패: {e}", exc_info=True)
-            return "메인 채팅 채널에 메시지 전송 실패."
+            logger.error(f"메인 채팅 환영 메시지 전송 실패: {e}", exc_info=True); return "메인 채팅 채널에 메시지 전송 실패."
         return None
+    # ▲▲▲ [핵심 수정] ▲▲▲
     
     async def _send_dm_notification(self, member: discord.Member, is_approved: bool, reason: str = "") -> None:
         try:
@@ -426,7 +448,7 @@ class ApprovalView(ui.View):
         except Exception as e:
             logger.error(f"거절 로그 전송 실패: {e}", exc_info=True); return "거절 로그 채널에 메시지 전송 실패."
         return None
-# --- OnboardingGuideView, OnboardingPanelView 클래스는 이전과 동일하므로 생략 ---
+
 class OnboardingGuideView(ui.View):
     def __init__(self, cog_instance: 'Onboarding', steps_data: List[Dict[str, Any]], user: discord.User):
         super().__init__(timeout=300); self.onboarding_cog = cog_instance; self.steps_data = steps_data
@@ -553,7 +575,6 @@ class OnboardingPanelView(ui.View):
 class Onboarding(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # ▼▼▼ [핵심 수정] 환영 메시지에 필요한 모든 ID를 저장할 변수 선언 ▼▼▼
         self.panel_channel_id: Optional[int] = None
         self.approval_channel_id: Optional[int] = None
         self.introduction_channel_id: Optional[int] = None
@@ -563,21 +584,13 @@ class Onboarding(commands.Cog):
         self.private_age_log_channel_id: Optional[int] = None
         self.master_role_id: Optional[int] = None
         self.vice_master_role_id: Optional[int] = None
-        
-        # 환영 메시지용 ID들
-        self.staff_role_id: Optional[int] = None
-        self.nickname_channel_id: Optional[int] = None
-        self.role_channel_id: Optional[int] = None
-        self.inquiry_channel_id: Optional[int] = None
-        self.bot_guide_channel_id: Optional[int] = None # 'onboarding_panel_channel_id' 와 동일
-        self.festival_channel_id: Optional[int] = None
-        
         self.view_instance = None
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
         self._user_locks: Dict[int, asyncio.Lock] = {}
         
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
-        if user_id not in self._user_locks: self._user_locks[user_id] = asyncio.Lock()
+        if user_id not in self._user_locks:
+            self._user_locks[user_id] = asyncio.Lock()
         return self._user_locks[user_id]
 
     @property
@@ -598,7 +611,6 @@ class Onboarding(commands.Cog):
     async def cog_load(self): 
         await self.load_configs()
 
-    # ▼▼▼ [핵심 수정] 필요한 모든 ID를 불러오도록 load_configs 수정 ▼▼▼
     async def load_configs(self):
         self.panel_channel_id = get_id("onboarding_panel_channel_id")
         self.approval_channel_id = get_id("onboarding_approval_channel_id")
@@ -609,20 +621,12 @@ class Onboarding(commands.Cog):
         self.private_age_log_channel_id = get_id("onboarding_private_age_log_channel_id")
         self.master_role_id = get_id("role_staff_village_chief")
         self.vice_master_role_id = get_id("role_staff_deputy_chief")
-        
-        # 환영 메시지에 필요한 ID 로드
-        self.staff_role_id = get_id("role_approval")
-        self.nickname_channel_id = get_id("nickname_panel_channel_id")
-        self.role_channel_id = get_id("auto_role_channel_id")
-        self.inquiry_channel_id = get_id("inquiry_panel_channel_id")
-        self.bot_guide_channel_id = get_id("onboarding_panel_channel_id") # 봇 가이드는 온보딩 패널 채널
-        self.festival_channel_id = get_id("festival_announcement_channel_id") # 축제 채널 ID 추가
-        
         logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
     
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_onboarding") -> bool:
         base_panel_key = panel_key.replace("panel_", "")
         embed_key = panel_key
+
         try:
             panel_info = get_panel_id(base_panel_key)
             if panel_info and (old_id := panel_info.get('message_id')):
@@ -630,12 +634,16 @@ class Onboarding(commands.Cog):
                     old_message = await channel.fetch_message(old_id)
                     await old_message.delete()
                 except (discord.NotFound, discord.HTTPException): pass
+
             embed_data = await get_embed_from_db(embed_key)
             if not embed_data:
                 logger.warning(f"DB에서 '{embed_key}' 임베드 데이터를 찾을 수 없어, 패널 생성을 건너뜁니다.")
                 return False
+                
             embed = discord.Embed.from_dict(embed_data)
-            if self.view_instance is None: await self.register_persistent_views()
+            if self.view_instance is None:
+                await self.register_persistent_views()
+            
             await self.view_instance.setup_buttons()
             new_message = await channel.send(embed=embed, view=self.view_instance)
             await save_panel_id(base_panel_key, new_message.id, channel.id)
