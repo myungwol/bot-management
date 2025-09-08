@@ -457,8 +457,10 @@ UI_EMBEDS = {
         "color": 0x3498DB
     },
     "farewell_embed": {
-        "description": "👋 **{user_name}**님이 마을을 떠났습니다.\n함께했던 모든 순간에 감사드립니다.\n앞으로의 여정에 행운이 가득하기를 바랍니다.",
-        "color": 0x99AAB5  # 회색 계열
+        "title": "👋 다음에 또 만나요",
+        "description": 
+        "**{member_name}**님이 마을을 떠났습니다.\n함께했던 모든 순간에 감사드립니다.\n앞으로의 여정에 행운이 가득하기를 바랍니다.",
+        "color": 0x99AAB5
     },
     "panel_roles": {
         "title": "📖 역할 부여",
