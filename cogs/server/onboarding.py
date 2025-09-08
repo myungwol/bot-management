@@ -14,7 +14,6 @@ from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
     get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
-# ▼▼▼ [핵심 수정] has_required_roles 함수를 import 합니다. ▼▼▼
 from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_required_roles
 
 logger = logging.getLogger(__name__)
@@ -203,11 +202,9 @@ class ApprovalView(ui.View):
     @ui.button(label="거절", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
     
-    # ▼▼▼ [핵심 수정] 권한 확인 로직을 중앙 함수 호출로 변경 ▼▼▼
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
         required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
         return await has_required_roles(interaction, required_keys)
-    # ▲▲▲ [핵심 수정] ▲▲▲
     
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
@@ -513,11 +510,13 @@ class OnboardingPanelView(ui.View):
         last_time = await get_cooldown(user_id_str, cooldown_key)
         
         if last_time > 0 and (utc_now - last_time) < cooldown_seconds:
+            # ▼▼▼ [핵심 수정] 쿨타임 메시지를 시/분/초 형식으로 변경 ▼▼▼
             time_remaining = cooldown_seconds - (utc_now - last_time)
             formatted_time = format_seconds_to_hms(time_remaining)
             message = f"❌ 다음 안내는 **{formatted_time}** 후에 볼 수 있습니다. 잠시만 기다려주세요."
             await interaction.response.send_message(message, ephemeral=True)
             return
+            # ▲▲▲ [핵심 수정] ▲▲▲
             
         await interaction.response.defer(ephemeral=True, thinking=True)
         await set_cooldown(user_id_str, cooldown_key)
