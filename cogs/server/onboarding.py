@@ -14,7 +14,8 @@ from utils.database import (
     get_id, save_panel_id, get_panel_id, get_cooldown, set_cooldown, 
     get_embed_from_db, get_onboarding_steps, get_panel_components_from_db, get_config
 )
-from utils.helpers import format_embed_from_db, format_seconds_to_hms
+# ▼▼▼ [핵심 수정] has_required_roles 함수를 import 합니다. ▼▼▼
+from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_required_roles
 
 logger = logging.getLogger(__name__)
 
@@ -202,28 +203,11 @@ class ApprovalView(ui.View):
     @ui.button(label="거절", style=discord.ButtonStyle.danger, custom_id="onboarding_reject")
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
     
-    # --- ▼ 핵심 수정 부분: 권한 확인 로직 변경 ▼ ---
+    # ▼▼▼ [핵심 수정] 권한 확인 로직을 중앙 함수 호출로 변경 ▼▼▼
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
-        # Cog에서 모든 관련 역할 ID를 가져옵니다.
-        approval_role_id = self.onboarding_cog.approval_role_id
-        master_role_id = self.onboarding_cog.master_role_id
-        vice_master_role_id = self.onboarding_cog.vice_master_role_id
-
-        # 허용된 역할 ID 목록을 만듭니다 (None이 아닌 것만 포함).
-        allowed_role_ids = {rid for rid in [approval_role_id, master_role_id, vice_master_role_id] if rid is not None}
-        
-        if not isinstance(interaction.user, discord.Member) or not allowed_role_ids:
-            await interaction.response.send_message("❌ 이 버튼을 누를 권한이 없거나, 권한 역할이 설정되지 않았습니다.", ephemeral=True)
-            return False
-
-        # 사용자가 가진 역할 ID와 허용된 역할 ID 목록을 비교합니다.
-        user_role_ids = {role.id for role in interaction.user.roles}
-        if not user_role_ids.intersection(allowed_role_ids):
-            await interaction.response.send_message("❌ 이 버튼을 누를 권한이 없습니다.", ephemeral=True)
-            return False
-            
-        return True
-    # --- ▲ 핵심 수정 부분 ▲ ---
+        required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
+        return await has_required_roles(interaction, required_keys)
+    # ▲▲▲ [핵심 수정] ▲▲▲
     
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
@@ -563,10 +547,8 @@ class Onboarding(commands.Cog):
         self.approval_role_id: Optional[int] = None
         self.main_chat_channel_id: Optional[int] = None
         self.private_age_log_channel_id: Optional[int] = None
-        # --- ▼ 핵심 수정 부분: 촌장/부촌장 역할 ID 속성 추가 ▼ ---
         self.master_role_id: Optional[int] = None
         self.vice_master_role_id: Optional[int] = None
-        # --- ▲ 핵심 수정 부분 ▲ ---
         self.view_instance = None
         logger.info("Onboarding Cog가 성공적으로 초기화되었습니다.")
         self._user_locks: Dict[int, asyncio.Lock] = {}
@@ -602,7 +584,6 @@ class Onboarding(commands.Cog):
         self.approval_role_id = get_id("role_approval")
         self.main_chat_channel_id = get_id("main_chat_channel_id")
         self.private_age_log_channel_id = get_id("onboarding_private_age_log_channel_id")
-        # --- ▼ 핵심 수정 부분: DB에서 촌장/부촌장 역할 ID 로드 ▼ ---
         self.master_role_id = get_id("role_staff_village_chief")
         self.vice_master_role_id = get_id("role_staff_deputy_chief")
         logger.info("[Onboarding Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
