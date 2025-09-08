@@ -7,6 +7,7 @@ import re
 import asyncio
 from datetime import datetime, timezone
 import logging
+import time
 from typing import Optional, Dict, Set
 
 from utils.database import (
@@ -18,18 +19,22 @@ from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_requi
 
 logger = logging.getLogger(__name__)
 
-# 이제 모달은 잠금 해제 책임을 가지지 않고, 데이터 처리만 담당합니다.
+# --- 모달은 이제 데이터 입력 역할만 수행합니다 ---
 class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
 
     def __init__(self, view: 'NicknameApprovalView'):
-        super().__init__()
+        super().__init__(timeout=180) # 모달 자체의 타임아웃
         self.view = view
 
     async def on_submit(self, interaction: discord.Interaction):
-        # 이 모달은 이제 잠금을 직접 해제하지 않습니다.
-        # 대신, 부모 View의 _handle_approval_flow 함수를 호출하여 후속 처리를 위임합니다.
+        # 상위 View의 처리 함수를 호출합니다.
         await self.view._handle_approval_flow(interaction, is_approved=False, reason=self.reason.value)
+
+    async def on_timeout(self) -> None:
+        # 모달이 타임아웃되면 아무것도 하지 않습니다.
+        # 잠금 해제는 이제 View의 시간 기반 로직이 처리합니다.
+        pass
 
 class NicknameApprovalView(ui.View):
     def __init__(self, member: discord.Member, new_name: str, cog_instance: 'Nicknames'):
@@ -44,7 +49,6 @@ class NicknameApprovalView(ui.View):
         return await has_required_roles(interaction, required_keys)
     
     def _create_log_embed(self, member, moderator, final_name, is_approved, reason=None):
-        # (변경 없음)
         if is_approved:
             embed = discord.Embed(title="✅ 이름 변경 알림 (승인)", color=discord.Color.green())
             embed.add_field(name="주민", value=member.mention, inline=False).add_field(name="기존 이름", value=f"`{self.original_name}`", inline=False).add_field(name="새 이름", value=f"`{final_name}`", inline=False).add_field(name="담당자", value=moderator.mention, inline=False)
@@ -54,10 +58,9 @@ class NicknameApprovalView(ui.View):
         return embed
 
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool, reason: Optional[str] = None):
-        """승인/거절 로직을 처리하는 중앙 함수"""
+        """승인/거절 로직의 실제 처리 부분"""
         message_id = interaction.message.id
         try:
-            # 모달에서 호출된 경우 이미 defer되었을 수 있으므로 확인
             if not interaction.response.is_done():
                 await interaction.response.defer()
 
@@ -84,38 +87,51 @@ class NicknameApprovalView(ui.View):
             await interaction.followup.send(f"✅ {status_text} 처리가 완료되었습니다.", ephemeral=True)
             await interaction.message.delete()
         finally:
-            # 이 함수가 끝나면 잠금을 해제
-            logger.info(f"[NICKNAME_HANDLER] 처리 완료, 잠금 해제 시도 (Message ID: {message_id})")
-            self.nicknames_cog.locked_requests.discard(message_id)
+            # 성공적으로 처리된 경우, 즉시 잠금을 해제합니다.
+            self.nicknames_cog.locked_requests.pop(message_id, None)
+            logger.info(f"[NICKNAME_HANDLER] 성공적으로 처리 완료, 잠금 해제 (Message ID: {message_id})")
+
+    async def _lock_check_and_proceed(self, interaction: discord.Interaction) -> bool:
+        """잠금 상태를 확인하고, 잠겨있으면 남은 시간을 표시합니다."""
+        message_id = interaction.message.id
+        lock_time = self.nicknames_cog.locked_requests.get(message_id)
+
+        if lock_time:
+            elapsed = time.time() - lock_time
+            if elapsed < self.nicknames_cog.LOCK_DURATION:
+                remaining = self.nicknames_cog.LOCK_DURATION - elapsed
+                await interaction.response.send_message(
+                    f"⏳ 다른 관리자가 이 신청을 처리 중입니다.\n**({int(remaining)}초 후 자동 잠금 해제)**", 
+                    ephemeral=True
+                )
+                return False # 진행 불가
+            else:
+                # 60초가 지났다면 오래된 잠금을 해제하고 계속 진행
+                logger.warning(f"[NICKNAME_LOCK] ⚠️ 시간 초과된 잠금을 발견하여 해제합니다. (Message ID: {message_id})")
+                self.nicknames_cog.locked_requests.pop(message_id, None)
+
+        # 잠금을 설정하고 진행 허가
+        self.nicknames_cog.locked_requests[message_id] = time.time()
+        logger.info(f"[NICKNAME_LOCK] ✅ Message ID {message_id}를 잠갔습니다.")
+        return True # 진행 가능
 
     @ui.button(label="승인", style=discord.ButtonStyle.success, custom_id="nick_approve")
     async def approve(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction): return
-        message_id = interaction.message.id
-        if message_id in self.nicknames_cog.locked_requests:
-            return await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다.", ephemeral=True)
+        if not await self._lock_check_and_proceed(interaction): return
         
-        self.nicknames_cog.locked_requests.add(message_id)
-        logger.info(f"[NICKNAME_BUTTON] 승인 버튼 클릭, Message ID {message_id} 잠금.")
+        # 잠금에 성공했으므로, 실제 처리 함수를 호출합니다.
         await self._handle_approval_flow(interaction, is_approved=True)
 
     @ui.button(label="거절", style=discord.ButtonStyle.danger, custom_id="nick_reject")
     async def reject(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction): return
-        message_id = interaction.message.id
-        if message_id in self.nicknames_cog.locked_requests:
-            return await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다.", ephemeral=True)
-        
-        self.nicknames_cog.locked_requests.add(message_id)
-        logger.info(f"[NICKNAME_BUTTON] 거절 버튼 클릭, Message ID {message_id} 잠금.")
-        
-        # Failsafe 타이머 시작! 모달 타임아웃(180초)보다 5초 길게 설정
-        asyncio.create_task(self.nicknames_cog._unlock_failsafe(message_id, delay=185))
-        
+        if not await self._lock_check_and_proceed(interaction): return
+
+        # 잠금에 성공했으므로, 모달을 띄웁니다.
         modal = RejectionReasonModal(self)
         await interaction.response.send_modal(modal)
 
-# --- 이하 NicknameChangeModal, NicknameChangerPanelView 는 변경 없음 ---
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     new_name = ui.TextInput(label="새로운 이름", placeholder="이모티콘, 특수문자 사용 불가. 한글 4자/영문 8자까지", required=True, max_length=12)
 
@@ -197,8 +213,9 @@ class NicknameChangerPanelView(ui.View):
             
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
-
 class Nicknames(commands.Cog):
+    LOCK_DURATION = 60  # 잠금 지속 시간 (초)
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.approval_channel_id: Optional[int] = None
@@ -208,17 +225,11 @@ class Nicknames(commands.Cog):
         self.vice_master_role_id: Optional[int] = None
         self.view_instance = None
         self.panel_regeneration_lock = asyncio.Lock()
-        self.locked_requests: Set[int] = set()
+        
+        # ▼▼▼ [최종 수정] 타임스탬프 기반 잠금 Dict ▼▼▼
+        self.locked_requests: Dict[int, float] = {}
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
 
-    async def _unlock_failsafe(self, message_id: int, delay: int):
-        """지정된 시간 후에도 잠금이 해제되지 않았으면 강제로 해제합니다."""
-        await asyncio.sleep(delay)
-        if message_id in self.locked_requests:
-            logger.warning(f"[NICKNAME_FAILSAFE] ⚠️ 타임아웃된 요청을 강제 해제합니다 (Message ID: {message_id})")
-            self.locked_requests.discard(message_id)
-            
-    # --- 이하 나머지 함수들은 변경 없음 ---
     @staticmethod
     def calculate_weighted_length(name: str) -> int:
         total_length = 0
