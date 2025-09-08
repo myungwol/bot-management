@@ -453,13 +453,12 @@ UI_EMBEDS = {
     "welcome_embed": {
         "title": "🎉 {guild_name}에 오신 것을 환영합니다!",
         "description":
-        "{member_mention}님, 안녕하세요!\n\n우선, 서버 안내를 읽고 자기소개를 작성해주세요.",
+        "{member_mention}님, 마을 생활을 시작하기 전에, 잠시 시간을 내어 <#1412052194517061652> 채널에서 마을에 대한 안내를 받고 자기소개를 작성 해주세요.\n앞으로 즐거운 시간 보내시길 바랍니다! 😊",
         "color": 0x3498DB
     },
-    "farewell_embed": {
-        "title": "👋 다음에 또 만나요",
-        "description": "**{member_name}**님이 마을을 떠났습니다.",
-        "color": 0x99AAB5
+    "embed_member_remove": {
+        "description": "👋 **{user_name}**님이 마을을 떠났습니다.\n함께했던 모든 순간에 감사드립니다.\n앞으로의 여정에 행운이 가득하기를 바랍니다.",
+        "color": 0x99AAB5  # 회색 계열
     },
     "panel_roles": {
         "title": "📖 역할 부여",
