@@ -207,17 +207,18 @@ class ApprovalView(ui.View):
     
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
-    
-    # ▼▼▼ [핵심 수정] Lock 관리를 위해 try...finally 구문 적용 ▼▼▼
+        
+    # ▼▼▼ [핵심 수정] 올바른 Lock 관리 로직으로 변경 ▼▼▼
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction):
             return
 
         lock = self.onboarding_cog.get_user_lock(self.author_id)
-        if not await lock.acquire(blocking=False):
+        if lock.locked():
             await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
             return
         
+        await lock.acquire()
         try:
             member = interaction.guild.get_member(self.author_id)
             if not member:
@@ -235,7 +236,8 @@ class ApprovalView(ui.View):
                 timed_out = await rejection_modal.wait()
                 
                 if timed_out or not rejection_modal.reason.value:
-                    return # 모달 취소 시, Lock 해제를 위해 조기 리턴
+                    # 모달 취소 시, 아무것도 하지 않고 함수를 종료 (버튼은 활성화된 상태 유지)
+                    return 
                 
                 rejection_reason = rejection_modal.reason.value
             else:
@@ -253,6 +255,7 @@ class ApprovalView(ui.View):
 
             status_text = "승인" if is_approved else "거절"
             if success:
+                # defer가 호출되었으므로 followup을 사용
                 await interaction.followup.send(f"✅ **{status_text}** 처리가 완료되었습니다.", ephemeral=True)
             else:
                 error_report = f"❌ **{status_text}** 처리 중 오류가 발생했습니다:\n" + "\n".join(f"- {res}" for res in results)
