@@ -48,8 +48,10 @@ class NicknameApprovalView(ui.View):
         try:
             member = interaction.guild.get_member(self.target_member_id)
             if not member:
+                # 응답을 먼저 보내야 follow-up을 사용할 수 있습니다.
                 await interaction.response.send_message("❌ 오류: 대상 멤버를 서버에서 찾을 수 없습니다.", ephemeral=True)
                 try:
+                    # 원본 메시지를 삭제합니다.
                     await interaction.message.delete()
                 except (discord.NotFound, discord.HTTPException):
                     pass
@@ -61,20 +63,24 @@ class NicknameApprovalView(ui.View):
                 await interaction.response.send_modal(modal)
                 timed_out = await modal.wait()
                 
+                # 사용자가 모달을 제출하지 않고 닫거나, 타임아웃된 경우
                 if timed_out or not modal.reason.value:
-                    # 모달이 취소된 경우, 아무것도 하지 않고 함수를 종료합니다.
-                    # finally 블록에서 Lock이 안전하게 해제됩니다.
+                    # 아무 처리도 하지 않고 함수를 종료합니다. 
+                    # Lock은 finally 블록에서 해제되고, 버튼은 그대로 활성화된 상태를 유지합니다.
                     return
                 
+                # 정상적으로 제출된 경우에만 사유를 저장합니다.
                 rejection_reason = modal.reason.value
             else:
-                # 승인 시에는 모달이 없으므로 defer를 먼저 호출합니다.
+                # 승인 버튼은 모달이 없으므로 바로 defer 처리합니다.
                 await interaction.response.defer(ephemeral=True)
 
             # 모달이 성공적으로 제출되었거나, 승인 버튼을 누른 경우에만 버튼을 비활성화합니다.
             for item in self.children:
                 item.disabled = True
-            await interaction.edit_original_response(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
+            # edit_original_response는 최초 응답에만 사용 가능하므로, 모달 응답 후에는 followup을 사용해야 합니다.
+            # 이 경우, 원래 메시지를 직접 수정합니다.
+            await interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
 
             final_name = await self.nicknames_cog.get_final_nickname(member, base_name=self.new_name)
             error_report = ""
@@ -102,19 +108,27 @@ class NicknameApprovalView(ui.View):
                 await self._send_log_message_fallback(log_embed)
 
             status_text = "승인" if is_approved else "거절"
-            if error_report:
-                await interaction.followup.send(f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}", ephemeral=True)
+            
+            # 모달을 사용한 경우, followup으로 응답해야 합니다.
+            if interaction.is_done():
+                response_method = interaction.followup.send
             else:
-                message = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
+                response_method = interaction.response.send_message
+
+            if error_report:
+                await response_method(f"❌ **{status_text}** 처리 중 일부 작업에 실패했습니다:\n{error_report}", ephemeral=True)
+            else:
+                message = await response_method(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
                 await asyncio.sleep(3)
                 await message.delete()
             
-            await interaction.delete_original_response()
+            await interaction.message.delete()
         
         finally:
             # 이 함수가 어떤 경로로 종료되든, Lock은 반드시 해제됩니다.
-            lock.release()
-    # ▲▲▲ [핵심 수정] ▲▲▲
+            if lock.locked():
+                lock.release()
+    # ▲▲▲ [최종 수정] ▲▲▲
     
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
