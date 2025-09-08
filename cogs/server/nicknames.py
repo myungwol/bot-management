@@ -18,8 +18,6 @@ from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_requi
 
 logger = logging.getLogger(__name__)
 
-# --- 파일 최상단에 있던 calculate_weighted_length 함수는 Nicknames Cog 내부로 이동했습니다. ---
-
 class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
@@ -36,21 +34,25 @@ class NicknameApprovalView(ui.View):
         required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
         return await has_required_roles(interaction, required_keys)
 
+    # ▼▼▼ [핵심 수정] Lock 관리를 위해 try...finally 구문 적용 ▼▼▼
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
-        if not await self._check_permission(interaction): return
+        if not await self._check_permission(interaction):
+            return
 
-        user_process_lock = self.nicknames_cog.get_user_lock(self.target_member_id)
-        if user_process_lock.locked():
+        lock = self.nicknames_cog.get_user_lock(self.target_member_id)
+        if not await lock.acquire(blocking=False):
             await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
             return
-        
-        async with user_process_lock:
+
+        try:
             member = interaction.guild.get_member(self.target_member_id)
             if not member:
-                try: await interaction.message.delete()
-                except discord.NotFound: pass
                 await interaction.response.send_message("❌ 오류: 대상 멤버를 서버에서 찾을 수 없습니다.", ephemeral=True)
-                return
+                try:
+                    await interaction.message.delete()
+                except (discord.NotFound, discord.HTTPException):
+                    pass
+                return # finally 블록에서 Lock이 해제됨
 
             rejection_reason = None
             if not is_approved:
@@ -58,28 +60,26 @@ class NicknameApprovalView(ui.View):
                 await interaction.response.send_modal(modal)
                 timed_out = await modal.wait()
                 
+                # 모달이 취소된 경우, 아무것도 하지 않고 함수를 종료 (버튼은 활성화된 상태 유지)
                 if timed_out or not modal.reason.value:
-                    try:
-                        msg = await interaction.followup.send("⏳ 닉네임 변경 처리가 취소되었습니다.", ephemeral=True, wait=True)
-                        await asyncio.sleep(5)
-                        await msg.delete()
-                    except (discord.NotFound, discord.HTTPException):
-                        pass
-                    return
+                    return # finally 블록에서 Lock이 해제됨
+                
                 rejection_reason = modal.reason.value
             else:
-                await interaction.response.defer()
-            
-            for item in self.children: item.disabled = True
-            try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
-            except (discord.NotFound, discord.HTTPException): pass
+                await interaction.response.defer(ephemeral=True)
+
+            # 성공적으로 모달이 제출되었거나 승인 버튼을 누른 경우, 버튼을 비활성화하여 중복 클릭 방지
+            for item in self.children:
+                item.disabled = True
+            await interaction.edit_original_response(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
 
             final_name = await self.nicknames_cog.get_final_nickname(member, base_name=self.new_name)
             error_report = ""
             if is_approved:
                 try:
                     await member.edit(nick=final_name, reason=f"관리자가 승인 ({interaction.user})")
-                except Exception as e: error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
+                except Exception as e:
+                    error_report += f"- 닉네임 변경 실패: `{type(e).__name__}: {e}`\n"
             
             log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
             
@@ -107,10 +107,13 @@ class NicknameApprovalView(ui.View):
                 await asyncio.sleep(3)
                 await message.delete()
             
-            try: await interaction.message.delete()
-            except discord.NotFound: pass
-        
-        self.nicknames_cog.release_user_lock(self.target_member_id)
+            # 성공적으로 처리 완료 후 원본 메시지 삭제
+            await interaction.delete_original_response()
+
+        finally:
+            # 어떤 상황에서든 함수가 종료될 때 반드시 Lock을 해제
+            lock.release()
+    # ▲▲▲ [핵심 수정] ▲▲▲
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
@@ -211,12 +214,10 @@ class NicknameChangerPanelView(ui.View):
             utc_now = datetime.now(timezone.utc).timestamp()
 
             if last_time and utc_now - last_time < cooldown_seconds:
-                # ▼▼▼ [핵심 수정] 쿨타임 메시지를 시/분/초 형식으로 변경 ▼▼▼
                 time_remaining = cooldown_seconds - (utc_now - last_time)
                 formatted_time = format_seconds_to_hms(time_remaining)
                 message = f"❌ 다음 신청까지 **{formatted_time}** 남았습니다."
                 return await i.response.send_message(message, ephemeral=True)
-                # ▲▲▲ [핵심 수정] ▲▲▲
             
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
@@ -239,10 +240,6 @@ class Nicknames(commands.Cog):
             self._user_locks[user_id] = asyncio.Lock()
         return self._user_locks[user_id]
     
-    def release_user_lock(self, user_id: int):
-        if user_id in self._user_locks:
-            del self._user_locks[user_id]
-
     @staticmethod
     def calculate_weighted_length(name: str) -> int:
         total_length = 0
