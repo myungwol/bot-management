@@ -193,7 +193,6 @@ class ApprovalView(ui.View):
         self.author_id = author.id
         self.original_embed = copy.deepcopy(original_embed)
         self.onboarding_cog = cog_instance
-        self.user_process_lock = self.onboarding_cog.get_user_lock(self.author_id)
         self.actual_birth_year = actual_birth_year
     
     @ui.button(label="승인", style=discord.ButtonStyle.success, custom_id="onboarding_approve")
@@ -208,34 +207,43 @@ class ApprovalView(ui.View):
     
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
-        
+    
+    # ▼▼▼ [핵심 수정] Lock 관리를 위해 try...finally 구문 적용 ▼▼▼
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
-        if not await self._check_permission(interaction): return
-        if self.user_process_lock.locked():
+        if not await self._check_permission(interaction):
+            return
+
+        lock = self.onboarding_cog.get_user_lock(self.author_id)
+        if not await lock.acquire(blocking=False):
             await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
             return
         
-        async with self.user_process_lock:
+        try:
             member = interaction.guild.get_member(self.author_id)
             if not member:
+                await interaction.response.send_message("❌ 대상 멤버를 찾을 수 없습니다. 서버에서 나간 것 같습니다.", ephemeral=True)
                 try:
                     await interaction.message.delete()
-                    await interaction.response.send_message("❌ 대상 멤버를 찾을 수 없습니다. 서버에서 나간 것 같습니다.", ephemeral=True)
-                except (discord.NotFound, discord.HTTPException): pass
+                except (discord.NotFound, discord.HTTPException):
+                    pass
                 return
-            
+
             rejection_reason = None
             if not is_approved:
                 rejection_modal = RejectionReasonModal()
                 await interaction.response.send_modal(rejection_modal)
-                if await rejection_modal.wait() or not rejection_modal.reason.value: return
+                timed_out = await rejection_modal.wait()
+                
+                if timed_out or not rejection_modal.reason.value:
+                    return # 모달 취소 시, Lock 해제를 위해 조기 리턴
+                
                 rejection_reason = rejection_modal.reason.value
             else:
-                await interaction.response.defer()
+                await interaction.response.defer(ephemeral=True)
 
-            for item in self.children: item.disabled = True
-            try: await interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
-            except (discord.NotFound, discord.HTTPException): pass
+            for item in self.children:
+                item.disabled = True
+            await interaction.edit_original_response(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
             
             moderator = interaction.user
             if is_approved:
@@ -250,11 +258,12 @@ class ApprovalView(ui.View):
                 error_report = f"❌ **{status_text}** 처리 중 오류가 발생했습니다:\n" + "\n".join(f"- {res}" for res in results)
                 await interaction.followup.send(error_report, ephemeral=True)
 
-            try: await interaction.message.delete()
-            except (discord.NotFound, discord.HTTPException): pass
+            await interaction.delete_original_response()
         
-        if self.author_id in self.onboarding_cog._user_locks:
-            del self.onboarding_cog._user_locks[self.author_id]
+        finally:
+            # 모든 경우에 Lock을 해제하도록 보장
+            lock.release()
+    # ▲▲▲ [핵심 수정] ▲▲▲
 
     async def _process_approval(self, moderator: discord.Member, member: discord.Member) -> (bool, List[str]):
         role_grant_error = await self._grant_roles(member)
@@ -510,13 +519,11 @@ class OnboardingPanelView(ui.View):
         last_time = await get_cooldown(user_id_str, cooldown_key)
         
         if last_time > 0 and (utc_now - last_time) < cooldown_seconds:
-            # ▼▼▼ [핵심 수정] 쿨타임 메시지를 시/분/초 형식으로 변경 ▼▼▼
             time_remaining = cooldown_seconds - (utc_now - last_time)
             formatted_time = format_seconds_to_hms(time_remaining)
             message = f"❌ 다음 안내는 **{formatted_time}** 후에 볼 수 있습니다. 잠시만 기다려주세요."
             await interaction.response.send_message(message, ephemeral=True)
             return
-            # ▲▲▲ [핵심 수정] ▲▲▲
             
         await interaction.response.defer(ephemeral=True, thinking=True)
         await set_cooldown(user_id_str, cooldown_key)
