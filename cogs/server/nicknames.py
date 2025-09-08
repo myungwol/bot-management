@@ -35,19 +35,23 @@ class NicknameApprovalView(ui.View):
         required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
         return await has_required_roles(interaction, required_keys)
 
-    # ▼▼▼ [최종 수정] 메시지 ID 기반의 새로운 잠금 로직 ▼▼▼
+    # ▼▼▼ [최종 디버깅] 상세 로깅이 추가된 잠금 로직 ▼▼▼
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction):
             return
 
         message_id = interaction.message.id
+        logger.info(f"--- [NICKNAME_LOCK] 처리 시작: User '{interaction.user.display_name}' on Message ID: {message_id} ---")
+
         if message_id in self.nicknames_cog.locked_requests:
+            logger.warning(f"[NICKNAME_LOCK] ⚠️ 실패: Message ID {message_id}는 이미 잠겨있습니다. 현재 잠금 목록: {self.nicknames_cog.locked_requests}")
             await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
             return
         
         self.nicknames_cog.locked_requests.add(message_id)
+        logger.info(f"[NICKNAME_LOCK] ✅ 성공: Message ID {message_id}를 잠갔습니다. 현재 잠금 목록: {self.nicknames_cog.locked_requests}")
+        
         try:
-            # --- 이하 로직은 이전과 거의 동일 ---
             member = interaction.guild.get_member(self.target_member_id)
             if not member:
                 await interaction.response.send_message("❌ 오류: 대상 멤버를 서버에서 찾을 수 없습니다.", ephemeral=True)
@@ -59,48 +63,48 @@ class NicknameApprovalView(ui.View):
             if not is_approved:
                 modal = RejectionReasonModal()
                 await interaction.response.send_modal(modal)
+                
+                logger.info(f"[NICKNAME_LOCK] ⏳ 대기: Message ID {message_id}의 거절 사유 입력을 기다립니다...")
                 timed_out = await modal.wait()
+                logger.info(f"[NICKNAME_LOCK]  resumed: Message ID {message_id} | Timed out: {timed_out} | Reason value exists: {bool(modal.reason.value)}")
                 
                 if timed_out or not modal.reason.value:
-                    # 모달 취소 시, 아무것도 하지 않고 함수 종료 (finally에서 잠금 해제)
-                    return
+                    logger.info(f"[NICKNAME_LOCK] ↪️ 취소: Message ID {message_id}의 모달이 취소/타임아웃되었습니다. 처리를 중단하고 잠금을 해제합니다.")
+                    return # 여기서 함수가 종료되고 finally 블록이 실행됩니다.
                 
                 rejection_reason = modal.reason.value
             else:
                 await interaction.response.defer(ephemeral=True)
 
+            logger.info(f"[NICKNAME_LOCK] ⚙️ 처리 진행: Message ID {message_id}의 승인/거절 로직을 계속합니다.")
             for item in self.children:
                 item.disabled = True
             await interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
 
-            # ... (닉네임 변경, 로그 생성 등 나머지 처리 로직)
+            # ... (이하 처리 로직은 동일)
             final_name = await self.nicknames_cog.get_final_nickname(member, base_name=self.new_name)
             if is_approved:
-                try:
-                    await member.edit(nick=final_name, reason=f"관리자가 승인 ({interaction.user})")
-                except Exception:
-                    pass # 오류 보고는 아래에서
+                await member.edit(nick=final_name, reason=f"관리자가 승인 ({interaction.user})")
             
             log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
-            
-            log_channel_id = self.nicknames_cog.nickname_log_channel_id
-            if log_channel_id and (log_channel := self.nicknames_cog.bot.get_channel(log_channel_id)):
-                await log_channel.send(embed=log_embed)
+            if self.nicknames_cog.nickname_log_channel_id:
+                log_channel = self.nicknames_cog.bot.get_channel(self.nicknames_cog.nickname_log_channel_id)
+                if log_channel: await log_channel.send(embed=log_embed)
 
             status_text = "승인" if is_approved else "거절"
-            
-            response_method = interaction.followup.send
-            message = await response_method(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
+            msg = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
             await asyncio.sleep(3)
-            try: await message.delete()
-            except discord.NotFound: pass
-            
+            await msg.delete()
             await interaction.message.delete()
         
+        except Exception as e:
+            logger.error(f"[NICKNAME_LOCK] 💥 오류: Message ID {message_id} 처리 중 예외 발생: {e}", exc_info=True)
+
         finally:
-            # 어떤 경우에도 반드시 잠금을 해제합니다.
+            logger.info(f"[NICKNAME_LOCK] 🔓 해제 시도: Message ID {message_id}의 잠금을 해제합니다.")
             self.nicknames_cog.locked_requests.discard(message_id)
-    # ▲▲▲ [최종 수정] ▲▲▲
+            logger.info(f"[NICKNAME_LOCK] ⏹️ 해제 완료. 현재 잠금 목록: {self.nicknames_cog.locked_requests}")
+            logger.info(f"--- [NICKNAME_LOCK] 처리 종료: Message ID: {message_id} ---")
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         # 이 함수는 변경 없음
