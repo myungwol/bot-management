@@ -48,7 +48,7 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.voice_states = True
-BOT_VERSION = "v2.5-log-cleanup" # 로그 가독성 개선 버전
+BOT_VERSION = "v2.6-stability-hotfix" # 안정성 개선 핫픽스 버전
 
 # --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
@@ -81,11 +81,11 @@ class MyBot(commands.Bot):
         if registered_views_count > 0:
             logger.info(f"✅ 총 {registered_views_count}개의 Cog에서 영구 View를 성공적으로 등록했습니다.")
 
-    async def on_ready(self):
-        # on_ready로 이동하여 봇이 완전히 준비된 후에 루프를 시작하도록 합니다.
-        if not self.refresh_cache_periodically.is_running():
-            self.refresh_cache_periodically.start()
-            logger.info("✅ 주기적인 DB 캐시 새로고침 루프를 시작합니다.")
+    # ▼▼▼ [핵심 수정] on_ready 메소드를 삭제하고, 관련 로직을 아래 @bot.event on_ready 함수로 통합합니다. ▼▼▼
+    # async def on_ready(self):
+    #     if not self.refresh_cache_periodically.is_running():
+    #         self.refresh_cache_periodically.start()
+    #         logger.info("✅ 주기적인 DB 캐시 새로고침 루프를 시작합니다.")
 
     @tasks.loop(minutes=5)
     async def refresh_cache_periodically(self):
@@ -132,6 +132,7 @@ class MyBot(commands.Bot):
 
 bot = MyBot(command_prefix="/", intents=intents)
 
+# ▼▼▼ [핵심 수정] on_ready 이벤트를 이 함수로 통합합니다. ▼▼▼
 @bot.event
 async def on_ready():
     logger.info("==================================================")
@@ -157,6 +158,11 @@ async def on_ready():
         logger.info(f"✅ 총 {refreshed_cogs_count}개의 Cog 설정이 새로고침되었습니다.")
     logger.info("------ [ 모든 Cog 설정 새로고침 완료 ] ------")
     
+    # [수정] 주기적 캐시 새로고침 루프를 여기서 시작합니다.
+    if not bot.refresh_cache_periodically.is_running():
+        bot.refresh_cache_periodically.start()
+        logger.info("✅ 주기적인 DB 캐시 새로고침 루프를 시작합니다.")
+
     try:
         if TEST_GUILD_ID:
             guild = discord.Object(id=TEST_GUILD_ID)
