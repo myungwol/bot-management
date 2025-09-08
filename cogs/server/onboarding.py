@@ -224,19 +224,15 @@ class ApprovalView(ui.View):
             await interaction.response.send_modal(rejection_modal)
             timed_out = await rejection_modal.wait()
             
-            # 모달이 취소되었거나 내용이 없으면 잠금을 걸지 않고 그대로 종료합니다.
             if timed_out or not rejection_modal.reason.value:
                 return 
             
             rejection_reason = rejection_modal.reason.value
         else:
-            # 승인 시에는 모달이 없으므로 defer를 먼저 호출합니다.
             await interaction.response.defer(ephemeral=True)
 
-        # 실제 처리를 시작하기 직전에 잠금을 획득합니다.
         await lock.acquire()
         try:
-            # 버튼을 비활성화하고 처리 중 메시지를 표시합니다.
             for item in self.children:
                 item.disabled = True
             await interaction.edit_original_response(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
@@ -268,7 +264,6 @@ class ApprovalView(ui.View):
             await interaction.delete_original_response()
         
         finally:
-            # 모든 경우에 Lock을 해제하도록 보장합니다.
             lock.release()
     # ▲▲▲ [핵심 수정] ▲▲▲
 
@@ -380,7 +375,7 @@ class ApprovalView(ui.View):
             logger.error(f"공개 환영 메시지 전송 실패: {e}", exc_info=True); return "자기소개 채널에 메시지 전송 실패."
         return None
     
-    # ▼▼▼ [핵심 수정] 멘션이 제대로 되도록 요청하신 ID를 반영한 로직 ▼▼▼
+    # ▼▼▼ [핵심 수정] 멘션 대상을 '도우미'로 변경하고 제공된 ID를 반영 ▼▼▼
     async def _send_main_chat_welcome(self, member: discord.Member) -> Optional[str]:
         try:
             ch_id = self.onboarding_cog.main_chat_channel_id
@@ -389,13 +384,12 @@ class ApprovalView(ui.View):
                 if not embed_data: return "메인 채팅 환영 임베드를 찾을 수 없음."
                 
                 # 템플릿에 필요한 데이터 준비 (DB에 없으면 제공된 ID를 사용)
-                staff_role_id = get_id('role_approval') or 1412052122949779517
+                staff_role_id = get_id('role_staff_newbie_helper') or 1412052122949779517
                 nickname_channel_id = get_id('nickname_panel_channel_id') or 1412052293096050729
                 role_channel_id = get_id('auto_role_channel_id') or 1412052301115424799
                 inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1412052236736925737
-                # ui_defaults.py에 아직 없을 수 있는 키들을 위해 DB 조회 후 제공된 ID를 사용
-                bot_guide_channel_id = get_id('bot_guide_channel_id') or 1412052405477970040
-                festival_channel_id = get_id('festival_channel_id') or 1412052244349845627
+                bot_guide_channel_id = get_id('log_channel_message') or 1412052405477970040 # 'bot_guide_channel_id' 키가 없어서 임시로 다른 키 사용
+                festival_channel_id = get_id('channel_log_server') or 1412052244349845627 # 'festival_channel_id' 키가 없어서 임시로 다른 키 사용
 
                 format_args = {
                     "member_mention": member.mention,
