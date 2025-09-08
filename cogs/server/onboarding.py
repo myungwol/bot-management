@@ -208,7 +208,6 @@ class ApprovalView(ui.View):
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
         return next((f.value for f in embed.fields if f.name == field_name), None)
         
-    # ▼▼▼ [핵심 수정] 올바른 Lock 관리 로직으로 변경 ▼▼▼
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction):
             return
@@ -265,29 +264,41 @@ class ApprovalView(ui.View):
         
         finally:
             lock.release()
-    # ▲▲▲ [핵심 수정] ▲▲▲
 
+    # ▼▼▼ [핵심 수정] 작업들을 순차적으로 실행하도록 변경 ▼▼▼
     async def _process_approval(self, moderator: discord.Member, member: discord.Member) -> (bool, List[str]):
-        role_grant_error = await self._grant_roles(member)
-        
-        if role_grant_error:
-            logger.error(f"자기소개 승인 실패: 역할 부여 중 오류 발생 - {role_grant_error}")
-            return False, [role_grant_error]
-        
-        remaining_tasks = [
-            self._update_nickname(member),
-            self._send_public_welcome(moderator, member),
-            self._send_main_chat_welcome(member),
-            self._send_dm_notification(member, is_approved=True)
-        ]
-        results = await asyncio.gather(*remaining_tasks, return_exceptions=True)
-        
-        failed_tasks_messages = [res for res in results if isinstance(res, str)]
-        
-        if failed_tasks_messages:
-            logger.warning(f"자기소개 승인 후 부가 작업 실패: {failed_tasks_messages}")
+        errors: List[str] = []
 
-        return True, failed_tasks_messages
+        # 1. 역할 부여
+        role_grant_error = await self._grant_roles(member)
+        if role_grant_error:
+            logger.error(f"자기소개 승인 실패 (1/4): 역할 부여 중 오류 - {role_grant_error}")
+            errors.append(role_grant_error)
+            return False, errors
+
+        # 2. 닉네임 업데이트
+        nickname_update_error = await self._update_nickname(member)
+        if nickname_update_error:
+            logger.warning(f"자기소개 승인 중 경고 (2/4): 닉네임 업데이트 실패 - {nickname_update_error}")
+            errors.append(nickname_update_error)
+
+        # 3. 공개 채널에 환영 메시지 전송
+        public_welcome_error = await self._send_public_welcome(moderator, member)
+        if public_welcome_error:
+            logger.warning(f"자기소개 승인 중 경고 (3/4): 공개 환영 메시지 실패 - {public_welcome_error}")
+            errors.append(public_welcome_error)
+            
+        # 4. 메인 채팅 채널에 환영 메시지 전송
+        main_chat_error = await self._send_main_chat_welcome(member)
+        if main_chat_error:
+            logger.warning(f"자기소개 승인 중 경고 (4/4): 메인 채팅 환영 실패 - {main_chat_error}")
+            errors.append(main_chat_error)
+
+        # 5. DM 알림 전송 (이건 실패해도 전체 실패로 간주하지 않음)
+        await self._send_dm_notification(member, is_approved=True)
+
+        return True, errors
+    # ▲▲▲ [핵심 수정] ▲▲▲
 
     async def _process_rejection(self, moderator: discord.Member, member: discord.Member, reason: str) -> (bool, List[str]):
         tasks = [ self._send_rejection_log(moderator, member, reason), self._send_dm_notification(member, is_approved=False, reason=reason) ]
@@ -388,8 +399,8 @@ class ApprovalView(ui.View):
                 nickname_channel_id = get_id('nickname_panel_channel_id') or 1412052293096050729
                 role_channel_id = get_id('auto_role_channel_id') or 1412052301115424799
                 inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1412052236736925737
-                bot_guide_channel_id = get_id('log_channel_message') or 1412052405477970040 # 'bot_guide_channel_id' 키가 없어서 임시로 다른 키 사용
-                festival_channel_id = get_id('channel_log_server') or 1412052244349845627 # 'festival_channel_id' 키가 없어서 임시로 다른 키 사용
+                bot_guide_channel_id = get_id('bot_guide_channel_id') or 1412052405477970040 
+                festival_channel_id = get_id('festival_channel_id') or 1412052244349845627
 
                 format_args = {
                     "member_mention": member.mention,
@@ -402,7 +413,7 @@ class ApprovalView(ui.View):
                 }
 
                 embed = format_embed_from_db(embed_data, **format_args)
-                await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+                await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
         except Exception as e:
             logger.error(f"메인 채팅 환영 메시지 전송 실패: {e}", exc_info=True); return "메인 채팅 채널에 메시지 전송 실패."
         return None
