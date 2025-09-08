@@ -1,7 +1,8 @@
 # cogs/server/nicknames.py
+
 import discord
-from discord import ui
 from discord.ext import commands
+from discord import app_commands, ui
 import re
 import asyncio
 from datetime import datetime, timezone
@@ -22,30 +23,26 @@ class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
 
     def __init__(self, original_interaction: discord.Interaction, view: 'NicknameApprovalView'):
-        super().__init__()
+        super().__init__(timeout=180) # 3분 타임아웃
         self.original_interaction = original_interaction
         self.view = view
         self.cog = view.nicknames_cog
 
     async def on_submit(self, interaction: discord.Interaction):
-        # 성공 경로: 제출 시
+        """모달이 성공적으로 '제출'되었을 때 호출됩니다."""
         message_id = self.original_interaction.message.id
         try:
-            # 이 defer는 on_submit의 응답을 위한 것입니다.
             await interaction.response.defer()
 
-            # 비활성화 및 "처리 중" 메시지 표시
             for item in self.view.children: item.disabled = True
             await self.original_interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self.view)
 
-            # --- 핵심 로직 실행 ---
             member = interaction.guild.get_member(self.view.target_member_id)
             if member:
                 log_embed = self.view._create_log_embed(member, interaction.user, self.view.new_name, is_approved=False, reason=self.reason.value)
                 if self.cog.nickname_log_channel_id:
                     log_channel = self.cog.bot.get_channel(self.cog.nickname_log_channel_id)
                     if log_channel: await log_channel.send(embed=log_embed)
-            # --- 로직 종료 ---
             
             await interaction.followup.send("✅ 거절 처리가 완료되었습니다.", ephemeral=True)
             await self.original_interaction.message.delete()
@@ -54,17 +51,17 @@ class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
             logger.error(f"[NICKNAME_MODAL] on_submit 중 오류: {e}", exc_info=True)
             if not interaction.is_done(): await interaction.followup.send("오류가 발생했습니다.", ephemeral=True)
         finally:
-            logger.info(f"[NICKNAME_MODAL] on_submit: 잠금 해제 시도 (Message ID: {message_id})")
+            logger.info(f"[NICKNAME_MODAL] on_submit: 잠금 해제 (Message ID: {message_id})")
             self.cog.locked_requests.discard(message_id)
 
     async def on_timeout(self) -> None:
-        # 실패 경로: 시간 초과 또는 사용자가 모달을 닫았을 때
+        """모달이 타임아웃되거나 사용자가 그냥 닫았을 때 호출됩니다."""
         message_id = self.original_interaction.message.id
-        logger.info(f"[NICKNAME_MODAL] on_timeout: 잠금 해제 시도 (Message ID: {message_id})")
+        logger.info(f"[NICKNAME_MODAL] on_timeout: 잠금 해제 (Message ID: {message_id})")
         self.cog.locked_requests.discard(message_id)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
-        # 실패 경로: 오류 발생 시
+        """모달 처리 중 오류가 발생했을 때 호출됩니다."""
         message_id = self.original_interaction.message.id
         logger.error(f"[NICKNAME_MODAL] on_error: {error}", exc_info=True)
         self.cog.locked_requests.discard(message_id)
@@ -84,7 +81,6 @@ class NicknameApprovalView(ui.View):
         return await has_required_roles(interaction, required_keys)
     
     def _create_log_embed(self, member, moderator, final_name, is_approved, reason=None):
-        # 이 함수는 변경 없음
         if is_approved:
             embed = discord.Embed(title="✅ 이름 변경 알림 (승인)", color=discord.Color.green())
             embed.add_field(name="주민", value=member.mention, inline=False).add_field(name="기존 이름", value=f"`{self.original_name}`", inline=False).add_field(name="새 이름", value=f"`{final_name}`", inline=False).add_field(name="담당자", value=moderator.mention, inline=False)
@@ -131,88 +127,11 @@ class NicknameApprovalView(ui.View):
 
         self.nicknames_cog.locked_requests.add(message_id)
         logger.info(f"[NICKNAME_BUTTON] 거절 버튼 클릭, Message ID {message_id} 잠금.")
+        
         # 모달을 생성하고, 잠금 해제 책임을 모달에게 넘겨줍니다.
         modal = RejectionReasonModal(interaction, self)
         await interaction.response.send_modal(modal)
-        
-        try:
-            member = interaction.guild.get_member(self.target_member_id)
-            if not member:
-                await interaction.response.send_message("❌ 오류: 대상 멤버를 서버에서 찾을 수 없습니다.", ephemeral=True)
-                try: await interaction.message.delete()
-                except (discord.NotFound, discord.HTTPException): pass
-                return
 
-            rejection_reason = None
-            if not is_approved:
-                modal = RejectionReasonModal()
-                await interaction.response.send_modal(modal)
-                
-                logger.info(f"[NICKNAME_LOCK] ⏳ 대기: Message ID {message_id}의 거절 사유 입력을 기다립니다...")
-                timed_out = await modal.wait()
-                logger.info(f"[NICKNAME_LOCK]  resumed: Message ID {message_id} | Timed out: {timed_out} | Reason value exists: {bool(modal.reason.value)}")
-                
-                if timed_out or not modal.reason.value:
-                    logger.info(f"[NICKNAME_LOCK] ↪️ 취소: Message ID {message_id}의 모달이 취소/타임아웃되었습니다. 처리를 중단하고 잠금을 해제합니다.")
-                    return # 여기서 함수가 종료되고 finally 블록이 실행됩니다.
-                
-                rejection_reason = modal.reason.value
-            else:
-                await interaction.response.defer(ephemeral=True)
-
-            logger.info(f"[NICKNAME_LOCK] ⚙️ 처리 진행: Message ID {message_id}의 승인/거절 로직을 계속합니다.")
-            for item in self.children:
-                item.disabled = True
-            await interaction.message.edit(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
-
-            # ... (이하 처리 로직은 동일)
-            final_name = await self.nicknames_cog.get_final_nickname(member, base_name=self.new_name)
-            if is_approved:
-                await member.edit(nick=final_name, reason=f"관리자가 승인 ({interaction.user})")
-            
-            log_embed = self._create_log_embed(member, interaction.user, final_name, is_approved, rejection_reason)
-            if self.nicknames_cog.nickname_log_channel_id:
-                log_channel = self.nicknames_cog.bot.get_channel(self.nicknames_cog.nickname_log_channel_id)
-                if log_channel: await log_channel.send(embed=log_embed)
-
-            status_text = "승인" if is_approved else "거절"
-            msg = await interaction.followup.send(f"✅ {status_text} 처리가 정상적으로 완료되었습니다.", ephemeral=True, wait=True)
-            await asyncio.sleep(3)
-            await msg.delete()
-            await interaction.message.delete()
-        
-        except Exception as e:
-            logger.error(f"[NICKNAME_LOCK] 💥 오류: Message ID {message_id} 처리 중 예외 발생: {e}", exc_info=True)
-
-        finally:
-            logger.info(f"[NICKNAME_LOCK] 🔓 해제 시도: Message ID {message_id}의 잠금을 해제합니다.")
-            self.nicknames_cog.locked_requests.discard(message_id)
-            logger.info(f"[NICKNAME_LOCK] ⏹️ 해제 완료. 현재 잠금 목록: {self.nicknames_cog.locked_requests}")
-            logger.info(f"--- [NICKNAME_LOCK] 처리 종료: Message ID: {message_id} ---")
-
-    def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
-        # 이 함수는 변경 없음
-        if is_approved:
-            embed = discord.Embed(title="✅ 이름 변경 알림 (승인)", color=discord.Color.green())
-            embed.add_field(name="주민", value=member.mention, inline=False)
-            embed.add_field(name="기존 이름", value=f"`{self.original_name}`", inline=False)
-            embed.add_field(name="새 이름", value=f"`{final_name}`", inline=False)
-            embed.add_field(name="담당자", value=moderator.mention, inline=False)
-        else:
-            embed = discord.Embed(title="❌ 이름 변경 알림 (거절)", color=discord.Color.red())
-            embed.add_field(name="주민", value=member.mention, inline=False)
-            embed.add_field(name="기존 이름", value=f"`{self.original_name}`", inline=False)
-            embed.add_field(name="신청한 이름", value=f"`{self.new_name}`", inline=False)
-            embed.add_field(name="거절 사유", value=reason or "사유 미입력", inline=False)
-            embed.add_field(name="담당자", value=moderator.mention, inline=False)
-        return embed
-
-    @ui.button(label="승인", style=discord.ButtonStyle.success, custom_id="nick_approve")
-    async def approve(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=True)
-    @ui.button(label="거절", style=discord.ButtonStyle.danger, custom_id="nick_reject")
-    async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
-
-# ... 나머지 NicknameChangeModal, NicknameChangerPanelView, Nicknames Cog 클래스는 이전과 동일 ...
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     new_name = ui.TextInput(label="새로운 이름", placeholder="이모티콘, 특수문자 사용 불가. 한글 4자/영문 8자까지", required=True, max_length=12)
 
@@ -294,7 +213,6 @@ class NicknameChangerPanelView(ui.View):
             
             await i.response.send_modal(NicknameChangeModal(self.nicknames_cog))
 
-
 class Nicknames(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -305,14 +223,10 @@ class Nicknames(commands.Cog):
         self.vice_master_role_id: Optional[int] = None
         self.view_instance = None
         self.panel_regeneration_lock = asyncio.Lock()
-        self._user_locks: Dict[int, asyncio.Lock] = {}
+        
+        # ▼▼▼ [수정] 메시지 ID 기반 잠금 Set ▼▼▼
         self.locked_requests: Set[int] = set()
         logger.info("Nicknames Cog가 성공적으로 초기화되었습니다.")
-
-    def get_user_lock(self, user_id: int) -> asyncio.Lock:
-        if user_id not in self._user_locks:
-            self._user_locks[user_id] = asyncio.Lock()
-        return self._user_locks[user_id]
     
     @staticmethod
     def calculate_weighted_length(name: str) -> int:
