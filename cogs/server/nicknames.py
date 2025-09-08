@@ -115,7 +115,7 @@ class NicknameApprovalView(ui.View):
             # 이 함수가 어떤 경로로 종료되든, Lock은 반드시 해제됩니다.
             lock.release()
     # ▲▲▲ [핵심 수정] ▲▲▲
-
+    
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
             embed = discord.Embed(title="✅ 이름 변경 알림 (승인)", color=discord.Color.green())
