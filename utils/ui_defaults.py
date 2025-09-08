@@ -176,22 +176,22 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_info_age_70s": {
-        "name": "70년생",
+        "name": "70년대생",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_age_80s": {
-        "name": "80년생",
+        "name": "80년대생",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_age_90s": {
-        "name": "90년생",
+        "name": "90년대생",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_age_00s": {
-        "name": "00년생",
+        "name": "00년대생",
         "is_prefix": False,
         "priority": 0
     },
