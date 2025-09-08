@@ -865,6 +865,23 @@ UI_EMBEDS = {
         "description": "{user_mention}님의 **{tool_name}** 업그레이드가 완료되었습니다! 인벤토리를 확인해주세요.",
         "color": 0xFFD700
     },
+    "log_mining_result": {
+        "title": "⛏️ 광산 탐사 결과",
+        "description": "{user_mention}님의 탐사가 종료되었습니다.",
+        "color": 0x607D8B,
+        "fields": [
+            {
+                "name": "사용한 장비",
+                "value": "`{pickaxe_name}`",
+                "inline": True
+            },
+            {
+                "name": "채굴한 광물",
+                "value": "{mined_ores}",
+                "inline": False
+            }
+        ]
+    },
 }
 
 UI_PANEL_COMPONENTS = [
