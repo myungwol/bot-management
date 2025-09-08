@@ -34,16 +34,17 @@ class NicknameApprovalView(ui.View):
         required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
         return await has_required_roles(interaction, required_keys)
 
-    # ▼▼▼ [핵심 수정] Lock 관리를 위해 try...finally 구문 적용 ▼▼▼
+    # ▼▼▼ [핵심 수정] 올바른 Lock 관리 로직으로 변경 ▼▼▼
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction):
             return
 
         lock = self.nicknames_cog.get_user_lock(self.target_member_id)
-        if not await lock.acquire(blocking=False):
+        if lock.locked():
             await interaction.response.send_message("⏳ 다른 관리자가 이 신청을 처리 중입니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
             return
-
+        
+        await lock.acquire()
         try:
             member = interaction.guild.get_member(self.target_member_id)
             if not member:
@@ -52,7 +53,7 @@ class NicknameApprovalView(ui.View):
                     await interaction.message.delete()
                 except (discord.NotFound, discord.HTTPException):
                     pass
-                return # finally 블록에서 Lock이 해제됨
+                return
 
             rejection_reason = None
             if not is_approved:
@@ -60,15 +61,14 @@ class NicknameApprovalView(ui.View):
                 await interaction.response.send_modal(modal)
                 timed_out = await modal.wait()
                 
-                # 모달이 취소된 경우, 아무것도 하지 않고 함수를 종료 (버튼은 활성화된 상태 유지)
                 if timed_out or not modal.reason.value:
-                    return # finally 블록에서 Lock이 해제됨
+                    # 모달 취소 시, Lock 해제를 위해 조기 리턴
+                    return 
                 
                 rejection_reason = modal.reason.value
             else:
                 await interaction.response.defer(ephemeral=True)
 
-            # 성공적으로 모달이 제출되었거나 승인 버튼을 누른 경우, 버튼을 비활성화하여 중복 클릭 방지
             for item in self.children:
                 item.disabled = True
             await interaction.edit_original_response(content=f"⏳ {interaction.user.mention}님이 처리 중...", view=self)
@@ -107,11 +107,10 @@ class NicknameApprovalView(ui.View):
                 await asyncio.sleep(3)
                 await message.delete()
             
-            # 성공적으로 처리 완료 후 원본 메시지 삭제
             await interaction.delete_original_response()
 
         finally:
-            # 어떤 상황에서든 함수가 종료될 때 반드시 Lock을 해제
+            # 모든 경우에 Lock을 해제하도록 보장
             lock.release()
     # ▲▲▲ [핵심 수정] ▲▲▲
 
