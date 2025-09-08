@@ -830,10 +830,7 @@ UI_EMBEDS = {
         "description": "환영합니다! 이 광산은 10분 동안 유지됩니다.\n\n아래 '광석 찾기' 버튼을 눌러 주변을 탐색하세요.\n탐색 및 채굴에는 약간의 시간이 소요됩니다.",
         "color": 0x607D8B
     },
-    "log_item_use_mine_pass": {
-        "title": "🎟️ 광산 입장권 사용 알림",
-        "color": 0x607D8B
-    },
+    # ▼▼▼ [핵심 수정] 중복된 키 "log_item_use_mine_pass" 제거 ▼▼▼
     "log_item_use_mine_pass": {
         "title": "🎟️ 광산 입장권 사용 알림",
         "color": 0x607D8B
@@ -1394,7 +1391,7 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 낚시 성공 기록",
         "channel_type": "text"
     },
-        "log_item_mine_pass": {
+    "log_item_mine_pass": {
         "type": "channel",
         "cog_name": "ItemSystem",
         "key": "log_item_mine_pass",
@@ -1429,14 +1426,7 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[온보딩] 비공개 나이 기록 채널", 
         "channel_type": "text"
     },
-    "panel_mining": {
-        "type": "panel",
-        "cog_name": "Mining",
-        "key": "mining_panel_channel_id",
-        "friendly_name": "[게임] 광산 패널",
-        "channel_type": "text"
-    },
-    # ▼▼▼ 아래 내용 추가 ▼▼▼
+    # ▼▼▼ [핵심 수정] 중복된 키 "panel_mining"과 "panel_blacksmith" 제거 ▼▼▼
     "panel_blacksmith": {
         "type": "panel",
         "cog_name": "Blacksmith",
