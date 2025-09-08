@@ -355,7 +355,6 @@ ONBOARDING_CHOICES = {
         }]
     }
 }
-# [✅✅✅ 핵심 수정 ✅✅✅] 중복 정의를 제거하고, 벌점 차감권의 타입을 변경했습니다.
 USABLE_ITEMS = {
     "role_item_warning_deduct": {
         "name": "벌점 1회 차감권",
@@ -377,7 +376,6 @@ USABLE_ITEMS = {
         "type": "farm_expansion",
         "description": "자신의 농장을 1칸 확장합니다."
     },
-    # ▼▼▼ 아래 내용 추가 ▼▼▼
     "item_mine_pass": {
         "name": "광산 입장권",
         "type": "mine_entry",
@@ -480,11 +478,13 @@ UI_EMBEDS = {
         "description": "### 마을에서 사용할 이름을 변경하고 싶다면, 아래 버튼을 통해 신청해주세요.\n- 이름에 특수문자, 이모티콘, 공백은 사용할 수 없습니다.\n- 이름은 최대 8글자로 한글은 2글자, 영문, 숫자는 1글자로 취급됩니다.\n- 부적절한 닉네임은 승인되지 않습니다.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n제출 후, 직원이 확인하고 승인하면 이름이 변경됩니다.",
         "color": 0x5865F2
     },
+    # ▼▼▼ [핵심 수정] 멘션 대상 텍스트를 '직원'에서 '님'으로 변경하여 자연스럽게 만듭니다. ▼▼▼
     "embed_main_chat_welcome": {
         "title": "",
-        "description": "### 새로운 이웃이 생겼어요! 다 함께 따뜻한 인사를 나눠주세요. :sparkling_heart:\n**마을에서의 생활이 더욱 즐거워질 수 있도록,**\n**몇 가지 유용한 안내판을 준비했어요. :map:**\n### ┃ :house_with_garden: 마을 적응이 어렵나요?\n　╰─➤ 도움이 필요하다면 언제든 {staff_role_mention} 직원을 찾아주세요!\n### ┃ :black_nib: 새로운 이름이 필요하세요?\n　╰─➤{nickname_channel_mention} 채널에서 멋진 이름으로 바꿀 수 있어요.\n### ┃ :bell: 알림을 받고 싶으신가요??\n　╰─➤{role_channel_mention}에서 개성 있는 역할을 받아보세요.\n### ┃ :love_letter: 좋은 생각이 떠올랐나요?\n　╰─➤{inquiry_channel_mention}에 소중한 의견을 남겨주세요.\n### ┃ :fairy: 마을의 요정(봇)이 궁금하세요?\n　╰─➤ {bot_guide_channel_mention} 채널에서 사용법을 확인해 주세요.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n### ┃:circus_tent: 현재 진행 중인 마을 축제!\n　╰─➤{festival_channel_mention}을 확인해 주세요.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯",
+        "description": "### 새로운 이웃이 생겼어요! 다 함께 따뜻한 인사를 나눠주세요. :sparkling_heart:\n**마을에서의 생활이 더욱 즐거워질 수 있도록,**\n**몇 가지 유용한 안내판을 준비했어요. :map:**\n### ┃ :house_with_garden: 마을 적응이 어렵나요?\n　╰─➤ 도움이 필요하다면 언제든 {staff_role_mention}님을 찾아주세요!\n### ┃ :black_nib: 새로운 이름이 필요하세요?\n　╰─➤{nickname_channel_mention} 채널에서 멋진 이름으로 바꿀 수 있어요.\n### ┃ :bell: 알림을 받고 싶으신가요??\n　╰─➤{role_channel_mention}에서 개성 있는 역할을 받아보세요.\n### ┃ :love_letter: 좋은 생각이 떠올랐나요?\n　╰─➤{inquiry_channel_mention}에 소중한 의견을 남겨주세요.\n### ┃ :fairy: 마을의 요정(봇)이 궁금하세요?\n　╰─➤ {bot_guide_channel_mention} 채널에서 사용법을 확인해 주세요.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n### ┃:circus_tent: 현재 진행 중인 마을 축제!\n　╰─➤{festival_channel_mention}을 확인해 주세요.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯",
         "color": 0x2ECC71
     },
+    # ▲▲▲ [핵심 수정] ▲▲▲
     "panel_warning": {
         "title": "🚨 벌점 관리 패널",
         "description":
@@ -777,11 +777,11 @@ UI_EMBEDS = {
     "log_item_use_warning_deduct": {
         "title": "🎫 벌점 차감권 사용 알림",
         "color": 3066993
-    },  # 초록색
+    },
     "log_item_use_event_priority": {
         "title": "✨ 이벤트 우선권 사용 알림",
         "color": 16776960
-    },  # 노란색
+    },
     "panel_champion_board": {
         "title":
         "🏆 종합 챔피언 보드 🏆",
@@ -810,7 +810,6 @@ UI_EMBEDS = {
             "value": "{harvest_champion}",
             "inline": False
         }, {
-            # ▼▼▼ [핵심 수정] 아래 채광 필드를 추가합니다. ▼▼▼
             "name": "⛏️ 채광",
             "value": "{mining_champion}",
             "inline": False
@@ -819,7 +818,6 @@ UI_EMBEDS = {
             "text": "매일 00:05 KST에 갱신됩니다."
         }
     },
-    # ▼▼▼ 아래 내용 추가 ▼▼▼
     "panel_mining": {
         "title": "⛏️ 광산 입구",
         "description": "> 광산에 들어가려면 '광산 입장권'이 필요합니다.\n> 입장권은 상점에서 구매할 수 있습니다.",
@@ -830,16 +828,14 @@ UI_EMBEDS = {
         "description": "환영합니다! 이 광산은 10분 동안 유지됩니다.\n\n아래 '광석 찾기' 버튼을 눌러 주변을 탐색하세요.\n탐색 및 채굴에는 약간의 시간이 소요됩니다.",
         "color": 0x607D8B
     },
-    # ▼▼▼ [핵심 수정] 중복된 키 "log_item_use_mine_pass" 제거 ▼▼▼
     "log_item_use_mine_pass": {
         "title": "🎟️ 광산 입장권 사용 알림",
         "color": 0x607D8B
     },
-    # ▼▼▼ 아래 내용 추가 ▼▼▼
     "panel_blacksmith": {
         "title": "🛠️ 대장간",
         "description": "> 각종 도구를 업그레이드하여 성능을 향상시킬 수 있습니다.\n> 업그레이드에는 재료와 시간, 코인이 필요합니다.",
-        "color": 0x964B00 # 갈색
+        "color": 0x964B00
     },
     "panel_trade": {
         "title": "🤝 거래소",
