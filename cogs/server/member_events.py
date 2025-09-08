@@ -26,7 +26,8 @@ class MemberEvents(commands.Cog):
         self.role_channel_id: Optional[int] = None
         self.inquiry_channel_id: Optional[int] = None
         self.onboarding_channel_id: Optional[int] = None
-        # 참고: 축제 채널 ID는 동적으로 변할 수 있으므로, 필요 시 별도 로직으로 가져와야 합니다.
+        # ▼▼▼ [추가] 축제 공지 채널 ID 변수 추가 ▼▼▼
+        self.festival_channel_id: Optional[int] = None
         logger.info("MemberEvents (입장/퇴장) Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
@@ -35,13 +36,26 @@ class MemberEvents(commands.Cog):
     async def load_configs(self):
         self.welcome_channel_id = get_id("new_welcome_channel_id")
         self.farewell_channel_id = get_id("farewell_channel_id")
+        
         # ▼▼▼ [수정] 데이터베이스에서 새 환영 메시지에 필요한 채널 및 역할 ID 로드 ▼▼▼
         self.main_chat_channel_id = get_id("main_chat_channel_id")
-        self.staff_role_id = get_id("role_approval")
-        self.nickname_channel_id = get_id("nickname_panel_channel_id")
-        self.role_channel_id = get_id("auto_role_channel_id")
-        self.inquiry_channel_id = get_id("inquiry_panel_channel_id")
-        self.onboarding_channel_id = get_id("onboarding_panel_channel_id")
+        
+        # 제공해주신 "신입 담당 역할" ID는 'role_approval' 키를 사용합니다.
+        self.staff_role_id = get_id("role_approval") # ID: 1412052122949779517
+        
+        # 제공해주신 채널 ID들은 아래 키들에 해당합니다.
+        self.nickname_channel_id = get_id("nickname_panel_channel_id") # ID: 1412052293096050729
+        self.role_channel_id = get_id("auto_role_channel_id") # ID: 1412052301115424799
+        self.inquiry_channel_id = get_id("inquiry_panel_channel_id") # ID: 1412052236736925737
+        
+        # '봇 가이드 채널'은 '서버 안내 패널'과 동일한 채널을 사용합니다.
+        self.onboarding_channel_id = get_id("onboarding_panel_channel_id") # ID: 1412052405477970040
+        
+        # ▼▼▼ [추가] 축제 공지 채널 ID 로드 ▼▼▼
+        # 참고: 이 채널은 SETUP_COMMAND_MAP에 없으므로, 'festival_announcement_channel_id'라는 키를 사용하도록 추가했습니다.
+        # 이 키로 DB에 채널 ID(1412052244349845627)를 저장해야 정상적으로 멘션됩니다.
+        self.festival_channel_id = get_id("festival_announcement_channel_id")
+        
         logger.info("[MemberEvents Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
     @commands.Cog.listener()
@@ -70,7 +84,6 @@ class MemberEvents(commands.Cog):
                 logger.error(f"'{member.display_name}'님의 데이터 복구에 실패했습니다. (권한 부족) 백업 데이터는 유지됩니다.")
             except Exception as e:
                 logger.error(f"'{member.display_name}'님 데이터 복구 중 예기치 않은 오류 발생: {e}", exc_info=True)
-            # 재참여 유저도 환영 메시지를 받을 수 있도록 return 제거
 
         # --- 신규 유저 DB 초기화 로직 (기존과 동일) ---
         try:
@@ -116,8 +129,8 @@ class MemberEvents(commands.Cog):
                     "role_channel_mention": f"<#{self.role_channel_id}>" if self.role_channel_id else "**역할받기**",
                     "inquiry_channel_mention": f"<#{self.inquiry_channel_id}>" if self.inquiry_channel_id else "**건의하기**",
                     "bot_guide_channel_mention": f"<#{self.onboarding_channel_id}>" if self.onboarding_channel_id else "**서버안내**",
-                    # 축제 채널은 동적으로 관리될 수 있으므로, 임시로 고정 텍스트를 넣거나 별도 로직이 필요합니다.
-                    "festival_channel_mention": "**축제-안내**" 
+                    # ▼▼▼ [수정] 축제 채널 ID를 사용하여 멘션 생성 ▼▼▼
+                    "festival_channel_mention": f"<#{self.festival_channel_id}>" if self.festival_channel_id else "**축제-안내**" 
                 }
                 embed = format_embed_from_db(embed_data, **format_args)
                 
