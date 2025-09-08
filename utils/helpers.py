@@ -5,9 +5,9 @@
 import discord
 import copy
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 import re
-from .database import get_config
+from .database import get_config, get_id
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,36 @@ def format_seconds_to_hms(seconds: float) -> str:
         parts.append(f"{secs}초")
         
     return ' '.join(parts)
+    
+# ▼▼▼ [핵심 추가] 중앙 집중식 권한 확인 함수 ▼▼▼
+async def has_required_roles(interaction: discord.Interaction, required_keys: List[str], error_message: str = "❌ 이 버튼을 누를 권한이 없습니다.") -> bool:
+    """
+    사용자가 필요한 역할 중 하나 이상을 가지고 있는지 확인하는 중앙 함수.
+    서버 소유자는 항상 통과됩니다.
+    """
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("❌ 서버 멤버가 아니므로 권한을 확인할 수 없습니다.", ephemeral=True)
+        return False
+
+    # 서버 소유자는 모든 권한을 가집니다.
+    if interaction.user.id == interaction.guild.owner_id:
+        return True
+
+    # 필요한 역할 ID들을 DB에서 가져옵니다.
+    allowed_role_ids = {get_id(key) for key in required_keys if get_id(key)}
+    
+    if not allowed_role_ids:
+        await interaction.response.send_message("❌ 권한 확인에 필요한 역할이 서버에 설정되지 않았습니다. 관리자에게 문의하세요.", ephemeral=True)
+        return False
+
+    # 사용자가 가진 역할 ID와 비교합니다.
+    user_role_ids = {role.id for role in interaction.user.roles}
+    if not user_role_ids.intersection(allowed_role_ids):
+        await interaction.response.send_message(error_message, ephemeral=True)
+        return False
+        
+    return True
+# ▲▲▲ [핵심 추가] ▲▲▲
 
 def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.Embed:
     if not isinstance(embed_data, dict):
