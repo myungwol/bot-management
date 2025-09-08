@@ -14,12 +14,10 @@ from utils.database import (
     get_id, get_embed_from_db, get_panel_components_from_db,
     get_config
 )
-# ▼▼▼ [핵심 수정] helpers.py에서 get_clean_display_name 함수는 더 이상 사용하지 않으므로 import 목록에서 제거합니다. ▼▼▼
-from utils.helpers import format_embed_from_db, format_seconds_to_hms
+# ▼▼▼ [핵심 수정] has_required_roles 함수를 import 합니다. ▼▼▼
+from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_required_roles
 
 logger = logging.getLogger(__name__)
-
-# --- 파일 최상단에 있던 calculate_weighted_length 함수는 Nicknames Cog 내부로 이동했습니다. ---
 
 class RejectionReasonModal(ui.Modal, title="거절 사유 입력"):
     reason = ui.TextInput(label="거절 사유", placeholder="거절하는 이유를 구체적으로 입력해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=200)
@@ -33,23 +31,11 @@ class NicknameApprovalView(ui.View):
         self.nicknames_cog = cog_instance
         self.original_name = member.display_name
     
+    # ▼▼▼ [핵심 수정] 권한 확인 로직을 중앙 함수 호출로 변경 ▼▼▼
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
-        approval_role_id = self.nicknames_cog.approval_role_id
-        master_role_id = self.nicknames_cog.master_role_id
-        vice_master_role_id = self.nicknames_cog.vice_master_role_id
-
-        allowed_role_ids = {rid for rid in [approval_role_id, master_role_id, vice_master_role_id] if rid is not None}
-
-        if not isinstance(interaction.user, discord.Member) or not allowed_role_ids:
-            await interaction.response.send_message("❌ 이 버튼을 누를 권한이 없거나, 권한 역할이 설정되지 않았습니다.", ephemeral=True)
-            return False
-
-        user_role_ids = {role.id for role in interaction.user.roles}
-        if not user_role_ids.intersection(allowed_role_ids):
-            await interaction.response.send_message("❌ 이 버튼을 누를 권한이 없습니다.", ephemeral=True)
-            return False
-            
-        return True
+        required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
+        return await has_required_roles(interaction, required_keys)
+    # ▲▲▲ [핵심 수정] ▲▲▲
 
     async def _handle_approval_flow(self, interaction: discord.Interaction, is_approved: bool):
         if not await self._check_permission(interaction): return
@@ -65,20 +51,24 @@ class NicknameApprovalView(ui.View):
                 try: await interaction.message.delete()
                 except discord.NotFound: pass
                 await interaction.response.send_message("❌ 오류: 대상 멤버를 서버에서 찾을 수 없습니다.", ephemeral=True)
-                # ▼▼▼ [핵심 수정] 멤버를 찾을 수 없는 경우에도 Lock을 해제합니다. ▼▼▼
-                self.nicknames_cog.release_user_lock(self.target_member_id)
                 return
 
             rejection_reason = None
             if not is_approved:
                 modal = RejectionReasonModal()
                 await interaction.response.send_modal(modal)
-                # ▼▼▼ [핵심 수정] 모달이 타임아웃되거나 사용자가 취소했을 때 Lock을 해제하는 로직 ▼▼▼
                 timed_out = await modal.wait()
-                if timed_out or not modal.reason:
-                    # 사용자가 모달을 닫거나 타임아웃된 경우, Lock을 풀어 다른 관리자가 작업할 수 있게 합니다.
-                    self.nicknames_cog.release_user_lock(self.target_member_id)
-                    return
+                
+                # ▼▼▼ [핵심 수정] 모달이 타임아웃되거나 사용자가 취소했을 때 피드백을 보내고 Lock을 해제하는 로직 ▼▼▼
+                if timed_out or not modal.reason.value:
+                    try:
+                        msg = await interaction.followup.send("⏳ 닉네임 변경 처리가 취소되었습니다.", ephemeral=True, wait=True)
+                        await asyncio.sleep(5)
+                        await msg.delete()
+                    except (discord.NotFound, discord.HTTPException):
+                        pass
+                    return # Lock은 async with 구문이 끝나며 자동으로 해제됩니다.
+                # ▲▲▲ [핵심 수정] ▲▲▲
                 rejection_reason = modal.reason.value
             else:
                 await interaction.response.defer()
@@ -123,7 +113,7 @@ class NicknameApprovalView(ui.View):
             try: await interaction.message.delete()
             except discord.NotFound: pass
         
-        # 처리가 정상적으로 끝난 후에도 Lock을 제거합니다.
+        # 처리가 끝나면 Lock을 제거합니다.
         self.nicknames_cog.release_user_lock(self.target_member_id)
 
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
@@ -162,9 +152,6 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
         await i.response.defer(ephemeral=True)
         name = self.new_name.value
         
-        # ▼▼▼ [핵심 수정] 한글을 포함하도록 정규식 패턴 수정 ▼▼▼
-        # DB에서 가져오는 대신, 직접 코드에 명시하여 실수를 방지합니다.
-        # \uAC00-\uD7A3: 완성형 한글 음절 전체 범위를 의미합니다.
         pattern_str = r"^[a-zA-Z0-9\uAC00-\uD7A3]+$"
         max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
 
@@ -261,7 +248,6 @@ class Nicknames(commands.Cog):
     @staticmethod
     def calculate_weighted_length(name: str) -> int:
         total_length = 0
-        # ▼▼▼ [핵심 수정] 한글 완성형 음절 범위를 정규식에 추가합니다. ▼▼▼
         pattern = re.compile(r'[\uAC00-\uD7A3]')
         for char in name:
             total_length += 2 if pattern.match(char) else 1
