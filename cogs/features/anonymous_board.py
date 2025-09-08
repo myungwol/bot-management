@@ -4,17 +4,20 @@ from discord import ui
 from discord.ext import commands
 import logging
 import asyncio
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timezone, timedelta
 
 from utils.database import (
     get_id, add_anonymous_message, get_embed_from_db,
     get_panel_id, save_panel_id, get_panel_components_from_db,
     has_posted_anonymously_today
 )
-from utils.helpers import format_embed_from_db
+# ▼▼▼ [핵심 수정] 쿨타임 표시를 위해 format_seconds_to_hms 함수를 import 합니다. ▼▼▼
+from utils.helpers import format_embed_from_db, format_seconds_to_hms
 
 logger = logging.getLogger(__name__)
+
+# 한국 시간대(KST)를 나타내는 timezone 객체
+KST = timezone(timedelta(hours=9))
 
 class AnonymousModal(ui.Modal, title="익명 메시지 작성"):
     content = ui.TextInput(
@@ -75,9 +78,21 @@ class AnonymousPanelView(ui.View):
     async def on_button_click(self, interaction: discord.Interaction):
         already_posted = await has_posted_anonymously_today(interaction.user.id)
         
+        # ▼▼▼ [핵심 수정] 쿨타임 안내 메시지를 남은 시간 표시로 변경 ▼▼▼
         if already_posted:
-            await interaction.response.send_message("❌ 오늘은 이미 익명 글을 작성했습니다. 내일 다시 시도해주세요.", ephemeral=True)
+            # 1. 현재 KST 시간을 기준으로 내일 자정 시간을 계산합니다.
+            now_kst = datetime.now(KST)
+            tomorrow_kst = now_kst.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            
+            # 2. 남은 시간을 초 단위로 계산합니다.
+            time_remaining_seconds = (tomorrow_kst - now_kst).total_seconds()
+            
+            # 3. 초를 "X시간 Y분 Z초" 형식으로 변환합니다.
+            formatted_time = format_seconds_to_hms(time_remaining_seconds)
+            
+            await interaction.response.send_message(f"❌ 오늘은 이미 글을 작성했습니다. 다음 작성까지 **{formatted_time}** 남았습니다.", ephemeral=True)
             return
+        # ▲▲▲ [핵심 수정] ▲▲▲
             
         await interaction.response.send_modal(AnonymousModal(self.cog))
 
@@ -107,9 +122,6 @@ class AnonymousBoard(commands.Cog):
             return self.bot.get_channel(self.panel_channel_id)
         return None
         
-    # [✅✅✅ 핵심 수정 ✅✅✅]
-    # 요청에 따라 로그(익명 메시지)와 패널 생성을 분리하여 안정성을 높입니다.
-    # 익명 메시지를 먼저 보내고, 그 다음에 새 패널을 보냅니다.
     async def regenerate_panel(self, channel: Optional[discord.TextChannel] = None, panel_key: str = "panel_anonymous_board", last_anonymous_embed: Optional[discord.Embed] = None) -> bool:
         target_channel = channel or self.panel_channel
         if not target_channel:
