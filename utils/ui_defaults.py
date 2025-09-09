@@ -1670,6 +1670,7 @@ ADMIN_ACTION_MAP = {
     "coin_take": "[코인] 유저의 코인 차감",
     "xp_give": "[XP] 유저에게 XP 지급",
     "level_set": "[레벨] 유저 레벨 설정",
+    "trigger_daily_updates": "[수동] 시세 및 작물 상태 업데이트 즉시 실행",
 }
 
 PROFILE_RANK_ROLES = [{
