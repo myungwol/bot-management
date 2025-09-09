@@ -1478,6 +1478,14 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 요리 완성",
         "channel_type": "text"
     },
+    # [추가] 레시피 발견 로그 채널 설정
+    "log_recipe_discovery": {
+        "type": "channel",
+        "cog_name": "Cooking",
+        "key": "log_recipe_discovery_channel_id",
+        "friendly_name": "[로그] 레시피 발견",
+        "channel_type": "text"
+    },
 }
 ADMIN_ROLE_KEYS = [
     "role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief",
