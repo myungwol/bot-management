@@ -486,9 +486,6 @@ class ServerSystem(commands.Cog):
         
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
-2-3. core.py (게임 봇) - 요청 감지 및 실행 로직 추가
-        else:
-            await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
-
+            
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
