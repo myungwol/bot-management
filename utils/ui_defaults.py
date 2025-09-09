@@ -1055,7 +1055,6 @@ UI_PANEL_COMPONENTS = [
         "row": 0,
         "order_in_row": 0
     },
-    # ▼▼▼ 아래 내용 추가 ▼▼▼
     {
         "component_key": "enter_mine",
         "panel_key": "panel_mining",
@@ -1080,7 +1079,7 @@ UI_PANEL_COMPONENTS = [
         "title": "🎉 요리 완성!",
         "description": "{user_mention}님의 **{recipe_name}** 요리가 완성되었습니다! 부엌을 확인해주세요.",
         "color": 16766720
-    }
+    },
 ]
 SETUP_COMMAND_MAP = {
     "panel_roles": {
