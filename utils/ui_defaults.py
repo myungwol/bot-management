@@ -1065,6 +1065,21 @@ UI_PANEL_COMPONENTS = [
         "emoji": "⛏️",
         "row": 0,
         "order_in_row": 0
+    },
+    "panel_cooking_creation": {
+        "title": "🍲 나만의 부엌 만들기!",
+        "description": "> 아래 버튼을 눌러 당신만의 부엌(개인 스레드)을 만듭니다.\n> 가마솥을 설치하고 다양한 요리에 도전해보세요!",
+        "color": 2359296
+    },
+    "cooking_thread_welcome": {
+        "title": "{user_name}님의 부엌",
+        "description": "환영합니다! 이곳은 당신만의 요리 공간입니다.\n\n**시작하는 법:**\n1. 먼저 상점에서 '가마솥'을 구매합니다.\n2. 아래 메뉴에서 가마솥을 선택하고 재료를 넣어 요리를 시작해보세요!",
+        "color": 15105078
+    },
+    "log_cooking_complete": {
+        "title": "🎉 요리 완성!",
+        "description": "{user_mention}님의 **{recipe_name}** 요리가 완성되었습니다! 부엌을 확인해주세요.",
+        "color": 16766720
     }
 ]
 SETUP_COMMAND_MAP = {
