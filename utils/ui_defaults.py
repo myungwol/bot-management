@@ -1838,120 +1838,102 @@ UI_STRINGS = {
     }
 }
 JOB_ADVANCEMENT_DATA = {
-    "50": [{
-        "job_key":
-        "fisherman",
-        "job_name":
-        "낚시꾼",
-        "role_key":
-        "role_job_fisherman",
-        "description":
-        "물고기를 낚는 데 특화된 전문가입니다.",
-        "abilities": [{
-            "ability_key": "fish_bait_saver_1",
-            "ability_name": "미끼 절약 (확률)",
-            "description": "낚시할 때 일정 확률로 미끼를 소모하지 않습니다."
-        }, {
-            "ability_key": "fish_bite_time_down_1",
-            "ability_name": "입질 시간 단축",
-            "description": "물고기가 미끼를 무는 데 걸리는 시간이 전체적으로 2초 단축됩니다."
-        }]
-    }, {
-        "job_key":
-        "farmer",
-        "job_name":
-        "농부",
-        "role_key":
-        "role_job_farmer",
-        "description":
-        "작물을 키우고 수확하는 데 특화된 전문가입니다.",
-        "abilities": [{
-            "ability_key": "farm_seed_saver_1",
-            "ability_name": "씨앗 절약 (확률)",
-            "description": "씨앗을 심을 때 일정 확률로 씨앗을 소모하지 않습니다."
-        }, {
-            "ability_key": "farm_water_retention_1",
-            "ability_name": "수분 유지력 UP",
-            "description": "작물이 수분을 더 오래 머금어 물을 주는 간격이 길어집니다."
-        }]
-    }, {
-        "job_key":
-        "miner",
-        "job_name":
-        "광부",
-        "role_key":
-        "role_job_miner",
-        "description":
-        "광물 채굴에 특화된 전문가입니다.",
-        "abilities": [{
-            "ability_key": "mine_time_down_1",
-            "ability_name": "신속한 채굴",
-            "description": "광석 채굴에 필요한 시간이 3초 단축됩니다."
-        }, {
-            "ability_key": "mine_duration_up_1",
-            "ability_name": "집중 탐사",
-            "description": "광산 입장 시 15% 확률로 제한 시간이 2배(20분)로 늘어납니다."
-        }]
-    }],
-    "100": [{
-        "job_key":
-        "master_angler",
-        "job_name":
-        "강태공",
-        "role_key":
-        "role_job_master_angler",
-        "description":
-        "낚시의 길을 통달하여 전설의 물고기를 쫓는 자. 낚시꾼의 상위 직업입니다.",
-        "prerequisite_job":
-        "fisherman",
-        "abilities": [{
-            "ability_key": "fish_rare_up_2",
-            "ability_name": "희귀어 확률 UP (대)",
-            "description": "희귀한 물고기를 낚을 확률이 상승합니다."
-        }, {
-            "ability_key": "fish_size_up_2",
-            "ability_name": "물고기 크기 UP (대)",
-            "description": "낚는 물고기의 평균 크기가 커집니다."
-        }]
-    }, {
-        "job_key":
-        "master_farmer",
-        "job_name":
-        "대농",
-        "role_key":
-        "role_job_master_farmer",
-        "description":
-        "농업의 정수를 깨달아 대지로부터 최대의 은혜를 얻는 자. 농부의 상위 직업입니다.",
-        "prerequisite_job":
-        "farmer",
-        "abilities": [{
-            "ability_key": "farm_yield_up_2",
-            "ability_name": "수확량 UP (대)",
-            "description": "작물을 수확할 때의 수확량이 대폭 증가합니다."
-        }, {
-            "ability_key": "farm_growth_speed_up_2",
-            "ability_name": "성장 속도 UP (대)",
-            "description": "작물의 성장 시간이 단축됩니다."
-        }]
-    }, {
-        "job_key":
-        "expert_miner",
-        "job_name":
-        "전문 광부",
-        "role_key":
-        "role_job_expert_miner",
-        "description":
-        "광맥의 흐름을 읽어 희귀한 광물을 찾아내는 베테랑입니다. 광부의 상위 직업입니다.",
-        "prerequisite_job":
-        "miner",
-        "abilities": [{
-            "ability_key": "mine_rare_up_2",
-            "ability_name": "노다지 발견",
-            "description": "희귀한 광물을 발견할 확률이 대폭 증가합니다."
-        }, {
-            "ability_key": "mine_double_yield_2",
-            "ability_name": "풍부한 광맥",
-            "description": "광석 채굴 시 20% 확률로 광석을 2개 획득합니다."
-        }]
-    }]
+    "50": [
+        {
+            "job_key": "fisherman",
+            "job_name": "낚시꾼",
+            "role_key": "role_job_fisherman",
+            "description": "물고기를 낚는 데 특화된 전문가입니다.",
+            "abilities": [
+                {"ability_key": "fish_bait_saver_1", "ability_name": "미끼 절약 (확률)", "description": "낚시할 때 일정 확률로 미끼를 소모하지 않습니다."},
+                {"ability_key": "fish_bite_time_down_1", "ability_name": "입질 시간 단축", "description": "물고기가 미끼를 무는 데 걸리는 시간이 전체적으로 2초 단축됩니다."}
+            ]
+        },
+        {
+            "job_key": "farmer",
+            "job_name": "농부",
+            "role_key": "role_job_farmer",
+            "description": "작물을 키우고 수확하는 데 특화된 전문가입니다.",
+            "abilities": [
+                {"ability_key": "farm_seed_saver_1", "ability_name": "씨앗 절약 (확률)", "description": "씨앗을 심을 때 일정 확률로 씨앗을 소모하지 않습니다."},
+                {"ability_key": "farm_water_retention_1", "ability_name": "수분 유지력 UP", "description": "작물이 수분을 더 오래 머금어 물을 주는 간격이 길어집니다."}
+            ]
+        },
+        {
+            "job_key": "miner",
+            "job_name": "광부",
+            "role_key": "role_job_miner",
+            "description": "광물 채굴에 특화된 전문가입니다.",
+            "abilities": [
+                {"ability_key": "mine_time_down_1", "ability_name": "신속한 채굴", "description": "광석 채굴에 필요한 시간이 3초 단축됩니다."},
+                {"ability_key": "mine_duration_up_1", "ability_name": "집중 탐사", "description": "광산 입장 시 15% 확률로 제한 시간이 2배(20분)로 늘어납니다."}
+            ]
+        },
+        {
+            "job_key": "chef",
+            "job_name": "요리사",
+            "role_key": "role_job_chef",
+            "description": "다양한 재료로 맛있는 음식을 만드는 요리의 전문가입니다.",
+            "abilities": [
+                {"ability_key": "cook_ingredient_saver_1", "ability_name": "알뜰한 손맛 (확률)", "description": "요리할 때 15% 확률로 재료를 소모하지 않습니다."},
+                {"ability_key": "cook_time_down_1", "ability_name": "요리의 기본", "description": "모든 요리의 소요 시간이 10% 단축됩니다."}
+            ]
+        }
+    ],
+    "100": [
+        {
+            "job_key": "master_angler",
+            "job_name": "강태공",
+            "role_key": "role_job_master_angler",
+            "description": "낚시의 길을 통달하여 전설의 물고기를 쫓는 자. 낚시꾼의 상위 직업입니다.",
+            "prerequisite_job": "fisherman",
+            "abilities": [
+                {"ability_key": "fish_rare_up_2", "ability_name": "희귀어 확률 UP (대)", "description": "희귀한 물고기를 낚을 확률이 상승합니다."},
+                {"ability_key": "fish_size_up_2", "ability_name": "물고기 크기 UP (대)", "description": "낚는 물고기의 평균 크기가 커집니다."}
+            ]
+        },
+        {
+            "job_key": "master_farmer",
+            "job_name": "대농",
+            "role_key": "role_job_master_farmer",
+            "description": "농업의 정수를 깨달아 대지로부터 최대의 은혜를 얻는 자. 농부의 상위 직업입니다.",
+            "prerequisite_job": "farmer",
+            "abilities": [
+                {"ability_key": "farm_yield_up_2", "ability_name": "수확량 UP (대)", "description": "작물을 수확할 때의 수확량이 대폭 증가합니다."},
+                {"ability_key": "farm_growth_speed_up_2", "ability_name": "성장 속도 UP (대)", "description": "작물의 성장 시간이 단축됩니다."}
+            ]
+        },
+        {
+            "job_key": "expert_miner",
+            "job_name": "전문 광부",
+            "role_key": "role_job_expert_miner",
+            "description": "광맥의 흐름을 읽어 희귀한 광물을 찾아내는 베테랑입니다. 광부의 상위 직업입니다.",
+            "prerequisite_job": "miner",
+            "abilities": [
+                {"ability_key": "mine_rare_up_2", "ability_name": "노다지 발견", "description": "희귀한 광물을 발견할 확률이 대폭 증가합니다."},
+                {"ability_key": "mine_double_yield_2", "ability_name": "풍부한 광맥", "description": "광석 채굴 시 20% 확률로 광석을 2개 획득합니다."}
+            ]
+        },
+        {
+            # [수정] '마스터 셰프' 능력 최종 수정본
+            "job_key": "master_chef",
+            "job_name": "마스터 셰프",
+            "role_key": "role_job_master_chef",
+            "description": "요리의 경지에 이르러 평범한 재료로도 최고의 맛을 이끌어내는 자. 요리사의 상위 직업입니다.",
+            "prerequisite_job": "chef",
+            "abilities": [
+                {
+                    "ability_key": "cook_quality_up_2",
+                    "ability_name": "장인의 솜씨",
+                    "description": "요리 완성 시 10% 확률로 '특상품' 요리를 만듭니다. 특상품은 더 비싸게 판매할 수 있습니다."
+                },
+                {
+                    "ability_key": "cook_double_yield_2",
+                    "ability_name": "풍성한 식탁",
+                    "description": "요리 완성 시 15% 확률로 결과물을 2개 획득합니다."
+                }
+            ]
+        }
+    ]
 }
+# ... (파일의 나머지 부분은 그대로 유지) ...
