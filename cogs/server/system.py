@@ -470,7 +470,23 @@ class ServerSystem(commands.Cog):
             
             embed.description = "\n\n".join(description)
             await interaction.followup.send(embed=embed, ephemeral=True)
+            
+        # ▼▼▼ 아래 elif 블록 전체를 추가해주세요. ▼▼▼
+        elif action == "trigger_daily_updates":
+            try:
+                timestamp = time.time()
+                await save_config_to_db("manual_update_request", timestamp)
+                logger.info(f"게임 봇에게 수동 업데이트를 요청했습니다. (요청자: {interaction.user.name})")
+                await interaction.followup.send("✅ 게임 봇에게 **시세 변동** 및 **작물 상태 업데이트**를 즉시 실행하도록 요청했습니다.\n"
+                                                "약 15초 내에 변경사항이 적용됩니다.")
+            except Exception as e:
+                logger.error(f"수동 업데이트 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 수동 업데이트를 요청하는 중 오류가 발생했습니다.")
+        # ▲▲▲ 위 elif 블록 전체를 추가해주세요. ▲▲▲
         
+        else:
+            await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
+2-3. core.py (게임 봇) - 요청 감지 및 실행 로직 추가
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
 
