@@ -384,9 +384,6 @@ USABLE_ITEMS = {
         "log_embed_key": "log_item_use_mine_pass"
     }
 }
-# bot-management/utils/ui_defaults.py 파일입니다.
-
-# 기존 UI_EMBEDS 딕셔너리 전체를 아래 코드로 교체해주세요.
 UI_EMBEDS = {
     "onboarding_guide_server": {
         "title": "",
@@ -457,7 +454,7 @@ UI_EMBEDS = {
         "color": 0x3498DB
     },
     "farewell_embed": {
-        "description": 
+        "description":
         "## 👋 다음에 또 만나요\n### **{member_name}**님이 마을을 떠났습니다.\n### 함께했던 모든 순간에 감사드립니다.\n### 앞으로의 여정에 행운이 가득하기를 바랍니다.",
         "color": 0x99AAB5
     },
@@ -1079,22 +1076,7 @@ UI_PANEL_COMPONENTS = [
         "emoji": "⛏️",
         "row": 0,
         "order_in_row": 0
-    },
-    "panel_cooking_creation": {
-        "title": "🍲 나만의 부엌 만들기!",
-        "description": "> 아래 버튼을 눌러 당신만의 부엌(개인 스레드)을 만듭니다.\n> 가마솥을 설치하고 다양한 요리에 도전해보세요!",
-        "color": 2359296
-    },
-    "cooking_thread_welcome": {
-        "title": "{user_name}님의 부엌",
-        "description": "환영합니다! 이곳은 당신만의 요리 공간입니다.\n\n**시작하는 법:**\n1. 먼저 상점에서 '가마솥'을 구매합니다.\n2. 아래 메뉴에서 가마솥을 선택하고 재료를 넣어 요리를 시작해보세요!",
-        "color": 15105078
-    },
-    "log_cooking_complete": {
-        "title": "🎉 요리 완성!",
-        "description": "{user_mention}님의 **{recipe_name}** 요리가 완성되었습니다! 부엌을 확인해주세요.",
-        "color": 16766720
-    },
+    }
 ]
 SETUP_COMMAND_MAP = {
     "panel_roles": {
@@ -1481,7 +1463,7 @@ SETUP_COMMAND_MAP = {
         "key": "log_blacksmith_channel_id",
         "friendly_name": "[로그] 대장간 제작 완료",
         "channel_type": "text"
-    }, # <<<< 여기에 쉼표가 없었을 것입니다. 제가 추가했습니다.
+    },
     "panel_cooking_creation": {
         "type": "panel",
         "cog_name": "Cooking",
@@ -1781,7 +1763,6 @@ UI_STRINGS = {
             "label": "작물",
             "emoji": "🌾"
         }, {
-            # ▼▼▼ [핵심 수정] 아래 딕셔너리 블록을 새로 추가하세요. ▼▼▼
             "key": "mineral",
             "title_suffix": " - 광물",
             "label": "광물",
@@ -1829,7 +1810,6 @@ UI_STRINGS = {
         "crop_tab": {
             "no_items": "보유 중인 작물이 없습니다."
         },
-        # ▼▼▼ [핵심 수정] 아래 딕셔너리 블록을 새로 추가하세요. ▼▼▼
         "mineral_tab": {
             "no_items": "보유 중인 광물이 없습니다."
         },
@@ -1886,8 +1866,7 @@ JOB_ADVANCEMENT_DATA = {
             "ability_name": "수분 유지력 UP",
             "description": "작물이 수분을 더 오래 머금어 물을 주는 간격이 길어집니다."
         }]
-    }, { # <--- 쉼표(,)를 꼭 추가해주세요.
-        # ▼▼▼ [핵심 수정] 아래 50레벨 광부 직업 블록 전체를 추가하세요. ▼▼▼
+    }, {
         "job_key":
         "miner",
         "job_name":
@@ -1946,8 +1925,7 @@ JOB_ADVANCEMENT_DATA = {
             "ability_name": "성장 속도 UP (대)",
             "description": "작물의 성장 시간이 단축됩니다."
         }]
-    }, { # <--- 쉼표(,)를 꼭 추가해주세요.
-        # ▼▼▼ [핵심 수정] 아래 100레벨 전문 광부 직업 블록 전체를 추가하세요. ▼▼▼
+    }, {
         "job_key":
         "expert_miner",
         "job_name":
