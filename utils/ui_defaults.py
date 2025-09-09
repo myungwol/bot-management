@@ -1411,6 +1411,13 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 광산 입장권 사용 내역",
         "channel_type": "text"
     },
+    "log_cooking_complete": {
+        "type": "channel",
+        "cog_name": "Cooking",
+        "key": "log_cooking_complete_channel_id",
+        "friendly_name": "[로그] 요리 완성",
+        "channel_type": "text"
+    },
     "channel_bump_reminder": {
         "type": "channel",
         "cog_name": "Reminder",
