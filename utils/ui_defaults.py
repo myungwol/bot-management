@@ -895,6 +895,21 @@ UI_EMBEDS = {
         "description": "{user_mention}님의 **{recipe_name}** 요리가 완성되었습니다! 부엌을 확인해주세요.",
         "color": 16766720
     },
+    "log_recipe_discovery": {
+        "title": "🎉 새로운 레시피 발견!",
+        "description": "**{user_mention}**님이 새로운 요리 **'{recipe_name}'**의 레시피를 최초로 발견했습니다!",
+        "color": 0xFFD700,
+        "fields": [
+            {
+                "name": "📜 레시피",
+                "value": "```{ingredients_str}```",
+                "inline": False
+            }
+        ],
+        "thumbnail": {
+            "url": "{user_avatar_url}"
+        }
+    },
 }
 UI_PANEL_COMPONENTS = [
     {
