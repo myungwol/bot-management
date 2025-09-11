@@ -394,7 +394,14 @@ USABLE_ITEMS = {
         "description": "광산에 10분 동안 입장할 수 있는 티켓입니다.",
         "log_channel_key": "log_item_mine_pass",
         "log_embed_key": "log_item_use_mine_pass"
-    }
+    },
+    "item_job_reset_ticket": {
+        "name": "직업 초기화권",
+        "type": "job_reset",
+        "description": "자신의 직업을 초기화하고, 레벨에 맞는 전직을 다시 진행할 수 있습니다. (레벨은 유지됩니다)",
+        "log_channel_key": "log_item_job_reset",
+        "log_embed_key": "log_item_use_job_reset"
+    },
 }
 UI_EMBEDS = {
     "onboarding_guide_server": {
@@ -919,7 +926,13 @@ UI_EMBEDS = {
             }
         ]
     },
+    "log_item_use_job_reset": {
+        "title": "📜 직업 초기화권 사용 알림",
+        "description": "{user_mention}님이 직업을 초기화하고 새로운 여정을 시작합니다.",
+        "color": 0x9B59B6
+    },
 }
+
 UI_PANEL_COMPONENTS = [
     {
         "component_key": "start_onboarding_guide",
@@ -1510,7 +1523,15 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 레시피 발견",
         "channel_type": "text"
     },
+    "log_item_job_reset": {
+        "type": "channel",
+        "cog_name": "ItemSystem",
+        "key": "log_item_job_reset",
+        "friendly_name": "[로그] 직업 초기화권 사용 내역",
+        "channel_type": "text"
+    },
 }
+
 ADMIN_ROLE_KEYS = [
     "role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief",
     "role_staff_police", "role_staff_festival", "role_staff_pr",
