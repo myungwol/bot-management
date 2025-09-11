@@ -159,7 +159,13 @@ class ServerSystem(commands.Cog):
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
-        role_setup_actions = {"role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", "role_setup:dissoku_reminder_role_id": "[알림] Dissoku UP 알림 역할 설정"}
+        # ▼▼▼ [핵심 수정] dissoku -> dicoall 로 변경 ▼▼▼
+        role_setup_actions = {
+            "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", 
+            "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정"
+        }
+        # ▲▲▲ [핵심 수정] 종료 ▲▲▲
+        
         for key, name in role_setup_actions.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
