@@ -39,6 +39,12 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": True,
         "priority": 50
     },
+    # [추가] 마스터 셰프 역할
+    "role_job_master_chef": {
+        "name": "마스터 셰프",
+        "is_prefix": True,
+        "priority": 16
+    },
     "role_job_master_angler": {
         "name": "강태공",
         "is_prefix": True,
@@ -53,6 +59,12 @@ UI_ROLE_KEY_MAP = {
         "name": "전문 광부",
         "is_prefix": True,
         "priority": 16
+    },
+    # [추가] 요리사 역할
+    "role_job_chef": {
+        "name": "요리사",
+        "is_prefix": True,
+        "priority": 15
     },
     "role_job_fisherman": {
         "name": "낚시꾼",
@@ -706,7 +718,7 @@ UI_EMBEDS = {
         "title":
         "🪙 코인 획득 알림",
         "description":
-        "{user_mention}님이 활동 보상으로 코인을 획득했습니다.",
+        "{user_mention}님이 활동 보상로 코인을 획득했습니다.",
         "color":
         0x2ECC71,
         "fields": [{
@@ -1641,14 +1653,17 @@ WARNING_THRESHOLDS = [
 CUSTOM_EMBED_SENDER_ROLES = [
     "role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief"
 ]
+# ▼▼▼ [핵심 수정] JOB_SYSTEM_CONFIG에 요리사 직업 매핑 추가 ▼▼▼
 JOB_SYSTEM_CONFIG = {
     "JOB_ROLE_MAP": {
         "fisherman": "role_job_fisherman",
         "farmer": "role_job_farmer",
         "miner": "role_job_miner",
+        "chef": "role_job_chef", # [추가]
         "master_angler": "role_job_master_angler",
         "master_farmer": "role_job_master_farmer",
-        "expert_miner": "role_job_expert_miner"
+        "expert_miner": "role_job_expert_miner",
+        "master_chef": "role_job_master_chef" # [추가]
     },
     "LEVEL_TIER_ROLES": [{
         "level": 150,
@@ -1664,6 +1679,7 @@ JOB_SYSTEM_CONFIG = {
         "role_key": "role_resident_rookie"
     }]
 }
+# ▲▲▲ [핵심 수정] 종료 ▲▲▲
 AGE_ROLE_MAPPING = [{
     "key": "role_info_age_00s",
     "range": [2000, 2100],
