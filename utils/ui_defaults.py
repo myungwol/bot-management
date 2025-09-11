@@ -917,12 +917,7 @@ UI_EMBEDS = {
                 "value": "```{ingredients_str}```",
                 "inline": False
             }
-        ],
-        "thumbnail": {
-            "url": "{user_avatar_url}"
-        }
-    },
-}
+        ]
 UI_PANEL_COMPONENTS = [
     {
         "component_key": "start_onboarding_guide",
