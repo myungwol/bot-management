@@ -1466,11 +1466,12 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[알림] Disboard BUMP 채널",
         "channel_type": "text"
     },
-    "channel_dissoku_reminder": {
+    # ▼▼▼ [핵심 수정] dissoku -> dicoall 로 변경 ▼▼▼
+    "channel_dicoall_reminder": {
         "type": "channel",
         "cog_name": "Reminder",
-        "key": "dissoku_reminder_channel_id",
-        "friendly_name": "[알림] Dissoku UP 채널",
+        "key": "dicoall_reminder_channel_id",
+        "friendly_name": "[알림] Dicoall UP 채널",
         "channel_type": "text"
     },
     "channel_weather": {
