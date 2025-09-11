@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import asyncio
 import time
+import json # [추가] 로그를 위해 json 모듈을 임포트합니다.
 
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
@@ -34,6 +35,7 @@ async def is_admin(interaction: discord.Interaction) -> bool:
         raise app_commands.CheckFailure("이 명령어를 실행할 관리자 권한이 없습니다.")
     return True
 
+# ... (TemplateEditModal, EmbedTemplateSelectView 클래스는 변경 없음)
 class TemplateEditModal(ui.Modal, title="임베드 템플릿 편집"):
     title_input = ui.TextInput(label="제목", placeholder="임베드 제목을 입력하세요.", required=False, max_length=256)
     description_input = ui.TextInput(label="설명", placeholder="임베드 설명을 입력하세요.", style=discord.TextStyle.paragraph, required=False, max_length=4000)
@@ -87,6 +89,7 @@ class EmbedTemplateSelectView(ui.View):
             await interaction.edit_original_response(view=self)
             await interaction.followup.send(f"✅ 임베드 템플릿 `{embed_key}`가 성공적으로 업데이트되었습니다.\n`/admin setup`으로 관련 패널을 재설치하면 변경사항이 적용됩니다.", embed=modal.embed, ephemeral=True)
 
+
 class ServerSystem(commands.Cog):
     admin_group = app_commands.Group(name="admin", description="서버 관리용 명령어입니다.", default_permissions=discord.Permissions(manage_guild=True))
 
@@ -95,13 +98,21 @@ class ServerSystem(commands.Cog):
         logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.CheckFailure): await interaction.response.send_message(f"❌ {error}", ephemeral=True)
-        elif isinstance(error, app_commands.MissingPermissions): await interaction.response.send_message(f"❌ 이 명령어를 사용하려면 다음 권한이 필요합니다: `{', '.join(error.missing_permissions)}`", ephemeral=True)
+        if isinstance(error, app_commands.CheckFailure): 
+            # [안정성 강화] 응답이 이미 전송되었는지 확인하여 이중 응답 오류 방지
+            if not interaction.response.is_done():
+                await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+        elif isinstance(error, app_commands.MissingPermissions): 
+            if not interaction.response.is_done():
+                await interaction.response.send_message(f"❌ 이 명령어를 사용하려면 다음 권한이 필요합니다: `{', '.join(error.missing_permissions)}`", ephemeral=True)
         else:
             logger.error(f"'{interaction.command.qualified_name}' 명령어 처리 중 오류 발생: {error}", exc_info=True)
-            if not interaction.response.is_done(): await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
-            else: await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            if not interaction.response.is_done(): 
+                await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            else: 
+                await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
 
+    # ... (purge, setup_action_autocomplete 메소드는 변경 없음)
     @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
     @app_commands.rename(amount='개수', user='유저')
     @app_commands.describe(
@@ -155,6 +166,7 @@ class ServerSystem(commands.Cog):
         
         return sorted(choices, key=lambda c: c.name)[:25]
 
+
     @admin_group.command(name="setup", description="봇의 모든 설정을 관리합니다.")
     @app_commands.describe(action="실행할 작업을 선택하세요.", channel="[채널/통계] 작업에 필요한 채널을 선택하세요.", role="[역할/통계] 작업에 필요한 역할을 선택하세요.", user="[코인/XP/레벨] 대상을 지정하세요.", amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.", level="[레벨] 설정할 레벨을 입력하세요.", stat_type="[통계] 표시할 통계 유형을 선택하세요.", template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)")
     @app_commands.autocomplete(action=setup_action_autocomplete)
@@ -162,7 +174,11 @@ class ServerSystem(commands.Cog):
     @app_commands.check(is_admin)
     async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
+        
+        # [로그 추가] 어떤 관리자가 어떤 명령을 실행했는지 기록
+        logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
 
+        # ... (strings_sync, eventpass_... , channel_setup: 부분은 변경 없음)
         if action == "strings_sync":
             try:
                 await save_config_to_db("strings", UI_STRINGS)
@@ -222,11 +238,14 @@ class ServerSystem(commands.Cog):
             
             await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
             return
-        
+
         if action == "game_data_reload":
+            db_key = "game_data_reload_request"
+            payload = time.time()
             try:
-                await save_config_to_db("game_data_reload_request", time.time())
-                logger.info("게임 데이터 새로고침 요청을 DB에 저장했습니다.")
+                await save_config_to_db(db_key, payload)
+                # [로그 추가] DB에 어떤 키와 값으로 요청을 보냈는지 기록
+                logger.info(f"[Game Bot Request] DB에 요청을 보냈습니다. Key: '{db_key}', Value: {payload}")
                 await interaction.followup.send("✅ 게임 봇에게 게임 데이터(아이템, 낚시 확률 등)를 새로고침하도록 요청했습니다.\n"
                                                 "약 10초 내에 변경사항이 적용됩니다.")
             except Exception as e:
@@ -234,6 +253,7 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 게임 데이터 새로고침 요청 중 오류가 발생했습니다.")
             return
 
+        # ... (status_show, server_id_set 부분은 변경 없음)
         if action == "status_show":
             embed = discord.Embed(title="⚙️ 서버 설정 현황 대시보드", color=0x3498DB)
             embed.set_footer(text=f"최종 확인: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
@@ -266,25 +286,46 @@ class ServerSystem(commands.Cog):
             except Exception as e:
                 logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
                 await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
-        
+
+
         elif action in ["coin_give", "coin_take", "xp_give", "level_set"]:
             if not user: return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션이 필요합니다.", ephemeral=True)
+            
+            db_key = ""
+            payload = {}
+            response_message = ""
+
             if action == "coin_give":
                 if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
-                await save_config_to_db(f"coin_admin_update_request_{user.id}", {"amount": amount, "timestamp": time.time()})
-                await interaction.followup.send(f"✅ {user.mention}님에게 코인 `{amount}`를 지급하도록 게임 봇에게 요청했습니다.")
+                db_key = f"coin_admin_update_request_{user.id}"
+                payload = {"amount": amount, "timestamp": time.time()}
+                response_message = f"✅ {user.mention}님에게 코인 `{amount}`를 지급하도록 게임 봇에게 요청했습니다."
             elif action == "coin_take":
                 if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
-                await save_config_to_db(f"coin_admin_update_request_{user.id}", {"amount": -amount, "timestamp": time.time()})
-                await interaction.followup.send(f"✅ {user.mention}님의 코인 `{amount}`를 차감하도록 게임 봇에게 요청했습니다.")
+                db_key = f"coin_admin_update_request_{user.id}"
+                payload = {"amount": -amount, "timestamp": time.time()}
+                response_message = f"✅ {user.mention}님의 코인 `{amount}`를 차감하도록 게임 봇에게 요청했습니다."
             elif action == "xp_give":
                 if not amount: return await interaction.followup.send("❌ `amount` 옵션이 필요합니다.", ephemeral=True)
-                await save_config_to_db(f"xp_admin_update_request_{user.id}", {"xp_to_add": amount, "timestamp": time.time()})
-                await interaction.followup.send(f"✅ {user.mention}님에게 XP `{amount}`를 부여하도록 게임 봇에게 요청했습니다.")
+                db_key = f"xp_admin_update_request_{user.id}"
+                payload = {"xp_to_add": amount, "timestamp": time.time()}
+                response_message = f"✅ {user.mention}님에게 XP `{amount}`를 부여하도록 게임 봇에게 요청했습니다."
             elif action == "level_set":
                 if not level: return await interaction.followup.send("❌ `level` 옵션이 필요합니다.", ephemeral=True)
-                await save_config_to_db(f"xp_admin_update_request_{user.id}", {"exact_level": level, "timestamp": time.time()})
-                await interaction.followup.send(f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다.")
+                db_key = f"xp_admin_update_request_{user.id}"
+                payload = {"exact_level": level, "timestamp": time.time()}
+                response_message = f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다."
+            
+            # [로그 추가] 및 [안정성 강화] try-except 블록으로 감싸기
+            if db_key and payload:
+                try:
+                    await save_config_to_db(db_key, payload)
+                    logger.info(f"[Game Bot Request] DB에 요청을 보냈습니다. Key: '{db_key}', Value: {json.dumps(payload)}")
+                    await interaction.followup.send(response_message)
+                except Exception as e:
+                    logger.error(f"게임 봇 요청({action}) 저장 중 DB 오류 발생: {e}", exc_info=True)
+                    await interaction.followup.send("❌ 게임 봇에 요청을 보내는 중 오류가 발생했습니다.")
+            return
 
         elif action == "template_edit":
             all_embeds = await get_all_embeds()
@@ -303,14 +344,20 @@ class ServerSystem(commands.Cog):
                 db_key = f"panel_regenerate_request_{panel_key}"
                 tasks.append(save_config_to_db(db_key, timestamp))
             
-            await asyncio.gather(*tasks)
-            
-            return await interaction.followup.send(
-                f"✅ {len(game_panel_keys)}개의 게임 패널에 대해 일괄 재설치를 요청했습니다.\n"
-                "게임 봇이 온라인 상태라면 약 10초 내에 패널이 업데이트됩니다.",
-                ephemeral=True
-            )
-
+            try:
+                await asyncio.gather(*tasks)
+                # [로그 추가] 어떤 패널들의 재생성을 요청했는지 기록
+                logger.info(f"[Game Bot Request] {len(game_panel_keys)}개의 게임 패널 재설치를 요청했습니다: {', '.join(game_panel_keys)}")
+                return await interaction.followup.send(
+                    f"✅ {len(game_panel_keys)}개의 게임 패널에 대해 일괄 재설치를 요청했습니다.\n"
+                    "게임 봇이 온라인 상태라면 약 10초 내에 패널이 업데이트됩니다.",
+                    ephemeral=True
+                )
+            except Exception as e:
+                logger.error(f"게임 패널 일괄 재설치 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 게임 패널 재설치 요청 중 오류가 발생했습니다.", ephemeral=True)
+        
+        # ... (나머지 코드는 변경 없음)
         elif action.startswith("role_setup:"):
             db_key = action.split(":", 1)[1]
             if not role:
@@ -354,7 +401,9 @@ class ServerSystem(commands.Cog):
                         is_game_panel = "[게임]" in friendly_name
                         if is_game_panel:
                             timestamp = datetime.now(timezone.utc).timestamp()
-                            await save_config_to_db(f"panel_regenerate_request_{key}", timestamp)
+                            db_key = f"panel_regenerate_request_{key}"
+                            await save_config_to_db(db_key, timestamp)
+                            logger.info(f"[Game Bot Request] DB에 패널 재설치 요청을 보냈습니다. Key: '{db_key}', Value: {timestamp}")
                             success_list.append(f"・`{friendly_name}`: 게임 봇에게 재설치를 요청했습니다.")
                             continue
 
@@ -377,7 +426,6 @@ class ServerSystem(commands.Cog):
                         if success: success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
                         else: failure_list.append(f"・`{friendly_name}`: 재설치 중 알 수 없는 오류가 발생했습니다.")
                         
-                        # [수정] Rate Limit 방지를 위해 각 패널 재생성 후 1초 대기
                         await asyncio.sleep(1)
 
                     except Exception as e:
@@ -406,7 +454,6 @@ class ServerSystem(commands.Cog):
                     else: error_roles.append(f"・`{role_name}`: DB 저장 실패")
                 else: missing_roles.append(f"・`{role_name}`")
                 
-                # [수정] Rate Limit 방지를 위해 각 DB 쓰기 작업 후 짧게 대기
                 await asyncio.sleep(0.1)
             
             embed = discord.Embed(title="⚙️ 역할 데이터베이스 전체 동기화 결과", color=0x2ECC71)
@@ -471,18 +518,17 @@ class ServerSystem(commands.Cog):
             embed.description = "\n\n".join(description)
             await interaction.followup.send(embed=embed, ephemeral=True)
             
-        # ▼▼▼ 아래 elif 블록 전체를 추가해주세요. ▼▼▼
         elif action == "trigger_daily_updates":
+            db_key = "manual_update_request"
+            payload = time.time()
             try:
-                timestamp = time.time()
-                await save_config_to_db("manual_update_request", timestamp)
-                logger.info(f"게임 봇에게 수동 업데이트를 요청했습니다. (요청자: {interaction.user.name})")
+                await save_config_to_db(db_key, payload)
+                logger.info(f"[Game Bot Request] DB에 요청을 보냈습니다. Key: '{db_key}', Value: {payload}")
                 await interaction.followup.send("✅ 게임 봇에게 **시세 변동** 및 **작물 상태 업데이트**를 즉시 실행하도록 요청했습니다.\n"
                                                 "약 15초 내에 변경사항이 적용됩니다.")
             except Exception as e:
                 logger.error(f"수동 업데이트 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 수동 업데이트를 요청하는 중 오류가 발생했습니다.")
-        # ▲▲▲ 위 elif 블록 전체를 추가해주세요. ▲▲▲
         
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
