@@ -918,6 +918,8 @@ UI_EMBEDS = {
                 "inline": False
             }
         ]
+    },
+}
 UI_PANEL_COMPONENTS = [
     {
         "component_key": "start_onboarding_guide",
