@@ -1825,6 +1825,11 @@ UI_STRINGS = {
             "title_suffix": " - 광물",
             "label": "광물",
             "emoji": "💎"
+        }, {
+            "key": "food",
+            "title_suffix": " - 음식",
+            "label": "음식",
+            "emoji": "🍲"
         }],
         "info_tab": {
             "description": "아래 탭을 선택하여 상세 정보를 확인하세요.",
@@ -1870,6 +1875,9 @@ UI_STRINGS = {
         },
         "mineral_tab": {
             "no_items": "보유 중인 광물이 없습니다."
+        },
+        "food_tab": {
+            "no_items": "보유 중인 음식이 없습니다."
         },
         "wip_tab": {
             "description": "이 기능은 현재 준비 중입니다."
