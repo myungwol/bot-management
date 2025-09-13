@@ -556,7 +556,24 @@ class ServerSystem(commands.Cog):
             except Exception as e:
                 logger.error(f"농장 시간 넘기기 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 농장 시간을 변경하는 중 오류가 발생했습니다.")
-        
+                
+        elif action == "farm_reset_date":
+            try:
+                # 1. DB에 저장된 가상 날짜 키를 삭제하여 기본값(실제 시간)을 사용하도록 되돌립니다.
+                await delete_config_from_db("farm_current_date")
+                
+                # 2. 변경사항을 즉시 확인하기 위해 작물 업데이트를 요청합니다.
+                await save_config_to_db("manual_update_request", time.time())
+
+                await interaction.followup.send(
+                    "✅ 농장 시간을 현재의 실제 시간으로 초기화했습니다.\n"
+                    "이제부터 농장은 실제 시간에 맞춰 업데이트됩니다."
+                )
+            except Exception as e:
+                logger.error(f"농장 시간 초기화 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 농장 시간을 초기화하는 중 오류가 발생했습니다.")
+        # ▲▲▲ [코드 추가] ▲▲▲
+
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
             
