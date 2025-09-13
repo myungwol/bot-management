@@ -146,7 +146,20 @@ async def save_config_to_db(key: str, value: Any):
     global _bot_configs_cache
     await supabase.table('bot_configs').upsert({"config_key": key, "config_value": value}).execute()
     _bot_configs_cache[key] = value
-
+    
+@supabase_retry_handler()
+async def delete_config_from_db(key: str):
+    """특정 설정 키를 DB와 로컬 캐시에서 삭제합니다."""
+    global _bot_configs_cache
+    try:
+        await supabase.table('bot_configs').delete().eq('config_key', key).execute()
+        _bot_configs_cache.pop(key, None)
+        logger.info(f"설정 키 '{key}'가 DB와 로컬 캐시에서 성공적으로 삭제되었습니다.")
+        return True
+    except Exception as e:
+        logger.error(f"설정 키 '{key}' 삭제 중 오류 발생: {e}", exc_info=True)
+        return False
+        
 def get_config(key: str, default: Any = None) -> Any:
     return _bot_configs_cache.get(key, default)
 
