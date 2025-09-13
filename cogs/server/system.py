@@ -534,9 +534,7 @@ class ServerSystem(commands.Cog):
             try:
                 from datetime import date, timedelta, timezone
                 
-                # ▼▼▼ [핵심 수정] await 키워드 제거 ▼▼▼
                 current_date_str = get_config("farm_current_date")
-                # ▲▲▲ [핵심 수정] ▲▲▲
                 
                 if current_date_str:
                     current_date = date.fromisoformat(current_date_str)
@@ -546,6 +544,10 @@ class ServerSystem(commands.Cog):
                 next_day = current_date + timedelta(days=1)
                 await save_config_to_db("farm_current_date", next_day.isoformat())
 
+                # ▼▼▼ [핵심 수정] 게임 봇이 변경된 날짜를 즉시 인식하도록 설정 새로고침 요청을 추가합니다. ▼▼▼
+                await save_config_to_db("config_reload_request", time.time())
+                # ▲▲▲ [핵심 수정] 여기까지 ▲▲▲
+                
                 await save_config_to_db("manual_update_request", time.time())
                 
                 await interaction.followup.send(
