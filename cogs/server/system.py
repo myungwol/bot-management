@@ -15,7 +15,7 @@ from utils.database import (
     get_all_stats_channels, add_stats_channel, remove_stats_channel,
     _channel_id_cache,
     supabase,
-    get_all_embeds, get_embed_from_db, save_embed_to_db
+    get_all_embeds, get_embed_from_db, save_embed_to_db,
     delete_config_from_db
 )
 from utils.helpers import calculate_xp_for_level
