@@ -1753,6 +1753,7 @@ ADMIN_ACTION_MAP = {
     "xp_give": "[XP] 유저에게 XP 지급",
     "level_set": "[레벨] 유저 레벨 설정",
     "trigger_daily_updates": "[수동] 시세 및 작물 상태 업데이트 즉시 실행",
+    "farm_next_day": "[농장] 다음 날로 시간 넘기기 (테스트용)",
 }
 
 PROFILE_RANK_ROLES = [{
