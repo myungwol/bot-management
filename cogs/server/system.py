@@ -536,6 +536,36 @@ class ServerSystem(commands.Cog):
                 logger.error(f"수동 업데이트 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 수동 업데이트를 요청하는 중 오류가 발생했습니다.")
         
+        # ▼▼▼ [코드 추가] 아래 블록 전체를 여기에 추가해주세요. ▼▼▼
+        elif action == "farm_next_day":
+            try:
+                from datetime import date, timedelta
+                
+                # 1. 현재 농장 기준일 불러오기
+                current_date_str = await get_config("farm_current_date")
+                if current_date_str:
+                    current_date = date.fromisoformat(current_date_str)
+                else:
+                    # 기준일이 없으면 오늘 날짜로 초기화
+                    current_date = datetime.now(timezone(timedelta(hours=9))).date()
+
+                # 2. 날짜를 하루 증가시키고 DB에 저장
+                next_day = current_date + timedelta(days=1)
+                await save_config_to_db("farm_current_date", next_day.isoformat())
+
+                # 3. 작물 업데이트를 즉시 실행하도록 요청
+                await save_config_to_db("manual_update_request", time.time())
+                
+                await interaction.followup.send(
+                    f"✅ 농장 시간을 다음 날로 변경했습니다.\n"
+                    f"**현재 농장 기준일: {next_day.strftime('%Y-%m-%d')}**\n"
+                    f"이 날짜를 기준으로 작물 상태 업데이트를 요청했습니다."
+                )
+            except Exception as e:
+                logger.error(f"농장 시간 넘기기 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 농장 시간을 변경하는 중 오류가 발생했습니다.")
+        # ▲▲▲ [코드 추가] ▲▲▲
+
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
             
