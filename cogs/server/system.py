@@ -90,6 +90,10 @@ class EmbedTemplateSelectView(ui.View):
             await interaction.followup.send(f"✅ 임베드 템플릿 `{embed_key}`가 성공적으로 업데이트되었습니다.\n`/admin setup`으로 관련 패널을 재설치하면 변경사항이 적용됩니다.", embed=modal.embed, ephemeral=True)
 
 
+# bot-management/cogs/server/system.py
+
+# ... (파일 상단의 import 및 is_admin, Modal, View 클래스는 그대로 유지) ...
+
 class ServerSystem(commands.Cog):
     admin_group = app_commands.Group(name="admin", description="서버 관리용 명령어입니다.", default_permissions=discord.Permissions(manage_guild=True))
 
@@ -99,7 +103,6 @@ class ServerSystem(commands.Cog):
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.CheckFailure): 
-            # [안정성 강화] 응답이 이미 전송되었는지 확인하여 이중 응답 오류 방지
             if not interaction.response.is_done():
                 await interaction.response.send_message(f"❌ {error}", ephemeral=True)
         elif isinstance(error, app_commands.MissingPermissions): 
@@ -112,7 +115,6 @@ class ServerSystem(commands.Cog):
             else: 
                 await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
 
-    # ... (purge, setup_action_autocomplete 메소드는 변경 없음)
     @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
     @app_commands.rename(amount='개수', user='유저')
     @app_commands.describe(
@@ -159,12 +161,10 @@ class ServerSystem(commands.Cog):
             if current.lower() in choice_name.lower():
                 choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
-        # ▼▼▼ [핵심 수정] dissoku -> dicoall 로 변경 ▼▼▼
         role_setup_actions = {
             "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", 
             "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정"
         }
-        # ▲▲▲ [핵심 수정] 종료 ▲▲▲
         
         for key, name in role_setup_actions.items():
             if current.lower() in name.lower():
@@ -181,10 +181,8 @@ class ServerSystem(commands.Cog):
     async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
         
-        # [로그 추가] 어떤 관리자가 어떤 명령을 실행했는지 기록
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
 
-        # ... (strings_sync, eventpass_... , channel_setup: 부분은 변경 없음)
         if action == "strings_sync":
             try:
                 await save_config_to_db("strings", UI_STRINGS)
@@ -250,7 +248,6 @@ class ServerSystem(commands.Cog):
             payload = time.time()
             try:
                 await save_config_to_db(db_key, payload)
-                # [로그 추가] DB에 어떤 키와 값으로 요청을 보냈는지 기록
                 logger.info(f"[Game Bot Request] DB에 요청을 보냈습니다. Key: '{db_key}', Value: {payload}")
                 await interaction.followup.send("✅ 게임 봇에게 게임 데이터(아이템, 낚시 확률 등)를 새로고침하도록 요청했습니다.\n"
                                                 "약 10초 내에 변경사항이 적용됩니다.")
@@ -259,7 +256,6 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 게임 데이터 새로고침 요청 중 오류가 발생했습니다.")
             return
 
-        # ... (status_show, server_id_set 부분은 변경 없음)
         if action == "status_show":
             embed = discord.Embed(title="⚙️ 서버 설정 현황 대시보드", color=0x3498DB)
             embed.set_footer(text=f"최종 확인: {discord.utils.format_dt(discord.utils.utcnow(), style='F')}")
@@ -322,7 +318,6 @@ class ServerSystem(commands.Cog):
                 payload = {"exact_level": level, "timestamp": time.time()}
                 response_message = f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다."
             
-            # [로그 추가] 및 [안정성 강화] try-except 블록으로 감싸기
             if db_key and payload:
                 try:
                     await save_config_to_db(db_key, payload)
@@ -352,7 +347,6 @@ class ServerSystem(commands.Cog):
             
             try:
                 await asyncio.gather(*tasks)
-                # [로그 추가] 어떤 패널들의 재생성을 요청했는지 기록
                 logger.info(f"[Game Bot Request] {len(game_panel_keys)}개의 게임 패널 재설치를 요청했습니다: {', '.join(game_panel_keys)}")
                 return await interaction.followup.send(
                     f"✅ {len(game_panel_keys)}개의 게임 패널에 대해 일괄 재설치를 요청했습니다.\n"
@@ -363,7 +357,6 @@ class ServerSystem(commands.Cog):
                 logger.error(f"게임 패널 일괄 재설치 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 게임 패널 재설치 요청 중 오류가 발생했습니다.", ephemeral=True)
         
-        # ... (나머지 코드는 변경 없음)
         elif action.startswith("role_setup:"):
             db_key = action.split(":", 1)[1]
             if not role:
@@ -536,24 +529,22 @@ class ServerSystem(commands.Cog):
                 logger.error(f"수동 업데이트 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 수동 업데이트를 요청하는 중 오류가 발생했습니다.")
         
-        # ▼▼▼ [코드 추가] 아래 블록 전체를 여기에 추가해주세요. ▼▼▼
         elif action == "farm_next_day":
             try:
-                from datetime import date, timedelta
+                from datetime import date, timedelta, timezone
                 
-                # 1. 현재 농장 기준일 불러오기
-                current_date_str = await get_config("farm_current_date")
+                # ▼▼▼ [핵심 수정] await 키워드 제거 ▼▼▼
+                current_date_str = get_config("farm_current_date")
+                # ▲▲▲ [핵심 수정] ▲▲▲
+                
                 if current_date_str:
                     current_date = date.fromisoformat(current_date_str)
                 else:
-                    # 기준일이 없으면 오늘 날짜로 초기화
                     current_date = datetime.now(timezone(timedelta(hours=9))).date()
 
-                # 2. 날짜를 하루 증가시키고 DB에 저장
                 next_day = current_date + timedelta(days=1)
                 await save_config_to_db("farm_current_date", next_day.isoformat())
 
-                # 3. 작물 업데이트를 즉시 실행하도록 요청
                 await save_config_to_db("manual_update_request", time.time())
                 
                 await interaction.followup.send(
@@ -564,8 +555,7 @@ class ServerSystem(commands.Cog):
             except Exception as e:
                 logger.error(f"농장 시간 넘기기 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 농장 시간을 변경하는 중 오류가 발생했습니다.")
-        # ▲▲▲ [코드 추가] ▲▲▲
-
+        
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
             
