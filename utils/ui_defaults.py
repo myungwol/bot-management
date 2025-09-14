@@ -1960,7 +1960,7 @@ JOB_ADVANCEMENT_DATA = {
             "prerequisite_job": "farmer",
             "abilities": [
                 {"ability_key": "farm_yield_up_2", "ability_name": "수확량 UP (대)", "description": "작물을 수확할 때의 수확량이 대폭 증가합니다."},
-                {"ability_key": "farm_growth_speed_up_2", "ability_name": "성장 속도 UP (대)", "description": "작물의 성장 시간이 단축됩니다."}
+                {"ability_key": "farm_seed_harvester_2", "ability_name": "씨앗 수확 (확률)", "description": "작물 수확 시 낮은 확률로 해당 작물의 씨앗을 1~3개 획득합니다."}
             ]
         },
         {
