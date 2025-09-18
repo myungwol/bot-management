@@ -931,6 +931,47 @@ UI_EMBEDS = {
         "description": "{user_mention}님이 직업을 초기화하고 새로운 여정을 시작합니다.",
         "color": 0x9B59B6
     },
+# 2. UI_EMBEDS 에 추가
+# (다른 임베드 설정들 사이에 추가하시면 됩니다.)
+    "panel_friend_invite": {
+        "title": "💌 친구 초대 이벤트!",
+        "description": "서버에 친구를 초대하고 특별한 보상을 받아가세요!\n\n> 아래 '초대 코드 만들기' 버튼을 누르면 당신만의 1회용 초대 코드가 발급됩니다.\n> 친구가 이 코드로 서버에 들어오면, 당신에게 **500코인**이 지급됩니다!\n\n**[주의사항]**\n- 초대 코드는 7일 동안, 한 명만 사용할 수 있습니다.\n- 이미 초대 코드를 발급받은 경우, 해당 초대가 사용되거나 만료되기 전까지 새 코드를 만들 수 없습니다.",
+        "color": 0x5865F2,
+        "footer": {
+            "text": "친구와 함께 즐거운 마을 생활을!"
+        }
+    },
+    "invite_thread_message": {
+        "title": "💌 초대 코드가 발급되었습니다!",
+        "description": "{user_mention}님, 친구를 초대할 수 있는 코드는 아래와 같습니다.\n\n> 이 코드를 복사해서 친구에게 전달해주세요!\n> 친구가 서버에 들어오면 이 스레드는 자동으로 사라집니다.",
+        "fields": [{
+            "name": "🔗 초대 코드",
+            "value": "```{invite_code}```",
+            "inline": False
+        }],
+        "color": 0x2ECC71
+    },
+    "log_friend_invite_success": {
+        "title": "🎉 새로운 친구가 도착했어요!",
+        "description": "{new_member_mention}님이 {inviter_mention}님의 초대로 마을에 합류했습니다.",
+        "color": 0x3498DB,
+        "fields": [{
+            "name": "💌 초대한 사람",
+            "value": "{inviter_mention}",
+            "inline": True
+        }, {
+            "name": "🎁 새로 온 친구",
+            "value": "{new_member_mention}",
+            "inline": True
+        }, {
+            "name": "💰 지급된 보상",
+            "value": "`500`{currency_icon}",
+            "inline": False
+        }],
+        "footer": {
+            "text": "친구 초대 이벤트"
+        }
+    },
 }
 
 UI_PANEL_COMPONENTS = [
@@ -1113,7 +1154,17 @@ UI_PANEL_COMPONENTS = [
         "emoji": "⛏️",
         "row": 0,
         "order_in_row": 0
-    }
+    },
+    {
+        "component_key": "create_friend_invite",
+        "panel_key": "friend_invite",
+        "component_type": "button",
+        "label": "초대 코드 만들기",
+        "style": "success",
+        "emoji": "💌",
+        "row": 0,
+        "order_in_row": 0
+    },
 ]
 SETUP_COMMAND_MAP = {
     "panel_roles": {
@@ -1529,6 +1580,20 @@ SETUP_COMMAND_MAP = {
         "cog_name": "ItemSystem",
         "key": "log_item_job_reset",
         "friendly_name": "[로그] 직업 초기화권 사용 내역",
+        "channel_type": "text"
+    },
+    "panel_friend_invite": {
+        "type": "panel",
+        "cog_name": "FriendInvite",
+        "key": "friend_invite_panel_channel_id",
+        "friendly_name": "[이벤트] 친구 초대 패널",
+        "channel_type": "text"
+    },
+    "log_friend_invite": {
+        "type": "channel",
+        "cog_name": "FriendInvite",
+        "key": "friend_invite_log_channel_id",
+        "friendly_name": "[로그] 친구 초대 이벤트",
         "channel_type": "text"
     },
 }
