@@ -1586,7 +1586,7 @@ SETUP_COMMAND_MAP = {
         "type": "panel",
         "cog_name": "FriendInvite",
         "key": "friend_invite_panel_channel_id",
-        "friendly_name": "[이벤트] 친구 초대 패널",
+        "friendly_name": "[게임] 친구 초대 패널",
         "channel_type": "text"
     },
     "log_friend_invite": {
