@@ -532,7 +532,7 @@ class ServerSystem(commands.Cog):
         
         elif action == "farm_next_day":
             try:
-                from datetime import date, timedelta, timezone
+                from datetime import date, timedelta # <--- timezone을 여기서 제거합니다.
                 
                 current_date_str = get_config("farm_current_date")
                 
