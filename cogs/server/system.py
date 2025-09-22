@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import asyncio
 import time
-import json # [추가] 로그를 위해 json 모듈을 임포트합니다.
+import json
 
 from utils.database import (
     get_config, save_id_to_db, save_config_to_db, get_id,
@@ -36,7 +36,6 @@ async def is_admin(interaction: discord.Interaction) -> bool:
         raise app_commands.CheckFailure("이 명령어를 실행할 관리자 권한이 없습니다.")
     return True
 
-# ... (TemplateEditModal, EmbedTemplateSelectView 클래스는 변경 없음)
 class TemplateEditModal(ui.Modal, title="임베드 템플릿 편집"):
     title_input = ui.TextInput(label="제목", placeholder="임베드 제목을 입력하세요.", required=False, max_length=256)
     description_input = ui.TextInput(label="설명", placeholder="임베드 설명을 입력하세요.", style=discord.TextStyle.paragraph, required=False, max_length=4000)
@@ -89,11 +88,6 @@ class EmbedTemplateSelectView(ui.View):
             for item in self.children: item.disabled = True
             await interaction.edit_original_response(view=self)
             await interaction.followup.send(f"✅ 임베드 템플릿 `{embed_key}`가 성공적으로 업데이트되었습니다.\n`/admin setup`으로 관련 패널을 재설치하면 변경사항이 적용됩니다.", embed=modal.embed, ephemeral=True)
-
-
-# bot-management/cogs/server/system.py
-
-# ... (파일 상단의 import 및 is_admin, Modal, View 클래스는 그대로 유지) ...
 
 class ServerSystem(commands.Cog):
     admin_group = app_commands.Group(name="admin", description="서버 관리용 명령어입니다.", default_permissions=discord.Permissions(manage_guild=True))
@@ -149,10 +143,16 @@ class ServerSystem(commands.Cog):
         except Exception as e:
             logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
-
+    
+    # ▼▼▼ [수정] autocomplete 함수에 '펫 즉시 부화' 추가 ▼▼▼
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
-        for key, name in ADMIN_ACTION_MAP.items():
+        
+        # ADMIN_ACTION_MAP을 복사하여 수정
+        extended_admin_map = ADMIN_ACTION_MAP.copy()
+        extended_admin_map["pet_hatch_now"] = "[펫] 펫 즉시 부화 (테스트용)"
+
+        for key, name in extended_admin_map.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
         
@@ -172,10 +172,11 @@ class ServerSystem(commands.Cog):
                 choices.append(app_commands.Choice(name=name, value=key))
         
         return sorted(choices, key=lambda c: c.name)[:25]
+    # ▲▲▲ [수정] 완료 ▲▲▲
 
 
     @admin_group.command(name="setup", description="봇의 모든 설정을 관리합니다.")
-    @app_commands.describe(action="실행할 작업을 선택하세요.", channel="[채널/통계] 작업에 필요한 채널을 선택하세요.", role="[역할/통계] 작업에 필요한 역할을 선택하세요.", user="[코인/XP/레벨] 대상을 지정하세요.", amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.", level="[레벨] 설정할 레벨을 입력하세요.", stat_type="[통계] 표시할 통계 유형을 선택하세요.", template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)")
+    @app_commands.describe(action="실행할 작업을 선택하세요.", channel="[채널/통계] 작업에 필요한 채널을 선택하세요.", role="[역할/통계] 작업에 필요한 역할을 선택하세요.", user="[코인/XP/레벨/펫] 대상을 지정하세요.", amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.", level="[레벨] 설정할 레벨을 입력하세요.", stat_type="[통계] 표시할 통계 유형을 선택하세요.", template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)")
     @app_commands.autocomplete(action=setup_action_autocomplete)
     @app_commands.choices(stat_type=[app_commands.Choice(name="[설정] 전체 멤버 수 (봇 포함)", value="total"), app_commands.Choice(name="[설정] 유저 수 (봇 제외)", value="humans"), app_commands.Choice(name="[설정] 봇 수", value="bots"), app_commands.Choice(name="[설정] 서버 부스트 수", value="boosters"), app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"), app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove")])
     @app_commands.check(is_admin)
@@ -183,7 +184,8 @@ class ServerSystem(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
-
+        
+        # ... (기존 action 처리 로직은 그대로 유지) ...
         if action == "strings_sync":
             try:
                 await save_config_to_db("strings", UI_STRINGS)
@@ -328,6 +330,33 @@ class ServerSystem(commands.Cog):
                     logger.error(f"게임 봇 요청({action}) 저장 중 DB 오류 발생: {e}", exc_info=True)
                     await interaction.followup.send("❌ 게임 봇에 요청을 보내는 중 오류가 발생했습니다.")
             return
+        
+        # ▼▼▼ [추가] 펫 즉시 부화 명령어 로직 ▼▼▼
+        elif action == "pet_hatch_now":
+            if not user:
+                return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
+
+            try:
+                # 1. 대상 유저의 펫이 알 상태인지 확인
+                pet_res = await supabase.table('pets').select('id, current_stage').eq('user_id', user.id).maybe_single().execute()
+                if not (pet_res and pet_res.data):
+                    return await interaction.followup.send(f"❌ {user.mention}님은 펫을 소유하고 있지 않습니다.", ephemeral=True)
+                
+                if pet_res.data['current_stage'] != 1:
+                    return await interaction.followup.send(f"❌ {user.mention}님의 펫은 이미 부화한 상태입니다.", ephemeral=True)
+                
+                # 2. 부화 시간을 지금보다 과거로 설정하여 즉시 부화되도록 함
+                past_time = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+                await supabase.table('pets').update({'hatches_at': past_time}).eq('id', pet_res.data['id']).execute()
+                
+                logger.info(f"관리자({interaction.user.id})가 {user.id}의 펫을 즉시 부화시켰습니다.")
+                await interaction.followup.send(f"✅ {user.mention}님의 알을 즉시 부화시키도록 게임 봇에게 요청했습니다.\n"
+                                                "게임 봇이 온라인 상태라면 약 30초 내에 부화 처리됩니다.", ephemeral=True)
+            except Exception as e:
+                logger.error(f"펫 즉시 부화 처리 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 펫 즉시 부화 처리 중 오류가 발생했습니다.", ephemeral=True)
+            return
+        # ▲▲▲ [추가] 완료 ▲▲▲
 
         elif action == "template_edit":
             all_embeds = await get_all_embeds()
@@ -532,7 +561,7 @@ class ServerSystem(commands.Cog):
         
         elif action == "farm_next_day":
             try:
-                from datetime import date, timedelta # <--- timezone을 여기서 제거합니다.
+                from datetime import date, timedelta
                 
                 current_date_str = get_config("farm_current_date")
                 
@@ -544,10 +573,7 @@ class ServerSystem(commands.Cog):
                 next_day = current_date + timedelta(days=1)
                 await save_config_to_db("farm_current_date", next_day.isoformat())
 
-                # ▼▼▼ [핵심 수정] 게임 봇이 변경된 날짜를 즉시 인식하도록 설정 새로고침 요청을 추가합니다. ▼▼▼
                 await save_config_to_db("config_reload_request", time.time())
-                # ▲▲▲ [핵심 수정] 여기까지 ▲▲▲
-                
                 await save_config_to_db("manual_update_request", time.time())
                 
                 await interaction.followup.send(
@@ -561,12 +587,8 @@ class ServerSystem(commands.Cog):
                 
         elif action == "farm_reset_date":
             try:
-                # 1. DB에 저장된 가상 날짜 키를 삭제하여 기본값(실제 시간)을 사용하도록 되돌립니다.
                 await delete_config_from_db("farm_current_date")
-                
-                # 2. 변경사항을 즉시 확인하기 위해 작물 업데이트를 요청합니다.
                 await save_config_to_db("manual_update_request", time.time())
-
                 await interaction.followup.send(
                     "✅ 농장 시간을 현재의 실제 시간으로 초기화했습니다.\n"
                     "이제부터 농장은 실제 시간에 맞춰 업데이트됩니다."
@@ -574,7 +596,6 @@ class ServerSystem(commands.Cog):
             except Exception as e:
                 logger.error(f"농장 시간 초기화 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 농장 시간을 초기화하는 중 오류가 발생했습니다.")
-        # ▲▲▲ [코드 추가] ▲▲▲
 
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
