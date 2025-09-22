@@ -352,14 +352,13 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 펫 즉시 부화 처리 중 오류가 발생했습니다.", ephemeral=True)
             return
 
-        elif action == "pet_levelup_test":
+        elif action == "pet_admin_levelup": # <--- "pet_levelup_test"를 "pet_admin_levelup"으로 변경
             if not user:
                 return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
             
             try:
-                # ▼▼▼ [수정] DB 키 이름을 'pet_admin_levelup_request'로 변경합니다. ▼▼▼
                 db_key = f"pet_admin_levelup_request_{user.id}"
-                await save_config_to_db(db_key, time.time()) # 값은 timestamp로 되돌려도 괜찮습니다.
+                await save_config_to_db(db_key, time.time())
                 
                 logger.info(f"관리자({interaction.user.id})가 {user.id}의 펫 레벨업을 요청했습니다.")
                 await interaction.followup.send(f"✅ {user.mention}님의 펫을 1레벨 성장시키도록 게임 봇에게 요청했습니다.\n"
