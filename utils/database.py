@@ -228,17 +228,20 @@ async def get_panel_components_from_db(panel_key: str) -> list:
     response = await supabase.table('panel_components').select('*').eq('panel_key', panel_key).order('row', desc=False).order('order_in_row', desc=False).execute()
     return response.data if response and response.data else []
 @supabase_retry_handler()
-async def get_cooldown(user_id_str: str, cooldown_key: str) -> float:
-    response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('user_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute()
+async def get_cooldown(user_id: int, cooldown_key: str) -> float: # 함수 인자 이름을 user_id_str -> user_id로 변경
+    user_id_str = str(user_id) # 숫자로 받은 ID를 문자열로 변환
+    response = await supabase.table('cooldowns').select('last_cooldown_timestamp').eq('subject_id', user_id_str).eq('cooldown_key', cooldown_key).limit(1).execute() # user_id -> subject_id
     if response and response.data and (timestamp_str := response.data[0].get('last_cooldown_timestamp')) is not None:
         try:
             if timestamp_str.endswith('Z'): timestamp_str = timestamp_str[:-1] + '+00:00'
             return datetime.fromisoformat(timestamp_str).timestamp()
         except (ValueError, TypeError): return 0.0
     return 0.0
+
 @supabase_retry_handler()
-async def set_cooldown(user_id_str: str, cooldown_key: str):
-    await supabase.table('cooldowns').upsert({ "user_id": user_id_str, "cooldown_key": cooldown_key, "last_cooldown_timestamp": datetime.now(timezone.utc).isoformat() }, on_conflict='user_id, cooldown_key').execute()
+async def set_cooldown(user_id: int, cooldown_key: str): # 함수 인자 이름을 user_id_str -> user_id로 변경
+    user_id_str = str(user_id) # 숫자로 받은 ID를 문자열로 변환
+    await supabase.table('cooldowns').upsert({ "subject_id": user_id_str, "cooldown_key": cooldown_key, "last_cooldown_timestamp": datetime.now(timezone.utc).isoformat() }, on_conflict='subject_id, cooldown_key').execute() # user_id -> subject_id
 @supabase_retry_handler()
 async def get_all_stats_channels() -> List[Dict[str, Any]]:
     response = await supabase.table('stats_channels').select('*').execute()
