@@ -1824,7 +1824,7 @@ ADMIN_ACTION_MAP = {
     "trigger_daily_updates": "[수동] 시세 및 작물 상태 업데이트 즉시 실행",
     "farm_next_day": "[농장] 다음 날로 시간 넘기기 (테스트용)",
     "farm_reset_date": "[농장] 시간을 현재로 초기화 (테스트용)",
-    "pet_hatch_now": "[펫] 펫 즉시 부화 (테스트용)"
+    "pet_hatch_now": "[펫] 펫 즉시 부화 (테스트용)",
     "pet_levelup_test": "[펫] 펫 1레벨업 (테스트용)"
 }
 
