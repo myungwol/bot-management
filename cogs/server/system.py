@@ -5,7 +5,8 @@ from discord.ext import commands
 from discord import app_commands, ui
 import logging
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
+# ▼▼▼ [수정] timedelta를 import 목록에 추가합니다. ▼▼▼
+from datetime import datetime, timezone, timedelta
 import asyncio
 import time
 import json
@@ -144,11 +145,9 @@ class ServerSystem(commands.Cog):
             logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
     
-    # ▼▼▼ [수정] autocomplete 함수에 '펫 즉시 부화' 추가 ▼▼▼
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         
-        # ADMIN_ACTION_MAP을 복사하여 수정
         extended_admin_map = ADMIN_ACTION_MAP.copy()
         extended_admin_map["pet_hatch_now"] = "[펫] 펫 즉시 부화 (테스트용)"
 
@@ -172,7 +171,6 @@ class ServerSystem(commands.Cog):
                 choices.append(app_commands.Choice(name=name, value=key))
         
         return sorted(choices, key=lambda c: c.name)[:25]
-    # ▲▲▲ [수정] 완료 ▲▲▲
 
 
     @admin_group.command(name="setup", description="봇의 모든 설정을 관리합니다.")
@@ -184,8 +182,7 @@ class ServerSystem(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
-        
-        # ... (기존 action 처리 로직은 그대로 유지) ...
+
         if action == "strings_sync":
             try:
                 await save_config_to_db("strings", UI_STRINGS)
@@ -330,14 +327,12 @@ class ServerSystem(commands.Cog):
                     logger.error(f"게임 봇 요청({action}) 저장 중 DB 오류 발생: {e}", exc_info=True)
                     await interaction.followup.send("❌ 게임 봇에 요청을 보내는 중 오류가 발생했습니다.")
             return
-        
-        # ▼▼▼ [추가] 펫 즉시 부화 명령어 로직 ▼▼▼
+
         elif action == "pet_hatch_now":
             if not user:
                 return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
 
             try:
-                # 1. 대상 유저의 펫이 알 상태인지 확인
                 pet_res = await supabase.table('pets').select('id, current_stage').eq('user_id', user.id).maybe_single().execute()
                 if not (pet_res and pet_res.data):
                     return await interaction.followup.send(f"❌ {user.mention}님은 펫을 소유하고 있지 않습니다.", ephemeral=True)
@@ -345,7 +340,6 @@ class ServerSystem(commands.Cog):
                 if pet_res.data['current_stage'] != 1:
                     return await interaction.followup.send(f"❌ {user.mention}님의 펫은 이미 부화한 상태입니다.", ephemeral=True)
                 
-                # 2. 부화 시간을 지금보다 과거로 설정하여 즉시 부화되도록 함
                 past_time = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
                 await supabase.table('pets').update({'hatches_at': past_time}).eq('id', pet_res.data['id']).execute()
                 
@@ -356,7 +350,6 @@ class ServerSystem(commands.Cog):
                 logger.error(f"펫 즉시 부화 처리 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 펫 즉시 부화 처리 중 오류가 발생했습니다.", ephemeral=True)
             return
-        # ▲▲▲ [추가] 완료 ▲▲▲
 
         elif action == "template_edit":
             all_embeds = await get_all_embeds()
