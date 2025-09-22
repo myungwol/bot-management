@@ -368,6 +368,26 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 펫 레벨업 요청 중 오류가 발생했습니다.", ephemeral=True)
             return
 
+        # ▼▼▼▼▼ 여기에 아래 코드를 추가하세요 ▼▼▼▼▼
+        elif action == "pet_level_set":
+            if not user:
+                return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
+            if not level:
+                return await interaction.followup.send("❌ 이 작업을 수행하려면 `level` 옵션을 지정해야 합니다.", ephemeral=True)
+
+            try:
+                db_key = f"pet_level_set_request_{user.id}"
+                await save_config_to_db(db_key, {"exact_level": level, "timestamp": time.time()})
+                
+                logger.info(f"관리자({interaction.user.id})가 {user.id}의 펫 레벨을 {level}로 설정하도록 요청했습니다.")
+                await interaction.followup.send(f"✅ {user.mention}님의 펫 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다.\n"
+                                                "게임 봇이 온라인 상태라면 약 10초 내에 처리됩니다.", ephemeral=True)
+            except Exception as e:
+                logger.error(f"펫 레벨 설정 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 펫 레벨 설정 요청 중 오류가 발생했습니다.", ephemeral=True)
+            return
+        # ▲▲▲▲▲ 여기까지 추가 ▲▲▲▲▲
+
         elif action == "template_edit":
             all_embeds = await get_all_embeds()
             if not all_embeds: return await interaction.followup.send("❌ DB에 편집 가능한 임베드 템플릿이 없습니다.", ephemeral=True)
