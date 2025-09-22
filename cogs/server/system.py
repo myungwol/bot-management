@@ -5,7 +5,6 @@ from discord.ext import commands
 from discord import app_commands, ui
 import logging
 from typing import Optional, List, Dict, Any
-# ▼▼▼ [핵심 수정] 여기에 timedelta가 포함되어 있는지 다시 한번 확인해주세요. ▼▼▼
 from datetime import datetime, timezone, timedelta
 import asyncio
 import time
