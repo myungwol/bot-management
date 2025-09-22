@@ -5,6 +5,7 @@ from discord.ext import commands
 from discord import app_commands, ui
 import logging
 from typing import Optional, List, Dict, Any
+# ▼▼▼ [핵심] 이 라인이 아래와 정확히 일치하는지 다시 확인해주세요. ▼▼▼
 from datetime import datetime, timezone, timedelta
 import asyncio
 import time
@@ -143,7 +144,7 @@ class ServerSystem(commands.Cog):
         except Exception as e:
             logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
-
+    
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
         
