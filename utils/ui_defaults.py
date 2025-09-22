@@ -964,6 +964,11 @@ UI_EMBEDS = {
             "text": "친구 초대 이벤트"
         }
     },
+    "panel_incubator": {
+        "title": "🥚 펫 인큐베이터",
+        "description": "> 보유하고 있는 알을 부화기에 넣어 펫을 얻을 수 있습니다.\n> 부화에는 시간이 필요하며, 알을 오래 품을수록 더 좋은 능력치를 가질 수 있습니다.",
+        "color": 0x7289DA
+    },
 }
 
 UI_PANEL_COMPONENTS = [
@@ -1586,6 +1591,13 @@ SETUP_COMMAND_MAP = {
         "cog_name": "FriendInvite",
         "key": "friend_invite_log_channel_id",
         "friendly_name": "[로그] 친구 초대 이벤트",
+        "channel_type": "text"
+    },
+    "panel_incubator": {
+        "type": "panel",
+        "cog_name": "PetSystem",
+        "key": "incubator_panel_channel_id",
+        "friendly_name": "[게임] 펫 인큐베이터 패널",
         "channel_type": "text"
     },
 }
