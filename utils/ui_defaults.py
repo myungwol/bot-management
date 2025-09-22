@@ -969,6 +969,23 @@ UI_EMBEDS = {
         "description": "> 보유하고 있는 알을 부화기에 넣어 펫을 얻을 수 있습니다.\n> 부화에는 시간이 필요하며, 알을 오래 품을수록 더 좋은 능력치를 가질 수 있습니다.",
         "color": 0x7289DA
     },
+    "panel_dungeon": {
+        "title": "🛡️ 던전 입구",
+        "description": "> 펫과 함께 몬스터를 사냥하고 경험치와 아이템을 얻으세요!\n> 각 던전에 입장하려면 상점에서 알맞은 입장권을 구매해야 합니다.",
+        "color": 0x71368A
+    },
+    "log_dungeon_result": {
+        "title": "🛡️ 던전 탐사 결과",
+        "description": "{user_mention}님의 **{dungeon_name}** 탐사가 종료되었습니다.",
+        "color": 0x71368A,
+        "fields": [
+            {
+                "name": "획득한 아이템",
+                "value": "{rewards_list}",
+                "inline": False
+            }
+        ]
+    },
 }
 
 UI_PANEL_COMPONENTS = [
@@ -1302,6 +1319,13 @@ SETUP_COMMAND_MAP = {
         "cog_name": "Trade",
         "key": "trade_panel_channel_id",
         "friendly_name": "[게임] 거래소 패널",
+        "channel_type": "text"
+    },
+    "panel_dungeon": {
+        "type": "panel",
+        "cog_name": "Dungeon",
+        "key": "dungeon_panel_channel_id",
+        "friendly_name": "[게임] 던전 입구 패널",
         "channel_type": "text"
     },
     "log_trade": {
