@@ -352,6 +352,23 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 펫 즉시 부화 처리 중 오류가 발생했습니다.", ephemeral=True)
             return
 
+        elif action == "pet_levelup_test":
+            if not user:
+                return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
+            
+            try:
+                # 게임 봇에게 요청 보내기
+                db_key = f"pet_levelup_request_{user.id}"
+                await save_config_to_db(db_key, time.time())
+                
+                logger.info(f"관리자({interaction.user.id})가 {user.id}의 펫 레벨업을 요청했습니다.")
+                await interaction.followup.send(f"✅ {user.mention}님의 펫을 1레벨 성장시키도록 게임 봇에게 요청했습니다.\n"
+                                                "게임 봇이 온라인 상태라면 약 10초 내에 처리됩니다.", ephemeral=True)
+            except Exception as e:
+                logger.error(f"펫 레벨업 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 펫 레벨업 요청 중 오류가 발생했습니다.", ephemeral=True)
+            return
+
         elif action == "template_edit":
             all_embeds = await get_all_embeds()
             if not all_embeds: return await interaction.followup.send("❌ DB에 편집 가능한 임베드 템플릿이 없습니다.", ephemeral=True)
