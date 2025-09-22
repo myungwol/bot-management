@@ -357,9 +357,9 @@ class ServerSystem(commands.Cog):
                 return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
             
             try:
-                # 게임 봇에게 요청 보내기
+                # ▼▼▼ [수정] time.time() 대신 빈 딕셔너리를 저장합니다. ▼▼▼
                 db_key = f"pet_levelup_request_{user.id}"
-                await save_config_to_db(db_key, time.time())
+                await save_config_to_db(db_key, {}) # 빈 딕셔너리로 변경
                 
                 logger.info(f"관리자({interaction.user.id})가 {user.id}의 펫 레벨업을 요청했습니다.")
                 await interaction.followup.send(f"✅ {user.mention}님의 펫을 1레벨 성장시키도록 게임 봇에게 요청했습니다.\n"
