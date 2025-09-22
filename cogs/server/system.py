@@ -5,7 +5,6 @@ from discord.ext import commands
 from discord import app_commands, ui
 import logging
 from typing import Optional, List, Dict, Any
-# ▼▼▼ [핵심] 이 라인이 아래와 정확히 일치하는지 다시 확인해주세요. ▼▼▼
 from datetime import datetime, timezone, timedelta
 import asyncio
 import time
@@ -27,6 +26,8 @@ from utils.ui_defaults import (
 )
 
 logger = logging.getLogger(__name__)
+# ▼▼▼ [진단용 로그] 이 로그가 보이면 최신 파일이 적용된 것입니다. ▼▼▼
+logger.info("### system.py v2 (timedelta fix applied) LOADED ###")
 
 async def is_admin(interaction: discord.Interaction) -> bool:
     if not isinstance(interaction.user, discord.Member): return False
@@ -36,6 +37,8 @@ async def is_admin(interaction: discord.Interaction) -> bool:
         if interaction.user.id == interaction.guild.owner_id: return True
         raise app_commands.CheckFailure("이 명령어를 실행할 관리자 권한이 없습니다.")
     return True
+
+# ... (이하 모든 코드는 이전과 동일합니다) ...
 
 class TemplateEditModal(ui.Modal, title="임베드 템플릿 편집"):
     title_input = ui.TextInput(label="제목", placeholder="임베드 제목을 입력하세요.", required=False, max_length=256)
