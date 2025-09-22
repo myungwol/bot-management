@@ -1834,7 +1834,8 @@ ADMIN_ACTION_MAP = {
     "farm_next_day": "[농장] 다음 날로 시간 넘기기 (테스트용)",
     "farm_reset_date": "[농장] 시간을 현재로 초기화 (테스트용)",
     "pet_hatch_now": "[펫] 펫 즉시 부화 (테스트용)",
-    "pet_admin_levelup": "[펫] 펫 1레벨업 (테스트용)" # <--- "pet_levelup_test"를 "pet_admin_levelup"으로 변경
+    "pet_admin_levelup": "[펫] 펫 1레벨업 (테스트용)",
+    "pet_level_set": "[펫] 펫 레벨 설정 (테스트용)" # <--- 이 줄을 추가하세요.
 }
 
 PROFILE_RANK_ROLES = [{
