@@ -1894,6 +1894,9 @@ UI_STRINGS = {
         "현재 소지금: `{balance}`{currency_icon}\n구매하고 싶은 상품을 선택하세요.",
         "wip_category": "이 카테고리의 상품은 현재 준비 중입니다."
     },
+    "profile_view": {
+        "base_title":
+        "{user_name}의 소지품",
         "tabs": [{
             "key": "info", "title_suffix": " - 정보", "label": "정보", "emoji": "ℹ️"
         }, {
@@ -1979,8 +1982,8 @@ UI_STRINGS = {
             "unequip_prefix": "✋",
             "back_button": "뒤로"
         }
-    } # "profile_view" 딕셔너리가 여기서 닫힙니다.
-} # "UI_STRINGS" 딕셔너리가 여기서 닫힙니다.
+    }
+}
 JOB_ADVANCEMENT_DATA = {
     "50": [
         {
