@@ -1894,49 +1894,28 @@ UI_STRINGS = {
         "현재 소지금: `{balance}`{currency_icon}\n구매하고 싶은 상품을 선택하세요.",
         "wip_category": "이 카테고리의 상품은 현재 준비 중입니다."
     },
-    "profile_view": {
-        "base_title":
-        "{user_name}의 소지품",
         "tabs": [{
-            "key": "info",
-            "title_suffix": " - 정보",
-            "label": "정보",
-            "emoji": "ℹ️"
+            "key": "info", "title_suffix": " - 정보", "label": "정보", "emoji": "ℹ️"
         }, {
-            "key": "item",
-            "title_suffix": " - 아이템",
-            "label": "아이템",
-            "emoji": "📦"
+            "key": "item", "title_suffix": " - 아이템", "label": "아이템", "emoji": "📦"
         }, {
-            "key": "gear",
-            "title_suffix": " - 장비",
-            "label": "장비",
-            "emoji": "⚒️"
+            "key": "ticket", "title_suffix": " - 입장권", "label": "입장권", "emoji": "🎟️"
         }, {
-            "key": "fish",
-            "title_suffix": " - 어항",
-            "label": "어항",
-            "emoji": "🐠"
+            "key": "gear", "title_suffix": " - 장비", "label": "장비", "emoji": "⚒️"
         }, {
-            "key": "seed",
-            "title_suffix": " - 씨앗",
-            "label": "씨앗",
-            "emoji": "🌱"
+            "key": "fish", "title_suffix": " - 어항", "label": "어항", "emoji": "🐠"
         }, {
-            "key": "crop",
-            "title_suffix": " - 작물",
-            "label": "작물",
-            "emoji": "🌾"
+            "key": "seed", "title_suffix": " - 씨앗", "label": "씨앗", "emoji": "🌱"
         }, {
-            "key": "mineral",
-            "title_suffix": " - 광물",
-            "label": "광물",
-            "emoji": "💎"
+            "key": "crop", "title_suffix": " - 작물", "label": "작물", "emoji": "🌾"
         }, {
-            "key": "food",
-            "title_suffix": " - 음식",
-            "label": "음식",
-            "emoji": "🍲"
+            "key": "mineral", "title_suffix": " - 광물", "label": "광물", "emoji": "💎"
+        }, {
+            "key": "food", "title_suffix": " - 음식", "label": "음식", "emoji": "🍲"
+        }, {
+            "key": "loot", "title_suffix": " - 전리품", "label": "전리품", "emoji": "🏆"
+        }, {
+            "key": "pet", "title_suffix": " - 펫 아이템", "label": "펫 아이템", "emoji": "🐾"
         }],
         "info_tab": {
             "description": "아래 탭을 선택하여 상세 정보를 확인하세요.",
