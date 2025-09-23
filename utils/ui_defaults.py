@@ -1979,8 +1979,8 @@ UI_STRINGS = {
             "unequip_prefix": "✋",
             "back_button": "뒤로"
         }
-    }
-}
+    } # "profile_view" 딕셔너리가 여기서 닫힙니다.
+} # "UI_STRINGS" 딕셔너리가 여기서 닫힙니다.
 JOB_ADVANCEMENT_DATA = {
     "50": [
         {
