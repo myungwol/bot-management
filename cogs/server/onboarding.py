@@ -249,7 +249,8 @@ class ApprovalView(ui.View):
             if is_approved:
                 success, results = await self._process_approval(moderator, member)
             else:
-                success, results = await self._process_rejection(moderator, member, reason)
+                # ▼▼▼ [핵심 수정] 변수명을 'reason'에서 'rejection_reason'으로 변경합니다. ▼▼▼
+                success, results = await self._process_rejection(moderator, member, rejection_reason)
 
             status_text = "승인" if is_approved else "거절"
             if success:
