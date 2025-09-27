@@ -499,7 +499,7 @@ UI_EMBEDS = {
     },
     "embed_main_chat_welcome": {
         "title": "",
-        "description": "### 새로운 이웃이 생겼어요! 다 함께 따뜻한 인사를 나눠주세요. :sparkling_heart:\n**마을에서의 생활이 더욱 즐거워질 수 있도록,**\n**몇 가지 유용한 안내판을 준비했어요. :map:**\n### ┃ :house_with_garden: 마을 적응이 어렵나요?\n　╰─➤ 도움이 필요하다면 언제든 {staff_role_mention}님을 찾아주세요!\n### ┃ :black_nib: 새로운 이름이 필요하세요?\n　╰─➤{nickname_channel_mention} 채널에서 멋진 이름으로 바꿀 수 있어요.\n### ┃ :bell: 알림을 받고 싶으신가요??\n　╰─➤{role_channel_mention}에서 개성 있는 역할을 받아보세요.\n### ┃ :love_letter: 좋은 생각이 떠올랐나요?\n　╰─➤{inquiry_channel_mention}에 소중한 의견을 남겨주세요.\n### ┃ :fairy: 마을의 요정(봇)이 궁금하세요?\n　╰─➤ {bot_guide_channel_mention} 채널에서 사용법을 확인해 주세요.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n### ┃:circus_tent: 현재 진행 중인 마을 축제!\n　╰─➤{festival_channel_mention}을 확인해 주세요.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯",
+        "description": "### 새로운 이웃이 생겼어요! 다 함께 따뜻한 인사를 나눠주세요. :sparkling_heart:\n**마을에서의 생활이 더욱 즐거워질 수 있도록,**\n**몇 가지 유용한 안내판을 준비했어요. :map:**\n### ┃ :house_with_garden: 마을 적응이 어렵나요?\n　╰─➤ 도움이 필요하다면 언제든 {staff_role_mention}님을 찾아주세요!\n### ┃ :black_nib: 새로운 이름이 필요하세요?\n　╰─➤{nickname_channel_mention} 채널에서 멋진 이름으로 바꿀 수 있어요.\n### ┃ :bell: 알림을 받고 싶으신가요?\n　╰─➤{role_channel_mention}에서 개성 있는 역할을 받아보세요.\n### ┃ :love_letter: 좋은 생각이 떠올랐나요?\n　╰─➤{inquiry_channel_mention}에 소중한 의견을 남겨주세요.\n### ┃ :fairy: 마을의 요정(봇)이 궁금하세요?\n　╰─➤ {bot_guide_channel_mention} 채널에서 사용법을 확인해 주세요.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n### ┃:circus_tent: 현재 진행 중인 마을 축제!\n　╰─➤{festival_channel_mention}을 확인해 주세요.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯",
         "color": 0x2ECC71
     },
     "panel_warning": {
