@@ -1304,13 +1304,6 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[게임] 거래소 패널",
         "channel_type": "text"
     },
-    "panel_dungeon": {
-        "type": "panel",
-        "cog_name": "Dungeon",
-        "key": "dungeon_panel_channel_id",
-        "friendly_name": "[게임] 던전 입구 패널",
-        "channel_type": "text"
-    },
     "log_trade": {
         "type": "channel",
         "cog_name": "Trade",
