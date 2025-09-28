@@ -1304,6 +1304,13 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[게임] 거래소 패널",
         "channel_type": "text"
     },
+    "panel_pet_exploration": {
+        "type": "panel",
+        "cog_name": "Exploration",
+        "key": "exploration_panel_channel_id",
+        "friendly_name": "[게임] 펫 탐사 패널",
+        "channel_type": "text"
+    },
     "log_trade": {
         "type": "channel",
         "cog_name": "Trade",
