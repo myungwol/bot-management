@@ -1,4 +1,4 @@
-# bot-management/cogs/server/system.py
+# cogs/server/system.py
 
 import discord
 from discord.ext import commands
@@ -148,12 +148,8 @@ class ServerSystem(commands.Cog):
         choices = []
         
         extended_admin_map = ADMIN_ACTION_MAP.copy()
-
-        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
-        # ADMIN_ACTION_MAP에 테스트용 액션을 추가합니다.
         extended_admin_map["boss_reset_check_test"] = "[보스] 리셋 루프 즉시 실행 (테스트용)"
-        # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
-        
+
         for key, name in extended_admin_map.items():
             if current.lower() in name.lower():
                 choices.append(app_commands.Choice(name=name, value=key))
@@ -214,23 +210,6 @@ class ServerSystem(commands.Cog):
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
 
-        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
-        if action == "boss_reset_check_test":
-            try:
-                # 게임 봇의 Cog를 직접 가져옵니다.
-                game_bot_cog = self.bot.cogs.get("BossRaid")
-                if not game_bot_cog:
-                    return await interaction.followup.send("❌ 게임 봇의 'BossRaid' Cog를 찾을 수 없습니다. 게임 봇이 실행 중인지 확인해주세요.", ephemeral=True)
-                
-                # force_weekly과 force_monthly를 True로 설정하여 날짜와 상관없이 로직을 강제로 실행합니다.
-                result_message = await game_bot_cog.manual_reset_check(force_weekly=True, force_monthly=True)
-                await interaction.followup.send(f"✅ 게임 봇에게 보스 리셋 루프를 즉시 실행하도록 요청했습니다.\n결과: `{result_message}`\n\n**참고:** 이미 보스가 소환된 상태라면 새로운 보스가 생성되지 않습니다. 새로운 보스 생성을 테스트하려면 먼저 `/admin setup action:[보스] 강제 처치` 명령으로 기존 보스를 제거해주세요.", ephemeral=True)
-            except Exception as e:
-                logger.error(f"보스 리셋 루프 수동 실행 중 오류: {e}", exc_info=True)
-                await interaction.followup.send("❌ 보스 리셋 루프를 실행하는 중 오류가 발생했습니다.", ephemeral=True)
-            return
-        # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
-                        
         if action == "strings_sync":
             try:
                 await save_config_to_db("strings", UI_STRINGS)
@@ -303,6 +282,23 @@ class ServerSystem(commands.Cog):
                 logger.error(f"게임 데이터 새로고침 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 게임 데이터 새로고침 요청 중 오류가 발생했습니다.")
             return
+        
+        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
+        if action == "boss_reset_check_test":
+            try:
+                # 원인: 게임 봇의 Cog를 직접 가져오려고 시도했습니다.
+                # 해결: 데이터베이스에 요청을 기록하는 방식으로 변경합니다.
+                db_key = "boss_reset_manual_request"
+                payload = {"timestamp": time.time()}
+                await save_config_to_db(db_key, payload)
+                
+                logger.info(f"[Game Bot Request] DB에 수동 보스 리셋 요청을 보냈습니다: {payload}")
+                await interaction.followup.send(f"✅ 게임 봇에게 보스 리셋 루프를 즉시 실행하도록 요청했습니다.\n\n**참고:** 이미 보스가 소환된 상태라도, 이 명령은 기존 보스를 만료시키고 새로운 보스를 생성합니다.", ephemeral=True)
+            except Exception as e:
+                logger.error(f"보스 리셋 루프 수동 실행 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 보스 리셋 루프를 요청하는 중 오류가 발생했습니다.", ephemeral=True)
+            return
+        # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
 
         if action == "status_show":
             embed = discord.Embed(title="⚙️ 서버 설정 현황 대시보드", color=0x3498DB)
