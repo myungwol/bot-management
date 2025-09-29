@@ -1,7 +1,5 @@
 # bot-management/utils/database.py
-"""
-Supabase 데이터베이스와의 모든 상호작용을 관리하는 중앙 파일입니다.
-"""
+
 import os
 import asyncio
 import logging
@@ -15,16 +13,19 @@ import discord
 from supabase import create_client, AsyncClient
 from postgrest.exceptions import APIError
 
-# [✅ 수정] STATIC_AUTO_ROLE_PANELS를 임포트합니다.
+# --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
+# ui_defaults.py에서 BOSS_REWARD_TIERS를 import 합니다.
 from .ui_defaults import (
     UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, 
     SETUP_COMMAND_MAP, JOB_SYSTEM_CONFIG, AGE_ROLE_MAPPING, GAME_CONFIG,
-    ONBOARDING_CHOICES, STATIC_AUTO_ROLE_PANELS
+    ONBOARDING_CHOICES, STATIC_AUTO_ROLE_PANELS, BOSS_REWARD_TIERS
 )
+# --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
 
 logger = logging.getLogger(__name__)
 
 KST = timezone(timedelta(hours=9))
+
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 1. 클라이언트 초기화 및 캐시
@@ -97,6 +98,9 @@ async def sync_defaults_to_db():
         )
         await save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy)
         
+        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
+        # 원인: save_config_to_db() 호출이 asyncio.gather() 밖에 있었습니다.
+        # 해결: 다른 비동기 함수들과 함께 asyncio.gather()의 인자로 전달합니다.
         await asyncio.gather(
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
@@ -106,11 +110,9 @@ async def sync_defaults_to_db():
             save_config_to_db("AGE_ROLE_MAPPING", AGE_ROLE_MAPPING),
             save_config_to_db("GAME_CONFIG", GAME_CONFIG),
             save_config_to_db("ONBOARDING_CHOICES", ONBOARDING_CHOICES),
-            # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
-            # 누락되었던 BOSS_REWARD_TIERS 설정을 DB에 동기화하는 코드를 추가합니다.
             save_config_to_db("BOSS_REWARD_TIERS", BOSS_REWARD_TIERS)
-            # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
         )
+        # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
         all_channel_keys = [info['key'] for info in SETUP_COMMAND_MAP.values()]
@@ -120,7 +122,7 @@ async def sync_defaults_to_db():
         if placeholder_records:
             await supabase.table('channel_configs').upsert(placeholder_records, on_conflict="channel_key", ignore_duplicates=True).execute()
 
-        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 역할 패널/게임/나이/온보딩 설정 동기화 완료.")
+        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 역할 패널/게임/나이/온보딩/보스 보상 설정 동기화 완료.")
 
     except Exception as e:
         logger.error(f"❌ 기본값 DB 동기화 중 치명적 오류 발생: {e}", exc_info=True)
