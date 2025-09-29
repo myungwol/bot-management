@@ -5,7 +5,6 @@ from discord.ext import commands
 from discord import app_commands, ui
 import logging
 from typing import Optional, List, Dict, Any
-# ▼▼▼ 모든 datetime 관련 import는 여기 한 곳에서만 이루어집니다. ▼▼▼
 from datetime import datetime, timezone, timedelta, date
 import asyncio
 import time
@@ -27,7 +26,6 @@ from utils.ui_defaults import (
 )
 
 logger = logging.getLogger(__name__)
-logger.info("### DIAGNOSTIC LOG: system.py v4.0 (scope fix) LOADED ###")
 
 async def is_admin(interaction: discord.Interaction) -> bool:
     if not isinstance(interaction.user, discord.Member): return False
@@ -150,7 +148,6 @@ class ServerSystem(commands.Cog):
         choices = []
         
         extended_admin_map = ADMIN_ACTION_MAP.copy()
-        extended_admin_map["pet_hatch_now"] = "[펫] 펫 즉시 부화 (테스트용)"
 
         for key, name in extended_admin_map.items():
             if current.lower() in name.lower():
@@ -173,13 +170,41 @@ class ServerSystem(commands.Cog):
         
         return sorted(choices, key=lambda c: c.name)[:25]
 
-
     @admin_group.command(name="setup", description="봇의 모든 설정을 관리합니다.")
-    @app_commands.describe(action="실행할 작업을 선택하세요.", channel="[채널/통계] 작업에 필요한 채널을 선택하세요.", role="[역할/통계] 작업에 필요한 역할을 선택하세요.", user="[코인/XP/레벨/펫] 대상을 지정하세요.", amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.", level="[레벨] 설정할 레벨을 입력하세요.", stat_type="[통계] 표시할 통계 유형을 선택하세요.", template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)")
+    @app_commands.describe(
+        action="실행할 작업을 선택하세요.",
+        boss_type="[보스] 대상으로 할 보스의 종류를 선택하세요.",
+        channel="[채널/통계] 작업에 필요한 채널을 선택하세요.",
+        role="[역할/통계] 작업에 필요한 역할을 선택하세요.",
+        user="[코인/XP/레벨/펫] 대상을 지정하세요.",
+        amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.",
+        level="[레벨/펫] 설정할 레벨을 입력하세요.",
+        stat_type="[통계] 표시할 통계 유형을 선택하세요.",
+        template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)"
+    )
     @app_commands.autocomplete(action=setup_action_autocomplete)
-    @app_commands.choices(stat_type=[app_commands.Choice(name="[설정] 전체 멤버 수 (봇 포함)", value="total"), app_commands.Choice(name="[설정] 유저 수 (봇 제외)", value="humans"), app_commands.Choice(name="[설정] 봇 수", value="bots"), app_commands.Choice(name="[설정] 서버 부스트 수", value="boosters"), app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"), app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove")])
+    @app_commands.choices(
+        stat_type=[
+            app_commands.Choice(name="[설정] 전체 멤버 수 (봇 포함)", value="total"),
+            app_commands.Choice(name="[설정] 유저 수 (봇 제외)", value="humans"),
+            app_commands.Choice(name="[설정] 봇 수", value="bots"),
+            app_commands.Choice(name="[설정] 서버 부스트 수", value="boosters"),
+            app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"),
+            app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove")
+        ],
+        boss_type=[
+            app_commands.Choice(name="주간 보스", value="weekly"),
+            app_commands.Choice(name="월간 보스", value="monthly"),
+        ]
+    )
     @app_commands.check(is_admin)
-    async def setup(self, interaction: discord.Interaction, action: str, channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None, role: Optional[discord.Role] = None, user: Optional[discord.Member] = None, amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None, stat_type: Optional[str] = None, template: Optional[str] = None):
+    async def setup(self, interaction: discord.Interaction, action: str,
+                    boss_type: Optional[str] = None,
+                    channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None,
+                    role: Optional[discord.Role] = None, user: Optional[discord.Member] = None,
+                    amount: Optional[app_commands.Range[int, 1, None]] = None,
+                    level: Optional[app_commands.Range[int, 1, None]] = None,
+                    stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
@@ -290,7 +315,6 @@ class ServerSystem(commands.Cog):
                 logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
                 await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
 
-
         elif action in ["coin_give", "coin_take", "xp_give", "level_set"]:
             if not user: return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션이 필요합니다.", ephemeral=True)
             
@@ -352,7 +376,7 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 펫 즉시 부화 처리 중 오류가 발생했습니다.", ephemeral=True)
             return
 
-        elif action == "pet_admin_levelup": # <--- "pet_levelup_test"를 "pet_admin_levelup"으로 변경
+        elif action == "pet_admin_levelup":
             if not user:
                 return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
             
@@ -367,8 +391,7 @@ class ServerSystem(commands.Cog):
                 logger.error(f"펫 레벨업 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 펫 레벨업 요청 중 오류가 발생했습니다.", ephemeral=True)
             return
-
-        # ▼▼▼▼▼ 여기에 아래 코드를 추가하세요 ▼▼▼▼▼
+            
         elif action == "pet_level_set":
             if not user:
                 return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
@@ -386,7 +409,6 @@ class ServerSystem(commands.Cog):
                 logger.error(f"펫 레벨 설정 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 펫 레벨 설정 요청 중 오류가 발생했습니다.", ephemeral=True)
             return
-        # ▲▲▲▲▲ 여기까지 추가 ▲▲▲▲▲
 
         elif action == "exploration_complete_now":
             if not user:
@@ -466,17 +488,13 @@ class ServerSystem(commands.Cog):
                 if info.get("type") == "panel":
                     friendly_name = info.get("friendly_name", key)
                     
-                    if key == "panel_item_usage":
-                        success_list.append(f"・`{friendly_name}`: 아이템 패널은 게임 봇에서 관리합니다. 서버 봇에서는 재생성하지 않습니다.")
-                        continue
-
                     try:
                         cog_name, channel_db_key = info.get("cog_name"), info.get("key")
                         if not all([cog_name, channel_db_key]):
                             failure_list.append(f"・`{friendly_name}`: 설정 정보가 불완전합니다.")
                             continue
 
-                        is_game_panel = "[게임]" in friendly_name
+                        is_game_panel = "[게임]" in friendly_name or "[보스]" in friendly_name
                         if is_game_panel:
                             timestamp = datetime.now(timezone.utc).timestamp()
                             db_key = f"panel_regenerate_request_{key}"
@@ -608,9 +626,8 @@ class ServerSystem(commands.Cog):
                 logger.error(f"수동 업데이트 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 수동 업데이트를 요청하는 중 오류가 발생했습니다.")
         
-        if action == "farm_next_day":
+        elif action == "farm_next_day":
             try:
-                # ▼▼▼ [핵심 수정] 함수 내 import 제거 ▼▼▼
                 current_date_str = get_config("farm_current_date")
                 
                 if current_date_str:
@@ -644,6 +661,30 @@ class ServerSystem(commands.Cog):
             except Exception as e:
                 logger.error(f"농장 시간 초기화 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 농장 시간을 초기화하는 중 오류가 발생했습니다.")
+
+        elif action in ["boss_spawn_test", "boss_defeat_test"]:
+            if not boss_type:
+                return await interaction.followup.send("❌ 이 작업을 수행하려면 `boss_type` 옵션(주간/월간)을 반드시 선택해야 합니다.", ephemeral=True)
+
+            try:
+                db_key = f"{action}_request"
+                payload = {"boss_type": boss_type, "timestamp": time.time()}
+
+                await save_config_to_db(db_key, payload)
+                logger.info(f"[Game Bot Request] DB에 보스 테스트 요청을 보냈습니다. Key: '{db_key}', Value: {payload}")
+
+                if action == "boss_spawn_test":
+                    response_message = f"✅ 게임 봇에게 **{boss_type} 보스**를 강제로 소환하도록 요청했습니다.\n" \
+                                       "기존에 진행 중이던 레이드가 있다면 종료되고 새로 생성됩니다."
+                else: # boss_defeat_test
+                    response_message = f"✅ 게임 봇에게 현재 진행 중인 **{boss_type} 보스**를 강제로 처치하도록 요청했습니다."
+
+                await interaction.followup.send(response_message + "\n약 10초 내에 채널에 변경사항이 적용됩니다.", ephemeral=True)
+
+            except Exception as e:
+                logger.error(f"보스 테스트 명령어 처리 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 보스 테스트 명령을 요청하는 중 오류가 발생했습니다.", ephemeral=True)
+            return
 
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
