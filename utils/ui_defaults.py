@@ -1666,15 +1666,6 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 친구 초대 이벤트",
         "channel_type": "text"
     },
-    # ▼▼▼▼▼ 여기에 아래 코드를 추가하세요 ▼▼▼▼▼
-    "log_pet_levelup": {
-        "type": "channel",
-        "cog_name": "PetSystem",
-        "key": "log_pet_levelup_channel_id",
-        "friendly_name": "[로그] 펫 성장 기록",
-        "channel_type": "text"
-    },
-    # ▲▲▲▲▲ 여기까지 추가 ▲▲▲▲▲
     "panel_incubator": {
         "type": "panel",
         "cog_name": "PetSystem",
