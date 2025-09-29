@@ -108,7 +108,9 @@ async def sync_defaults_to_db():
             save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG),
             save_config_to_db("AGE_ROLE_MAPPING", AGE_ROLE_MAPPING),
             save_config_to_db("GAME_CONFIG", GAME_CONFIG),
-            save_config_to_db("ONBOARDING_CHOICES", ONBOARDING_CHOICES)
+            save_config_to_db("ONBOARDING_CHOICES", ONBOARDING_CHOICES),
+            save_config_to_db("BOSS_REWARD_TIERS", BOSS_REWARD_TIERS)
+
         )
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
