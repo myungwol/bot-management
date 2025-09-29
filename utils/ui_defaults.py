@@ -402,7 +402,19 @@ USABLE_ITEMS = {
         "log_channel_key": "log_item_job_reset",
         "log_embed_key": "log_item_use_job_reset"
     },
+    # [추가] 보물 상자를 사용 가능한 아이템으로 등록합니다.
+    "item_weekly_boss_chest": {
+        "name": "주간 보스 보물 상자",
+        "type": "open_chest",
+        "description": "주간 보스를 처치하고 얻은 전리품 상자. 무엇이 들어있을까?"
+    },
+    "item_monthly_boss_chest": {
+        "name": "월간 보스 보물 상자",
+        "type": "open_chest",
+        "description": "월간 보스를 처치하고 얻은 희귀한 전리품 상자. 무엇이 들어있을까?"
+    }
 }
+
 UI_EMBEDS = {
     "onboarding_guide_server": {
         "title": "",
@@ -2123,6 +2135,24 @@ JOB_ADVANCEMENT_DATA = {
                 }
             ]
         }
+    ]
+}
+BOSS_REWARD_TIERS = {
+    "weekly": [
+        {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [20000, 30000], "xp": [2500, 3500], "rare_item_chance": 1.0},
+        {"percentile": 0.10, "name": "상위 기여자 (4-10%)",    "coins": [12000, 18000], "xp": [1500, 2200], "rare_item_chance": 0.75},
+        {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [7000, 11000],  "xp": [800, 1200],  "rare_item_chance": 0.50},
+        {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [4000, 6000],   "xp": [400, 600],   "rare_item_chance": 0.25},
+        {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [1500, 2500],   "xp": [150, 250],   "rare_item_chance": 0.10},
+        {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [500, 1000],    "xp": [50, 100],    "rare_item_chance": 0.0}
+    ],
+    "monthly": [
+        {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [100000, 150000], "xp": [10000, 15000], "rare_item_chance": 1.0},
+        {"percentile": 0.10, "name": "상위 기여자 (4-10%)",    "coins": [60000, 90000],   "xp": [6000, 9000],   "rare_item_chance": 0.80},
+        {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [35000, 55000],   "xp": [3000, 5000],   "rare_item_chance": 0.60},
+        {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [20000, 30000],   "xp": [1500, 2500],   "rare_item_chance": 0.35},
+        {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [8000, 12000],    "xp": [800, 1200],    "rare_item_chance": 0.15},
+        {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [3000, 5000],     "xp": [300, 500],     "rare_item_chance": 0.0}
     ]
 }
 # ... (파일의 나머지 부분은 그대로 유지) ...
