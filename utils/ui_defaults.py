@@ -1348,20 +1348,6 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[게임] 펫 탐사 패널",
         "channel_type": "text"
     },
-    "channel_weekly_boss": {
-        "type": "channel",
-        "cog_name": "BossRaid", # 게임 봇의 Cog 이름과 일치해야 함
-        "key": "weekly_boss_channel_id",
-        "friendly_name": "[보스] 주간 보스 채널",
-        "channel_type": "text"
-    },
-    "channel_monthly_boss": {
-        "type": "channel",
-        "cog_name": "BossRaid", # 게임 봇의 Cog 이름과 일치해야 함
-        "key": "monthly_boss_channel_id",
-        "friendly_name": "[보스] 월간 보스 채널",
-        "channel_type": "text"
-    },
     "log_trade": {
         "type": "channel",
         "cog_name": "Trade",
@@ -1565,14 +1551,6 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 광산 입장권 사용 내역",
         "channel_type": "text"
     },
-    "log_boss_events": {
-        "type": "channel",
-        "cog_name": "BossRaid", # 게임 봇의 Cog 이름과 일치해야 함
-        "key": "boss_log_channel_id",
-        "friendly_name": "[로그] 보스 이벤트 기록",
-        "channel_type": "text"
-    },
-    # ▲▲▲▲▲ 여기까지 추가 ▲▲▲▲▲
     "log_pet_levelup": {
         "type": "channel",
         "cog_name": "PetSystem",
@@ -1671,6 +1649,27 @@ SETUP_COMMAND_MAP = {
         "cog_name": "PetSystem",
         "key": "incubator_panel_channel_id",
         "friendly_name": "[게임] 펫 인큐베이터 패널",
+        "channel_type": "text"
+    },
+    "channel_weekly_boss": {
+        "type": "channel",
+        "cog_name": "BossRaid", # 게임 봇의 Cog 이름과 일치해야 함
+        "key": "weekly_boss_channel_id",
+        "friendly_name": "[보스] 주간 보스 채널",
+        "channel_type": "text"
+    },
+    "channel_monthly_boss": {
+        "type": "channel",
+        "cog_name": "BossRaid", # 게임 봇의 Cog 이름과 일치해야 함
+        "key": "monthly_boss_channel_id",
+        "friendly_name": "[보스] 월간 보스 채널",
+        "channel_type": "text"
+    },
+    "log_boss_events": {
+        "type": "channel",
+        "cog_name": "BossRaid", # 게임 봇의 Cog 이름과 일치해야 함
+        "key": "boss_log_channel_id",
+        "friendly_name": "[로그] 보스 이벤트 기록",
         "channel_type": "text"
     },
 }
