@@ -101,16 +101,15 @@ async def sync_defaults_to_db():
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
             save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP),
-            # [✅✅✅ 핵심 수정 ✅✅✅]
-            # 누락되었던 역할 패널 설정을 DB에 동기화하는 코드를 추가합니다.
-            # 이 설정이 없으면 역할 패널 Cog가 어떤 역할을 표시해야 할지 알 수 없습니다.
             save_config_to_db("STATIC_AUTO_ROLE_PANELS", STATIC_AUTO_ROLE_PANELS),
             save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG),
             save_config_to_db("AGE_ROLE_MAPPING", AGE_ROLE_MAPPING),
             save_config_to_db("GAME_CONFIG", GAME_CONFIG),
             save_config_to_db("ONBOARDING_CHOICES", ONBOARDING_CHOICES),
+            # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
+            # 누락되었던 BOSS_REWARD_TIERS 설정을 DB에 동기화하는 코드를 추가합니다.
             save_config_to_db("BOSS_REWARD_TIERS", BOSS_REWARD_TIERS)
-
+            # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
         )
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
