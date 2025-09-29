@@ -2144,7 +2144,10 @@ BOSS_REWARD_TIERS = {
         {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [7000, 11000],  "xp": [800, 1200],  "rare_item_chance": 0.50},
         {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [4000, 6000],   "xp": [400, 600],   "rare_item_chance": 0.25},
         {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [1500, 2500],   "xp": [150, 250],   "rare_item_chance": 0.10},
+        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
+        # 1.0 대신 1.01로 수정하여 100% 순위의 유저도 포함되도록 합니다.
         {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [500, 1000],    "xp": [50, 100],    "rare_item_chance": 0.0}
+        # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
     ],
     "monthly": [
         {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [100000, 150000], "xp": [10000, 15000], "rare_item_chance": 1.0},
@@ -2152,7 +2155,8 @@ BOSS_REWARD_TIERS = {
         {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [35000, 55000],   "xp": [3000, 5000],   "rare_item_chance": 0.60},
         {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [20000, 30000],   "xp": [1500, 2500],   "rare_item_chance": 0.35},
         {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [8000, 12000],    "xp": [800, 1200],    "rare_item_chance": 0.15},
+        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
         {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [3000, 5000],     "xp": [300, 500],     "rare_item_chance": 0.0}
+        # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
     ]
 }
-# ... (파일의 나머지 부분은 그대로 유지) ...
