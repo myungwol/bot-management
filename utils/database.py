@@ -89,19 +89,18 @@ async def sync_defaults_to_db():
     logger.info("------ [ 기본값 DB 동기화 시작 ] ------")
     try:
         role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
-        await save_config_to_db("ROLE_KEY_MAP", role_name_map)
         
         prefix_hierarchy = sorted(
             [info["name"] for info in UI_ROLE_KEY_MAP.values() if info.get("is_prefix")],
             key=lambda name: next((info.get("priority", 0) for info in UI_ROLE_KEY_MAP.values() if info["name"] == name), 0),
             reverse=True
         )
-        await save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy)
         
-        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
-        # 원인: save_config_to_db() 호출이 asyncio.gather() 밖에 있었습니다.
-        # 해결: 다른 비동기 함수들과 함께 asyncio.gather()의 인자로 전달합니다.
+        # ▼▼▼▼▼ 핵심 수정 ▼▼▼▼▼
+        # 모든 비동기 DB 저장 작업을 하나의 asyncio.gather로 묶어 병렬 처리합니다.
         await asyncio.gather(
+            save_config_to_db("ROLE_KEY_MAP", role_name_map),
+            save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy),
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
             save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP),
@@ -112,7 +111,7 @@ async def sync_defaults_to_db():
             save_config_to_db("ONBOARDING_CHOICES", ONBOARDING_CHOICES),
             save_config_to_db("BOSS_REWARD_TIERS", BOSS_REWARD_TIERS)
         )
-        # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
+        # ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
         all_channel_keys = [info['key'] for info in SETUP_COMMAND_MAP.values()]
