@@ -210,6 +210,34 @@ class ServerSystem(commands.Cog):
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
 
+        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
+        # 임시로 사용할 액션을 추가하여 DB 설정을 직접 수정합니다.
+        if action == "fix_boss_reward_tiers":
+            try:
+                # 1. DB에서 현재 설정을 가져옵니다.
+                reward_tiers_config = get_config("BOSS_REWARD_TIERS")
+                if not reward_tiers_config:
+                    return await interaction.followup.send("❌ DB에서 BOSS_REWARD_TIERS 설정을 찾을 수 없습니다.", ephemeral=True)
+
+                # 2. '단순 참여자' 등급의 percentile 값을 수정합니다.
+                for boss_type in ['weekly', 'monthly']:
+                    if boss_type in reward_tiers_config and reward_tiers_config[boss_type]:
+                        # 마지막 등급을 찾습니다 (가장 percentile이 높은 등급)
+                        last_tier = max(reward_tiers_config[boss_type], key=lambda x: x['percentile'])
+                        last_tier['percentile'] = 1.01
+                
+                # 3. 수정된 설정을 다시 DB에 저장합니다.
+                await save_config_to_db("BOSS_REWARD_TIERS", reward_tiers_config)
+                # 4. 게임 봇이 설정을 다시 로드하도록 요청합니다.
+                await save_config_to_db("config_reload_request", time.time())
+
+                await interaction.followup.send("✅ 보스 보상 티어의 랭킹 조건을 수정했습니다. 이제 참가자가 1명일 때도 보상 등급이 정상적으로 표시됩니다.", ephemeral=True)
+
+            except Exception as e:
+                logger.error(f"보스 보상 티어 수정 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 보스 보상 티어를 수정하는 중 오류가 발생했습니다.", ephemeral=True)
+            return
+                        
         if action == "strings_sync":
             try:
                 await save_config_to_db("strings", UI_STRINGS)
