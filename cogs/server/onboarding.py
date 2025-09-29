@@ -323,10 +323,19 @@ class ApprovalView(ui.View):
 
             age_role_mapping = get_config("AGE_ROLE_MAPPING", [])
             
-            birth_year_str = self.actual_birth_year
-
-            if birth_year_str.isdigit():
-                birth_year = int(birth_year_str)
+            # ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼
+            public_birth_year_display = self._get_field_value(self.original_embed, "출생 연도")
+            
+            # 1. 공개적으로 '비공개'를 선택했는지 먼저 확인합니다.
+            if public_birth_year_display == "비공개":
+                if (rid := get_id("role_info_age_private")) and (r := guild.get_role(rid)):
+                    roles_to_add.append(r)
+                else:
+                    failed_to_find_roles.append("role_info_age_private")
+            
+            # 2. '비공개'가 아닐 경우에만 실제 나이 기반 역할을 부여합니다.
+            elif self.actual_birth_year.isdigit():
+                birth_year = int(self.actual_birth_year)
                 age_limit = 16
                 current_year = datetime.now(timezone.utc).year
                 if (current_year - birth_year) < age_limit:
@@ -339,6 +348,7 @@ class ApprovalView(ui.View):
                         else:
                             failed_to_find_roles.append(mapping["key"])
                         break
+            # ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲
             
             if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="자기소개 승인")
             if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="자기소개 승인 완료")
