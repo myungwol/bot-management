@@ -20,7 +20,7 @@ REMINDER_CONFIG = {
         'name': "Disboard BUMP"
     },
     'dicoall': {
-        'bot_id': 1123157581539246150,
+        'bot_id': 664647740877176832,
         'cooltime': 3600,
         'keyword': "서버가 상단에 표시되었습니다.", # <--- 수정된 키워드
         'command': "/up",
