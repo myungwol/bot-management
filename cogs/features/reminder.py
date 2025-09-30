@@ -53,23 +53,34 @@ class Reminder(commands.Cog):
         }
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
-    @commands.Cog.listener()
+@commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
 
-        # [안정성 강화] 임베드가 비어있을 경우를 대비
-        if not message.embeds[0].description:
-            return
+        embed = message.embeds[0]
+        
+        # 임베드의 모든 텍스트(제목, 설명, 필드)를 하나로 합칩니다.
+        full_embed_text_parts = []
+        if embed.title:
+            full_embed_text_parts.append(embed.title)
+        if embed.description:
+            full_embed_text_parts.append(embed.description)
+        for field in embed.fields:
+            if field.name:
+                full_embed_text_parts.append(field.name)
+            if field.value:
+                full_embed_text_parts.append(field.value)
+        
+        full_embed_text = "\n".join(full_embed_text_parts)
 
-        embed_description = message.embeds[0].description
-
+        # 합쳐진 전체 텍스트에서 키워드를 찾습니다.
         for key, config in REMINDER_CONFIG.items():
-            # [안정성 강화] 봇 ID가 일치하는지 먼저 확인
-            if message.author.id == config['bot_id'] and config['keyword'] in embed_description:
+            if message.author.id == config['bot_id'] and config['keyword'] in full_embed_text:
                 await self.schedule_new_reminder(key, message.guild)
+                logger.info(f"[{message.guild.name}] 서버에서 '{config['name']}' 키워드를 감지했습니다. 알림 예약을 시작합니다.")
                 break
-
+                
     async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
         if not self.configs.get(reminder_type) or not self.configs[reminder_type].get('channel_id') or not self.configs[reminder_type].get('role_id'):
             return
