@@ -1018,6 +1018,21 @@ UI_EMBEDS = {
             }
         ]
     },
+    "panel_pet_pvp": {
+        "title": "⚔️ 펫 대전장",
+        "description": "> 다른 유저의 펫과 실력을 겨뤄보세요!\n> 아래 버튼을 눌러 대결할 상대를 찾을 수 있습니다.",
+        "color": 0xC27C0E,
+        "footer": { "text": "도전 신청에는 5분의 재사용 대기시간이 적용됩니다." }
+    },
+    "log_pet_pvp_result": {
+        "title": "🏆 펫 대전 종료! 🏆",
+        "description": "**{winner_mention}**님의 펫 **'{winner_pet_name}'**(이)가 치열한 전투 끝에 승리했습니다!",
+        "color": 0xFFD700,
+        "fields": [
+            { "name": "👑 승자", "value": "{winner_mention}", "inline": True },
+            { "name": "💧 패자", "value": "{loser_mention}", "inline": True }
+        ]
+    },
 }
 
 UI_PANEL_COMPONENTS = [
@@ -1358,6 +1373,13 @@ SETUP_COMMAND_MAP = {
         "cog_name": "Exploration",
         "key": "exploration_panel_channel_id",
         "friendly_name": "[게임] 펫 탐사 패널",
+        "channel_type": "text"
+    },
+    "panel_pet_pvp": {
+        "type": "panel",
+        "cog_name": "PetPvP",
+        "key": "pet_pvp_panel_channel_id",
+        "friendly_name": "[게임] 펫 대전장 패널",
         "channel_type": "text"
     },
     "log_trade": {
