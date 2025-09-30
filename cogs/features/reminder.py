@@ -21,7 +21,7 @@ REMINDER_CONFIG = {
     },
     # ▼▼▼ [핵심 수정] dissoku 부분을 dicoall 정보로 변경 ▼▼▼
     'dicoall': {
-        'bot_id': 1123157581539246150, # Dicoall 봇 ID
+        'bot_id': 664647740877176832, # Dicoall 봇 ID
         'cooltime': 3600,  # 1시간
         'keyword': "서버를 UP 했습니다!", # Dicoall의 응답 메시지 키워드
         'command': "/up",
