@@ -14,20 +14,18 @@ logger = logging.getLogger(__name__)
 REMINDER_CONFIG = {
     'disboard': {
         'bot_id': 302050872383242240,
-        'cooltime': 7200,  # 2시간
-        'keyword': "서버 순위를 올렸어요!", # Disboard는 그대로 유지
+        'cooltime': 7200,
+        'keyword': "서버 갱신 완료!", # <--- 수정된 키워드
         'command': "/bump",
         'name': "Disboard BUMP"
     },
-    # ▼▼▼ [핵심 수정] dissoku 부분을 dicoall 정보로 변경 ▼▼▼
     'dicoall': {
-        'bot_id': 664647740877176832, # Dicoall 봇 ID
-        'cooltime': 3600,  # 1시간
-        'keyword': "서버를 UP 했습니다!", # Dicoall의 응답 메시지 키워드
+        'bot_id': 1123157581539246150,
+        'cooltime': 3600,
+        'keyword': "서버가 상단에 표시되었습니다.", # <--- 수정된 키워드
         'command': "/up",
-        'name': "Dicoall UP" # 사용자에게 보여질 이름
+        'name': "Dicoall UP"
     }
-    # ▲▲▲ [핵심 수정] 종료 ▲▲▲
 }
 
 class Reminder(commands.Cog):
