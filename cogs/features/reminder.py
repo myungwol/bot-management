@@ -53,7 +53,7 @@ class Reminder(commands.Cog):
         }
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
-@commands.Cog.listener()
+    @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
