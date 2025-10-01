@@ -137,13 +137,28 @@ class MemberEvents(commands.Cog):
                 try:
                     await after.add_roles(key_role, reason="서버 부스트 시작")
                     logger.info(f"{after.display_name}님이 서버 부스트를 시작하여 '개인 방 열쇠' 역할을 지급했습니다.")
-                    try:
-                        await after.send(
-                            f"🎉 **{after.guild.name}** 서버를 부스트해주셔서 감사합니다!\n"
-                            "혜택으로 **개인 음성 채널**을 만들 수 있는 `개인 방 열쇠` 역할이 부여되었습니다."
-                        )
-                    except discord.Forbidden:
-                        logger.warning(f"{after.display_name}님에게 DM을 보낼 수 없어 부스트 감사 메시지를 보내지 못했습니다.")
+
+                    # --- ▼▼▼▼▼ 핵심 수정 부분 ▼▼▼▼▼ ---
+                    # 메시지를 보낼 채널 ID를 지정합니다.
+                    target_channel_id = 1422758270468100127
+                    channel = self.bot.get_channel(target_channel_id)
+
+                    if channel and isinstance(channel, discord.TextChannel):
+                        try:
+                            # 채널에 보낼 메시지 (사용자 멘션 포함)
+                            message_content = (
+                                f"🎉 {after.mention}님, **{after.guild.name}** 서버를 부스트해주셔서 정말 감사합니다!\n"
+                                "혜택으로 **개인 음성 채널**을 만들 수 있는 `개인 방 열쇠` 역할이 부여되었습니다."
+                            )
+                            await channel.send(message_content, allowed_mentions=discord.AllowedMentions(users=True))
+                        except discord.Forbidden:
+                            logger.error(f"부스트 감사 메시지를 채널(ID: {target_channel_id})에 보낼 권한이 없습니다.")
+                        except Exception as e:
+                            logger.error(f"부스트 감사 메시지를 채널에 보내는 중 오류 발생: {e}", exc_info=True)
+                    else:
+                        logger.warning(f"부스트 감사 메시지를 보낼 채널(ID: {target_channel_id})을 찾을 수 없거나 텍스트 채널이 아닙니다.")
+                    # --- ▲▲▲▲▲ 핵심 수정 완료 ▲▲▲▲▲ ---
+                    
                 except discord.Forbidden:
                     logger.error(f"{after.display_name}님에게 '개인 방 열쇠' 역할을 지급하지 못했습니다. (권한 부족)")
                 except Exception as e:
