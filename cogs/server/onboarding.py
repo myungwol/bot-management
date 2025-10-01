@@ -123,11 +123,11 @@ class GenderAgeSelectView(ui.View):
         self.add_item(self.gender_select)
         
         decade_options = [
+            discord.SelectOption(label="비공개", value="private")
             discord.SelectOption(label="2000년대", value="2000s"),
             discord.SelectOption(label="1990년대", value="1990s"),
             discord.SelectOption(label="1980년대", value="1980s"),
             discord.SelectOption(label="1970년대", value="1970s"),
-            discord.SelectOption(label="비공개", value="private")
         ]
         self.decade_select = ui.Select(placeholder="태어난 연대를 선택해주세요...", options=decade_options, custom_id="onboarding_decade_select")
         self.decade_select.callback = self.on_decade_select
