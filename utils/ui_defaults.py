@@ -1980,9 +1980,11 @@ UI_STRINGS = {
         }, {
             "key": "gear", "title_suffix": " - 장비", "label": "장비", "emoji": "⚒️"
         }, {
-            "key": "fish", "title_suffix": " - 어항", "label": "어항", "emoji": "🐠"
+            "key": "pet", "title_suffix": " - 펫 아이템", "label": "펫 아이템", "emoji": "🐾"
         }, {
             "key": "seed", "title_suffix": " - 씨앗", "label": "씨앗", "emoji": "🌱"
+        }, {
+            "key": "fish", "title_suffix": " - 어항", "label": "어항", "emoji": "🐠"
         }, {
             "key": "crop", "title_suffix": " - 작물", "label": "작물", "emoji": "🌾"
         }, {
@@ -1991,8 +1993,6 @@ UI_STRINGS = {
             "key": "food", "title_suffix": " - 음식", "label": "음식", "emoji": "🍲"
         }, {
             "key": "loot", "title_suffix": " - 전리품", "label": "전리품", "emoji": "🏆"
-        }, {
-            "key": "pet", "title_suffix": " - 펫 아이템", "label": "펫 아이템", "emoji": "🐾"
         }],
         "info_tab": {
             "description": "아래 탭을 선택하여 상세 정보를 확인하세요.",
