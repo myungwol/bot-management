@@ -1978,8 +1978,6 @@ UI_STRINGS = {
         }, {
             "key": "item", "title_suffix": " - 아이템", "label": "아이템", "emoji": "📦"
         }, {
-            "key": "ticket", "title_suffix": " - 입장권", "label": "입장권", "emoji": "🎟️"
-        }, {
             "key": "gear", "title_suffix": " - 장비", "label": "장비", "emoji": "⚒️"
         }, {
             "key": "fish", "title_suffix": " - 어항", "label": "어항", "emoji": "🐠"
