@@ -237,77 +237,72 @@ UI_ROLE_KEY_MAP = {
 
     # --- ゲーム/プラットフォーム役職 ---
     "role_game_minecraft": {
-        "name": "マイクラ-Minecraft",
+        "name": "マイクラーMinecraft",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_valorant": {
-        "name": "ヴァロ-VALORANT",
+        "name": "ヴァローVALORANT",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_overwatch": {
-        "name": "オバウォ-Overwatch",
+        "name": "オバウォーOverwatch",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_lol": {
-        "name": "ロル-League of Legends",
+        "name": "ロルーLeague of Legends",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_mahjong": {
-        "name": "麻雀-Mahjong",
+        "name": "麻雀ーMahjong",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_amongus": {
-        "name": "アモアス-Among Us",
+        "name": "アモアスーAmong Us",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_mh": {
-        "name": "モンハン-Monster Hunter",
+        "name": "モンハンMonster Hunter",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_genshin": {
-        "name": "原神-Genshin Impact",
+        "name": "原神ーGenshin Impact",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_apex": {
-        "name": "エペ-Apex Legends",
+        "name": "エペApex Legends",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_splatoon": { # 역할 추가됨
-        "name": "スプラ-Splatoon",
+        "name": "スプラーSplatoon",
         "is_prefix": False,
         "priority": 0
     },
     "role_game_godfield": { # 역할 추가됨
-        "name": "ゴッフィ-God Field",
+        "name": "ゴッフィーGod Field",
         "is_prefix": False,
         "priority": 0
     },
     "role_platform_steam": {
-        "name": "スチーム-Steam",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_platform_PC": {
-        "name": "PC",
+        "name": "スチームーSteam",
         "is_prefix": False,
         "priority": 0
     },
     "role_platform_smartphone": {
-        "name": "スマホ-Smartphone",
+        "name": "スマホーSmartphone",
         "is_prefix": False,
         "priority": 0
     },
     "role_platform_switch": {
-        "name": "スイッチ-Switch",
+        "name": "スイッチーSwitch",
         "is_prefix": False,
         "priority": 0
     },
