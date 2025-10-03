@@ -234,7 +234,11 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": False,
         "priority": 0
     },
-
+    "role_notify_dissoku": {
+        "name": "ディス速",
+        "is_prefix": False,
+        "priority": 0
+    },
     # --- ゲーム/プラットフォーム役職 ---
     "role_game_minecraft": {
         "name": "マイクラーMinecraft",
@@ -1439,6 +1443,13 @@ SETUP_COMMAND_MAP = {
     "channel_dicoall_reminder": {
         "type": "channel", "cog_name": "Reminder", "key": "dicoall_reminder_channel_id",
         "friendly_name": "[알림] Dicoall UP 채널", "channel_type": "text"
+    },
+    "channel_dissoku_reminder": {
+        "type": "channel",
+        "cog_name": "Reminder",
+        "key": "dissoku_reminder_channel_id",
+        "friendly_name": "[알림] ディス速 VOTE 채널",
+        "channel_type": "text"
     },
     "channel_weather": {
         "type": "channel", "cog_name": "WorldSystem", "key": "weather_channel_id",
