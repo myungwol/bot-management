@@ -137,9 +137,7 @@ class NicknameApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
 class NicknameChangeModal(ui.Modal, title="名前変更申請"):
-    # --- ▼▼▼ [핵심 수정] 안내 메시지 변경 ▼▼▼ ---
-    new_name = ui.TextInput(label="新しい名前", placeholder="絵文字, 特殊文字使用不可. 漢字4文字/その他8文字まで", required=True, max_length=12)
-    # --- ▲▲▲ [수정 완료] ▲▲▲ ---
+    new_name = ui.TextInput(label="新しい名前", placeholder="漢字は2文字、ひらがな/カタカナ/英数字は1文字として計算", required=True, max_length=12)
 
     def __init__(self, cog_instance: 'Nicknames'):
         super().__init__()
@@ -149,7 +147,6 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         await i.response.defer(ephemeral=True)
         name = self.new_name.value
         
-        # 한국어(자음, 모음 포함) 제거, 일본어(히라가나, 가타카나, 한자) 허용
         pattern_str = r"^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+$"
         max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
 
@@ -238,17 +235,13 @@ class Nicknames(commands.Cog):
             self._user_locks[user_id] = asyncio.Lock()
         return self._user_locks[user_id]
     
-    # --- ▼▼▼ [핵심 수정] 이름 길이 계산 로직 변경 ▼▼▼ ---
     @staticmethod
     def calculate_weighted_length(name: str) -> int:
         total_length = 0
-        # 漢字の範囲 (CJK Unified Ideographs)
         kanji_pattern = re.compile(r'[\u4E00-\u9FAF]')
         for char in name:
-            # 漢字の場合は2、それ以外(ひらがな, カタカナ, 英数字)は1として計算
             total_length += 2 if kanji_pattern.match(char) else 1
         return total_length
-    # --- ▲▲▲ [수정 완료] ▲▲▲ ---
 
     async def register_persistent_views(self):
         self.view_instance = NicknameChangerPanelView(self)
