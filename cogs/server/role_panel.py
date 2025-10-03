@@ -25,7 +25,7 @@ class RoleSelectDropdown(ui.Select):
             role_id = get_id(role_id_key)
             if role_id:
                 options.append(discord.SelectOption(
-                    label=role_info.get('label', '이름 없는 역할'),
+                    label=role_info.get('label', '名前のない役職'),
                     value=str(role_id),
                     description=role_info.get('description'),
                     default=(role_id in current_user_role_ids)
@@ -33,24 +33,21 @@ class RoleSelectDropdown(ui.Select):
                 self.managed_role_ids.add(role_id)
             else:
                 logger.warning(f"역할 패널: DB에서 '{role_id_key}'에 해당하는 역할 ID를 찾지 못해 드롭다운에 추가할 수 없었습니다.")
-
-        # [✅✅✅ 핵심 수정 ✅✅✅]
-        # min_values=0과 기본값인 required=True가 충돌하여 발생하는 API 오류를 해결합니다.
-        # required=False를 명시적으로 추가하여 '아무것도 선택하지 않음' 상태를 허용합니다.
+        
         super().__init__(
-            placeholder=f"{category_name} 역할을 선택하세요 (다중 선택 가능)",
+            placeholder=f"{category_name} 役職を選択してください（複数選択可能）",
             min_values=0,
-            max_values=len(options) if options else 1, # 선택지가 없으면 비활성화되므로 1로 두어도 안전합니다.
+            max_values=len(options) if options else 1,
             options=options,
             disabled=not options,
-            required=False # 이 옵션을 추가하여 오류를 해결합니다.
+            required=False
         )
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
         if not isinstance(interaction.user, discord.Member):
-             await interaction.followup.send("❌ 오류가 발생했습니다: 멤버 정보를 찾을 수 없습니다.", ephemeral=True)
+             await interaction.followup.send("❌ エラーが発生しました: メンバー情報が見つかりません。", ephemeral=True)
              return
 
         try:
@@ -62,18 +59,18 @@ class RoleSelectDropdown(ui.Select):
                 if role := interaction.guild.get_role(role_id):
                     roles_to_set.append(role)
             
-            await interaction.user.edit(roles=roles_to_set, reason="역할 패널을 통한 역할 변경")
+            await interaction.user.edit(roles=roles_to_set, reason="役職パネルによる役職変更")
             
-            message = await interaction.followup.send("✅ 역할이 성공적으로 업데이트되었습니다.", ephemeral=True, wait=True)
+            message = await interaction.followup.send("✅ 役職が正常に更新されました。", ephemeral=True, wait=True)
             await asyncio.sleep(5)
             await message.delete()
             
         except discord.Forbidden:
             logger.error("역할 패널: 역할 업데이트 실패. 봇의 역할이 대상 역할보다 낮거나 권한이 부족합니다.")
-            await interaction.followup.send("❌ 역할 업데이트에 실패했습니다. 봇의 권한을 확인해주세요.", ephemeral=True)
+            await interaction.followup.send("❌ 役職の更新に失敗しました。ボットの権限を確認してください。", ephemeral=True)
         except Exception as e:
             logger.error(f"역할 패널 업데이트 중 예기치 않은 오류가 발생했습니다: {e}", exc_info=True)
-            await interaction.followup.send("❌ 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
+            await interaction.followup.send("❌ 処理中にエラーが発生しました。しばらくしてからもう一度お試しください。", ephemeral=True)
 
 class PersistentCategorySelectView(ui.View):
     def __init__(self, panel_config: Dict[str, Any]):
@@ -82,7 +79,7 @@ class PersistentCategorySelectView(ui.View):
         
         options = [
             discord.SelectOption(
-                label=category.get('label', '이름 없는 카테고리'),
+                label=category.get('label', '名前のないカテゴリ'),
                 value=category.get('id'),
                 emoji=category.get('emoji'),
                 description=category.get('description')
@@ -91,7 +88,7 @@ class PersistentCategorySelectView(ui.View):
         ]
         
         category_select = ui.Select(
-            placeholder="역할을 부여받을 카테고리를 선택하세요...",
+            placeholder="役職を付与するカテゴリを選択してください...",
             options=options,
             custom_id="persistent_role_category_select",
             disabled=not options
@@ -104,28 +101,28 @@ class PersistentCategorySelectView(ui.View):
         
         panel_configs = get_config("STATIC_AUTO_ROLE_PANELS", {})
         if not panel_configs or not isinstance(panel_configs, dict):
-            await interaction.followup.send("❌ 역할 패널 설정이 올바르지 않습니다. 관리자에게 문의해주세요.", ephemeral=True)
+            await interaction.followup.send("❌ 役職パネルの設定が正しくありません。管理者に問い合わせてください。", ephemeral=True)
             return
 
         panel_key = self.panel_config.get("panel_key")
         panel_config = panel_configs.get(panel_key)
 
         if not panel_config:
-             await interaction.followup.send("❌ 역할 패널 설정을 찾을 수 없었습니다.", ephemeral=True)
+             await interaction.followup.send("❌ 役職パネルの設定が見つかりませんでした。", ephemeral=True)
              return
 
         selected_category_id = interaction.data["values"][0]
         category_info = next((c for c in panel_config.get("categories", []) if c.get('id') == selected_category_id), None)
         if not category_info:
-            await interaction.followup.send("❌ 선택한 카테고리 정보를 찾을 수 없었습니다.", ephemeral=True)
+            await interaction.followup.send("❌ 選択したカテゴリ情報が見つかりませんでした。", ephemeral=True)
             return
             
-        category_name = category_info.get('label', '알 수 없는 카테고리')
+        category_name = category_info.get('label', '不明なカテゴリ')
         category_roles = panel_config.get("roles", {}).get(selected_category_id, [])
         
         temp_view = ui.View(timeout=300)
         temp_view.add_item(RoleSelectDropdown(interaction.user, category_roles, category_name))
-        await interaction.followup.send("아래 메뉴에서 원하는 역할을 모두 선택한 후, 메뉴 바깥쪽을 클릭하여 닫아주세요.", view=temp_view, ephemeral=True)
+        await interaction.followup.send("下のメニューで希望の役職をすべて選択した後、メニューの外側をクリックして閉じてください。", view=temp_view, ephemeral=True)
 
 class RolePanel(commands.Cog):
     def __init__(self, bot: commands.Bot):
