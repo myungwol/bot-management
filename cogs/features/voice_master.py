@@ -17,13 +17,15 @@ from utils.ui_defaults import ADMIN_ROLE_KEYS
 
 logger = logging.getLogger(__name__)
 
+# --- ▼▼▼ [핵심 수정] 한국어 키를 영문으로 변경 ▼▼▼ ---
 CHANNEL_TYPE_INFO = {
-    "분수대":    {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "みんなの噴水", "min_limit": 4},
-    "놀이터":     {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "ゲームチャンネル", "min_limit": 3},
-    "벤치":   {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "新人のベンチ", "min_limit": 4},
-    "마이룸":      {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のマイルーム"},
-    "normal":   {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のチャンネル"} # Fallback
+    "fountain":   {"emoji": "⛲", "name_editable": False, "limit_editable": True,  "default_name": "みんなの噴水", "min_limit": 4},
+    "playground": {"emoji": "🎮", "name_editable": True,  "limit_editable": True,  "default_name": "ゲームチャンネル", "min_limit": 3},
+    "bench":      {"emoji": "🪑", "name_editable": False, "limit_editable": True,  "default_name": "新人のベンチ", "min_limit": 4},
+    "my_room":    {"emoji": "🏠", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のマイルーム"},
+    "normal":     {"emoji": "🔊", "name_editable": True,  "limit_editable": True,  "default_name": "{member_name}のチャンネル"} # Fallback
 }
+# --- ▲▲▲ [수정 완료] ▲▲▲ ---
 
 
 class VCEditModal(ui.Modal, title="🔊 ボイスチャンネル設定"):
@@ -152,12 +154,12 @@ class ControlPanelView(ui.View):
         type_info = CHANNEL_TYPE_INFO.get(self.channel_type, CHANNEL_TYPE_INFO["normal"])
         if type_info["name_editable"] or type_info["limit_editable"]:
             self.add_item(ui.Button(label="設定", style=discord.ButtonStyle.primary, emoji="⚙️", custom_id="vc_edit", row=0))
-        if self.channel_type != '마이룸': # '마이룸'
+        if self.channel_type != 'my_room':
             self.add_item(ui.Button(label="所有権譲渡", style=discord.ButtonStyle.secondary, emoji="👑", custom_id="vc_transfer", row=0))
-        if self.channel_type == '마이룸': # '마이룸'
+        if self.channel_type == 'my_room':
             self.add_item(ui.Button(label="招待", style=discord.ButtonStyle.success, emoji="📨", custom_id="vc_invite", row=1))
             self.add_item(ui.Button(label="追放", style=discord.ButtonStyle.danger, emoji="👢", custom_id="vc_kick", row=1))
-        elif self.channel_type in ['분수대', '놀이터', '벤치']: # '분수대', '놀이터', '벤치'
+        elif self.channel_type in ['fountain', 'playground', 'bench']:
             self.add_item(ui.Button(label="ブラックリスト追加", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="vc_add_blacklist", row=0))
             self.add_item(ui.Button(label="ブラックリスト解除", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="vc_remove_blacklist", row=1))
         for item in self.children:
@@ -258,10 +260,10 @@ class VoiceMaster(commands.Cog):
         
     async def load_configs(self):
         self.creator_channel_configs = {
-            get_id("vc_creator_channel_id_4p"): {"type": "분수대"},
-            get_id("vc_creator_channel_id_3p"): {"type": "놀이터"},
-            get_id("vc_creator_channel_id_벤치"): {"type": "벤치", "required_role_key": "role_resident_rookie"},
-            get_id("vc_creator_channel_id_마이룸"): {"type": "마이룸", "required_role_key": "role_personal_room_key"},
+            get_id("vc_creator_channel_id_4p"): {"type": "fountain"},
+            get_id("vc_creator_channel_id_3p"): {"type": "playground"},
+            get_id("vc_creator_channel_id_ベンチ"): {"type": "bench", "required_role_key": "role_resident_rookie"},
+            get_id("vc_creator_channel_id_마이룸"): {"type": "my_room", "required_role_key": "role_personal_room_key"},
         }
         self.creator_channel_configs = {k: v for k, v in self.creator_channel_configs.items() if k is not None}
         self.admin_role_ids = [role_id for key in ADMIN_ROLE_KEYS if (role_id := get_id(key)) is not None]
@@ -321,7 +323,7 @@ class VoiceMaster(commands.Cog):
                 channel_info = self.temp_channels.get(after.channel.id)
                 if not channel_info: return
                 channel_type = channel_info.get("type")
-                if channel_type == "벤치": # '벤치'
+                if channel_type == "bench":
                     is_owner = member.id == channel_info.get("owner_id")
                     
                     user_role_ids = {r.id for r in member.roles}
@@ -399,7 +401,7 @@ class VoiceMaster(commands.Cog):
         channel_type = config.get("type", "normal")
         type_info = CHANNEL_TYPE_INFO.get(channel_type, CHANNEL_TYPE_INFO["normal"])
         target_category = creator_channel.category or (guild.get_channel(self.default_category_id) if self.default_category_id else None)
-        user_limit = 4 if channel_type == '벤치' else 0 # '벤치'
+        user_limit = 4 if channel_type == 'bench' else 0
         base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
         
         if not type_info["name_editable"]:
@@ -431,7 +433,7 @@ class VoiceMaster(commands.Cog):
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
         overwrites = {owner: discord.PermissionOverwrite(connect=True)}
         
-        if channel_type in ['마이룸']: # '마이룸'
+        if channel_type == 'my_room':
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
             
             if self.master_role_id and (master_role := guild.get_role(self.master_role_id)):
@@ -439,7 +441,7 @@ class VoiceMaster(commands.Cog):
             if self.vice_master_role_id and (vice_master_role := guild.get_role(self.vice_master_role_id)):
                 overwrites[vice_master_role] = discord.PermissionOverwrite(connect=True)
         
-        elif channel_type == '벤치': # '벤치'
+        elif channel_type == 'bench':
             overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
             if (role_id := get_id("role_resident_rookie")) and (role := guild.get_role(role_id)):
                  overwrites[role] = discord.PermissionOverwrite(connect=True)
