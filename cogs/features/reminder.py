@@ -15,17 +15,26 @@ REMINDER_CONFIG = {
     'disboard': {
         'bot_id': 302050872383242240,
         'cooltime': 7200,
-        'keyword': "서버 갱신 완료!", # <--- 수정된 키워드
+        'keyword': "表示順をアップしたよ", # 일본어 Disboard 성공 키워드
         'command': "/bump",
         'name': "Disboard BUMP"
     },
     'dicoall': {
         'bot_id': 664647740877176832,
         'cooltime': 3600,
-        'keyword': "서버가 상단에 표시되었습니다.", # <--- 수정된 키워드
+        'keyword': "サーバーが上部に表示されました",
         'command': "/up",
         'name': "Dicoall UP"
+    },
+    # --- ▼▼▼ [추가] ディス速 알림 설정 추가 ▼▼▼ ---
+    'dissoku': {
+        'bot_id': 808999236855136267,
+        'cooltime': 43200, # 12시간
+        'keyword': "投票が完了しました", # 투표 완료 키워드
+        'command': "/up",
+        'name': "ディス速 VOTE"
     }
+    # --- ▲▲▲ [추가] ▲▲▲ ---
 }
 
 class Reminder(commands.Cog):
@@ -46,11 +55,16 @@ class Reminder(commands.Cog):
             'channel_id': get_id("bump_reminder_channel_id"),
             'role_id': get_id("bump_reminder_role_id")
         }
-        # [수정] dissoku -> dicoall
         self.configs['dicoall'] = {
             'channel_id': get_id("dicoall_reminder_channel_id"),
             'role_id': get_id("dicoall_reminder_role_id")
         }
+        # --- ▼▼▼ [추가] ディス速 설정 로드 추가 ▼▼▼ ---
+        self.configs['dissoku'] = {
+            'channel_id': get_id("dissoku_reminder_channel_id"),
+            'role_id': get_id("dissoku_reminder_role_id")
+        }
+        # --- ▲▲▲ [추가] ▲▲▲ ---
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
     @commands.Cog.listener()
@@ -60,7 +74,6 @@ class Reminder(commands.Cog):
 
         embed = message.embeds[0]
         
-        # 임베드의 모든 텍스트(제목, 설명, 필드)를 하나로 합칩니다.
         full_embed_text_parts = []
         if embed.title:
             full_embed_text_parts.append(embed.title)
@@ -74,7 +87,6 @@ class Reminder(commands.Cog):
         
         full_embed_text = "\n".join(full_embed_text_parts)
 
-        # 합쳐진 전체 텍스트에서 키워드를 찾습니다.
         for key, config in REMINDER_CONFIG.items():
             if message.author.id == config['bot_id'] and config['keyword'] in full_embed_text:
                 await self.schedule_new_reminder(key, message.guild)
@@ -123,7 +135,9 @@ class Reminder(commands.Cog):
                     continue
 
                 try:
-                    message = f"⏰ {role.mention} {config['name']} 시간입니다! `{config['command']}`를 입력해주세요!"
+                    # --- ▼▼▼ [수정] 사용자 알림 메시지 일본어 번역 ▼▼▼ ---
+                    message = f"⏰ {role.mention} {config['name']} の時間です！ `{config['command']}` を入力してください！"
+                    # --- ▲▲▲ [수정] ▲▲▲ ---
                     await channel.send(message, allowed_mentions=discord.AllowedMentions(roles=True))
                     logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']})")
                 except discord.Forbidden:
