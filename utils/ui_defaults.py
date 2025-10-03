@@ -1227,484 +1227,309 @@ UI_PANEL_COMPONENTS = [
     },
 ]
 
+# --- [관리자용 명령어 - 한국어 유지] ---
 SETUP_COMMAND_MAP = {
     "panel_roles": {
-        "type": "panel",
-        "cog_name": "RolePanel",
-        "key": "auto_role_channel_id",
-        "friendly_name": "役職自動付与パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "RolePanel", "key": "auto_role_channel_id",
+        "friendly_name": "역할 자동부여 패널", "channel_type": "text"
     },
     "panel_onboarding": {
-        "type": "panel",
-        "cog_name": "Onboarding",
-        "key": "onboarding_panel_channel_id",
-        "friendly_name": "サーバー案内パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Onboarding", "key": "onboarding_panel_channel_id",
+        "friendly_name": "서버 안내 패널", "channel_type": "text"
     },
     "panel_nicknames": {
-        "type": "panel",
-        "cog_name": "Nicknames",
-        "key": "nickname_panel_channel_id",
-        "friendly_name": "ニックネーム変更パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Nicknames", "key": "nickname_panel_channel_id",
+        "friendly_name": "닉네임 변경 패널", "channel_type": "text"
     },
     "panel_level_check": {
-        "type": "panel",
-        "cog_name": "LevelSystem",
-        "key": "level_check_panel_channel_id",
-        "friendly_name": "[ゲーム] レベル確認パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "LevelSystem", "key": "level_check_panel_channel_id",
+        "friendly_name": "[게임] 레벨 확인 패널", "channel_type": "text"
     },
     "channel_job_advancement": {
-        "type": "channel",
-        "cog_name": "LevelSystem",
-        "key": "job_advancement_channel_id",
-        "friendly_name": "[チャンネル] 転職所",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "LevelSystem", "key": "job_advancement_channel_id",
+        "friendly_name": "[채널] 전직소", "channel_type": "text"
     },
     "panel_anonymous_board": {
-        "type": "panel",
-        "cog_name": "AnonymousBoard",
-        "key": "anonymous_board_channel_id",
-        "friendly_name": "[パネル] 匿名掲示板",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "AnonymousBoard", "key": "anonymous_board_channel_id",
+        "friendly_name": "[패널] 익명 게시판", "channel_type": "text"
     },
     "panel_warning": {
-        "type": "panel",
-        "cog_name": "WarningSystem",
-        "key": "warning_panel_channel_id",
-        "friendly_name": "[パネル] 罰点管理",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "WarningSystem", "key": "warning_panel_channel_id",
+        "friendly_name": "[패널] 벌점 관리", "channel_type": "text"
     },
     "panel_custom_embed": {
-        "type": "panel",
-        "cog_name": "CustomEmbed",
-        "key": "custom_embed_panel_channel_id",
-        "friendly_name": "[パネル] カスタム埋め込み送信",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "CustomEmbed", "key": "custom_embed_panel_channel_id",
+        "friendly_name": "[패널] 커스텀 임베드 전송", "channel_type": "text"
     },
     "panel_commerce": {
-        "type": "panel",
-        "cog_name": "Commerce",
-        "key": "commerce_panel_channel_id",
-        "friendly_name": "[ゲーム] 商店パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Commerce", "key": "commerce_panel_channel_id",
+        "friendly_name": "[게임] 상점 패널", "channel_type": "text"
     },
     "panel_fishing_river": {
-        "type": "panel",
-        "cog_name": "Fishing",
-        "key": "river_fishing_panel_channel_id",
-        "friendly_name": "[ゲーム] 川の釣り場パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Fishing", "key": "river_fishing_panel_channel_id",
+        "friendly_name": "[게임] 강 낚시터 패널", "channel_type": "text"
     },
     "panel_fishing_sea": {
-        "type": "panel",
-        "cog_name": "Fishing",
-        "key": "sea_fishing_panel_channel_id",
-        "friendly_name": "[ゲーム] 海の釣り場パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Fishing", "key": "sea_fishing_panel_channel_id",
+        "friendly_name": "[게임] 바다 낚시터 패널", "channel_type": "text"
     },
     "panel_profile": {
-        "type": "panel",
-        "cog_name": "UserProfile",
-        "key": "profile_panel_channel_id",
-        "friendly_name": "[ゲーム] プロフィールパネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "UserProfile", "key": "profile_panel_channel_id",
+        "friendly_name": "[게임] 프로필 패널", "channel_type": "text"
     },
     "panel_atm": {
-        "type": "panel",
-        "cog_name": "Atm",
-        "key": "atm_panel_channel_id",
-        "friendly_name": "[ゲーム] ATMパネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Atm", "key": "atm_panel_channel_id",
+        "friendly_name": "[게임] ATM 패널", "channel_type": "text"
     },
     "panel_dice_game": {
-        "type": "panel",
-        "cog_name": "DiceGame",
-        "key": "dice_game_panel_channel_id",
-        "friendly_name": "[ゲーム] サイコロゲームパネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "DiceGame", "key": "dice_game_panel_channel_id",
+        "friendly_name": "[게임] 주사위 게임 패널", "channel_type": "text"
     },
     "panel_slot_machine": {
-        "type": "panel",
-        "cog_name": "SlotMachine",
-        "key": "slot_machine_panel_channel_id",
-        "friendly_name": "[ゲーム] スロットマシンパネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "SlotMachine", "key": "slot_machine_panel_channel_id",
+        "friendly_name": "[게임] 슬롯머신 패널", "channel_type": "text"
     },
     "panel_rps_game": {
-        "type": "panel",
-        "cog_name": "RPSGame",
-        "key": "rps_game_panel_channel_id",
-        "friendly_name": "[ゲーム] じゃんけんパネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "RPSGame", "key": "rps_game_panel_channel_id",
+        "friendly_name": "[게임] 가위바위보 패널", "channel_type": "text"
     },
     "panel_tasks": {
-        "type": "panel",
-        "cog_name": "Quests",
-        "key": "tasks_panel_channel_id",
-        "friendly_name": "[ゲーム] デイリー掲示板パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Quests", "key": "tasks_panel_channel_id",
+        "friendly_name": "[게임] 일일 게시판 패널", "channel_type": "text"
     },
     "panel_farm_creation": {
-        "type": "panel",
-        "cog_name": "Farm",
-        "key": "farm_creation_panel_channel_id",
-        "friendly_name": "[ゲーム] 農場作成パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Farm", "key": "farm_creation_panel_channel_id",
+        "friendly_name": "[게임] 농장 생성 패널", "channel_type": "text"
     },
     "panel_mining": {
-        "type": "panel",
-        "cog_name": "Mining",
-        "key": "mining_panel_channel_id",
-        "friendly_name": "[ゲーム] 鉱山パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Mining", "key": "mining_panel_channel_id",
+        "friendly_name": "[게임] 광산 패널", "channel_type": "text"
     },
     "panel_trade": {
-        "type": "panel",
-        "cog_name": "Trade",
-        "key": "trade_panel_channel_id",
-        "friendly_name": "[ゲーム] 取引所パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Trade", "key": "trade_panel_channel_id",
+        "friendly_name": "[게임] 거래소 패널", "channel_type": "text"
     },
     "panel_pet_exploration": {
-        "type": "panel",
-        "cog_name": "Exploration",
-        "key": "exploration_panel_channel_id",
-        "friendly_name": "[ゲーム] ペット探検パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Exploration", "key": "exploration_panel_channel_id",
+        "friendly_name": "[게임] 펫 탐사 패널", "channel_type": "text"
     },
     "panel_pet_pvp": {
-        "type": "panel",
-        "cog_name": "PetPvP",
-        "key": "pet_pvp_panel_channel_id",
-        "friendly_name": "[ゲーム] ペット対戦場パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "PetPvP", "key": "pet_pvp_panel_channel_id",
+        "friendly_name": "[게임] 펫 대전장 패널", "channel_type": "text"
     },
     "log_trade": {
-        "type": "channel",
-        "cog_name": "Trade",
-        "key": "trade_log_channel_id",
-        "friendly_name": "[ログ] 取引記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Trade", "key": "trade_log_channel_id",
+        "friendly_name": "[로그] 거래 기록", "channel_type": "text"
     },
     "panel_inquiry": {
-        "type": "panel",
-        "cog_name": "TicketSystem",
-        "key": "inquiry_panel_channel_id",
-        "friendly_name": "[チケット] 問い合わせ/提案パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "TicketSystem", "key": "inquiry_panel_channel_id",
+        "friendly_name": "[티켓] 문의/건의 패널", "channel_type": "text"
     },
     "panel_report": {
-        "type": "panel",
-        "cog_name": "TicketSystem",
-        "key": "report_panel_channel_id",
-        "friendly_name": "[チケット] ユーザー通報パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "TicketSystem", "key": "report_panel_channel_id",
+        "friendly_name": "[티켓] 유저 신고 패널", "channel_type": "text"
     },
     "channel_new_welcome": {
-        "type": "channel",
-        "cog_name": "MemberEvents",
-        "key": "new_welcome_channel_id",
-        "friendly_name": "新規メンバー歓迎チャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "MemberEvents", "key": "new_welcome_channel_id",
+        "friendly_name": "신규 멤버 환영 채널", "channel_type": "text"
     },
     "channel_farewell": {
-        "type": "channel",
-        "cog_name": "MemberEvents",
-        "key": "farewell_channel_id",
-        "friendly_name": "メンバー退室案内チャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "MemberEvents", "key": "farewell_channel_id",
+        "friendly_name": "멤버 퇴장 안내 채널", "channel_type": "text"
     },
     "channel_main_chat": {
-        "type": "channel",
-        "cog_name": "Onboarding",
-        "key": "main_chat_channel_id",
-        "friendly_name": "メインチャットチャンネル（自己紹介承認後案内）",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Onboarding", "key": "main_chat_channel_id",
+        "friendly_name": "메인 채팅 채널 (자기소개 승인 후 안내)", "channel_type": "text"
     },
     "channel_onboarding_approval": {
-        "type": "channel",
-        "cog_name": "Onboarding",
-        "key": "onboarding_approval_channel_id",
-        "friendly_name": "自己紹介承認/拒否チャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Onboarding", "key": "onboarding_approval_channel_id",
+        "friendly_name": "자기소개 승인/거절 채널", "channel_type": "text"
     },
     "channel_nickname_approval": {
-        "type": "channel",
-        "cog_name": "Nicknames",
-        "key": "nickname_approval_channel_id",
-        "friendly_name": "ニックネーム変更承認チャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Nicknames", "key": "nickname_approval_channel_id",
+        "friendly_name": "닉네임 변경 승인 채널", "channel_type": "text"
     },
     "channel_vc_creator_3p": {
-        "type": "channel",
-        "cog_name": "VoiceMaster",
-        "key": "vc_creator_channel_id_3p",
-        "friendly_name": "ボイスチャンネル自動生成（ゲーム）",
-        "channel_type": "voice"
+        "type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_3p",
+        "friendly_name": "음성 채널 자동 생성 (게임)", "channel_type": "voice"
     },
     "channel_vc_creator_4p": {
-        "type": "channel",
-        "cog_name": "VoiceMaster",
-        "key": "vc_creator_channel_id_4p",
-        "friendly_name": "ボイスチャンネル自動生成（広場）",
-        "channel_type": "voice"
+        "type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_4p",
+        "friendly_name": "음성 채널 자동 생성 (광장)", "channel_type": "voice"
     },
     "channel_vc_creator_newbie": {
-        "type": "channel",
-        "cog_name": "VoiceMaster",
-        "key": "vc_creator_channel_id_벤치",
-        "friendly_name": "[ボイスチャンネル] 新人専用生成",
-        "channel_type": "voice"
+        "type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_벤치",
+        "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"
     },
     "channel_vc_creator_vip": {
-        "type": "channel",
-        "cog_name": "VoiceMaster",
-        "key": "vc_creator_channel_id_마이룸",
-        "friendly_name": "[ボイスチャンネル] VIP専用生成",
-        "channel_type": "voice"
+        "type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_마이룸",
+        "friendly_name": "[음성 채널] VIP 전용 생성기", "channel_type": "voice"
     },
     "log_nickname": {
-        "type": "channel",
-        "cog_name": "Nicknames",
-        "key": "nickname_log_channel_id",
-        "friendly_name": "[ログ] ニックネーム変更記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Nicknames", "key": "nickname_log_channel_id",
+        "friendly_name": "[로그] 닉네임 변경 기록", "channel_type": "text"
     },
     "log_intro_approval": {
-        "type": "channel",
-        "cog_name": "Onboarding",
-        "key": "introduction_channel_id",
-        "friendly_name": "[ログ] 自己紹介承認記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Onboarding", "key": "introduction_channel_id",
+        "friendly_name": "[로그] 자기소개 승인 기록", "channel_type": "text"
     },
     "log_intro_rejection": {
-        "type": "channel",
-        "cog_name": "Onboarding",
-        "key": "introduction_rejection_log_channel_id",
-        "friendly_name": "[ログ] 自己紹介拒否記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Onboarding", "key": "introduction_rejection_log_channel_id",
+        "friendly_name": "[로그] 자기소개 거절 기록", "channel_type": "text"
     },
     "log_item_warning_deduct": {
-        "type": "channel",
-        "cog_name": "ItemSystem",
-        "key": "log_item_warning_deduct",
-        "friendly_name": "[ログ] 罰点取り消し券使用履歴",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "ItemSystem", "key": "log_item_warning_deduct",
+        "friendly_name": "[로그] 벌점 차감권 사용 내역", "channel_type": "text"
     },
     "log_item_event_priority": {
-        "type": "channel",
-        "cog_name": "ItemSystem",
-        "key": "log_item_event_priority",
-        "friendly_name": "[ログ] イベント優先権使用履歴",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "ItemSystem", "key": "log_item_event_priority",
+        "friendly_name": "[로그] 이벤트 우선권 사용 내역", "channel_type": "text"
     },
     "log_message": {
-        "type": "channel",
-        "cog_name": "MessageLogger",
-        "key": "log_channel_message",
-        "friendly_name": "[ログ] メッセージ（編集/削除）",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "MessageLogger", "key": "log_channel_message",
+        "friendly_name": "[로그] 메시지 (수정/삭제)", "channel_type": "text"
     },
     "log_voice": {
-        "type": "channel",
-        "cog_name": "VoiceLogger",
-        "key": "log_channel_voice",
-        "friendly_name": "[ログ] ボイスチャンネル（参加/移動/退出）",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "VoiceLogger", "key": "log_channel_voice",
+        "friendly_name": "[로그] 음성 채널 (참여/이동/퇴장)", "channel_type": "text"
     },
     "log_member": {
-        "type": "channel",
-        "cog_name": "MemberLogger",
-        "key": "log_channel_member",
-        "friendly_name": "[ログ] メンバー活動（役職付与/ニックネーム）",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "MemberLogger", "key": "log_channel_member",
+        "friendly_name": "[로그] 멤버 활동 (역할 부여/닉네임)", "channel_type": "text"
     },
     "log_channel": {
-        "type": "channel",
-        "cog_name": "ChannelLogger",
-        "key": "log_channel_channel",
-        "friendly_name": "[ログ] チャンネル管理（作成/削除/変更）",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "ChannelLogger", "key": "log_channel_channel",
+        "friendly_name": "[로그] 채널 관리 (생성/삭제/변경)", "channel_type": "text"
     },
     "log_server": {
-        "type": "channel",
-        "cog_name": "ServerLogger",
-        "key": "log_channel_server",
-        "friendly_name": "[ログ] サーバーおよび役職管理",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "ServerLogger", "key": "log_channel_server",
+        "friendly_name": "[로그] 서버 및 역할 관리", "channel_type": "text"
     },
     "log_warning": {
-        "type": "channel",
-        "cog_name": "WarningSystem",
-        "key": "warning_log_channel_id",
-        "friendly_name": "[ログ] 罰点発行記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "WarningSystem", "key": "warning_log_channel_id",
+        "friendly_name": "[로그] 벌점 발급 기록", "channel_type": "text"
     },
     "log_daily_check": {
-        "type": "channel",
-        "cog_name": "Quests",
-        "key": "log_daily_check_channel_id",
-        "friendly_name": "[ログ] 出席チェック記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Quests", "key": "log_daily_check_channel_id",
+        "friendly_name": "[로그] 출석체크 기록", "channel_type": "text"
     },
     "log_market": {
-        "type": "channel",
-        "cog_name": "EconomyCore",
-        "key": "market_log_channel_id",
-        "friendly_name": "[ログ] 市場相場変動",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "EconomyCore", "key": "market_log_channel_id",
+        "friendly_name": "[로그] 시장 시세 변동", "channel_type": "text"
     },
     "log_coin": {
-        "type": "channel",
-        "cog_name": "EconomyCore",
-        "key": "coin_log_channel_id",
-        "friendly_name": "[ログ] コイン活動",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "EconomyCore", "key": "coin_log_channel_id",
+        "friendly_name": "[로그] 코인 활동", "channel_type": "text"
     },
     "log_job_advancement": {
-        "type": "channel",
-        "cog_name": "LevelSystem",
-        "key": "job_log_channel_id",
-        "friendly_name": "[ログ] 転職記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "LevelSystem", "key": "job_log_channel_id",
+        "friendly_name": "[로그] 전직 기록", "channel_type": "text"
     },
     "log_fishing": {
-        "type": "channel",
-        "cog_name": "Fishing",
-        "key": "fishing_log_channel_id",
-        "friendly_name": "[ログ] 釣り成功記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Fishing", "key": "fishing_log_channel_id",
+        "friendly_name": "[로그] 낚시 성공 기록", "channel_type": "text"
     },
     "log_item_mine_pass": {
-        "type": "channel",
-        "cog_name": "ItemSystem",
-        "key": "log_item_mine_pass",
-        "friendly_name": "[ログ] 鉱山入場券使用履歴",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "ItemSystem", "key": "log_item_mine_pass",
+        "friendly_name": "[로그] 광산 입장권 사용 내역", "channel_type": "text"
     },
     "log_pet_levelup": {
-        "type": "channel",
-        "cog_name": "PetSystem",
-        "key": "log_pet_levelup_channel_id",
-        "friendly_name": "[ログ] ペット成長記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "PetSystem", "key": "log_pet_levelup_channel_id",
+        "friendly_name": "[로그] 펫 성장 기록", "channel_type": "text"
     },
     "channel_bump_reminder": {
-        "type": "channel",
-        "cog_name": "Reminder",
-        "key": "bump_reminder_channel_id",
-        "friendly_name": "[通知] Disboard BUMPチャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Reminder", "key": "bump_reminder_channel_id",
+        "friendly_name": "[알림] Disboard BUMP 채널", "channel_type": "text"
     },
     "channel_dicoall_reminder": {
-        "type": "channel",
-        "cog_name": "Reminder",
-        "key": "dicoall_reminder_channel_id",
-        "friendly_name": "[通知] Dicoall UPチャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Reminder", "key": "dicoall_reminder_channel_id",
+        "friendly_name": "[알림] Dicoall UP 채널", "channel_type": "text"
     },
     "channel_weather": {
-        "type": "channel",
-        "cog_name": "WorldSystem",
-        "key": "weather_channel_id",
-        "friendly_name": "[通知] 天気予報チャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "WorldSystem", "key": "weather_channel_id",
+        "friendly_name": "[알림] 날씨 예보 채널", "channel_type": "text"
     },
     "onboarding_private_age_log_channel_id": {
-        "type": "channel", 
-        "cog_name": "Onboarding", 
-        "key": "onboarding_private_age_log_channel_id", 
-        "friendly_name": "[オンボーディング] 非公開年齢記録チャンネル", 
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Onboarding", "key": "onboarding_private_age_log_channel_id", 
+        "friendly_name": "[온보딩] 비공개 나이 기록 채널", "channel_type": "text"
     },
     "panel_blacksmith": {
-        "type": "panel",
-        "cog_name": "Blacksmith",
-        "key": "blacksmith_panel_channel_id",
-        "friendly_name": "[ゲーム] 鍛冶屋パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Blacksmith", "key": "blacksmith_panel_channel_id",
+        "friendly_name": "[게임] 대장간 패널", "channel_type": "text"
     },
     "log_blacksmith_complete": {
-        "type": "channel",
-        "cog_name": "Blacksmith",
-        "key": "log_blacksmith_channel_id",
-        "friendly_name": "[ログ] 鍛冶屋製作完了",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Blacksmith", "key": "log_blacksmith_channel_id",
+        "friendly_name": "[로그] 대장간 제작 완료", "channel_type": "text"
     },
     "panel_cooking_creation": {
-        "type": "panel",
-        "cog_name": "Cooking",
-        "key": "cooking_creation_panel_channel_id",
-        "friendly_name": "[ゲーム] 料理開始パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "Cooking", "key": "cooking_creation_panel_channel_id",
+        "friendly_name": "[게임] 요리 시작 패널", "channel_type": "text"
     },
     "log_cooking_complete": {
-        "type": "channel",
-        "cog_name": "Cooking",
-        "key": "log_cooking_complete_channel_id",
-        "friendly_name": "[ログ] 料理完成",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Cooking", "key": "log_cooking_complete_channel_id",
+        "friendly_name": "[로그] 요리 완성", "channel_type": "text"
     },
     "log_recipe_discovery": {
-        "type": "channel",
-        "cog_name": "Cooking",
-        "key": "log_recipe_discovery_channel_id",
-        "friendly_name": "[ログ] レシピ発見",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "Cooking", "key": "log_recipe_discovery_channel_id",
+        "friendly_name": "[로그] 레시피 발견", "channel_type": "text"
     },
     "log_item_job_reset": {
-        "type": "channel",
-        "cog_name": "ItemSystem",
-        "key": "log_item_job_reset",
-        "friendly_name": "[ログ] 職業リセット券使用履歴",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "ItemSystem", "key": "log_item_job_reset",
+        "friendly_name": "[로그] 직업 초기화권 사용 내역", "channel_type": "text"
     },
     "panel_friend_invite": {
-        "type": "panel",
-        "cog_name": "FriendInvite",
-        "key": "friend_invite_panel_channel_id",
-        "friendly_name": "[ゲーム] 友達招待パネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "FriendInvite", "key": "friend_invite_panel_channel_id",
+        "friendly_name": "[게임] 친구 초대 패널", "channel_type": "text"
     },
     "log_friend_invite": {
-        "type": "channel",
-        "cog_name": "FriendInvite",
-        "key": "friend_invite_log_channel_id",
-        "friendly_name": "[ログ] 友達招待イベント",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "FriendInvite", "key": "friend_invite_log_channel_id",
+        "friendly_name": "[로그] 친구 초대 이벤트", "channel_type": "text"
     },
     "panel_incubator": {
-        "type": "panel",
-        "cog_name": "PetSystem",
-        "key": "incubator_panel_channel_id",
-        "friendly_name": "[ゲーム] ペットインキュベーターパネル",
-        "channel_type": "text"
+        "type": "panel", "cog_name": "PetSystem", "key": "incubator_panel_channel_id",
+        "friendly_name": "[게임] 펫 인큐베이터 패널", "channel_type": "text"
     },
     "channel_weekly_boss": {
-        "type": "channel",
-        "cog_name": "BossRaid",
-        "key": "weekly_boss_channel_id",
-        "friendly_name": "[ボス] 週間ボスチャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "BossRaid", "key": "weekly_boss_channel_id",
+        "friendly_name": "[보스] 주간 보스 채널", "channel_type": "text"
     },
     "channel_monthly_boss": {
-        "type": "channel",
-        "cog_name": "BossRaid",
-        "key": "monthly_boss_channel_id",
-        "friendly_name": "[ボス] 月間ボスチャンネル",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "BossRaid", "key": "monthly_boss_channel_id",
+        "friendly_name": "[보스] 월간 보스 채널", "channel_type": "text"
     },
     "log_boss_events": {
-        "type": "channel",
-        "cog_name": "BossRaid",
-        "key": "boss_log_channel_id",
-        "friendly_name": "[ログ] ボスイベント記録",
-        "channel_type": "text"
+        "type": "channel", "cog_name": "BossRaid", "key": "boss_log_channel_id",
+        "friendly_name": "[로그] 보스 이벤트 기록", "channel_type": "text"
     },
 }
+
+ADMIN_ACTION_MAP = {
+    "status_show": "[현황] 설정 대시보드 표시",
+    "server_id_set": "[중요] 서버 ID 설정",
+    "panels_regenerate_all": "[패널] 모든 관리 패널 재설치",
+    "template_edit": "[템플릿] 임베드 템플릿 편집",
+    "request_regenerate_all_game_panels": "[게임] 모든 게임 패널 재설치 요청",
+    "roles_sync": "[역할] 모든 역할 DB와 동기화",
+    "strings_sync": "[UI] 모든 UI 텍스트 DB와 동기화",
+    "game_data_reload": "[게임] 게임 데이터 새로고침",
+    "stats_set": "[통계] 통계 채널 설정/제거",
+    "stats_refresh": "[통계] 모든 통계 채널 새로고침",
+    "stats_list": "[통계] 설정된 통계 채널 목록",
+    "coin_give": "[코인] 유저에게 코인 지급",
+    "coin_take": "[코인] 유저의 코인 차감",
+    "xp_give": "[XP] 유저에게 XP 지급",
+    "level_set": "[레벨] 유저 레벨 설정",
+    "trigger_daily_updates": "[수동] 시세 및 작물 상태 업데이트 즉시 실행",
+    "farm_next_day": "[농장] 다음 날로 시간 넘기기 (테스트용)",
+    "farm_reset_date": "[농장] 시간을 현재로 초기화 (테스트용)",
+    "pet_hatch_now": "[펫] 펫 즉시 부화 (테스트용)",
+    "pet_admin_levelup": "[펫] 펫 1레벨업 (테스트용)",
+    "pet_level_set": "[펫] 펫 레벨 설정 (테스트용)",
+    "exploration_complete_now": "[펫] 펫 탐사 즉시 완료 (테스트용)",
+    "boss_spawn_test": "[보스] 강제 소환 (테스트용)",
+    "boss_defeat_test": "[보스] 강제 처치 (테스트용)",
+}
+# --- [관리자용 명령어 끝] ---
 
 ADMIN_ROLE_KEYS = [
     "role_admin_total", "role_staff_village_chief", "role_staff_deputy_chief",
@@ -1839,32 +1664,6 @@ GAME_CONFIG = {
     "CHAT_MESSAGE_REQUIREMENT": 20,
     "CHAT_REWARD_RANGE": [5, 10],
     "JOB_ADVANCEMENT_LEVELS": [50, 100]
-}
-ADMIN_ACTION_MAP = {
-    "status_show": "[状況] 設定ダッシュボード表示",
-    "server_id_set": "[重要] サーバーID設定",
-    "panels_regenerate_all": "[パネル] 全管理パネル再設置",
-    "template_edit": "[テンプレート] 埋め込みテンプレート編集",
-    "request_regenerate_all_game_panels": "[ゲーム] 全ゲームパネル再設置要請",
-    "roles_sync": "[役職] 全役職をDBと同期",
-    "strings_sync": "[UI] 全UIテキストをDBと同期",
-    "game_data_reload": "[ゲーム] ゲームデータリロード",
-    "stats_set": "[統計] 統計チャンネル設定/削除",
-    "stats_refresh": "[統計] 全統計チャンネルリフレッシュ",
-    "stats_list": "[統計] 設定済み統計チャンネル一覧",
-    "coin_give": "[コイン] ユーザーにコインを支給",
-    "coin_take": "[コイン] ユーザーのコインを差し引く",
-    "xp_give": "[XP] ユーザーにXPを付与",
-    "level_set": "[レベル] ユーザーレベル設定",
-    "trigger_daily_updates": "[手動] 相場および作物状態の更新を即時実行",
-    "farm_next_day": "[農場] 次の日に時間を進める（テスト用）",
-    "farm_reset_date": "[農場] 時間を現在にリセット（テスト用）",
-    "pet_hatch_now": "[ペット] ペット即時孵化（テスト用）",
-    "pet_admin_levelup": "[ペット] ペット1レベルアップ（テスト用）",
-    "pet_level_set": "[ペット] ペットレベル設定（テスト用）",
-    "exploration_complete_now": "[ペット] ペット探検即時完了（テスト用）",
-    "boss_spawn_test": "[ボス] 強制召喚（テスト用）",
-    "boss_defeat_test": "[ボス] 強制討伐（テスト用）",
 }
 
 PROFILE_RANK_ROLES = [{
