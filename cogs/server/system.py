@@ -162,7 +162,10 @@ class ServerSystem(commands.Cog):
         
         role_setup_actions = {
             "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", 
-            "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정"
+            "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정",
+            # --- ▼▼▼ [추가] ディス速 역할 설정 추가 ▼▼▼ ---
+            "role_setup:dissoku_reminder_role_id": "[알림] ディス速 VOTE 알림 역할 설정"
+            # --- ▲▲▲ [추가] ▲▲▲ ---
         }
         
         for key, name in role_setup_actions.items():
