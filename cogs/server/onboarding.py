@@ -45,6 +45,26 @@ class IntroductionModal(ui.Modal, title="住民登録証"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
+            # ▼▼▼ [수정 제안] 이름 유효성 검사 코드 추가 ▼▼▼
+            name_to_check = self.name.value
+            pattern_str = r"^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+$"
+            
+            # 닉네임 길이 계산을 위해 Nicknames Cog 가져오기
+            nicknames_cog = self.onboarding_cog.bot.get_cog("Nicknames")
+            if not nicknames_cog:
+                 # Cog를 찾을 수 없는 경우에 대한 안전 장치
+                 logger.error("Nicknames Cog를 찾을 수 없어 이름 길이 검사를 건너뜁니다.")
+            else:
+                max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
+                if not re.match(pattern_str, name_to_check):
+                    await interaction.followup.send("❌ エラー: 名前に絵文字や特殊文字、空白は使用できません。", ephemeral=True)
+                    return
+                
+                if (length := nicknames_cog.calculate_weighted_length(name_to_check)) > max_length:
+                    await interaction.followup.send(f"❌ エラー: 名前の長さがルールを超過しました。(現在: **{length}/{max_length}**)", ephemeral=True)
+                    return
+            # ▲▲▲ [수정 제안] 코드 끝 ▲▲▲
+
             actual_birth_year_for_validation = self.public_birth_year_display
             birth_year_for_approval_channel = self.public_birth_year_display
 
