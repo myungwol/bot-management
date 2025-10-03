@@ -68,7 +68,7 @@ class WarningModal(ui.Modal, title="罰点内容入力"):
             dm_embed.set_footer(text="ご不明な点がございましたら、問い合わせチケットをご利用ください。")
             await self.target_member.send(embed=dm_embed)
         except discord.Forbidden:
-            logger.warning(f"{self.target_member.display_name}님에게 DM을 보낼 수 없어 벌점 알림을 보내지 못했습니다.")
+            logger.warning(f"{self.target_member.display_name}님에게 DM을 보낼 수 없어 벌점 알림을 보내지 못했습니다。")
             
         await interaction.followup.send(f"✅ {self.target_member.mention} さんに **{amount_val}回** の罰点を正常に付与しました。(累積: {new_total}回)", ephemeral=True)
 
@@ -152,7 +152,7 @@ class WarningSystem(commands.Cog):
         logger.info("[WarningSystem Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
     async def update_warning_roles(self, member: discord.Member, total_count: int):
-        """누적 벌점 횟수에 따라 역할을 업데이트합니다."""
+        """累積罰点数に応じて役職を更新します。"""
         guild = member.guild
         
         all_warning_role_ids = {get_id(t['role_key']) for t in WARNING_THRESHOLDS if get_id(t['role_key'])}
@@ -178,14 +178,14 @@ class WarningSystem(commands.Cog):
                     roles_to_remove.append(role)
             
             if roles_to_add:
-                await member.add_roles(*roles_to_add, reason=f"누적 벌점 {total_count}회 달성")
+                await member.add_roles(*roles_to_add, reason=f"累積罰点 {total_count}回達成")
             if roles_to_remove:
-                await member.remove_roles(*roles_to_remove, reason=f"벌점 역할 업데이트")
+                await member.remove_roles(*roles_to_remove, reason=f"罰点役職更新")
                 
         except discord.Forbidden:
-            logger.error(f"벌점 역할 업데이트 실패: {member.display_name}님의 역할을 변경할 권한이 없습니다.")
+            logger.error(f"罰点役職更新失敗: {member.display_name}の役職を変更する権限がありません。")
         except Exception as e:
-            logger.error(f"벌점 역할 업데이트 중 오류: {e}", exc_info=True)
+            logger.error(f"罰点役職更新中のエラー: {e}", exc_info=True)
 
     async def send_log_message(self, moderator: discord.Member, target: discord.Member, reason: str, amount: int, new_total: int):
         if not self.log_channel_id: return
@@ -196,13 +196,13 @@ class WarningSystem(commands.Cog):
         if not embed_data: return
         
         embed = format_embed_from_db(embed_data)
-        embed.title = "🚨 罰点発行のお知らせ / 벌점 발급 알림"
+        embed.title = "🚨 罰点発行のお知らせ"
         embed.set_author(name=f"{moderator.display_name} → {target.display_name}", icon_url=moderator.display_avatar.url)
-        embed.add_field(name="対象者 / 대상자", value=f"{target.mention} (`{target.id}`)", inline=False)
-        embed.add_field(name="担当者 / 담당자", value=f"{moderator.mention} (`{moderator.id}`)", inline=False)
-        embed.add_field(name="事由 / 사유", value=reason, inline=False)
-        embed.add_field(name="付与回数 / 부여 횟수", value=f"`{amount}`回", inline=True)
-        embed.add_field(name="累積回数 / 누적 횟수", value=f"`{new_total}`回", inline=True)
+        embed.add_field(name="対象者", value=f"{target.mention} (`{target.id}`)", inline=False)
+        embed.add_field(name="担当者", value=f"{moderator.mention} (`{moderator.id}`)", inline=False)
+        embed.add_field(name="事由", value=reason, inline=False)
+        embed.add_field(name="付与回数", value=f"`{amount}`回", inline=True)
+        embed.add_field(name="累積回数", value=f"`{new_total}`回", inline=True)
         embed.timestamp = datetime.now(timezone.utc)
         
         await log_channel.send(
@@ -212,8 +212,8 @@ class WarningSystem(commands.Cog):
         )
         
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_warning") -> bool:
-        base_panel_key = panel_key.replace("panel_", "") # "warning"
-        embed_key = panel_key # "panel_warning"
+        base_panel_key = panel_key.replace("panel_", "")
+        embed_key = panel_key
 
         if not channel:
             logger.warning(f"벌점 패널 채널을 찾을 수 없어 재생성할 수 없습니다.")
