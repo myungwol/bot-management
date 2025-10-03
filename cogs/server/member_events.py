@@ -1,8 +1,8 @@
 # cogs/server/member_events.py
 """
-서버 멤버의 입장 및 퇴장 이벤트를 처리하는 Cog입니다.
-- 새로운 멤버가 서버에 참여하면 환영 메시지를 보내고 초기 역할을 부여합니다.
-- 멤버가 서버에서 나가면 작별 메시지를 보냅니다.
+サーバーメンバーの参加および退出イベントを処理するCogです。
+- 新しいメンバーがサーバーに参加すると、歓迎メッセージを送信し、初期役職を付与します。
+- メンバーがサーバーから退出すると、別れのメッセージを送信します。
 """
 import discord
 from discord.ext import commands
@@ -46,9 +46,8 @@ class MemberEvents(commands.Cog):
                 restored_nick = backup.get('nickname')
 
                 if roles_to_restore or restored_nick:
-                    await member.edit(roles=roles_to_restore, nick=restored_nick, reason="서버 재참여로 인한 데이터 복구")
+                    await member.edit(roles=roles_to_restore, nick=restored_nick, reason="サーバー再参加によるデータ復元")
                 
-                # [수정] 모든 복구 작업이 성공적으로 끝난 후에 백업을 삭제합니다.
                 await delete_member_backup(member.id, member.guild.id)
                 logger.info(f"'{member.display_name}'님의 역할과 닉네임을 성공적으로 복구하고 백업 데이터를 삭제했습니다.")
             except discord.Forbidden:
@@ -82,7 +81,7 @@ class MemberEvents(commands.Cog):
         
         if roles_to_add:
             try:
-                await member.add_roles(*roles_to_add, reason="서버 참여 시 초기 역할 부여")
+                await member.add_roles(*roles_to_add, reason="サーバー参加時の初期役職付与")
             except discord.Forbidden:
                 logger.error(f"'{member.display_name}'님에게 초기 역할을 부여하지 못했습니다. (권한 부족)")
 
@@ -95,7 +94,7 @@ class MemberEvents(commands.Cog):
                 embed = format_embed_from_db(embed_data, member_mention=member.mention, guild_name=member.guild.name)
                 if member.display_avatar:
                     embed.set_thumbnail(url=member.display_avatar.url)
-                await channel.send(f"환영합니다, {member.mention}님!", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+                await channel.send(f"ようこそ、{member.mention}さん！", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
@@ -135,20 +134,17 @@ class MemberEvents(commands.Cog):
         if before.premium_since is None and after.premium_since is not None:
             if key_role not in after.roles:
                 try:
-                    await after.add_roles(key_role, reason="서버 부스트 시작")
+                    await after.add_roles(key_role, reason="サーバーブースト開始")
                     logger.info(f"{after.display_name}님이 서버 부스트를 시작하여 '개인 방 열쇠' 역할을 지급했습니다.")
 
-                    # --- ▼▼▼▼▼ 핵심 수정 부분 ▼▼▼▼▼ ---
-                    # 메시지를 보낼 채널 ID를 지정합니다.
-                    target_channel_id = 1422758270468100127
+                    target_channel_id = 1423523052335005696
                     channel = self.bot.get_channel(target_channel_id)
 
                     if channel and isinstance(channel, discord.TextChannel):
                         try:
-                            # 채널에 보낼 메시지 (사용자 멘션 포함)
                             message_content = (
-                                f"🎉 {after.mention}님, **{after.guild.name}** 서버를 부스트해주셔서 정말 감사합니다!\n"
-                                "혜택으로 **개인 음성 채널**을 만들 수 있는 `개인 방 열쇠` 역할이 부여되었습니다."
+                                f"🎉 {after.mention}さん、**{after.guild.name}**サーバーをブーストしてくださり、誠にありがとうございます！\n"
+                                "特典として**個人ボイスチャンネル**を作成できる`マイルームの鍵`役職が付与されました。"
                             )
                             await channel.send(message_content, allowed_mentions=discord.AllowedMentions(users=True))
                         except discord.Forbidden:
@@ -157,7 +153,6 @@ class MemberEvents(commands.Cog):
                             logger.error(f"부스트 감사 메시지를 채널에 보내는 중 오류 발생: {e}", exc_info=True)
                     else:
                         logger.warning(f"부스트 감사 메시지를 보낼 채널(ID: {target_channel_id})을 찾을 수 없거나 텍스트 채널이 아닙니다.")
-                    # --- ▲▲▲▲▲ 핵심 수정 완료 ▲▲▲▲▲ ---
                     
                 except discord.Forbidden:
                     logger.error(f"{after.display_name}님에게 '개인 방 열쇠' 역할을 지급하지 못했습니다. (권한 부족)")
@@ -167,7 +162,7 @@ class MemberEvents(commands.Cog):
         elif before.premium_since is not None and after.premium_since is None:
             if key_role in after.roles:
                 try:
-                    await after.remove_roles(key_role, reason="서버 부스트 중지")
+                    await after.remove_roles(key_role, reason="サーバーブースト停止")
                     logger.info(f"{after.display_name}님이 서버 부스트를 중지하여 '개인 방 열쇠' 역할을 회수했습니다.")
                 except discord.Forbidden:
                     logger.error(f"{after.display_name}님의 '개인 방 열쇠' 역할을 회수하지 못했습니다. (권한 부족)")
