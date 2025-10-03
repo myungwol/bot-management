@@ -10,15 +10,13 @@ from datetime import datetime, timezone
 
 from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, get_panel_components_from_db, supabase
 from utils.ui_defaults import POLICE_ROLE_KEY, WARNING_THRESHOLDS
-# ▼▼▼ [핵심 수정] has_required_roles 함수를 import 합니다. ▼▼▼
 from utils.helpers import format_embed_from_db, has_required_roles
 
 logger = logging.getLogger(__name__)
 
-# --- 다른 클래스들은 변경사항이 없으므로 생략합니다 ---
-class WarningModal(ui.Modal, title="벌점 내용 입력"):
-    amount = ui.TextInput(label="벌점 횟수", placeholder="부여할 벌점 횟수를 숫자로 입력 (예: 1)", required=True, max_length=2)
-    reason = ui.TextInput(label="벌점 사유", placeholder="벌점을 발급하는 이유를 구체적으로 기입해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=500)
+class WarningModal(ui.Modal, title="罰点内容入力"):
+    amount = ui.TextInput(label="罰点の回数", placeholder="付与する罰点の回数を数字で入力 (例: 1)", required=True, max_length=2)
+    reason = ui.TextInput(label="罰点の事由", placeholder="罰点を発行する理由を具体的に記入してください。", style=discord.TextStyle.paragraph, required=True, max_length=500)
 
     def __init__(self, cog: 'WarningSystem', target_member: discord.Member):
         super().__init__()
@@ -31,10 +29,10 @@ class WarningModal(ui.Modal, title="벌점 내용 입력"):
         try:
             amount_val = int(self.amount.value)
             if amount_val <= 0:
-                await interaction.followup.send("❌ 벌점 횟수는 1 이상의 자연수를 입력해주세요.", ephemeral=True)
+                await interaction.followup.send("❌ 罰点の回数は1以上の自然数を入力してください。", ephemeral=True)
                 return
         except (ValueError, TypeError):
-            await interaction.followup.send("❌ 벌점점 횟수는 숫자로 입력해주세요.", ephemeral=True)
+            await interaction.followup.send("❌ 罰点の回数は数字で入力してください。", ephemeral=True)
             return
 
         try:
@@ -49,7 +47,7 @@ class WarningModal(ui.Modal, title="벌점 내용 입력"):
             new_total = response.data
         except Exception as e:
             logger.error(f"add_warning_and_get_total RPC 호출 실패: {e}", exc_info=True)
-            await interaction.followup.send("❌ 벌점 처리 중 데이터베이스 오류가 발생했습니다.", ephemeral=True)
+            await interaction.followup.send("❌ 罰点処理中にデータベースエラーが発生しました。", ephemeral=True)
             return
 
         await self.cog.update_warning_roles(self.target_member, new_total)
@@ -63,16 +61,16 @@ class WarningModal(ui.Modal, title="벌점 내용 입력"):
         )
         
         try:
-            dm_embed = discord.Embed(title=f"🚨 {interaction.guild.name}에서 벌점이 부여되었습니다", color=0xED4245)
-            dm_embed.add_field(name="사유", value=self.reason.value, inline=False)
-            dm_embed.add_field(name="부여된 벌점 횟수", value=f"{amount_val}회", inline=True)
-            dm_embed.add_field(name="누적 벌점 횟수", value=f"{new_total}회", inline=True)
-            dm_embed.set_footer(text="궁금한 점이 있다면 문의 티켓을 이용해주세요.")
+            dm_embed = discord.Embed(title=f"🚨 {interaction.guild.name}で罰点が付与されました", color=0xED4245)
+            dm_embed.add_field(name="事由", value=self.reason.value, inline=False)
+            dm_embed.add_field(name="付与された罰点の回数", value=f"{amount_val}回", inline=True)
+            dm_embed.add_field(name="累積罰点の回数", value=f"{new_total}回", inline=True)
+            dm_embed.set_footer(text="ご不明な点がございましたら、問い合わせチケットをご利用ください。")
             await self.target_member.send(embed=dm_embed)
         except discord.Forbidden:
             logger.warning(f"{self.target_member.display_name}님에게 DM을 보낼 수 없어 벌점 알림을 보내지 못했습니다.")
             
-        await interaction.followup.send(f"✅ {self.target_member.mention} 님에게 **{amount_val}회** 의 벌점을 성공적으로 부여했습니다. (누적: {new_total}회)", ephemeral=True)
+        await interaction.followup.send(f"✅ {self.target_member.mention} さんに **{amount_val}回** の罰点を正常に付与しました。(累積: {new_total}回)", ephemeral=True)
 
 
 class TargetUserSelectView(ui.View):
@@ -80,11 +78,11 @@ class TargetUserSelectView(ui.View):
         super().__init__(timeout=180)
         self.cog = cog
 
-    @ui.select(cls=ui.UserSelect, placeholder="벌점을 부여할 유저를 선택하세요.")
+    @ui.select(cls=ui.UserSelect, placeholder="罰点を付与するユーザーを選択してください。")
     async def select_user(self, interaction: discord.Interaction, select: ui.UserSelect):
         target_user = select.values[0]
         if target_user.bot:
-            await interaction.response.send_message("❌ 봇에게는 벌점을 부여할 수 없습니다.", ephemeral=True)
+            await interaction.response.send_message("❌ ボットには罰点を付与できません。", ephemeral=True)
             return
             
         modal = WarningModal(self.cog, target_user)
@@ -107,7 +105,7 @@ class WarningPanelView(ui.View):
         
         button_info = components[0]
         button = ui.Button(
-            label=button_info.get('label'),
+            label=button_info.get('label', "罰点を発行する"),
             style=discord.ButtonStyle.danger,
             emoji=button_info.get('emoji'),
             custom_id=button_info.get('component_key')
@@ -115,17 +113,15 @@ class WarningPanelView(ui.View):
         button.callback = self.on_button_click
         self.add_item(button)
 
-    # ▼▼▼ [핵심 수정] 권한 확인 로직을 중앙 함수 호출로 변경 ▼▼▼
     async def on_button_click(self, interaction: discord.Interaction):
         required_keys = [POLICE_ROLE_KEY, "role_staff_village_chief", "role_staff_deputy_chief"]
-        error_message = "❌ 이 기능은 `촌장`, `부촌장`, `경찰관` 역할만 사용할 수 있습니다."
+        error_message = "❌ この機能は`村長`, `副村長`, `警察官`役職のみ使用できます。"
         
         if not await has_required_roles(interaction, required_keys, error_message):
             return
 
         view = TargetUserSelectView(self.cog)
-        await interaction.response.send_message("벌점을 부여할 대상을 선택하세요.", view=view, ephemeral=True)
-    # ▲▲▲ [핵심 수정] ▲▲▲
+        await interaction.response.send_message("罰点を付与する対象を選択してください。", view=view, ephemeral=True)
 
 class WarningSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -200,12 +196,13 @@ class WarningSystem(commands.Cog):
         if not embed_data: return
         
         embed = format_embed_from_db(embed_data)
+        embed.title = "🚨 罰点発行のお知らせ / 벌점 발급 알림"
         embed.set_author(name=f"{moderator.display_name} → {target.display_name}", icon_url=moderator.display_avatar.url)
-        embed.add_field(name="대상자", value=f"{target.mention} (`{target.id}`)", inline=False)
-        embed.add_field(name="담당자", value=f"{moderator.mention} (`{moderator.id}`)", inline=False)
-        embed.add_field(name="사유", value=reason, inline=False)
-        embed.add_field(name="부여 횟수", value=f"`{amount}`회", inline=True)
-        embed.add_field(name="누적 횟수", value=f"`{new_total}`회", inline=True)
+        embed.add_field(name="対象者 / 대상자", value=f"{target.mention} (`{target.id}`)", inline=False)
+        embed.add_field(name="担当者 / 담당자", value=f"{moderator.mention} (`{moderator.id}`)", inline=False)
+        embed.add_field(name="事由 / 사유", value=reason, inline=False)
+        embed.add_field(name="付与回数 / 부여 횟수", value=f"`{amount}`回", inline=True)
+        embed.add_field(name="累積回数 / 누적 횟수", value=f"`{new_total}`回", inline=True)
         embed.timestamp = datetime.now(timezone.utc)
         
         await log_channel.send(
