@@ -1581,6 +1581,12 @@ STATIC_AUTO_ROLE_PANELS = {
                     "role_id_key": "role_notify_up",
                     "label": "Dicoall"
                 },
+                # --- ▼▼▼ [추가] ディス速 역할 추가 ▼▼▼ ---
+                {
+                    "role_id_key": "role_notify_dissoku",
+                    "label": "ディス速"
+                },
+                # --- ▲▲▲ [추가 완료] ▲▲▲ ---
             ],
             "games": [
                 { "role_id_key": "role_game_minecraft", "label": "マイクラ-Minecraft" },
@@ -1595,7 +1601,6 @@ STATIC_AUTO_ROLE_PANELS = {
                 { "role_id_key": "role_game_splatoon", "label": "スプラ-Splatoon" },
                 { "role_id_key": "role_game_godfield", "label": "ゴッフィ-God Field" },
                 { "role_id_key": "role_platform_steam", "label": "スチーム-Steam" },
-                { "role_id_key": "role_platform_PC", "label": "PC" },
                 { "role_id_key": "role_platform_smartphone", "label": "スマホ-Smartphone" },
                 { "role_id_key": "role_platform_switch", "label": "スイッチ-Switch" },
             ],
