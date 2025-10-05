@@ -281,7 +281,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_game_apex": {
-        "name": "エペApex Legends",
+        "name": "エペーApex Legends",
         "is_prefix": False,
         "priority": 0
     },
