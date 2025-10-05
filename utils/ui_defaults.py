@@ -488,8 +488,8 @@ UI_EMBEDS = {
         "color": 0x99AAB5
     },
     "panel_roles": {
-        "title": "📖 役職付与",
-        "description": "下のメニューからカテゴリを選択し、自分に必要な役職を受け取ってください。",
+        "title": "📖 ロール付与",
+        "description": "下のメニューからカテゴリを選択し、自分に必要なロールを受け取ってください。",
         "color": 0x5865F2
     },
     "panel_onboarding": {
