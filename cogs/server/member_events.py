@@ -144,7 +144,7 @@ class MemberEvents(commands.Cog):
                         try:
                             message_content = (
                                 f"🎉 {after.mention}さん、**{after.guild.name}**サーバーをブーストしてくださり、誠にありがとうございます！\n"
-                                "特典として**個人ボイスチャンネル**を作成できる`マイルームの鍵`役職が付与されました。"
+                                "特典として**個人ボイスチャンネル**を作成できる`マイルームの鍵`ロールが付与されました。"
                             )
                             await channel.send(message_content, allowed_mentions=discord.AllowedMentions(users=True))
                         except discord.Forbidden:
