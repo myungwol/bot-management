@@ -412,12 +412,12 @@ class ApprovalView(ui.View):
                 embed_data = await get_embed_from_db("embed_main_chat_welcome")
                 if not embed_data: return "メインチャット歓迎の埋め込みが見つかりません。"
                 
-                staff_role_id = get_id('role_staff_newbie_helper') or 1412052122949779517
-                nickname_channel_id = get_id('nickname_panel_channel_id') or 1412052293096050729
-                role_channel_id = get_id('auto_role_channel_id') or 1412052301115424799
-                inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1412052236736925737
-                bot_guide_channel_id = get_id('bot_guide_channel_id') or 1412052405477970040 
-                festival_channel_id = get_id('festival_channel_id') or 1412052244349845627
+                staff_role_id = get_id('role_staff_newbie_helper') or 1424609915921502209
+                nickname_channel_id = get_id('nickname_panel_channel_id') or 1423523844374925432
+                role_channel_id = get_id('auto_role_channel_id') or 1423523908992368710
+                inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1423523001499914240
+                bot_guide_channel_id = get_id('bot_guide_channel_id') or 1423527917362876457 
+                festival_channel_id = get_id('festival_channel_id') or 1423523493231984763
 
                 format_args = {
                     "member_mention": member.mention,
