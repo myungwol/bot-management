@@ -30,7 +30,7 @@ REMINDER_CONFIG = {
     'dissoku': {
         'bot_id': 761562078095867916,
         'cooltime': 7200, # 12시간
-        'keyword': "をアップしたよ!", # 투표 완료 키워드
+        'keyword': "𝗗𝗜𝘀𝗰𝗼𝗿𝗱 𝗩𝗶𝗹𝗹𝗮𝗴𝗲 [仮オープン] をアップしたよ!", # 투표 완료 키워드
         'command': "/up",
         'name': "ディス速 UP"
     }
