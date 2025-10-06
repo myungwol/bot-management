@@ -20,17 +20,17 @@ REMINDER_CONFIG = {
         'name': "Disboard BUMP"
     },
     'dicoall': {
-        'bot_id': 664647740877176832,
+        'bot_id': 903541413298450462,
         'cooltime': 3600,
-        'keyword': "サーバーが上部に表示されました",
+        'keyword': "サーバーが上位に表示されました。",
         'command': "/up",
         'name': "Dicoall UP"
     },
     # --- ▼▼▼ [추가] ディス速 알림 설정 추가 ▼▼▼ ---
     'dissoku': {
-        'bot_id': 808999236855136267,
+        'bot_id': 761562078095867916,
         'cooltime': 43200, # 12시간
-        'keyword': "投票が完了しました", # 투표 완료 키워드
+        'keyword': "をアップしたよ!", # 투표 완료 키워드
         'command': "/up",
         'name': "ディス速 VOTE"
     }
