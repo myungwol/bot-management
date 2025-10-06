@@ -1357,7 +1357,7 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "음성 채널 자동 생성 (광장)", "channel_type": "voice"
     },
     "channel_vc_creator_newbie": {
-        "type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_벤치",
+        "type": "channel", "cog_name": "VoiceMaster", "key": "vc_creator_channel_id_ベンチ",
         "friendly_name": "[음성 채널] 뉴비 전용 생성기", "channel_type": "voice"
     },
     "channel_vc_creator_vip": {
