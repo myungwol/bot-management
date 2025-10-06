@@ -842,7 +842,7 @@ UI_EMBEDS = {
             "inline": False
         }],
         "footer": {
-            "text": "毎日 00:05 KSTに更新されます。"
+            "text": "毎日 00:05 JSTに更新されます。" # KST -> JST
         }
     },
     "panel_mining": {
