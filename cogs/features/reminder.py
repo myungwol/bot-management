@@ -15,7 +15,7 @@ REMINDER_CONFIG = {
     'disboard': {
         'bot_id': 302050872383242240,
         'cooltime': 7200,
-        'keyword': "表示順をアップしたよ", # 일본어 Disboard 성공 키워드
+        'keyword': "表示順をアップしたよ",
         'command': "/bump",
         'name': "Disboard BUMP"
     },
@@ -26,15 +26,13 @@ REMINDER_CONFIG = {
         'command': "/up",
         'name': "Dicoall UP"
     },
-    # --- ▼▼▼ [추가] ディス速 알림 설정 추가 ▼▼▼ ---
     'dissoku': {
         'bot_id': 761562078095867916,
-        'cooltime': 7200, # 12시간
-        'keyword': "𝗗𝗜𝘀𝗰𝗼𝗿𝗱 𝗩𝗶𝗹𝗹𝗮𝗴𝗲 [仮オープン] をアップしたよ!", # 투표 완료 키워드
+        'cooltime': 7200,  # 12시간 = 43200초
+        'keyword': "をアップしたよ！", # 동적 키워드 문제를 해결하기 위해 고정된 부분만 사용
         'command': "/up",
         'name': "ディス速 UP"
     }
-    # --- ▲▲▲ [추가] ▲▲▲ ---
 }
 
 class Reminder(commands.Cog):
@@ -59,62 +57,49 @@ class Reminder(commands.Cog):
             'channel_id': get_id("dicoall_reminder_channel_id"),
             'role_id': get_id("dicoall_reminder_role_id")
         }
-        # --- ▼▼▼ [추가] ディス速 설정 로드 추가 ▼▼▼ ---
         self.configs['dissoku'] = {
             'channel_id': get_id("dissoku_reminder_channel_id"),
             'role_id': get_id("dissoku_reminder_role_id")
         }
-        # --- ▲▲▲ [추가] ▲▲▲ ---
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
-@commands.Cog.listener()
-async def on_message(self, message: discord.Message):
-    if not self.bot.is_ready() or message.guild is None or not message.embeds:
-        return
+    # ▼▼▼▼▼ 핵심 수정 부분 ▼▼▼▼▼
+    # on_message 함수를 Reminder 클래스 안으로 이동시키고, 들여쓰기와 중복 코드를 수정했습니다.
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if not self.bot.is_ready() or message.guild is None or not message.embeds:
+            return
 
-    embed = message.embeds[0]
-    
-    full_embed_text_parts = []
-    if embed.title:
-        full_embed_text_parts.append(embed.title)
-    if embed.description:
-        full_embed_text_parts.append(embed.description)
-    for field in embed.fields:
-        if field.name:
-            full_embed_text_parts.append(field.name)
-        if field.value:
-            full_embed_text_parts.append(field.value)
-    
-    full_embed_text = "\n".join(full_embed_text_parts)
-
-    # 디버깅을 위한 print 문 (문제가 해결되면 삭제하셔도 됩니다)
-    # print(f"--- [디버그] 메시지 발신자 ID: {message.author.id}")
-    # print(f"--- [디버그] 임베드 전체 텍스트:\n{full_embed_text}\n---")
-
-    for key, config in REMINDER_CONFIG.items():
-        # 'dissoku'의 경우, 문자열이 키워드로 끝나는지 확인하는 조건을 추가합니다.
-        is_dissoku_match = (key == 'dissoku' and any(line.strip().endswith(config['keyword']) for line in full_embed_text.split('\n')))
+        embed = message.embeds[0]
         
-        # ▼▼▼▼▼ 여기가 오류가 발생했던 부분입니다 ▼▼▼▼▼
-        if message.author.id == config['bot_id'] and (config['keyword'] in full_embed_text or is_dissoku_match):
-            # if 문 다음 줄은 반드시 들여쓰기가 되어야 합니다.
-            await self.schedule_new_reminder(key, message.guild)
-            logger.info(f"[{message.guild.name}] 서버에서 '{config['name']}' 키워드를 감지했습니다. 알림 예약을 시작합니다.")
-            break
-        # ▲▲▲▲▲ 수정 완료 ▲▲▲▲▲
+        full_embed_text_parts = []
+        if embed.title:
+            full_embed_text_parts.append(embed.title)
+        if embed.description:
+            full_embed_text_parts.append(embed.description)
+        for field in embed.fields:
+            if field.name:
+                full_embed_text_parts.append(field.name)
+            if field.value:
+                full_embed_text_parts.append(field.value)
+        
+        full_embed_text = "\n".join(full_embed_text_parts)
 
-    # ▼▼▼▼▼ 이 두 줄을 추가하세요 ▼▼▼▼▼
-        print(f"--- [디버그] 메시지 발신자 ID: {message.author.id}")
-        print(f"--- [디버그] 임베드 전체 텍스트:\n{full_embed_text}\n---")
-    # ▲▲▲▲▲ 여기까지 추가 ▲▲▲▲▲
+        # 디버깅용 print 문 (문제가 해결되면 이 두 줄을 삭제하거나 주석 처리하세요)
+        # print(f"--- [디버그] 메시지 발신자 ID: {message.author.id}")
+        # print(f"--- [디버그] 임베드 전체 텍스트:\n{full_embed_text}\n---")
 
         for key, config in REMINDER_CONFIG.items():
-                is_dissoku_match = (key == 'dissoku' and any(line.strip().endswith(config['keyword']) for line in full_embed_text.split('\n')))
-
-                if message.author.id == config['bot_id'] and (config['keyword'] in full_embed_text or is_dissoku_match):
+            # 'dissoku'의 경우, 문자열이 키워드로 끝나는지 확인하는 조건을 추가합니다.
+            is_dissoku_match = (key == 'dissoku' and any(line.strip().endswith(config['keyword']) for line in full_embed_text.split('\n')))
+            
+            # bot ID가 일치하고, (일반 키워드가 포함되어 있거나 || dissoku 매치가 참일 경우)
+            if message.author.id == config['bot_id'] and (config['keyword'] in full_embed_text or is_dissoku_match):
+                # if 문 다음 줄은 반드시 들여쓰기가 되어야 합니다.
                 await self.schedule_new_reminder(key, message.guild)
                 logger.info(f"[{message.guild.name}] 서버에서 '{config['name']}' 키워드를 감지했습니다. 알림 예약을 시작합니다.")
-                break
+                break # 일치하는 것을 찾았으므로 더 이상 순회할 필요가 없습니다.
+    # ▲▲▲▲▲ 수정 완료 ▲▲▲▲▲
                 
     async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
         if not self.configs.get(reminder_type) or not self.configs[reminder_type].get('channel_id') or not self.configs[reminder_type].get('role_id'):
@@ -158,9 +143,7 @@ async def on_message(self, message: discord.Message):
                     continue
 
                 try:
-                    # --- ▼▼▼ [수정] 사용자 알림 메시지 일본어 번역 ▼▼▼ ---
                     message = f"⏰ {role.mention} {config['name']} の時間です！ `{config['command']}` を入力してください！"
-                    # --- ▲▲▲ [수정] ▲▲▲ ---
                     await channel.send(message, allowed_mentions=discord.AllowedMentions(roles=True))
                     logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']})")
                 except discord.Forbidden:
