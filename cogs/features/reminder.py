@@ -68,6 +68,29 @@ class Reminder(commands.Cog):
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
 
+        # dissoku 봇의 메시지만 따로 집중적으로 확인하기 위한 디버깅 코드
+        if message.author.id == 761562078095867916:
+            embed = message.embeds[0]
+            
+            full_embed_text_parts = []
+            if embed.title:
+                full_embed_text_parts.append(embed.title)
+            if embed.description:
+                full_embed_text_parts.append(embed.description)
+            for field in embed.fields:
+                if field.name:
+                    full_embed_text_parts.append(field.name)
+                if field.value:
+                    full_embed_text_parts.append(field.value)
+            
+            full_embed_text = "\n".join(full_embed_text_parts)
+            
+            # repr() 함수는 눈에 보이지 않는 특수 문자까지 모두 출력해줍니다.
+            print("--- [dissoku 봇 실제 임베드 데이터] ---")
+            print(repr(full_embed_text))
+            print("---------------------------------------")
+
+        # --- 기존 알림 처리 로직 (수정 없음) ---
         embed = message.embeds[0]
         
         full_embed_text_parts = []
