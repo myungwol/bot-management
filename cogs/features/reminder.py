@@ -71,7 +71,7 @@ class Reminder(commands.Cog):
     async def on_message(self, message: discord.Message):
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
-
+    
         embed = message.embeds[0]
         
         full_embed_text_parts = []
@@ -86,26 +86,22 @@ class Reminder(commands.Cog):
                 full_embed_text_parts.append(field.value)
         
         full_embed_text = "\n".join(full_embed_text_parts)
-        
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if not self.bot.is_ready() or message.guild is None or not message.embeds:
-            return
-
-        embed = message.embeds[0]
     
-        full_embed_text_parts = []
-        if embed.title:
-            full_embed_text_parts.append(embed.title)
-        if embed.description:
-            full_embed_text_parts.append(embed.description)
-        for field in embed.fields:
-            if field.name:
-                full_embed_text_parts.append(field.name)
-            if field.value:
-                full_embed_text_parts.append(field.value)
+        # 디버깅을 위한 print 문 (문제가 해결되면 삭제하셔도 됩니다)
+        # print(f"--- [디버그] 메시지 발신자 ID: {message.author.id}")
+        # print(f"--- [디버그] 임베드 전체 텍스트:\n{full_embed_text}\n---")
     
-        full_embed_text = "\n".join(full_embed_text_parts)
+        for key, config in REMINDER_CONFIG.items():
+            # 'dissoku'의 경우, 문자열이 키워드로 끝나는지 확인하는 조건을 추가합니다.
+            is_dissoku_match = (key == 'dissoku' and any(line.strip().endswith(config['keyword']) for line in full_embed_text.split('\n')))
+            
+            # ▼▼▼▼▼ 여기가 오류가 발생했던 부분입니다 ▼▼▼▼▼
+            if message.author.id == config['bot_id'] and (config['keyword'] in full_embed_text or is_dissoku_match):
+                # if 문 다음 줄은 반드시 들여쓰기가 되어야 합니다.
+                await self.schedule_new_reminder(key, message.guild)
+                logger.info(f"[{message.guild.name}] 서버에서 '{config['name']}' 키워드를 감지했습니다. 알림 예약을 시작합니다.")
+                break
+            # ▲▲▲▲▲ 수정 완료 ▲▲▲▲▲
 
     # ▼▼▼▼▼ 이 두 줄을 추가하세요 ▼▼▼▼▼
         print(f"--- [디버그] 메시지 발신자 ID: {message.author.id}")
