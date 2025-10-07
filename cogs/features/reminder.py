@@ -29,7 +29,7 @@ REMINDER_CONFIG = {
     'dissoku': {
         'bot_id': 761562078095867916,
         'cooltime': 7200,  # 12시간 = 43200초
-        'keyword': "をアップしたよ！", # 동적 키워드 문제를 해결하기 위해 고정된 부분만 사용
+        'keyword': "command: /up", # 동적 키워드 문제를 해결하기 위해 고정된 부분만 사용
         'command': "/up",
         'name': "ディス速 UP"
     }
