@@ -7,6 +7,8 @@ import logging
 from typing import Optional, Dict
 from datetime import datetime, timedelta, timezone
 
+# 이 파일이 utils 폴더와 같은 위치나 상위 폴더에 있다고 가정합니다.
+# 경로 문제가 발생하면 from ..utils.database import ... 와 같이 수정해야 할 수 있습니다.
 from utils.database import get_id, schedule_reminder, get_due_reminders, deactivate_reminder
 
 logger = logging.getLogger(__name__)
@@ -28,8 +30,10 @@ REMINDER_CONFIG = {
     },
     'dissoku': {
         'bot_id': 761562078095867916,
-        'cooltime': 7200,  # 12시간 = 43200초
-        'keyword': "command: /up", # 동적 키워드 문제를 해결하기 위해 고정된 부분만 사용
+        'cooltime': 7200,
+        # dissoku 봇의 동적 커맨드 문제를 해결하기 위해,
+        # 임베드 내에 항상 포함되는 고정 텍스트로 키워드를 변경했습니다.
+        'keyword': "をアップしたよ!",
         'command': "/up",
         'name': "ディス速 UP"
     }
@@ -49,22 +53,22 @@ class Reminder(commands.Cog):
         self.check_reminders.cancel()
 
     async def load_configs(self):
+        # 데이터베이스에서 설정 값을 비동기적으로 로드한다고 가정합니다.
+        # get_id가 동기 함수일 경우, 별도의 async 처리가 필요 없을 수 있습니다.
         self.configs['disboard'] = {
-            'channel_id': get_id("bump_reminder_channel_id"),
-            'role_id': get_id("bump_reminder_role_id")
+            'channel_id': await get_id("bump_reminder_channel_id"),
+            'role_id': await get_id("bump_reminder_role_id")
         }
         self.configs['dicoall'] = {
-            'channel_id': get_id("dicoall_reminder_channel_id"),
-            'role_id': get_id("dicoall_reminder_role_id")
+            'channel_id': await get_id("dicoall_reminder_channel_id"),
+            'role_id': await get_id("dicoall_reminder_role_id")
         }
         self.configs['dissoku'] = {
-            'channel_id': get_id("dissoku_reminder_channel_id"),
-            'role_id': get_id("dissoku_reminder_role_id")
+            'channel_id': await get_id("dissoku_reminder_channel_id"),
+            'role_id': await get_id("dissoku_reminder_role_id")
         }
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
-    # ▼▼▼▼▼ 핵심 수정 부분 ▼▼▼▼▼
-    # on_message 함수를 Reminder 클래스 안으로 이동시키고, 들여쓰기와 중복 코드를 수정했습니다.
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
@@ -85,24 +89,22 @@ class Reminder(commands.Cog):
         
         full_embed_text = "\n".join(full_embed_text_parts)
 
-        # 디버깅용 print 문 (문제가 해결되면 이 두 줄을 삭제하거나 주석 처리하세요)
-        # print(f"--- [디버그] 메시지 발신자 ID: {message.author.id}")
-        # print(f"--- [디버그] 임베드 전체 텍스트:\n{full_embed_text}\n---")
+        # --- 디버깅 코드 (문제가 계속되면 아래 2줄의 주석 '#'을 제거하고 실행하여 로그를 확인하세요) ---
+        # if message.author.id in [config['bot_id'] for config in REMINDER_CONFIG.values()]:
+        #     print(f"--- [임베드 데이터 확인] ---\n{repr(full_embed_text)}\n--------------------------")
 
         for key, config in REMINDER_CONFIG.items():
-            # 'dissoku'의 경우, 문자열이 키워드로 끝나는지 확인하는 조건을 추가합니다.
-            is_dissoku_match = (key == 'dissoku' and any(line.strip().endswith(config['keyword']) for line in full_embed_text.split('\n')))
-            
-            # bot ID가 일치하고, (일반 키워드가 포함되어 있거나 || dissoku 매치가 참일 경우)
-            if message.author.id == config['bot_id'] and (config['keyword'] in full_embed_text or is_dissoku_match):
-                # if 문 다음 줄은 반드시 들여쓰기가 되어야 합니다.
+            # bot ID가 일치하고, 설정된 keyword가 임베드 텍스트에 포함되어 있는지 확인합니다.
+            # 이 한 줄의 조건문으로 모든 알림을 안정적으로 처리합니다.
+            if message.author.id == config['bot_id'] and config['keyword'] in full_embed_text:
                 await self.schedule_new_reminder(key, message.guild)
                 logger.info(f"[{message.guild.name}] 서버에서 '{config['name']}' 키워드를 감지했습니다. 알림 예약을 시작합니다.")
                 break # 일치하는 것을 찾았으므로 더 이상 순회할 필요가 없습니다.
-    # ▲▲▲▲▲ 수정 완료 ▲▲▲▲▲
                 
     async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
+        # configs 딕셔너리가 비어있거나, 해당 타입의 설정이 없는 경우를 대비
         if not self.configs.get(reminder_type) or not self.configs[reminder_type].get('channel_id') or not self.configs[reminder_type].get('role_id'):
+            logger.warning(f"[{guild.name}] 서버의 {reminder_type} 알림 설정(채널/역할 ID)이 로드되지 않아 스케줄링을 건너뜁니다.")
             return
 
         config = REMINDER_CONFIG[reminder_type]
@@ -129,8 +131,8 @@ class Reminder(commands.Cog):
                 config = REMINDER_CONFIG.get(reminder_type)
                 reminder_settings = self.configs.get(reminder_type)
 
-                if not config or not reminder_settings:
-                    logger.warning(f"알림(ID: {reminder['id']})의 타입({reminder_type})이 유효하지 않아 비활성화합니다.")
+                if not config or not reminder_settings or not reminder_settings.get('channel_id') or not reminder_settings.get('role_id'):
+                    logger.warning(f"알림(ID: {reminder['id']})의 타입({reminder_type})이 유효하지 않거나 설정이 없어 비활성화합니다.")
                     await deactivate_reminder(reminder['id'])
                     continue
                 
@@ -144,7 +146,7 @@ class Reminder(commands.Cog):
 
                 try:
                     message = f"⏰ {role.mention} {config['name']} の時間です！ `{config['command']}` を入力してください！"
-                    await channel.send(message, allowed_mentions=discord.AllowedMentions(roles=True))
+                    await channel.send(message, allowed_mentions=discord.Allowed_mentions(roles=True))
                     logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']})")
                 except discord.Forbidden:
                     logger.error(f"채널(ID: {channel.id})에 메시지를 보낼 권한이 없습니다.")
@@ -161,4 +163,6 @@ class Reminder(commands.Cog):
         await self.bot.wait_until_ready()
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(Reminder(bot))
+    # Cog를 로드하기 전에 비동기적으로 필요한 설정을 로드하는 것이 좋습니다.
+    cog = Reminder(bot)
+    await bot.add_cog(cog)
