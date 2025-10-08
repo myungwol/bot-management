@@ -1,4 +1,4 @@
-# cogs/features/reminder.py
+# cogs/features/reminder.py (최종 수정본)
 
 import discord
 from discord.ext import commands, tasks
@@ -48,7 +48,6 @@ class Reminder(commands.Cog):
         self.check_reminders.cancel()
 
     async def load_configs(self):
-        # get_id 함수는 동기 함수이므로 await를 사용하지 않습니다.
         self.configs['disboard'] = {
             'channel_id': get_id("bump_reminder_channel_id"),
             'role_id': get_id("bump_reminder_role_id")
@@ -64,51 +63,50 @@ class Reminder(commands.Cog):
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
     @commands.Cog.listener()
-    async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        # 수정된 '이후(after)' 메시지를 기준으로 on_message와 동일한 로직을 실행합니다.
-        
-        if not self.bot.is_ready() or after.guild is None or not after.embeds:
+    async def on_message(self, message: discord.Message):
+        if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
 
-        # 봇이 보낸 메시지가 아니라면 무시
-        if not after.author.bot:
-            return
-
-        embed = after.embeds[0]
-        
-        full_embed_text_parts = []
-        if embed.title:
-            full_embed_text_parts.append(embed.title)
-        if embed.description:
-            full_embed_text_parts.append(embed.description)
-        for field in embed.fields:
-            if field.name:
-                full_embed_text_parts.append(field.name)
-            if field.value:
-                full_embed_text_parts.append(field.value)
-        
-        full_embed_text = "\n".join(full_embed_text_parts)
+        embed = message.embeds[0]
+        full_embed_text = self.get_full_embed_text(embed)
 
         for key, config in REMINDER_CONFIG.items():
-            # 이미 처리된 알림이 중복 예약되는 것을 방지하기 위해,
-            # 수정 전(before) 메시지에는 키워드가 없고, 수정 후(after) 메시지에만 키워드가 있을 때 실행합니다.
-            
-            # 수정 전 텍스트 조합 (수정 전 메시지에 임베드가 없을 수 있으므로 예외 처리)
-            before_embed_text = ""
-            if before.embeds:
-                before_embed = before.embeds[0]
-                before_embed_text_parts = []
-                if before_embed.title: before_embed_text_parts.append(before_embed.title)
-                if before_embed.description: before_embed_text_parts.append(before_embed.description)
-                for field in before_embed.fields:
-                    if field.name: before_embed_text_parts.append(field.name)
-                    if field.value: before_embed_text_parts.append(field.value)
-                before_embed_text = "\n".join(before_embed_text_parts)
+            if message.author.id == config['bot_id'] and config['keyword'] in full_embed_text:
+                await self.schedule_new_reminder(key, message.guild)
+                logger.info(f"[{message.guild.name}] 서버에서 '{config['name']}' 키워드를 (새 메시지에서) 감지했습니다. 알림 예약을 시작합니다.")
+                break
+    
+    # ▼▼▼▼▼ Dissoku 문제를 해결하기 위한 '메시지 수정' 감지 리스너 ▼▼▼▼▼
+    @commands.Cog.listener()
+    async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        if not self.bot.is_ready() or after.guild is None or not after.embeds or not after.author.bot:
+            return
 
-            if after.author.id == config['bot_id'] and config['keyword'] in full_embed_text and config['keyword'] not in before_embed_text:
+        after_embed = after.embeds[0]
+        after_embed_text = self.get_full_embed_text(after_embed)
+
+        # 수정 전 메시지의 텍스트도 확인하여 중복 실행 방지
+        before_embed_text = ""
+        if before.embeds:
+            before_embed_text = self.get_full_embed_text(before.embeds[0])
+
+        for key, config in REMINDER_CONFIG.items():
+            # 수정 후 키워드가 있고, 수정 전에는 키워드가 없었을 때만 실행
+            if after.author.id == config['bot_id'] and config['keyword'] in after_embed_text and config['keyword'] not in before_embed_text:
                 await self.schedule_new_reminder(key, after.guild)
                 logger.info(f"[{after.guild.name}] 서버에서 '{config['name']}' 키워드를 (메시지 수정을 통해) 감지했습니다. 알림 예약을 시작합니다.")
                 break
+    # ▲▲▲▲▲ 코드 추가 완료 ▲▲▲▲▲
+
+    def get_full_embed_text(self, embed: discord.Embed) -> str:
+        """임베드에서 모든 텍스트를 추출하여 하나의 문자열로 합칩니다."""
+        parts = []
+        if embed.title: parts.append(embed.title)
+        if embed.description: parts.append(embed.description)
+        for field in embed.fields:
+            if field.name: parts.append(field.name)
+            if field.value: parts.append(field.value)
+        return "\n".join(parts)
                 
     async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
         if not self.configs.get(reminder_type) or not self.configs[reminder_type].get('channel_id') or not self.configs[reminder_type].get('role_id'):
