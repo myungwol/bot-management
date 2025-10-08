@@ -63,29 +63,18 @@ class Reminder(commands.Cog):
         }
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
-# cogs/features/reminder.py 파일의 on_message 함수를 이 코드로 완전히 교체하세요.
-
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        # --- [진단용 디버깅 코드] ---
-        # 봇이 임베드 메시지를 받으면, 어떤 봇이 보냈는지 ID를 포함한 모든 정보를 출력합니다.
-        if message.embeds:
-            print("\n--- [임베드 메시지 감지됨] ---")
-            print(f" > 채널: #{message.channel.name}")
-            print(f" > 작성자 이름: {message.author.name}")
-            print(f" > 작성자 ID: {message.author.id}")
-            print(f" > 봇 여부: {message.author.bot}")
-            # 메시지가 웹훅을 통해 전송되었는지 확인합니다.
-            if message.webhook_id:
-                print(f" > 웹훅 ID: {message.webhook_id}")
-            print("--------------------------------\n")
-        # --- [진단 끝] ---
-
-        # 기존 알림 기능 시작
-        if not self.bot.is_ready() or message.guild is None or not message.embeds:
+    async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        # 수정된 '이후(after)' 메시지를 기준으로 on_message와 동일한 로직을 실행합니다.
+        
+        if not self.bot.is_ready() or after.guild is None or not after.embeds:
             return
 
-        embed = message.embeds[0]
+        # 봇이 보낸 메시지가 아니라면 무시
+        if not after.author.bot:
+            return
+
+        embed = after.embeds[0]
         
         full_embed_text_parts = []
         if embed.title:
@@ -101,9 +90,24 @@ class Reminder(commands.Cog):
         full_embed_text = "\n".join(full_embed_text_parts)
 
         for key, config in REMINDER_CONFIG.items():
-            if message.author.id == config['bot_id'] and config['keyword'] in full_embed_text:
-                await self.schedule_new_reminder(key, message.guild)
-                logger.info(f"[{message.guild.name}] 서버에서 '{config['name']}' 키워드를 감지했습니다. 알림 예약을 시작합니다.")
+            # 이미 처리된 알림이 중복 예약되는 것을 방지하기 위해,
+            # 수정 전(before) 메시지에는 키워드가 없고, 수정 후(after) 메시지에만 키워드가 있을 때 실행합니다.
+            
+            # 수정 전 텍스트 조합 (수정 전 메시지에 임베드가 없을 수 있으므로 예외 처리)
+            before_embed_text = ""
+            if before.embeds:
+                before_embed = before.embeds[0]
+                before_embed_text_parts = []
+                if before_embed.title: before_embed_text_parts.append(before_embed.title)
+                if before_embed.description: before_embed_text_parts.append(before_embed.description)
+                for field in before_embed.fields:
+                    if field.name: before_embed_text_parts.append(field.name)
+                    if field.value: before_embed_text_parts.append(field.value)
+                before_embed_text = "\n".join(before_embed_text_parts)
+
+            if after.author.id == config['bot_id'] and config['keyword'] in full_embed_text and config['keyword'] not in before_embed_text:
+                await self.schedule_new_reminder(key, after.guild)
+                logger.info(f"[{after.guild.name}] 서버에서 '{config['name']}' 키워드를 (메시지 수정을 통해) 감지했습니다. 알림 예약을 시작합니다.")
                 break
                 
     async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
