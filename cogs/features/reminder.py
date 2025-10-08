@@ -63,34 +63,28 @@ class Reminder(commands.Cog):
         }
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
+# cogs/features/reminder.py 파일의 on_message 함수를 이 코드로 완전히 교체하세요.
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        # --- [진단용 디버깅 코드] ---
+        # 봇이 임베드 메시지를 받으면, 어떤 봇이 보냈는지 ID를 포함한 모든 정보를 출력합니다.
+        if message.embeds:
+            print("\n--- [임베드 메시지 감지됨] ---")
+            print(f" > 채널: #{message.channel.name}")
+            print(f" > 작성자 이름: {message.author.name}")
+            print(f" > 작성자 ID: {message.author.id}")
+            print(f" > 봇 여부: {message.author.bot}")
+            # 메시지가 웹훅을 통해 전송되었는지 확인합니다.
+            if message.webhook_id:
+                print(f" > 웹훅 ID: {message.webhook_id}")
+            print("--------------------------------\n")
+        # --- [진단 끝] ---
+
+        # 기존 알림 기능 시작
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
 
-        # dissoku 봇의 메시지만 따로 집중적으로 확인하기 위한 디버깅 코드
-        if message.author.id == 761562078095867916:
-            embed = message.embeds[0]
-            
-            full_embed_text_parts = []
-            if embed.title:
-                full_embed_text_parts.append(embed.title)
-            if embed.description:
-                full_embed_text_parts.append(embed.description)
-            for field in embed.fields:
-                if field.name:
-                    full_embed_text_parts.append(field.name)
-                if field.value:
-                    full_embed_text_parts.append(field.value)
-            
-            full_embed_text = "\n".join(full_embed_text_parts)
-            
-            # repr() 함수는 눈에 보이지 않는 특수 문자까지 모두 출력해줍니다.
-            print("--- [dissoku 봇 실제 임베드 데이터] ---")
-            print(repr(full_embed_text))
-            print("---------------------------------------")
-
-        # --- 기존 알림 처리 로직 (수정 없음) ---
         embed = message.embeds[0]
         
         full_embed_text_parts = []
