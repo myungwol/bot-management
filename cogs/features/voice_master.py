@@ -431,29 +431,16 @@ class VoiceMaster(commands.Cog):
         )
 
     def _get_permission_overwrites(self, guild: discord.Guild, owner: discord.Member, channel_type: str) -> Dict:
-        overwrites = {owner: discord.PermissionOverwrite(connect=True)}
+        # 채널 생성자에게만 '연결' 권한을 명시적으로 부여합니다.
+        # 이는 카테고리 권한과 상관없이 생성자가 항상 자기 채널에 들어갈 수 있게 보장하는 역할입니다.
+        overwrites = {
+            owner: discord.PermissionOverwrite(connect=True)
+        }
         
-        if channel_type == 'my_room':
-            overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
-            
-            if self.master_role_id and (master_role := guild.get_role(self.master_role_id)):
-                overwrites[master_role] = discord.PermissionOverwrite(connect=True)
-            if self.vice_master_role_id and (vice_master_role := guild.get_role(self.vice_master_role_id)):
-                overwrites[vice_master_role] = discord.PermissionOverwrite(connect=True)
-        
-        elif channel_type == 'bench':
-            overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=False)
-            if (role_id := get_id("role_resident_rookie")) and (role := guild.get_role(role_id)):
-                 overwrites[role] = discord.PermissionOverwrite(connect=True)
-            
-            if (role_id := self.helper_role_id) and (role := guild.get_role(role_id)):
-                overwrites[role] = discord.PermissionOverwrite(connect=True)
-
-            for admin_role_id in self.admin_role_ids:
-                if admin_role := guild.get_role(admin_role_id):
-                    overwrites[admin_role] = discord.PermissionOverwrite(connect=True)
-        else:
-            overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=True, connect=True)
+        # @everyone(guild.default_role)을 포함한 다른 모든 역할에 대한 권한 설정을 여기서 의도적으로 비워둡니다.
+        # 특정 역할에 대한 권한 덮어쓰기를 지정하지 않으면,
+        # 해당 역할은 상위 카테고리의 권한을 그대로 상속받습니다.
+        # 이것이 바로 디스코드 UI에서 슬래시('/')로 표시되는 '기본값' 또는 '상속' 상태입니다.
         return overwrites
 
     async def _send_control_panel(self, vc: discord.VoiceChannel, owner: discord.Member, channel_type: str) -> discord.Message:
