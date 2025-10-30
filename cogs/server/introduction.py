@@ -22,9 +22,8 @@ class RejectionReasonModal(ui.Modal, title="拒否事由入力"):
     reason = ui.TextInput(label="拒否事由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
-# [수정] Modal title 변경
 class IntroductionModal(ui.Modal, title="自己紹介"):
-    name = ui.TextInput(label="名前", placeholder="サーバーで使用する名前を記入してください", required=True, max_length=12)
+    name = ui.TextInput(label="名前", placeholder="サーバーで使用する名前を記入してください", required=True, max_length=32) # Discord 최대치인 32로 완화
     hobby = ui.TextInput(label="趣味/好きなこと", placeholder="趣味や好きなことを自由にお書きください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経緯", placeholder="例: Disboard, ○○からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     
@@ -33,64 +32,12 @@ class IntroductionModal(ui.Modal, title="自己紹介"):
         self.introduction_cog = cog_instance
         self.gender = gender
         self.public_birth_year_display = birth_year
-        
-        self.private_birth_year_input: Optional[ui.TextInput] = None
-        if self.public_birth_year_display == "非公開":
-            self.private_birth_year_input = ui.TextInput(
-                label="出生年（管理者確認用）",
-                placeholder="YYYY形式で入力してください。非公開として扱われます。",
-                required=True, min_length=4, max_length=4
-            )
-            self.add_item(self.private_birth_year_input)
     
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            name_to_check = self.name.value
-            pattern_str = r"^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+$"
-            
-            nicknames_cog = self.introduction_cog.bot.get_cog("Nicknames")
-            if not nicknames_cog:
-                 logger.error("Nicknames Cogを読み込めず、名前の長さ検証をスキップします。")
-            else:
-                max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
-                if not re.match(pattern_str, name_to_check):
-                    await interaction.followup.send("❌ エラー: 名前に絵文字、特殊文字、空白は使用できません。", ephemeral=True)
-                    return
-                
-                if (length := nicknames_cog.calculate_weighted_length(name_to_check)) > max_length:
-                    await interaction.followup.send(f"❌ エラー: 名前の長さがルールを超過しました。(現在: **{length}/{max_length}**)", ephemeral=True)
-                    return
-
             actual_birth_year_for_validation = self.public_birth_year_display
             birth_year_for_approval_channel = self.public_birth_year_display
-
-            if self.private_birth_year_input:
-                private_year_str = self.private_birth_year_input.value
-                try:
-                    year = int(private_year_str)
-                    current_year = datetime.now(timezone.utc).year
-                    if not (1940 <= year <= current_year - 18):
-                        await interaction.followup.send("❌ 無効な出生年です。満18歳以上の方のみ参加できます。", ephemeral=True)
-                        return
-                    actual_birth_year_for_validation = str(year)
-                except ValueError:
-                    await interaction.followup.send("❌ 出生年は数字で入力してください（例: 2001）。", ephemeral=True)
-                    return
-                
-                private_log_channel = self.introduction_cog.private_age_log_channel
-                if private_log_channel:
-                    log_embed = discord.Embed(
-                        title="📝 非公開年齢提出記録",
-                        description=f"{interaction.user.mention}さんが非公開オプションを選択し、実際の出生年を提出しました。",
-                        color=discord.Color.blurple()
-                    )
-                    log_embed.add_field(name="提出者", value=f"{interaction.user.mention} (`{interaction.user.id}`)")
-                    log_embed.add_field(name="提出された年", value=f"`{actual_birth_year_for_validation}`年")
-                    log_embed.set_footer(text="この情報は年齢制限の確認目的でのみ使用されます。")
-                    await private_log_channel.send(embed=log_embed)
-                
-                birth_year_for_approval_channel = "非公開"
 
             approval_channel = self.introduction_cog.approval_channel
             if not approval_channel: await interaction.followup.send("❌ エラー: 承認チャンネルが見つかりません。", ephemeral=True); return
@@ -115,7 +62,6 @@ class IntroductionModal(ui.Modal, title="自己紹介"):
             approval_role_id = self.introduction_cog.approval_role_id
             content = f"<@&{approval_role_id}> 新しい自己紹介申請があります。" if approval_role_id else "新しい自己紹介申請があります。"
             await approval_channel.send(content=content, embed=embed, view=view, allowed_mentions=discord.AllowedMentions(roles=True))
-            # [수정] 완료 메시지 변경
             await interaction.followup.send("✅ 自己紹介を担当者に提出しました。", ephemeral=True)
         except Exception as e: 
             logger.error(f"自己紹介提出中にエラー発生: {e}", exc_info=True)
@@ -314,7 +260,6 @@ class ApprovalView(ui.View):
             roles_to_add: List[discord.Role] = []
             failed_to_find_roles: List[str] = []
             
-            # [수정] 기본 역할만 부여하도록 목록을 단순화합니다.
             role_keys_to_grant = [
                 "role_resident", 
                 "role_resident_rookie", 
@@ -327,16 +272,12 @@ class ApprovalView(ui.View):
                 else:
                     failed_to_find_roles.append(key)
 
-            # [수정] 나이 제한 검사를 18세로 상향 조정합니다.
             age_limit = 18
             if self.actual_birth_year.isdigit():
                 birth_year = int(self.actual_birth_year)
                 current_year = datetime.now(timezone.utc).year
                 if (current_year - birth_year) < age_limit:
                     return f"年齢制限: ユーザーが満{age_limit}歳未満です。(出生年: {birth_year})"
-            
-            # [삭제] 성별 역할 부여 로직을 제거합니다.
-            # [삭제] 나이대 역할 부여 로직을 제거합니다.
             
             if roles_to_add:
                 await member.add_roles(*list(set(roles_to_add)), reason="自己紹介承認")
@@ -367,7 +308,7 @@ class ApprovalView(ui.View):
             ch_id = self.introduction_cog.introduction_log_channel_id
             if ch_id and (ch := member.guild.get_channel(ch_id)):
                 embed = discord.Embed(title="📝 自己紹介", color=discord.Color.green())
-                embed.add_field(name="住民", value=member.mention, inline=False)
+                embed.add_field(name="メンバー", value=member.mention, inline=False)
                 
                 for field in self.original_embed.fields: 
                     embed.add_field(name=field.name, value=field.value, inline=False)
@@ -431,9 +372,8 @@ class ApprovalView(ui.View):
         try:
             ch_id = self.introduction_cog.rejection_log_channel_id
             if ch_id and (ch := member.guild.get_channel(ch_id)):
-                # [수정] Embed title 변경
                 embed = discord.Embed(title="❌ 自己紹介が拒否されました", color=discord.Color.red())
-                embed.add_field(name="対象者", value=member.mention, inline=False) # '여행자' -> '対象者'
+                embed.add_field(name="対象者", value=member.mention, inline=False)
                 for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
                 embed.add_field(name="拒否事由", value=reason, inline=False); embed.add_field(name="担当者", value=moderator.mention, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
@@ -452,7 +392,7 @@ class IntroductionPanelView(ui.View):
         self.clear_items()
         components = await get_panel_components_from_db('introduction')
         if not components:
-            logger.warning("住民登録パネルのコンポーネントが見つかりませんでした。")
+            logger.warning("自己紹介パネルのコンポーネントが見つかりませんでした。")
             return
 
         button_info = components[0]
@@ -481,7 +421,6 @@ class Introduction(commands.Cog):
         self.private_age_log_channel_id: Optional[int] = None
         self.view_instance = None
         self._user_locks: Dict[int, asyncio.Lock] = {}
-        # [수정] Cog 초기화 로그 메시지 변경
         logger.info("Introduction (自己紹介) Cogが正常に初期化されました。")
         
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
