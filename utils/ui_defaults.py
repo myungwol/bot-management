@@ -843,7 +843,8 @@ UI_PANEL_COMPONENTS = [
         "component_key": "start_introduction",
         "panel_key": "introduction",
         "component_type": "button",
-        "label": "住民登録証を作成する",
+        # [수정] '주민 등록증' -> '자기소개'
+        "label": "自己紹介を作成する",
         "style": "success",
         "emoji": "📝",
         "row": 0,
