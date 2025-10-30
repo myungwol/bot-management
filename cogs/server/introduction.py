@@ -71,8 +71,9 @@ class IntroductionModal(ui.Modal, title="住民登録証"):
                 try:
                     year = int(private_year_str)
                     current_year = datetime.now(timezone.utc).year
-                    if not (1940 <= year <= current_year - 16):
-                        await interaction.followup.send("❌ 無効な出生年です。満16歳以上の方のみ参加できます。", ephemeral=True)
+                    # [수정] 나이 제한을 18세로 변경하고, 관련 에러 메시지를 수정합니다.
+                    if not (1940 <= year <= current_year - 18):
+                        await interaction.followup.send("❌ 無効な出生年です。満18歳以上の方のみ参加できます。", ephemeral=True)
                         return
                     actual_birth_year_for_validation = str(year)
                 except ValueError:
@@ -310,46 +311,47 @@ class ApprovalView(ui.View):
 
     async def _grant_roles(self, member: discord.Member) -> Optional[str]:
         try:
-            guild = member.guild; roles_to_add: List[discord.Role] = []; failed_to_find_roles: List[str] = []
+            guild = member.guild
+            roles_to_add: List[discord.Role] = []
+            failed_to_find_roles: List[str] = []
             
-            role_keys_to_grant = ["role_resident", "role_resident_rookie", "role_warning_separator", "role_shop_separator"]
+            # [수정] 기본 역할만 부여하도록 목록을 단순화합니다.
+            role_keys_to_grant = [
+                "role_resident", 
+                "role_resident_rookie", 
+                "role_warning_separator",
+                "role_shop_separator"
+            ]
             for key in role_keys_to_grant:
-                if (rid := get_id(key)) and (r := guild.get_role(rid)): roles_to_add.append(r)
-                else: failed_to_find_roles.append(key)
-            
-            gender_field = self._get_field_value(self.original_embed, "性別")
-            if gender_field == "男性":
-                if (rid := get_id("role_info_male")) and (r := guild.get_role(rid)): roles_to_add.append(r)
-            elif gender_field == "女性":
-                if (rid := get_id("role_info_female")) and (r := guild.get_role(rid)): roles_to_add.append(r)
+                if (rid := get_id(key)) and (r := guild.get_role(rid)):
+                    roles_to_add.append(r)
+                else:
+                    failed_to_find_roles.append(key)
 
-            age_role_mapping = get_config("AGE_ROLE_MAPPING", [])
-            public_birth_year_display = self._get_field_value(self.original_embed, "出生年")
-            
-            if public_birth_year_display == "非公開":
-                if (rid := get_id("role_info_age_private")) and (r := guild.get_role(rid)): roles_to_add.append(r)
-                else: failed_to_find_roles.append("role_info_age_private")
-            
-            elif self.actual_birth_year.isdigit():
+            # [수정] 나이 제한 검사를 18세로 상향 조정합니다.
+            age_limit = 18
+            if self.actual_birth_year.isdigit():
                 birth_year = int(self.actual_birth_year)
-                age_limit = 16
                 current_year = datetime.now(timezone.utc).year
                 if (current_year - birth_year) < age_limit:
                     return f"年齢制限: ユーザーが満{age_limit}歳未満です。(出生年: {birth_year})"
-
-                for mapping in age_role_mapping:
-                    if mapping["range"][0] <= birth_year < mapping["range"][1]:
-                        if (rid := get_id(mapping["key"])) and (r := guild.get_role(rid)): roles_to_add.append(r)
-                        else: failed_to_find_roles.append(mapping["key"])
-                        break
             
-            if roles_to_add: await member.add_roles(*list(set(roles_to_add)), reason="自己紹介承認")
-            if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles: await member.remove_roles(r, reason="自己紹介承認完了")
+            # [삭제] 성별 역할 부여 로직을 제거합니다.
+            # [삭제] 나이대 역할 부여 로직을 제거합니다.
             
-            if failed_to_find_roles: return f"役職が見つかりません: `{', '.join(failed_to_find_roles)}`。`/admin setup`コマンドで役職を同期してください。"
-        except discord.Forbidden: return "ボットの権限不足: 役職を付与/削除する権限がありません。"
+            if roles_to_add:
+                await member.add_roles(*list(set(roles_to_add)), reason="自己紹介承認")
+            
+            if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles:
+                await member.remove_roles(r, reason="自己紹介承認完了")
+            
+            if failed_to_find_roles: 
+                return f"役職が見つかりません: `{', '.join(failed_to_find_roles)}`。`/admin setup`コマンドで役職を同期してください。"
+        except discord.Forbidden: 
+            return "ボットの権限不足: 役職を付与/削除する権限がありません。"
         except Exception as e:
-            logger.error(f"役職付与中にエラー: {e}", exc_info=True); return "役職付与中に不明なエラーが発生しました。"
+            logger.error(f"役職付与中にエラー: {e}", exc_info=True)
+            return "役職付与中に不明なエラーが発生しました。"
         return None
         
     async def _update_nickname(self, member: discord.Member) -> Optional[str]:
@@ -367,9 +369,14 @@ class ApprovalView(ui.View):
             if ch_id and (ch := member.guild.get_channel(ch_id)):
                 embed = discord.Embed(title="📝 自己紹介", color=discord.Color.green())
                 embed.add_field(name="住民", value=member.mention, inline=False)
-                for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
+                
+                for field in self.original_embed.fields: 
+                    embed.add_field(name=field.name, value=field.value, inline=False)
+                
                 embed.add_field(name="担当者", value=moderator.mention, inline=False)
-                if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
+                
+                if member.display_avatar: 
+                    embed.set_thumbnail(url=member.display_avatar.url)
                 await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
             logger.error(f"公開歓迎メッセージ送信失敗: {e}", exc_info=True); return "自己紹介チャンネルへのメッセージ送信に失敗しました。"
@@ -443,7 +450,12 @@ class IntroductionPanelView(ui.View):
     
     async def setup_buttons(self):
         self.clear_items()
-        button_info = (await get_panel_components_from_db('introduction'))[0]
+        components = await get_panel_components_from_db('introduction')
+        if not components:
+            logger.warning("住民登録パネルのコンポーネントが見つかりませんでした。")
+            return
+
+        button_info = components[0]
         button = ui.Button(
             label=button_info.get('label'),
             style=discord.ButtonStyle.success,
