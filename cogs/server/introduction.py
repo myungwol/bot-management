@@ -254,11 +254,10 @@ class ApprovalView(ui.View):
             roles_to_add: List[discord.Role] = []
             failed_to_find_roles: List[str] = []
             
+            # [핵심 수정] 오류가 발생한 separator 역할들을 목록에서 제거합니다.
             role_keys_to_grant = [
                 "role_resident", 
                 "role_resident_rookie", 
-                "role_warning_separator",
-                "role_shop_separator"
             ]
             for key in role_keys_to_grant:
                 if (rid := get_id(key)) and (r := guild.get_role(rid)):
@@ -370,7 +369,6 @@ class IntroductionPanelView(ui.View):
         button.callback = self.start_introduction_callback
         self.add_item(button)
 
-    # [핵심 수정] GenderAgeSelectView를 생성할 때 self.introduction_cog를 올바르게 전달합니다.
     async def start_introduction_callback(self, interaction: discord.Interaction):
         view = GenderAgeSelectView(self.introduction_cog)
         await interaction.response.send_message("まず、あなたの性別と生まれた年を選択してください。", view=view, ephemeral=True)
