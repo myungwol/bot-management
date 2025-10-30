@@ -218,6 +218,11 @@ USABLE_ITEMS = {
 }
 
 UI_EMBEDS = {
+    "embed_main_chat_welcome": {
+    "title": "",
+    "description": "### 新しい隣人が増えました！みんなで温かい挨拶を交わしましょう。:sparkling_heart:\n**鯖での生活がもっと楽しくなるように、**\n**いくつかの便利な案内板を用意しました。:map:**\n### ┃ :fairy: 村の妖精（ボット）が気になりますか？\n　╰─➤ {bot_guide_channel_mention}チャンネルで使い方を確認してください。",
+    "color": 0x2ECC71
+    },
     "onboarding_guide_server": {
         "title": "",
         "description":
