@@ -166,7 +166,6 @@ class ApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
     
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
-        # [핵심 수정 1] 승인/거절 권한을 '管理人かも' 역할로만 제한합니다.
         required_keys = ["role_staff_village_chief"]
         return await has_required_roles(interaction, required_keys)
     
@@ -228,29 +227,28 @@ class ApprovalView(ui.View):
 
         role_grant_error = await self._grant_roles(member)
         if role_grant_error:
-            logger.error(f"自己紹介承認失敗 (1/4): 役職付与中にエラー - {role_grant_error}")
+            logger.error(f"自己紹介承認失敗 (1/3): 役職付与中にエラー - {role_grant_error}")
             errors.append(role_grant_error); return False, errors
 
         nickname_update_error = await self._update_nickname(member)
         if nickname_update_error:
-            logger.warning(f"自己紹介承認中の警告 (2/4): ニックネーム更新失敗 - {nickname_update_error}")
+            logger.warning(f"自己紹介承認中の警告 (2/3): ニックネーム更新失敗 - {nickname_update_error}")
             errors.append(nickname_update_error)
 
         public_welcome_error = await self._send_public_welcome(moderator, member)
         if public_welcome_error:
-            logger.warning(f"自己紹介承認中の警告 (3/4): 公開歓迎メッセージ失敗 - {public_welcome_error}")
+            logger.warning(f"自己紹介承認中の警告 (3/3): 公開歓迎メッセージ失敗 - {public_welcome_error}")
             errors.append(public_welcome_error)
             
-        main_chat_error = await self._send_main_chat_welcome(member)
-        if main_chat_error:
-            logger.warning(f"自己紹介承認中の警告 (4/4): メインチャット歓迎失敗 - {main_chat_error}")
-            errors.append(main_chat_error)
+        # [삭제] 메인 채팅 환영 및 DM 발송 기능 호출을 제거합니다.
+        # main_chat_error = await self._send_main_chat_welcome(member)
+        # await self._send_dm_notification(member, is_approved=True)
 
-        await self._send_dm_notification(member, is_approved=True)
         return True, errors
 
     async def _process_rejection(self, moderator: discord.Member, member: discord.Member, reason: str) -> (bool, List[str]):
-        tasks = [ self._send_rejection_log(moderator, member, reason), self._send_dm_notification(member, is_approved=False, reason=reason) ]
+        # [삭제] DM 발송 기능을 제거하고 거절 로그만 남깁니다.
+        tasks = [ self._send_rejection_log(moderator, member, reason) ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         failed_tasks_messages = [res for res in results if isinstance(res, str)]
         return not failed_tasks_messages, failed_tasks_messages
@@ -261,6 +259,7 @@ class ApprovalView(ui.View):
             roles_to_add: List[discord.Role] = []
             failed_to_find_roles: List[str] = []
             
+            # [수정] "role_resident" ("アメンバ") 역할을 추가합니다.
             role_keys_to_grant = [
                 "role_resident", 
                 "role_resident_rookie", 
@@ -283,8 +282,9 @@ class ApprovalView(ui.View):
             if roles_to_add:
                 await member.add_roles(*list(set(roles_to_add)), reason="自己紹介承認")
             
-            if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles:
-                await member.remove_roles(r, reason="自己紹介承認完了")
+            # [삭제] 여행자(role_guest) 역할을 제거하는 로직을 제거합니다.
+            # if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles:
+            #     await member.remove_roles(r, reason="自己紹介承認完了")
             
             if failed_to_find_roles: 
                 return f"役職が見つかりません: `{', '.join(failed_to_find_roles)}`。`/admin setup`コマンドで役職を同期してください。"
@@ -323,51 +323,9 @@ class ApprovalView(ui.View):
             logger.error(f"公開歓迎メッセージ送信失敗: {e}", exc_info=True); return "自己紹介チャンネルへのメッセージ送信に失敗しました。"
         return None
     
-    async def _send_main_chat_welcome(self, member: discord.Member) -> Optional[str]:
-        try:
-            ch_id = self.introduction_cog.main_chat_channel_id
-            if ch_id and (ch := member.guild.get_channel(ch_id)):
-                embed_data = await get_embed_from_db("embed_main_chat_welcome")
-                if not embed_data: return "メインチャット歓迎の埋め込みが見つかりません。"
-                
-                staff_role_id = get_id('role_staff_newbie_helper') or 1424609915921502209
-                nickname_channel_id = get_id('nickname_panel_channel_id') or 1423523844374925432
-                role_channel_id = get_id('auto_role_channel_id') or 1423523908992368710
-                inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1423523001499914240
-                bot_guide_channel_id = get_id('bot_guide_channel_id') or 1423527917362876457 
-                festival_channel_id = get_id('festival_channel_id') or 1423523493231984763
-
-                format_args = {
-                    "member_mention": member.mention, "staff_role_mention": f"<@&{staff_role_id}>",
-                    "nickname_channel_mention": f"<#{nickname_channel_id}>", "role_channel_mention": f"<#{role_channel_id}>",
-                    "inquiry_channel_mention": f"<#{inquiry_channel_id}>", "bot_guide_channel_mention": f"<#{bot_guide_channel_id}>",
-                    "festival_channel_mention": f"<#{festival_channel_id}>"
-                }
-                embed = format_embed_from_db(embed_data, **format_args)
-                await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
-        except Exception as e:
-            logger.error(f"メインチャット歓迎メッセージ送信失敗: {e}", exc_info=True); return "メインチャットチャンネルへのメッセージ送信に失敗しました。"
-        return None
+    # [삭제] _send_main_chat_welcome 함수를 제거합니다.
     
-    async def _send_dm_notification(self, member: discord.Member, is_approved: bool, reason: str = "") -> None:
-        try:
-            guild_name = member.guild.name
-            if is_approved:
-                embed_data = await get_embed_from_db("dm_onboarding_approved")
-                if not embed_data: return
-                embed = format_embed_from_db(embed_data, guild_name=guild_name)
-            else:
-                embed_data = await get_embed_from_db("dm_onboarding_rejected")
-                if not embed_data: return
-                embed = format_embed_from_db(embed_data, guild_name=guild_name)
-                embed.add_field(name="事由", value=reason, inline=False)
-                panel_channel_id = self.introduction_cog.panel_channel_id
-                if panel_channel_id:
-                    embed.add_field(name="再申請", value=f"<#{panel_channel_id}> で再度お試しください。", inline=False)
-            await member.send(embed=embed)
-        except discord.Forbidden: logger.warning(f"{member.display_name}さんへDMを送信できませんでした（DMがブロックされています）。")
-        except Exception as e: logger.error(f"DM通知送信失敗: {e}", exc_info=True)
-        return None
+    # [삭제] _send_dm_notification 함수를 제거합니다.
         
     async def _send_rejection_log(self, moderator: discord.Member, member: discord.Member, reason: str) -> Optional[str]:
         try:
@@ -427,7 +385,7 @@ class IntroductionPanelView(ui.View):
         self.add_item(button)
 
     async def start_introduction_callback(self, interaction: discord.Interaction):
-        view = GenderAgeSelectView(self.introduction_cog)
+        view = GenderAgeSelectView(self)
         await interaction.response.send_message("まず、あなたの性別と生まれた年を選択してください。", view=view, ephemeral=True)
 
 class Introduction(commands.Cog):
@@ -471,7 +429,6 @@ class Introduction(commands.Cog):
         self.approval_channel_id = get_id("onboarding_approval_channel_id")
         self.introduction_log_channel_id = get_id("introduction_channel_id")
         self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
-        # [핵심 수정 2] 멘션할 역할을 '管理人かも' 역할로 변경합니다.
         self.approval_role_id = get_id("role_staff_village_chief")
         self.main_chat_channel_id = get_id("main_chat_channel_id")
         self.private_age_log_channel_id = get_id("onboarding_private_age_log_channel_id")
