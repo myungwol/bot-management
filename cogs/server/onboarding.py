@@ -45,8 +45,8 @@ class OnboardingGuideView(ui.View):
 
         step_type = step_info.get("step_type")
         if step_type == "intro":
-             # [수정] 마지막 단계에서는 자기소개 패널로 안내하는 버튼을 표시합니다.
-             intro_button = ui.Button(label="住民登録証を作成しに行く", style=discord.ButtonStyle.success, custom_id="onboarding_go_to_intro")
+             # [수정] 버튼 레이블 변경
+             intro_button = ui.Button(label="自己紹介を作成しに行く", style=discord.ButtonStyle.success, custom_id="onboarding_go_to_intro")
              intro_button.callback = self.go_to_introduction
              self.add_item(intro_button)
         else:
@@ -88,12 +88,12 @@ class OnboardingGuideView(ui.View):
         if self.message: await self.message.edit(**content)
 
     async def go_to_introduction(self, interaction: discord.Interaction):
-        # [수정] 자기소개 채널 링크와 함께 안내 메시지를 보내고 가이드를 종료합니다.
         introduction_channel_id = get_id("introduction_panel_channel_id")
         if introduction_channel_id:
-            message = f"✅ 案内は以上です。<#{introduction_channel_id}> チャンネルに移動して住民登録証を作成してください。"
+            # [수정] 안내 메시지 변경
+            message = f"✅ 案内は以上です。<#{introduction_channel_id}> チャンネルに移動して自己紹介を作成してください。"
         else:
-            message = "✅ 案内は以上です。管理者が設定した住民登録チャンネルに移動してください。"
+            message = "✅ 案内は以上です。管理者が設定した自己紹介チャンネルに移動してください。"
 
         await interaction.response.send_message(message, ephemeral=True)
         if self.message:
