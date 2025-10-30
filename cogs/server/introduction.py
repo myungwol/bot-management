@@ -18,14 +18,13 @@ from utils.helpers import format_embed_from_db, has_required_roles
 
 logger = logging.getLogger(__name__)
 
-# --- 기존 Onboarding Cog에서 복사된 자기소개 관련 클래스들 ---
-
 class RejectionReasonModal(ui.Modal, title="拒否事由入力"):
     reason = ui.TextInput(label="拒否事由", placeholder="拒否する理由を具体的に入力してください。", style=discord.TextStyle.paragraph, required=True, max_length=200)
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
-class IntroductionModal(ui.Modal, title="住民登録証"):
-    name = ui.TextInput(label="名前", placeholder="村で使用する名前を記入してください", required=True, max_length=12)
+# [수정] Modal title 변경
+class IntroductionModal(ui.Modal, title="自己紹介"):
+    name = ui.TextInput(label="名前", placeholder="サーバーで使用する名前を記入してください", required=True, max_length=12)
     hobby = ui.TextInput(label="趣味/好きなこと", placeholder="趣味や好きなことを自由にお書きください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経緯", placeholder="例: Disboard, ○○からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     
@@ -38,7 +37,7 @@ class IntroductionModal(ui.Modal, title="住民登録証"):
         self.private_birth_year_input: Optional[ui.TextInput] = None
         if self.public_birth_year_display == "非公開":
             self.private_birth_year_input = ui.TextInput(
-                label="出生年（村長/副村長確認用）",
+                label="出生年（管理者確認用）",
                 placeholder="YYYY形式で入力してください。非公開として扱われます。",
                 required=True, min_length=4, max_length=4
             )
@@ -71,7 +70,6 @@ class IntroductionModal(ui.Modal, title="住民登録証"):
                 try:
                     year = int(private_year_str)
                     current_year = datetime.now(timezone.utc).year
-                    # [수정] 나이 제한을 18세로 변경하고, 관련 에러 메시지를 수정합니다.
                     if not (1940 <= year <= current_year - 18):
                         await interaction.followup.send("❌ 無効な出生年です。満18歳以上の方のみ参加できます。", ephemeral=True)
                         return
@@ -115,9 +113,10 @@ class IntroductionModal(ui.Modal, title="住民登録証"):
                 actual_birth_year=actual_birth_year_for_validation
             )
             approval_role_id = self.introduction_cog.approval_role_id
-            content = f"<@&{approval_role_id}> 新しい住民登録申請書が提出されました。" if approval_role_id else "新しい住民登録申請書が提出されました。"
+            content = f"<@&{approval_role_id}> 新しい自己紹介申請があります。" if approval_role_id else "新しい自己紹介申請があります。"
             await approval_channel.send(content=content, embed=embed, view=view, allowed_mentions=discord.AllowedMentions(roles=True))
-            await interaction.followup.send("✅ 住民登録証を担当者に提出しました。", ephemeral=True)
+            # [수정] 완료 메시지 변경
+            await interaction.followup.send("✅ 自己紹介を担当者に提出しました。", ephemeral=True)
         except Exception as e: 
             logger.error(f"自己紹介提出中にエラー発生: {e}", exc_info=True)
             await interaction.followup.send(f"❌ 予期せぬエラーが発生しました。", ephemeral=True)
@@ -432,8 +431,9 @@ class ApprovalView(ui.View):
         try:
             ch_id = self.introduction_cog.rejection_log_channel_id
             if ch_id and (ch := member.guild.get_channel(ch_id)):
-                embed = discord.Embed(title="❌ 住民登録が拒否されました", color=discord.Color.red())
-                embed.add_field(name="旅行者", value=member.mention, inline=False)
+                # [수정] Embed title 변경
+                embed = discord.Embed(title="❌ 自己紹介が拒否されました", color=discord.Color.red())
+                embed.add_field(name="対象者", value=member.mention, inline=False) # '여행자' -> '対象者'
                 for field in self.original_embed.fields: embed.add_field(name=field.name, value=field.value, inline=False)
                 embed.add_field(name="拒否事由", value=reason, inline=False); embed.add_field(name="担当者", value=moderator.mention, inline=False)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
@@ -481,7 +481,8 @@ class Introduction(commands.Cog):
         self.private_age_log_channel_id: Optional[int] = None
         self.view_instance = None
         self._user_locks: Dict[int, asyncio.Lock] = {}
-        logger.info("Introduction (住民登録) Cogが正常に初期化されました。")
+        # [수정] Cog 초기화 로그 메시지 변경
+        logger.info("Introduction (自己紹介) Cogが正常に初期化されました。")
         
     def get_user_lock(self, user_id: int) -> asyncio.Lock:
         if user_id not in self._user_locks: self._user_locks[user_id] = asyncio.Lock()
