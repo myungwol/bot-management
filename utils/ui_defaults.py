@@ -11,196 +11,128 @@ UI_ROLE_KEY_MAP = {
     # --- [コア] プレフィックス役職と優先順位 ---
     "role_admin_total": {
         "name": "森の妖精",
-        "is_prefix": True,
         "priority": 100
     },
     "role_staff_village_chief": {
         "name": "管理人かも",
-        "is_prefix": True,
         "priority": 90
     },
     "role_staff_deputy_chief": {
         "name": "エンジニア",
-        "is_prefix": True,
         "priority": 85
     },
     "role_premium_booster": {
         "name": "Server Booster",
-        "is_prefix": True,
         "priority": 55
     },
     "role_resident_elder": {
         "name": "Lv.150",
-        "is_prefix": True,
         "priority": 50
     },
     "role_job_master_chef": {
         "name": "マスターシェフ",
-        "is_prefix": True,
         "priority": 16
     },
     "role_job_master_angler": {
         "name": "太公望",
-        "is_prefix": True,
         "priority": 16
     },
     "role_job_master_farmer": {
         "name": "大農",
-        "is_prefix": True,
         "priority": 16
     },
     "role_job_expert_miner": {
         "name": "専門の鉱夫",
-        "is_prefix": True,
         "priority": 16
     },
     "role_job_chef": {
         "name": "料理人",
-        "is_prefix": True,
         "priority": 15
     },
     "role_job_fisherman": {
         "name": "釣り人",
-        "is_prefix": True,
         "priority": 15
     },
     "role_job_farmer": {
         "name": "農家",
-        "is_prefix": True,
         "priority": 15
     },
     "role_job_miner": {
         "name": "鉱夫",
-        "is_prefix": True,
         "priority": 15
     },
     "role_resident": {
         "name": "アメンバ",
-        "is_prefix": True,
         "priority": 10
     },
     "role_resident_veteran": {
         "name": "LV.100",
-        "is_prefix": True,
         "priority": 0
     },
     "role_resident_regular": {
         "name": "Lv.50",
-        "is_prefix": True,
         "priority": 0
     },
     "role_resident_rookie": {
         "name": "Lv.0",
-        "is_prefix": True,
-        "priority": 0
-    },
-
-    # --- 個人情報役職 (性別, 年齢層) ---
-    "role_info_male": {
-        "name": "男性",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_female": {
-        "name": "女性",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_private": {
-        "name": "非公開",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_70s": {
-        "name": "70年代生",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_80s": {
-        "name": "80年代生",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_90s": {
-        "name": "90年代生",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_00s": {
-        "name": "00年代生",
-        "is_prefix": False,
         "priority": 0
     },
 
     # --- ゲーム/プラットフォーム役職 ---
     "role_game_minecraft": {
         "name": "マイクラーMinecraft",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_valorant": {
         "name": "ヴァローVALORANT",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_overwatch": {
         "name": "オバウォーOverwatch",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_lol": {
         "name": "ロルーLeague of Legends",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_mahjong": {
         "name": "麻雀ーMahjong",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_amongus": {
         "name": "アモアスーAmong Us",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_mh": {
         "name": "モンハンMonster Hunter",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_genshin": {
         "name": "原神ーGenshin Impact",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_apex": {
         "name": "エペーApex Legends",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_splatoon": { # 역할 추가됨
         "name": "スプラーSplatoon",
-        "is_prefix": False,
         "priority": 0
     },
     "role_game_godfield": { # 역할 추가됨
         "name": "ゴッフィーGod Field",
-        "is_prefix": False,
         "priority": 0
     },
     "role_platform_steam": {
         "name": "スチームーSteam",
-        "is_prefix": False,
         "priority": 0
     },
     "role_platform_smartphone": {
         "name": "スマホーSmartphone",
-        "is_prefix": False,
         "priority": 0
     },
     "role_platform_switch": {
         "name": "スイッチーSwitch",
-        "is_prefix": False,
         "priority": 0
     },
 
@@ -1113,7 +1045,8 @@ SETUP_COMMAND_MAP = {
     # [추가] 새로운 주민 등록(자기소개) 패널 추가
     "panel_introduction": {
         "type": "panel", "cog_name": "Introduction", "key": "introduction_panel_channel_id",
-        "friendly_name": "주민 등록 패널", "channel_type": "text"
+        # [수정] '주민 등록' -> '자기소개'
+        "friendly_name": "자기소개 패널", "channel_type": "text"
     },
     "panel_nicknames": {
         "type": "panel", "cog_name": "Nicknames", "key": "nickname_panel_channel_id",
