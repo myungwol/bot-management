@@ -1387,7 +1387,7 @@ ADMIN_ACTION_MAP = {
     "panels_regenerate_all": "[패널] 모든 관리 패널 재설치",
     "template_edit": "[템플릿] 임베드 템플릿 편집",
     "request_regenerate_all_game_panels": "[게임] 모든 게임 패널 재설치 요청",
-    "roles_sync": "[역할] 모든 역할 DB와 동기화",
+    "roles_sync": "DB同期化",
     "strings_sync": "[UI] 모든 UI 텍스트 DB와 동기화",
     "game_data_reload": "[게임] 게임 데이터 새로고침",
     "stats_set": "[통계] 통계 채널 설정/제거",
