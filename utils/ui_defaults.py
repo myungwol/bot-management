@@ -15,19 +15,14 @@ UI_ROLE_KEY_MAP = {
         "priority": 100
     },
     "role_staff_village_chief": {
-        "name": "村長",
+        "name": "管理人かも",
         "is_prefix": True,
         "priority": 90
     },
     "role_staff_deputy_chief": {
-        "name": "副村長",
+        "name": "フグ鯖",
         "is_prefix": True,
         "priority": 85
-    },
-    "role_approval": {
-        "name": "職員",
-        "is_prefix": True,
-        "priority": 60
     },
     "role_premium_booster": {
         "name": "後援者",
@@ -35,7 +30,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 55
     },
     "role_resident_elder": {
-        "name": "長老",
+        "name": "Lv.150",
         "is_prefix": True,
         "priority": 50
     },
@@ -80,92 +75,23 @@ UI_ROLE_KEY_MAP = {
         "priority": 15
     },
     "role_resident": {
-        "name": "住民",
+        "name": "アメンバ",
         "is_prefix": True,
         "priority": 10
     },
-    "role_guest": {
-        "name": "旅行者",
-        "is_prefix": True,
-        "priority": 5
-    },
     "role_resident_veteran": {
-        "name": "ベテラン",
+        "name": "LV.100",
         "is_prefix": True,
         "priority": 0
     },
     "role_resident_regular": {
-        "name": "常連",
+        "name": "Lv.50",
         "is_prefix": True,
         "priority": 0
     },
     "role_resident_rookie": {
-        "name": "新人",
+        "name": "Lv.0",
         "is_prefix": True,
-        "priority": 0
-    },
-
-    # --- プレフィックスではないその他の役職 ---
-    "role_staff_police": {
-        "name": "警察官",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_staff_festival": {
-        "name": "祭り担当",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_staff_pr": {
-        "name": "広報担当",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_staff_design": {
-        "name": "デザイナー",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_staff_secretary": {
-        "name": "書記",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_staff_newbie_helper": {
-        "name": "サポーター",
-        "is_prefix": False,
-        "priority": 0
-    },
-
-    # --- オンボーディング/役職パネルの区切り役職 ---
-    "role_onboarding_step_1": {
-        "name": "════════════等級════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_onboarding_step_2": {
-        "name": "════════════情報════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_onboarding_step_3": {
-        "name": "════════════商店════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_onboarding_step_4": {
-        "name": "════════════通知════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_warning_separator": {
-        "name": "════════════罰点════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_shop_separator": {
-        "name": "═══════════ゲーム═══════════",
-        "is_prefix": False,
         "priority": 0
     },
 
@@ -206,39 +132,6 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
 
-    # --- 商店/アイテム役職 ---
-    "role_personal_room_key": {
-        "name": "マイルームの鍵",
-        "is_prefix": False,
-        "priority": 0
-    },
-
-    # --- 通知役職 ---
-    "role_notify_voice": {
-        "name": "通話募集",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_notify_friends": {
-        "name": "友達募集",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_notify_disboard": {
-        "name": "Disboard",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_notify_up": {
-        "name": "Dicoall", # UP -> Dicoall
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_notify_dissoku": {
-        "name": "ディス速",
-        "is_prefix": False,
-        "priority": 0
-    },
     # --- ゲーム/プラットフォーム役職 ---
     "role_game_minecraft": {
         "name": "マイクラーMinecraft",
@@ -311,27 +204,6 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
 
-    # --- 罰点役職 ---
-    "role_warning_level_1": {
-        "name": "罰点1回",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_warning_level_2": {
-        "name": "罰点2回",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_warning_level_3": {
-        "name": "罰点3回",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_warning_level_4": {
-        "name": "罰点4回",
-        "is_prefix": False,
-        "priority": 0
-    },
 }
 
 ONBOARDING_CHOICES = {
