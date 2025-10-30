@@ -25,7 +25,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 85
     },
     "role_premium_booster": {
-        "name": "後援者",
+        "name": "Server Booster",
         "is_prefix": True,
         "priority": 55
     },
