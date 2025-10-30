@@ -239,15 +239,10 @@ class ApprovalView(ui.View):
         if public_welcome_error:
             logger.warning(f"自己紹介承認中の警告 (3/3): 公開歓迎メッセージ失敗 - {public_welcome_error}")
             errors.append(public_welcome_error)
-            
-        # [삭제] 메인 채팅 환영 및 DM 발송 기능 호출을 제거합니다.
-        # main_chat_error = await self._send_main_chat_welcome(member)
-        # await self._send_dm_notification(member, is_approved=True)
 
         return True, errors
 
     async def _process_rejection(self, moderator: discord.Member, member: discord.Member, reason: str) -> (bool, List[str]):
-        # [삭제] DM 발송 기능을 제거하고 거절 로그만 남깁니다.
         tasks = [ self._send_rejection_log(moderator, member, reason) ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         failed_tasks_messages = [res for res in results if isinstance(res, str)]
@@ -259,7 +254,6 @@ class ApprovalView(ui.View):
             roles_to_add: List[discord.Role] = []
             failed_to_find_roles: List[str] = []
             
-            # [수정] "role_resident" ("アメンバ") 역할을 추가합니다.
             role_keys_to_grant = [
                 "role_resident", 
                 "role_resident_rookie", 
@@ -281,10 +275,6 @@ class ApprovalView(ui.View):
             
             if roles_to_add:
                 await member.add_roles(*list(set(roles_to_add)), reason="自己紹介承認")
-            
-            # [삭제] 여행자(role_guest) 역할을 제거하는 로직을 제거합니다.
-            # if (rid := get_id("role_guest")) and (r := guild.get_role(rid)) and r in member.roles:
-            #     await member.remove_roles(r, reason="自己紹介承認完了")
             
             if failed_to_find_roles: 
                 return f"役職が見つかりません: `{', '.join(failed_to_find_roles)}`。`/admin setup`コマンドで役職を同期してください。"
@@ -322,10 +312,6 @@ class ApprovalView(ui.View):
         except Exception as e:
             logger.error(f"公開歓迎メッセージ送信失敗: {e}", exc_info=True); return "自己紹介チャンネルへのメッセージ送信に失敗しました。"
         return None
-    
-    # [삭제] _send_main_chat_welcome 함수를 제거합니다.
-    
-    # [삭제] _send_dm_notification 함수를 제거합니다.
         
     async def _send_rejection_log(self, moderator: discord.Member, member: discord.Member, reason: str) -> Optional[str]:
         try:
@@ -384,8 +370,9 @@ class IntroductionPanelView(ui.View):
         button.callback = self.start_introduction_callback
         self.add_item(button)
 
+    # [핵심 수정] GenderAgeSelectView를 생성할 때 self.introduction_cog를 올바르게 전달합니다.
     async def start_introduction_callback(self, interaction: discord.Interaction):
-        view = GenderAgeSelectView(self)
+        view = GenderAgeSelectView(self.introduction_cog)
         await interaction.response.send_message("まず、あなたの性別と生まれた年を選択してください。", view=view, ephemeral=True)
 
 class Introduction(commands.Cog):
