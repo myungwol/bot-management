@@ -2,7 +2,7 @@
 
 import discord
 from discord.ext import commands
-from discord import app_commands, ui
+from discord import ui
 import re
 import asyncio
 from datetime import datetime, timezone
@@ -71,7 +71,8 @@ class NicknameApprovalView(ui.View):
                     pass
                 return
 
-            final_name = await self.nicknames_cog.get_final_nickname(member, base_name=self.new_name)
+            # [수정] final_name을 self.new_name으로 직접 사용합니다.
+            final_name = self.new_name
             error_report = ""
             if is_approved:
                 try:
@@ -111,13 +112,13 @@ class NicknameApprovalView(ui.View):
     def _create_log_embed(self, member: discord.Member, moderator: discord.Member, final_name: str, is_approved: bool, reason: Optional[str]) -> discord.Embed:
         if is_approved:
             embed = discord.Embed(title="✅ 名前変更通知 (承認)", color=discord.Color.green())
-            embed.add_field(name="住民", value=member.mention, inline=False)
+            embed.add_field(name="メンバー", value=member.mention, inline=False) # '주민' -> 'メンバー'
             embed.add_field(name="以前の名前", value=f"`{self.original_name}`", inline=False)
             embed.add_field(name="新しい名前", value=f"`{final_name}`", inline=False)
             embed.add_field(name="担当者", value=moderator.mention, inline=False)
         else:
             embed = discord.Embed(title="❌ 名前変更通知 (拒否)", color=discord.Color.red())
-            embed.add_field(name="住民", value=member.mention, inline=False)
+            embed.add_field(name="メンバー", value=member.mention, inline=False) # '주민' -> 'メンバー'
             embed.add_field(name="以前の名前", value=f"`{self.original_name}`", inline=False)
             embed.add_field(name="申請した名前", value=f"`{self.new_name}`", inline=False)
             embed.add_field(name="拒否事由", value=reason or "事由未入力", inline=False)
@@ -161,7 +162,7 @@ class NicknameChangeModal(ui.Modal, title="名前変更申請"):
         if not (ch := i.guild.get_channel(self.nicknames_cog.approval_channel_id)):
             return await i.followup.send("エラー: 承認チャンネルが見つかりません。", ephemeral=True)
         
-        await set_cooldown(str(i.user.id), "nickname_change")
+        await set_cooldown(i.user.id, "nickname_change") # user.id를 문자열로 변환할 필요가 없습니다.
 
         embed = discord.Embed(title="📝 名前変更申請", color=discord.Color.blue())
         embed.add_field(name="申請者", value=i.user.mention, inline=False).add_field(name="現在の名前", value=i.user.display_name, inline=False).add_field(name="希望の名前", value=name, inline=False)
@@ -180,7 +181,6 @@ class NicknameChangerPanelView(ui.View):
 
     async def setup_buttons(self):
         self.clear_items()
-        button_styles = get_config("DISCORD_BUTTON_STYLES_MAP", {})
         components_data = await get_panel_components_from_db('nicknames')
         if not components_data:
             default_button = ui.Button(label="名前変更申請", style=discord.ButtonStyle.primary, custom_id="request_nickname_change")
@@ -189,8 +189,7 @@ class NicknameChangerPanelView(ui.View):
             return
         for comp in components_data:
             if comp.get('component_type') == 'button' and comp.get('component_key'):
-                style_key = comp.get('style', 'secondary')
-                button = ui.Button(label=comp.get('label'), style=button_styles.get(style_key, discord.ButtonStyle.secondary), emoji=comp.get('emoji'), row=comp.get('row'), custom_id=comp.get('component_key'))
+                button = ui.Button(label=comp.get('label'), style=discord.ButtonStyle(comp.get('style_value', 1)), emoji=comp.get('emoji'), row=comp.get('row'), custom_id=comp.get('component_key'))
                 if comp.get('component_key') == 'request_nickname_change':
                     button.callback = self.request_change
                 self.add_item(button)
@@ -200,13 +199,8 @@ class NicknameChangerPanelView(ui.View):
         if lock.locked():
             return await i.response.send_message("以前のリクエストを処理中です。", ephemeral=True)
         async with lock:
-            try:
-                cooldown_seconds = int(get_config("NICKNAME_CHANGE_COOLDOWN_SECONDS", 14400))
-            except (ValueError, TypeError):
-                cooldown_seconds = 14400
-                logger.warning("NICKNAME_CHANGE_COOLDOWN_SECONDS 설정값이 숫자가 아니므로 기본값(14400)을 사용합니다.")
-            
-            last_time = await get_cooldown(str(i.user.id), "nickname_change")
+            cooldown_seconds = int(get_config("NICKNAME_CHANGE_COOLDOWN_SECONDS", 14400))
+            last_time = await get_cooldown(i.user.id, "nickname_change")
             utc_now = datetime.now(timezone.utc).timestamp()
 
             if last_time and utc_now - last_time < cooldown_seconds:
@@ -223,8 +217,6 @@ class Nicknames(commands.Cog):
         self.approval_channel_id: Optional[int] = None
         self.approval_role_id: Optional[int] = None
         self.nickname_log_channel_id: Optional[int] = None
-        self.master_role_id: Optional[int] = None
-        self.vice_master_role_id: Optional[int] = None
         self.view_instance = None
         self.panel_regeneration_lock = asyncio.Lock()
         self._user_locks: Dict[int, asyncio.Lock] = {}
@@ -255,59 +247,22 @@ class Nicknames(commands.Cog):
         self.approval_channel_id = get_id("nickname_approval_channel_id")
         self.nickname_log_channel_id = get_id("nickname_log_channel_id")
         self.approval_role_id = get_id("role_approval")
-        self.master_role_id = get_id("role_staff_village_chief")
-        self.vice_master_role_id = get_id("role_staff_deputy_chief")
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
-    async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
-        prefix_hierarchy = get_config("NICKNAME_PREFIX_HIERARCHY", [])
-        prefix = None
-        member_role_names = {role.name for role in member.roles}
-        
-        for prefix_name in prefix_hierarchy:
-            if prefix_name in member_role_names:
-                prefix = f"『 {prefix_name} 』"
-                break
-        
-        if base_name.strip():
-            base = base_name.strip()
-        else:
-            current_nick = member.nick or member.name
-            base = current_nick
-            for p_name in prefix_hierarchy:
-                prefix_to_check = f"『 {p_name} 』"
-                if current_nick.startswith(prefix_to_check):
-                    base = re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", current_nick)
-                    break
-        
-        final_nick = f"{prefix} {base}" if prefix else base
-        if len(final_nick) > 32:
-            prefix_len = len(prefix) if prefix else 0
-            allowed_base_len = 32 - (prefix_len + 1) if prefix else 32
-            base = base[:allowed_base_len]
-            final_nick = f"{prefix} {base}" if prefix else base
-        return final_nick
+    # [삭제] 칭호(접두사)를 붙이는 get_final_nickname 함수를 제거합니다.
+    # [삭제] 역할 변경 시 닉네임을 업데이트하는 on_member_update 리스너를 제거합니다.
 
     async def update_nickname(self, member: discord.Member, base_name_override: str):
+        """자기소개 승인 시 닉네임을 설정하는 함수. 칭호 없이 그대로 설정합니다."""
         try:
-            final_name = await self.get_final_nickname(member, base_name=base_name_override)
+            # [수정] 칭호 없이 전달된 이름 그대로 닉네임으로 설정합니다.
+            final_name = base_name_override.strip()
             if member.nick != final_name:
-                await member.edit(nick=final_name, reason="オンボーディング完了またはニックネーム承認")
+                await member.edit(nick=final_name, reason="自己紹介完了による名前設定")
         except discord.Forbidden:
-            logger.warning(f"닉네임 업데이트: {member.display_name}의 닉네임을 변경할 권한이 없습니다.")
+            logger.warning(f"ニックネーム更新: {member.display_name}のニックネームを変更する権限がありません。")
         except Exception as e:
-            logger.error(f"닉네임 업데이트: {member.display_name}의 닉네임 업데이트 중 오류 발생: {e}", exc_info=True)
-
-    @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member):
-        if after.bot or before.roles == after.roles:
-            return
-        new_nick = await self.get_final_nickname(after, base_name="")
-        if after.nick != new_nick:
-            try:
-                await after.edit(nick=new_nick, reason="役職変更による称号の自動更新")
-            except discord.Forbidden:
-                pass
+            logger.error(f"ニックネーム更新: {member.display_name}のニックネーム更新中にエラー発生: {e}", exc_info=True)
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames", log_embed: Optional[discord.Embed] = None) -> bool:
         async with self.panel_regeneration_lock:
@@ -346,14 +301,14 @@ class Nicknames(commands.Cog):
                     logger.info(f"✅ {panel_key} 패널을 성공적으로 새로 생성/갱신했습니다. (채널: #{channel.name})")
                     return True
                 else:
-                    logger.error("닉네임 패널 메시지 전송에 실패하여 ID를 저장할 수 없습니다.")
+                    logger.error("ニックネームパネルメッセージの送信に失敗し、IDを保存できません。")
                     if log_embed and self.nickname_log_channel_id:
                          if log_channel := self.bot.get_channel(self.nickname_log_channel_id):
                             await log_channel.send(embed=log_embed)
                     return False
 
             except Exception as e:
-                logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
+                logger.error(f"❌ {panel_key} パネル 재설치 중 오류 발생: {e}", exc_info=True)
                 return False
 
 async def setup(bot: commands.Bot):
