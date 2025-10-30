@@ -227,18 +227,24 @@ class ApprovalView(ui.View):
 
         role_grant_error = await self._grant_roles(member)
         if role_grant_error:
-            logger.error(f"自己紹介承認失敗 (1/3): 役職付与中にエラー - {role_grant_error}")
+            logger.error(f"自己紹介承認失敗 (1/4): 役職付与中にエラー - {role_grant_error}")
             errors.append(role_grant_error); return False, errors
 
         nickname_update_error = await self._update_nickname(member)
         if nickname_update_error:
-            logger.warning(f"自己紹介承認中の警告 (2/3): ニックネーム更新失敗 - {nickname_update_error}")
+            logger.warning(f"自己紹介承認中の警告 (2/4): ニックネーム更新失敗 - {nickname_update_error}")
             errors.append(nickname_update_error)
 
         public_welcome_error = await self._send_public_welcome(moderator, member)
         if public_welcome_error:
-            logger.warning(f"自己紹介承認中の警告 (3/3): 公開歓迎メッセージ失敗 - {public_welcome_error}")
+            logger.warning(f"自己紹介承認中の警告 (3/4): 公開歓迎メッセージ失敗 - {public_welcome_error}")
             errors.append(public_welcome_error)
+            
+        # [복구] 메인 채팅방 환영 메시지 전송 기능을 다시 호출합니다.
+        main_chat_error = await self._send_main_chat_welcome(member)
+        if main_chat_error:
+            logger.warning(f"自己紹介承認中の警告 (4/4): メインチャット歓迎失敗 - {main_chat_error}")
+            errors.append(main_chat_error)
 
         return True, errors
 
@@ -254,7 +260,6 @@ class ApprovalView(ui.View):
             roles_to_add: List[discord.Role] = []
             failed_to_find_roles: List[str] = []
             
-            # [핵심 수정] 오류가 발생한 separator 역할들을 목록에서 제거합니다.
             role_keys_to_grant = [
                 "role_resident", 
                 "role_resident_rookie", 
@@ -310,6 +315,33 @@ class ApprovalView(ui.View):
                 await ch.send(content=f"||{member.mention}||", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
             logger.error(f"公開歓迎メッセージ送信失敗: {e}", exc_info=True); return "自己紹介チャンネルへのメッセージ送信に失敗しました。"
+        return None
+    
+    # [복구] _send_main_chat_welcome 함수를 다시 추가합니다.
+    async def _send_main_chat_welcome(self, member: discord.Member) -> Optional[str]:
+        try:
+            ch_id = self.introduction_cog.main_chat_channel_id
+            if ch_id and (ch := member.guild.get_channel(ch_id)):
+                embed_data = await get_embed_from_db("embed_main_chat_welcome")
+                if not embed_data: return "メインチャット歓迎の埋め込みが見つかりません。"
+                
+                staff_role_id = get_id('role_staff_newbie_helper') or 1424609915921502209
+                nickname_channel_id = get_id('nickname_panel_channel_id') or 1423523844374925432
+                role_channel_id = get_id('auto_role_channel_id') or 1423523908992368710
+                inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1423523001499914240
+                bot_guide_channel_id = get_id('bot_guide_channel_id') or 1423527917362876457 
+                festival_channel_id = get_id('festival_channel_id') or 1423523493231984763
+
+                format_args = {
+                    "member_mention": member.mention, "staff_role_mention": f"<@&{staff_role_id}>",
+                    "nickname_channel_mention": f"<#{nickname_channel_id}>", "role_channel_mention": f"<#{role_channel_id}>",
+                    "inquiry_channel_mention": f"<#{inquiry_channel_id}>", "bot_guide_channel_mention": f"<#{bot_guide_channel_id}>",
+                    "festival_channel_mention": f"<#{festival_channel_id}>"
+                }
+                embed = format_embed_from_db(embed_data, **format_args)
+                await ch.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
+        except Exception as e:
+            logger.error(f"メインチャット歓迎メッセージ送信失敗: {e}", exc_info=True); return "メインチャットチャンネルへのメッセージ送信に失敗しました。"
         return None
         
     async def _send_rejection_log(self, moderator: discord.Member, member: discord.Member, reason: str) -> Optional[str]:
