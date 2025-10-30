@@ -388,21 +388,42 @@ class IntroductionPanelView(ui.View):
         super().__init__(timeout=None)
         self.introduction_cog = cog_instance
     
+    # [핵심 수정] 버튼 정보를 가져오지 못하더라도 오류가 발생하지 않도록 안정성을 강화합니다.
     async def setup_buttons(self):
         self.clear_items()
         components = await get_panel_components_from_db('introduction')
-        # [수정] 컴포넌트를 찾지 못했을 때를 대비한 안정성 코드
+        
         if not components:
-            logger.warning("自己紹介パネルのボタンコンポーネントがDBに見つかりませんでした。")
+            logger.warning("自己紹介パネルのボタンコンポーネントがDBに見つかりませんでした。デフォルトボタンを使用します。")
+            # DB 정보가 없을 경우를 대비해 기본 버튼을 추가합니다.
+            button = ui.Button(label="自己紹介を作成する", style=discord.ButtonStyle.success, emoji="📝", custom_id="start_introduction")
+            button.callback = self.start_introduction_callback
+            self.add_item(button)
             return
 
         button_info = components[0]
+        if not isinstance(button_info, dict):
+            logger.error(f"DBから取得したボタン情報が無効です: {button_info}")
+            return
+            
+        style_map = {
+            "primary": discord.ButtonStyle.primary, "secondary": discord.ButtonStyle.secondary,
+            "success": discord.ButtonStyle.success, "danger": discord.ButtonStyle.danger,
+            "link": discord.ButtonStyle.link,
+        }
+        button_style = style_map.get(button_info.get("style", "secondary").lower(), discord.ButtonStyle.secondary)
+
         button = ui.Button(
-            label=button_info.get('label'),
-            style=discord.ButtonStyle.success,
+            label=button_info.get('label', '自己紹介を作成する'),
+            style=button_style,
             emoji=button_info.get('emoji'),
             custom_id=button_info.get('component_key')
         )
+        
+        if not button.custom_id:
+            logger.error("DBから取得したボタン情報に 'component_key' がありません。")
+            return
+
         button.callback = self.start_introduction_callback
         self.add_item(button)
 
