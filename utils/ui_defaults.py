@@ -20,7 +20,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 90
     },
     "role_staff_deputy_chief": {
-        "name": "フグ鯖",
+        "name": "エンジニア",
         "is_prefix": True,
         "priority": 85
     },
