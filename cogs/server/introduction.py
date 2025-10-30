@@ -23,7 +23,7 @@ class RejectionReasonModal(ui.Modal, title="拒否事由入力"):
     async def on_submit(self, interaction: discord.Interaction): await interaction.response.defer()
 
 class IntroductionModal(ui.Modal, title="自己紹介"):
-    name = ui.TextInput(label="名前", placeholder="サーバーで使用する名前を記入してください", required=True, max_length=32) # Discord 최대치인 32로 완화
+    name = ui.TextInput(label="名前", placeholder="サーバーで使用する名前を記入してください", required=True, max_length=32)
     hobby = ui.TextInput(label="趣味/好きなこと", placeholder="趣味や好きなことを自由にお書きください", style=discord.TextStyle.paragraph, required=True, max_length=500)
     path = ui.TextInput(label="参加経緯", placeholder="例: Disboard, ○○からの招待など", style=discord.TextStyle.paragraph, required=True, max_length=200)
     
@@ -391,8 +391,9 @@ class IntroductionPanelView(ui.View):
     async def setup_buttons(self):
         self.clear_items()
         components = await get_panel_components_from_db('introduction')
+        # [수정] 컴포넌트를 찾지 못했을 때를 대비한 안정성 코드
         if not components:
-            logger.warning("自己紹介パネルのコンポーネントが見つかりませんでした。")
+            logger.warning("自己紹介パネルのボタンコンポーネントがDBに見つかりませんでした。")
             return
 
         button_info = components[0]
