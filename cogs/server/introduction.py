@@ -166,7 +166,8 @@ class ApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
     
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
-        required_keys = ["role_approval", "role_staff_village_chief", "role_staff_deputy_chief"]
+        # [핵심 수정 1] 승인/거절 권한을 '管理人かも' 역할로만 제한합니다.
+        required_keys = ["role_staff_village_chief"]
         return await has_required_roles(interaction, required_keys)
     
     def _get_field_value(self, embed: discord.Embed, field_name: str) -> Optional[str]:
@@ -388,14 +389,12 @@ class IntroductionPanelView(ui.View):
         super().__init__(timeout=None)
         self.introduction_cog = cog_instance
     
-    # [핵심 수정] 버튼 정보를 가져오지 못하더라도 오류가 발생하지 않도록 안정성을 강화합니다.
     async def setup_buttons(self):
         self.clear_items()
         components = await get_panel_components_from_db('introduction')
         
         if not components:
             logger.warning("自己紹介パネルのボタンコンポーネントがDBに見つかりませんでした。デフォルトボタンを使用します。")
-            # DB 정보가 없을 경우를 대비해 기본 버튼을 추가합니다.
             button = ui.Button(label="自己紹介を作成する", style=discord.ButtonStyle.success, emoji="📝", custom_id="start_introduction")
             button.callback = self.start_introduction_callback
             self.add_item(button)
@@ -472,7 +471,8 @@ class Introduction(commands.Cog):
         self.approval_channel_id = get_id("onboarding_approval_channel_id")
         self.introduction_log_channel_id = get_id("introduction_channel_id")
         self.rejection_log_channel_id = get_id("introduction_rejection_log_channel_id")
-        self.approval_role_id = get_id("role_approval")
+        # [핵심 수정 2] 멘션할 역할을 '管理人かも' 역할로 변경합니다.
+        self.approval_role_id = get_id("role_staff_village_chief")
         self.main_chat_channel_id = get_id("main_chat_channel_id")
         self.private_age_log_channel_id = get_id("onboarding_private_age_log_channel_id")
         logger.info("[Introduction Cog] データベースから設定を正常にロードしました。")
