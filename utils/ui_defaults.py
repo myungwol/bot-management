@@ -907,8 +907,9 @@ UI_EMBEDS = {
 
 UI_PANEL_COMPONENTS = [
     {
+        # [수정] panel_key를 server_guide로 변경
         "component_key": "start_onboarding_guide",
-        "panel_key": "onboarding",
+        "panel_key": "server_guide",
         "component_type": "button",
         "label": "案内を読む",
         "style": "success",
@@ -916,13 +917,14 @@ UI_PANEL_COMPONENTS = [
         "row": 0,
         "order_in_row": 0
     },
+    # [추가] 새로운 주민 등록 패널용 버튼 추가
     {
-        "component_key": "request_nickname_change",
-        "panel_key": "nicknames",
+        "component_key": "start_introduction",
+        "panel_key": "introduction",
         "component_type": "button",
-        "label": "名前変更申請",
-        "style": "primary",
-        "emoji": "✒️",
+        "label": "住民登録証を作成する",
+        "style": "success",
+        "emoji": "📝",
         "row": 0,
         "order_in_row": 0
     },
@@ -1104,9 +1106,14 @@ SETUP_COMMAND_MAP = {
         "type": "panel", "cog_name": "RolePanel", "key": "auto_role_channel_id",
         "friendly_name": "역할 자동부여 패널", "channel_type": "text"
     },
-    "panel_onboarding": {
-        "type": "panel", "cog_name": "Onboarding", "key": "onboarding_panel_channel_id",
+    "panel_server_guide": {
+        "type": "panel", "cog_name": "Onboarding", "key": "server_guide_panel_channel_id",
         "friendly_name": "서버 안내 패널", "channel_type": "text"
+    },
+    # [추가] 새로운 주민 등록(자기소개) 패널 추가
+    "panel_introduction": {
+        "type": "panel", "cog_name": "Introduction", "key": "introduction_panel_channel_id",
+        "friendly_name": "주민 등록 패널", "channel_type": "text"
     },
     "panel_nicknames": {
         "type": "panel", "cog_name": "Nicknames", "key": "nickname_panel_channel_id",
