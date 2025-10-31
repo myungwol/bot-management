@@ -218,11 +218,6 @@ USABLE_ITEMS = {
 }
 
 UI_EMBEDS = {
-    "embed_main_chat_welcome": {
-    "title": "",
-    "description": "### 新しい隣人が増えました！みんなで温かい挨拶を交わしましょう。:sparkling_heart:\n**鯖での生活がもっと楽しくなるように、**\n**いくつかの便利な案内板を用意しました。:map:**\n### ┃ :fairy: 村の妖精（ボット）が気になりますか？\n　╰─➤ {bot_guide_channel_mention}チャンネルで使い方を確認してください。",
-    "color": 0x2ECC71
-    },
     "onboarding_guide_server": {
         "title": "",
         "description":
@@ -289,7 +284,7 @@ UI_EMBEDS = {
     },
     "welcome_embed": {
         "description":
-        "## 🎉 {guild_name}へようこそ！\n### {member_mention}さん、鯖の生活を始める前に、\n### 少し時間を取って<#1433405809848615053>チャンネルで\n### 鯖についての案内を受け、自己紹介を作成してください。\n### これから楽しい時間を過ごせることを願っています！ 😊",
+        "## 🎉 {guild_name}へようこそ！\n### {member_mention}さん、鯖の生活を始める前に、\n### 少し時間を取って<#1433405809848615053>チャンネルで\n### 自己紹介を作成してください。\n### これから楽しい時間を過ごせることを願っています！ 😊",
         "color": 0x3498DB
     },
     "panel_introduction": {
@@ -311,7 +306,7 @@ UI_EMBEDS = {
     },
     "embed_main_chat_welcome": {
         "title": "",
-        "description": "### 新しい隣人が増えました！みんなで温かい挨拶を交わしましょう。:sparkling_heart:\n**村での生活がもっと楽しくなるように、**\n**いくつかの便利な案内板を用意しました。:map:**\n### ┃ :house_with_garden: 村に馴染むのが難しいですか？\n　╰─➤ 助けが必要なときはいつでも{staff_role_mention}さんを訪ねてください！\n### ┃ :black_nib: 新しい名前が必要ですか？\n　╰─➤ {nickname_channel_mention}チャンネルで素敵な名前に変えられます。\n### ┃ :bell: お知らせを受け取りたいですか？\n　╰─➤ {role_channel_mention}で個性的な役職をもらってみましょう。\n### ┃ :love_letter: 何か良いアイデアが浮かびましたか？\n　╰─➤ {inquiry_channel_mention}に大切な意見を残してください。\n### ┃ :fairy: 村の妖精（ボット）が気になりますか？\n　╰─➤ {bot_guide_channel_mention}チャンネルで使い方を確認してください。\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n### ┃:circus_tent: 現在進行中の村祭り！\n　╰─➤ {festival_channel_mention}を確認してください。\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯",
+        "description": "### 新しい隣人が増えました！みんなで温かい挨拶を交わしましょう。:sparkling_heart:\n**鯖での生活がもっと楽しくなるように、**\n**いくつかの便利な案内板を用意しました。:map:**\n### ┃ :fairy: 村の妖精（ボット）が気になりますか？\n　╰─➤ {bot_guide_channel_mention}チャンネルで使い方を確認してください。",
         "color": 0x2ECC71
     },
     "panel_warning": {
