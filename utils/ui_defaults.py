@@ -15,17 +15,17 @@ UI_ROLE_KEY_MAP = {
         "priority": 100
     },
     "role_staff_village_chief": {
-        "name": "촌장",
+        "name": "123",
         "is_prefix": True,
         "priority": 90
     },
     "role_staff_deputy_chief": {
-        "name": "부촌장",
+        "name": "234",
         "is_prefix": True,
         "priority": 85
     },
     "role_approval": {
-        "name": "직원",
+        "name": "345",
         "is_prefix": True,
         "priority": 60
     },
