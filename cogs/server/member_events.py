@@ -40,15 +40,14 @@ class MemberEvents(commands.Cog):
             try:
                 role_ids_to_restore = backup.get('roles', [])
                 roles_to_restore = [
-                    role for role_id in role_ids_to_restore 
+                    role for role_id in role_ids_to_restore
                     if (role := member.guild.get_role(role_id)) is not None
                 ]
                 restored_nick = backup.get('nickname')
 
                 if roles_to_restore or restored_nick:
                     await member.edit(roles=roles_to_restore, nick=restored_nick, reason="서버 재참여로 인한 데이터 복구")
-                
-                # [수정] 모든 복구 작업이 성공적으로 끝난 후에 백업을 삭제합니다.
+
                 await delete_member_backup(member.id, member.guild.id)
                 logger.info(f"'{member.display_name}'님의 역할과 닉네임을 성공적으로 복구하고 백업 데이터를 삭제했습니다.")
             except discord.Forbidden:
@@ -56,7 +55,7 @@ class MemberEvents(commands.Cog):
             except Exception as e:
                 logger.error(f"'{member.display_name}'님 데이터 복구 중 예기치 않은 오류 발생: {e}", exc_info=True)
             return
-            
+
         try:
             await supabase.table('user_levels').upsert({
                 'user_id': member.id,
@@ -67,8 +66,9 @@ class MemberEvents(commands.Cog):
         except Exception as e:
             logger.error(f"'{member.display_name}'님의 초기 레벨 데이터 생성 중 오류 발생: {e}", exc_info=True)
 
-        initial_role_keys = ["role_guest"]
-        
+        # [수정] 초기 역할 목록에 role_notify_welcome, role_notify_dding 추가
+        initial_role_keys = ["role_notify_welcome", "role_notify_dding", "role_guest"]
+
         roles_to_add: List[discord.Role] = []
         missing_role_names: List[str] = []
         role_key_map = get_config("ROLE_KEY_MAP", {})
@@ -79,7 +79,7 @@ class MemberEvents(commands.Cog):
                 roles_to_add.append(role)
             else:
                 missing_role_names.append(role_key_map.get(key, key))
-        
+
         if roles_to_add:
             try:
                 await member.add_roles(*roles_to_add, reason="서버 참여 시 초기 역할 부여")
@@ -88,7 +88,7 @@ class MemberEvents(commands.Cog):
 
         if missing_role_names:
             logger.warning(f"초기 역할 중 일부를 찾을 수 없습니다: {', '.join(missing_role_names)}")
-        
+
         if self.welcome_channel_id and (channel := self.bot.get_channel(self.welcome_channel_id)):
             embed_data = await get_embed_from_db('welcome_embed')
             if embed_data:
@@ -108,7 +108,7 @@ class MemberEvents(commands.Cog):
             logger.info(f"'{member.display_name}'님이 서버를 떠나 역할과 닉네임을 DB에 백업했습니다.")
         except Exception as e:
             logger.error(f"'{member.display_name}'님 데이터 백업 중 오류 발생: {e}", exc_info=True)
-            
+
         if self.farewell_channel_id and (channel := self.bot.get_channel(self.farewell_channel_id)):
             embed_data = await get_embed_from_db('farewell_embed')
             if embed_data:
@@ -126,7 +126,7 @@ class MemberEvents(commands.Cog):
         if not key_role_id:
             logger.warning("부스트 감지: '개인 방 열쇠' 역할의 ID가 DB에 설정되지 않았습니다.")
             return
-        
+
         key_role = after.guild.get_role(key_role_id)
         if not key_role:
             logger.warning(f"부스트 감지: 서버에서 '개인 방 열쇠' 역할(ID: {key_role_id})을 찾을 수 없습니다.")
