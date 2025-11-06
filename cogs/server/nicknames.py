@@ -274,7 +274,7 @@ class Nicknames(commands.Cog):
         
         for prefix_name in prefix_hierarchy:
             if prefix_name in member_role_names:
-                prefix = f"『 {prefix_name} 』"
+                prefix = f"{prefix_name}"
                 break
         
         if base_name.strip():
@@ -283,7 +283,7 @@ class Nicknames(commands.Cog):
             current_nick = member.nick or member.name
             base = current_nick
             for p_name in prefix_hierarchy:
-                prefix_to_check = f"『 {p_name} 』"
+                prefix_to_check = f"{p_name}"
                 if current_nick.startswith(prefix_to_check):
                     base = re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", current_nick)
                     break
