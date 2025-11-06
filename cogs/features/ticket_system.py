@@ -36,7 +36,7 @@ class InquiryTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
         self.cog, self.target_type, self.specific_roles = cog, None, set()
-        self.target_select = ui.Select(placeholder="문의할 대상을 선택해주세요...", options=[discord.SelectOption(label="촌장/부촌장에게", value="master"), discord.SelectOption(label="사무소 직원 전체에게", value="general"), discord.SelectOption(label="특정 담당자에게", value="specific")])
+        self.target_select = ui.Select(placeholder="문의할 대상을 선택해주세요...", options=[discord.SelectOption(label="대표/부대표에게", value="master"), discord.SelectOption(label="관라자 전체에게", value="general"), discord.SelectOption(label="특정 담당 관리자에게", value="specific")])
         self.target_select.callback = self.select_target_callback; self.add_item(self.target_select)
         self.proceed_button = ui.Button(label="내용 입력하기", style=discord.ButtonStyle.success, row=2)
         self.proceed_button.callback = self.proceed_callback; self.add_item(self.proceed_button)
@@ -62,10 +62,10 @@ class InquiryTargetSelectView(ui.View):
 class ReportTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180); self.cog = cog
-    @ui.button(label="✅ 경찰관 포함하기", style=discord.ButtonStyle.success)
+    @ui.button(label="✅ 보안팀 포함하기", style=discord.ButtonStyle.success)
     async def include_police(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReportModal(self.cog, set(self.cog.report_roles))); await interaction.delete_original_response()
-    @ui.button(label="❌ 경찰관 제외하기", style=discord.ButtonStyle.danger)
+    @ui.button(label="❌ 보안팀팀 제외하기", style=discord.ButtonStyle.danger)
     async def exclude_police(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReportModal(self.cog, set())); await interaction.delete_original_response()
 
@@ -150,7 +150,7 @@ class TicketControlView(ui.View):
 
     async def delete(self, interaction: discord.Interaction):
         if not await self._check_master_permission(interaction):
-            return await interaction.response.send_message("❌ `촌장`, `부촌장`만 이 버튼을 사용할 수 있습니다.", ephemeral=True)
+            return await interaction.response.send_message("❌ `대표`, `부대표`만 이 버튼을 사용할 수 있습니다.", ephemeral=True)
         await interaction.response.send_message(f"✅ 5초 후에 이 티켓을 삭제합니다.")
         await asyncio.sleep(5)
         try: await interaction.channel.delete(reason=f"{interaction.user.display_name}이(가) 삭제")
