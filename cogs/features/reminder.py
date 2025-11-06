@@ -1,9 +1,10 @@
-# cogs/features/reminder.py (최종 수정본)
+# cogs/server/reminder.py
 
 import discord
 from discord.ext import commands, tasks
+import asyncio
 import logging
-from typing import Dict
+from typing import Optional, Dict
 from datetime import datetime, timedelta, timezone
 
 from utils.database import get_id, schedule_reminder, get_due_reminders, deactivate_reminder
@@ -13,25 +14,20 @@ logger = logging.getLogger(__name__)
 REMINDER_CONFIG = {
     'disboard': {
         'bot_id': 302050872383242240,
-        'cooltime': 7200,
-        'keyword': "表示順をアップしたよ",
+        'cooltime': 7200,  # 2시간
+        'keyword': "서버 갱신 완료!", # Disboard는 그대로 유지
         'command': "/bump",
         'name': "Disboard BUMP"
     },
+    # ▼▼▼ [핵심 수정] dissoku 부분을 dicoall 정보로 변경 ▼▼▼
     'dicoall': {
-        'bot_id': 903541413298450462,
-        'cooltime': 3600,
-        'keyword': "サーバーが上位に表示されました。",
+        'bot_id': 664647740877176832, # Dicoall 봇 ID
+        'cooltime': 3600,  # 1시간
+        'keyword': "서버가 상단에 표시되었습니다. ", # Dicoall의 응답 메시지 키워드
         'command': "/up",
-        'name': "Dicoall UP"
-    },
-    'dissoku': {
-        'bot_id': 761562078095867916,
-        'cooltime': 7200,
-        'keyword': "をアップしたよ!",
-        'command': "/up",
-        'name': "ディス速 UP"
+        'name': "Dicoall UP" # 사용자에게 보여질 이름
     }
+    # ▲▲▲ [핵심 수정] 종료 ▲▲▲
 }
 
 class Reminder(commands.Cog):
@@ -52,13 +48,10 @@ class Reminder(commands.Cog):
             'channel_id': get_id("bump_reminder_channel_id"),
             'role_id': get_id("bump_reminder_role_id")
         }
+        # [수정] dissoku -> dicoall
         self.configs['dicoall'] = {
             'channel_id': get_id("dicoall_reminder_channel_id"),
             'role_id': get_id("dicoall_reminder_role_id")
-        }
-        self.configs['dissoku'] = {
-            'channel_id': get_id("dissoku_reminder_channel_id"),
-            'role_id': get_id("dissoku_reminder_role_id")
         }
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
@@ -67,50 +60,20 @@ class Reminder(commands.Cog):
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
 
-        embed = message.embeds[0]
-        full_embed_text = self.get_full_embed_text(embed)
-
-        for key, config in REMINDER_CONFIG.items():
-            if message.author.id == config['bot_id'] and config['keyword'] in full_embed_text:
-                await self.schedule_new_reminder(key, message.guild)
-                logger.info(f"[{message.guild.name}] 서버에서 '{config['name']}' 키워드를 (새 메시지에서) 감지했습니다. 알림 예약을 시작합니다.")
-                break
-    
-    # ▼▼▼▼▼ Dissoku 문제를 해결하기 위한 '메시지 수정' 감지 리스너 ▼▼▼▼▼
-    @commands.Cog.listener()
-    async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        if not self.bot.is_ready() or after.guild is None or not after.embeds or not after.author.bot:
+        # [안정성 강화] 임베드가 비어있을 경우를 대비
+        if not message.embeds[0].description:
             return
 
-        after_embed = after.embeds[0]
-        after_embed_text = self.get_full_embed_text(after_embed)
-
-        # 수정 전 메시지의 텍스트도 확인하여 중복 실행 방지
-        before_embed_text = ""
-        if before.embeds:
-            before_embed_text = self.get_full_embed_text(before.embeds[0])
+        embed_description = message.embeds[0].description
 
         for key, config in REMINDER_CONFIG.items():
-            # 수정 후 키워드가 있고, 수정 전에는 키워드가 없었을 때만 실행
-            if after.author.id == config['bot_id'] and config['keyword'] in after_embed_text and config['keyword'] not in before_embed_text:
-                await self.schedule_new_reminder(key, after.guild)
-                logger.info(f"[{after.guild.name}] 서버에서 '{config['name']}' 키워드를 (메시지 수정을 통해) 감지했습니다. 알림 예약을 시작합니다.")
+            # [안정성 강화] 봇 ID가 일치하는지 먼저 확인
+            if message.author.id == config['bot_id'] and config['keyword'] in embed_description:
+                await self.schedule_new_reminder(key, message.guild)
                 break
-    # ▲▲▲▲▲ 코드 추가 완료 ▲▲▲▲▲
 
-    def get_full_embed_text(self, embed: discord.Embed) -> str:
-        """임베드에서 모든 텍스트를 추출하여 하나의 문자열로 합칩니다."""
-        parts = []
-        if embed.title: parts.append(embed.title)
-        if embed.description: parts.append(embed.description)
-        for field in embed.fields:
-            if field.name: parts.append(field.name)
-            if field.value: parts.append(field.value)
-        return "\n".join(parts)
-                
     async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
         if not self.configs.get(reminder_type) or not self.configs[reminder_type].get('channel_id') or not self.configs[reminder_type].get('role_id'):
-            logger.warning(f"[{guild.name}] 서버의 {reminder_type} 알림 설정(채널/역할 ID)이 로드되지 않아 스케줄링을 건너뜁니다.")
             return
 
         config = REMINDER_CONFIG[reminder_type]
@@ -137,8 +100,8 @@ class Reminder(commands.Cog):
                 config = REMINDER_CONFIG.get(reminder_type)
                 reminder_settings = self.configs.get(reminder_type)
 
-                if not config or not reminder_settings or not reminder_settings.get('channel_id') or not reminder_settings.get('role_id'):
-                    logger.warning(f"알림(ID: {reminder['id']})의 타입({reminder_type})이 유효하지 않거나 설정이 없어 비활성화합니다.")
+                if not config or not reminder_settings:
+                    logger.warning(f"알림(ID: {reminder['id']})의 타입({reminder_type})이 유효하지 않아 비활성화합니다.")
                     await deactivate_reminder(reminder['id'])
                     continue
                 
@@ -151,7 +114,7 @@ class Reminder(commands.Cog):
                     continue
 
                 try:
-                    message = f"⏰ {role.mention} {config['name']} の時間です！ `{config['command']}` を入力してください！"
+                    message = f"⏰ {role.mention} {config['name']} 시간입니다! `{config['command']}`를 입력해주세요!"
                     await channel.send(message, allowed_mentions=discord.AllowedMentions(roles=True))
                     logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']})")
                 except discord.Forbidden:
@@ -169,5 +132,4 @@ class Reminder(commands.Cog):
         await self.bot.wait_until_ready()
 
 async def setup(bot: commands.Bot):
-    cog = Reminder(bot)
-    await bot.add_cog(cog)
+    await bot.add_cog(Reminder(bot))
