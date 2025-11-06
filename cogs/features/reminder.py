@@ -23,7 +23,7 @@ REMINDER_CONFIG = {
     'dicoall': {
         'bot_id': 664647740877176832, # Dicoall 봇 ID
         'cooltime': 3600,  # 1시간
-        'keyword': "서버가 상단에 표시되었습니다. ", # Dicoall의 응답 메시지 키워드
+        'keyword': "서버가 상단에 표시되었습니다. 🎉", # Dicoall의 응답 메시지 키워드
         'command': "/up",
         'name': "Dicoall UP" # 사용자에게 보여질 이름
     }
