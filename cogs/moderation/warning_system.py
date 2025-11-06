@@ -16,9 +16,9 @@ from utils.helpers import format_embed_from_db, has_required_roles
 logger = logging.getLogger(__name__)
 
 # --- 다른 클래스들은 변경사항이 없으므로 생략합니다 ---
-class WarningModal(ui.Modal, title="벌점 내용 입력"):
-    amount = ui.TextInput(label="벌점 횟수", placeholder="부여할 벌점 횟수를 숫자로 입력 (예: 1)", required=True, max_length=2)
-    reason = ui.TextInput(label="벌점 사유", placeholder="벌점을 발급하는 이유를 구체적으로 기입해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=500)
+class WarningModal(ui.Modal, title="경고 내용 입력"):
+    amount = ui.TextInput(label="경고 횟수", placeholder="부여할 경고 횟수를 숫자로 입력 (예: 1)", required=True, max_length=2)
+    reason = ui.TextInput(label="경고 사유", placeholder="경고을 발급하는 이유를 구체적으로 기입해주세요.", style=discord.TextStyle.paragraph, required=True, max_length=500)
 
     def __init__(self, cog: 'WarningSystem', target_member: discord.Member):
         super().__init__()
@@ -31,10 +31,10 @@ class WarningModal(ui.Modal, title="벌점 내용 입력"):
         try:
             amount_val = int(self.amount.value)
             if amount_val <= 0:
-                await interaction.followup.send("❌ 벌점 횟수는 1 이상의 자연수를 입력해주세요.", ephemeral=True)
+                await interaction.followup.send("❌ 경고 횟수는 1 이상의 자연수를 입력해주세요.", ephemeral=True)
                 return
         except (ValueError, TypeError):
-            await interaction.followup.send("❌ 벌점점 횟수는 숫자로 입력해주세요.", ephemeral=True)
+            await interaction.followup.send("❌ 경고 횟수는 숫자로 입력해주세요.", ephemeral=True)
             return
 
         try:
@@ -49,7 +49,7 @@ class WarningModal(ui.Modal, title="벌점 내용 입력"):
             new_total = response.data
         except Exception as e:
             logger.error(f"add_warning_and_get_total RPC 호출 실패: {e}", exc_info=True)
-            await interaction.followup.send("❌ 벌점 처리 중 데이터베이스 오류가 발생했습니다.", ephemeral=True)
+            await interaction.followup.send("❌ 경고 처리 중 데이터베이스 오류가 발생했습니다.", ephemeral=True)
             return
 
         await self.cog.update_warning_roles(self.target_member, new_total)
@@ -63,16 +63,16 @@ class WarningModal(ui.Modal, title="벌점 내용 입력"):
         )
         
         try:
-            dm_embed = discord.Embed(title=f"🚨 {interaction.guild.name}에서 벌점이 부여되었습니다", color=0xED4245)
+            dm_embed = discord.Embed(title=f"🚨 {interaction.guild.name}에서 경고가 부여되었습니다", color=0xED4245)
             dm_embed.add_field(name="사유", value=self.reason.value, inline=False)
-            dm_embed.add_field(name="부여된 벌점 횟수", value=f"{amount_val}회", inline=True)
-            dm_embed.add_field(name="누적 벌점 횟수", value=f"{new_total}회", inline=True)
+            dm_embed.add_field(name="부여된 경고 횟수", value=f"{amount_val}회", inline=True)
+            dm_embed.add_field(name="누적 경고 횟수", value=f"{new_total}회", inline=True)
             dm_embed.set_footer(text="궁금한 점이 있다면 문의 티켓을 이용해주세요.")
             await self.target_member.send(embed=dm_embed)
         except discord.Forbidden:
             logger.warning(f"{self.target_member.display_name}님에게 DM을 보낼 수 없어 벌점 알림을 보내지 못했습니다.")
             
-        await interaction.followup.send(f"✅ {self.target_member.mention} 님에게 **{amount_val}회** 의 벌점을 성공적으로 부여했습니다. (누적: {new_total}회)", ephemeral=True)
+        await interaction.followup.send(f"✅ {self.target_member.mention} 님에게 **{amount_val}회** 의 경고를 성공적으로 부여했습니다. (누적: {new_total}회)", ephemeral=True)
 
 
 class TargetUserSelectView(ui.View):
@@ -80,11 +80,11 @@ class TargetUserSelectView(ui.View):
         super().__init__(timeout=180)
         self.cog = cog
 
-    @ui.select(cls=ui.UserSelect, placeholder="벌점을 부여할 유저를 선택하세요.")
+    @ui.select(cls=ui.UserSelect, placeholder="경고를 부여할 유저를 선택하세요.")
     async def select_user(self, interaction: discord.Interaction, select: ui.UserSelect):
         target_user = select.values[0]
         if target_user.bot:
-            await interaction.response.send_message("❌ 봇에게는 벌점을 부여할 수 없습니다.", ephemeral=True)
+            await interaction.response.send_message("❌ 봇에게는 경고을 부여할 수 없습니다.", ephemeral=True)
             return
             
         modal = WarningModal(self.cog, target_user)
@@ -118,7 +118,7 @@ class WarningPanelView(ui.View):
     # ▼▼▼ [핵심 수정] 권한 확인 로직을 중앙 함수 호출로 변경 ▼▼▼
     async def on_button_click(self, interaction: discord.Interaction):
         required_keys = [POLICE_ROLE_KEY, "role_staff_village_chief", "role_staff_deputy_chief"]
-        error_message = "❌ 이 기능은 `촌장`, `부촌장`, `경찰관` 역할만 사용할 수 있습니다."
+        error_message = "❌ 이 기능은 `대표`, `부대표`, `포장 관리팀` 역할만 사용할 수 있습니다."
         
         if not await has_required_roles(interaction, required_keys, error_message):
             return
@@ -219,7 +219,7 @@ class WarningSystem(commands.Cog):
         embed_key = panel_key # "panel_warning"
 
         if not channel:
-            logger.warning(f"벌점 패널 채널을 찾을 수 없어 재생성할 수 없습니다.")
+            logger.warning(f"경고 패널 채널을 찾을 수 없어 재생성할 수 없습니다.")
             return False
 
         try:
@@ -244,7 +244,7 @@ class WarningSystem(commands.Cog):
             
             new_message = await channel.send(embed=embed, view=self.view_instance)
             await save_panel_id(base_panel_key, new_message.id, channel.id)
-            logger.info(f"✅ 벌점 패널을 성공적으로 새로 생성했습니다. (채널: #{channel.name})")
+            logger.info(f"✅ 경고 패널을 성공적으로 새로 생성했습니다. (채널: #{channel.name})")
             return True
         except Exception as e:
             logger.error(f"❌ {panel_key} 패널 재설치 중 오류 발생: {e}", exc_info=True)
