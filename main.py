@@ -63,16 +63,9 @@ class MyBot(commands.Bot):
         await self.load_all_extensions()
         
         cogs_with_persistent_views = [
-            "RolePanel", 
-            "Onboarding", # 서버 안내 Cog
-            "Introduction", # [추가] 주민 등록 Cog
-            "Nicknames", 
-            "TicketSystem", 
-            "CustomEmbed", 
-            "ItemSystem", 
-            "AnonymousBoard", 
-            "WarningSystem", 
-            "VoiceMaster"
+            "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
+            "CustomEmbed", "ItemSystem", "AnonymousBoard", 
+            "WarningSystem", "VoiceMaster"
         ]
         
         registered_views_count = 0
