@@ -38,29 +38,29 @@ class VoiceLogger(commands.Cog):
         embed = None
         if before.channel is None and after.channel is not None:
             embed = discord.Embed(
-                title="ボイスチャンネル参加 / 음성 채널 참여",
-                description=f"{member.mention} さんが **`{after.channel.name}`** チャンネルに参加しました。\n{member.mention} 님이 **`{after.channel.name}`** 채널에 참여했습니다.",
+                title="음성 채널 참여",
+                description=f"{member.mention} 님이 **`{after.channel.name}`** 채널에 참여했습니다.",
                 color=discord.Color.green(),
                 timestamp=datetime.now(timezone.utc)
             )
             embed.set_author(name=f"{member.display_name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
         elif before.channel is not None and after.channel is None:
             embed = discord.Embed(
-                title="ボイスチャンネル退出 / 음성 채널 퇴장",
-                description=f"{member.mention} さんが **`{before.channel.name}`** チャンネルから退出しました。\n{member.mention} 님이 **`{before.channel.name}`** 채널에서 나갔습니다.",
+                title="음성 채널 퇴장",
+                description=f"{member.mention} 님이 **`{before.channel.name}`** 채널에서 나갔습니다.",
                 color=discord.Color.dark_grey(),
                 timestamp=datetime.now(timezone.utc)
             )
             embed.set_author(name=f"{member.display_name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
         elif before.channel is not None and after.channel is not None:
             embed = discord.Embed(
-                title="ボイスチャンネル移動 / 음성 채널 이동",
-                description=f"{member.mention} さんがチャンネルを移動しました。\n{member.mention} 님이 채널을 이동했습니다.",
+                title="음성 채널 이동",
+                description=f"{member.mention} 님이 채널을 이동했습니다.",
                 color=discord.Color.blue(),
                 timestamp=datetime.now(timezone.utc)
             )
-            embed.add_field(name="移動元チャンネル / 기존 채널", value=f"`{before.channel.name}`", inline=False)
-            embed.add_field(name="移動先チャンネル / 새로운 채널", value=f"`{after.channel.name}`", inline=False)
+            embed.add_field(name="기존 채널", value=f"`{before.channel.name}`", inline=False)
+            embed.add_field(name="새로운 채널", value=f"`{after.channel.name}`", inline=False)
             embed.set_author(name=f"{member.display_name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
         
         if embed:
