@@ -173,12 +173,12 @@ UI_ROLE_KEY_MAP = {
 
     # --- 개인 정보 역할 (성별, 연령대) ---
     "role_info_male": {
-        "name": "남성",
+        "name": "남자",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_female": {
-        "name": "여성",
+        "name": "여자",
         "is_prefix": False,
         "priority": 0
     },
@@ -188,22 +188,22 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_info_age_70s": {
-        "name": "70년대생",
+        "name": "70",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_age_80s": {
-        "name": "80년대생",
+        "name": "80",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_age_90s": {
-        "name": "90년대생",
+        "name": "90",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_age_00s": {
-        "name": "00년대생",
+        "name": "00",
         "is_prefix": False,
         "priority": 0
     },
