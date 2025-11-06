@@ -10,27 +10,27 @@
 UI_ROLE_KEY_MAP = {
     # --- [핵심] 접두사 역할 및 우선순위 ---
     "role_admin_total": {
-        "name": "숲의 요정",
-        "is_prefix": True,
+        "name": "『 ⭐：엔지니어 』",
+        "is_prefix": False,
         "priority": 100
     },
     "role_staff_village_chief": {
-        "name": "123",
-        "is_prefix": True,
+        "name": "『 🧩：대표 』",
+        "is_prefix": False,
         "priority": 90
     },
     "role_staff_deputy_chief": {
-        "name": "234",
-        "is_prefix": True,
+        "name": "『 🌷：부 대 표 』",
+        "is_prefix": False,
         "priority": 85
     },
     "role_approval": {
-        "name": "345",
-        "is_prefix": True,
+        "name": "『🧺：바구니 』",
+        "is_prefix": False,
         "priority": 60
     },
     "role_premium_booster": {
-        "name": "후원자",
+        "name": "『 🍩：도넛』",
         "is_prefix": True,
         "priority": 55
     },
@@ -109,18 +109,18 @@ UI_ROLE_KEY_MAP = {
 
     # --- 그 외 접두사가 아닌 역할들 ---
     "role_staff_police": {
-        "name": "경찰관",
-        "is_prefix": False,
+        "name": "『 🫙：포 장 관 리 팀 』",
+        "is_prefix": True,
         "priority": 0
     },
     "role_staff_festival": {
-        "name": "축제 담당",
-        "is_prefix": False,
+        "name": "『 🍦：크 림 조 립 팀 』",
+        "is_prefix": True,
         "priority": 0
     },
     "role_staff_pr": {
-        "name": "홍보 담당",
-        "is_prefix": False,
+        "name": "『 🍯：시 럽 공 정 팀 』",
+        "is_prefix": True,
         "priority": 0
     },
     "role_staff_design": {
@@ -134,8 +134,8 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_staff_newbie_helper": {
-        "name": "도우미",
-        "is_prefix": False,
+        "name": "『 🍥：반 죽 제 조 팀 』",
+        "is_prefix": True,
         "priority": 0
     },
 
