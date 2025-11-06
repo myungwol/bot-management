@@ -129,8 +129,8 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_staff_secretary": {
-        "name": "서기",
-        "is_prefix": False,
+        "name": "『 🍫：기 계 공 정 팀 장 』",
+        "is_prefix": True,
         "priority": 0
     },
     "role_staff_newbie_helper": {
