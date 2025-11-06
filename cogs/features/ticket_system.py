@@ -62,10 +62,10 @@ class InquiryTargetSelectView(ui.View):
 class ReportTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180); self.cog = cog
-    @ui.button(label="✅ 보안팀 포함하기", style=discord.ButtonStyle.success)
+    @ui.button(label="✅ 포장 관리팀 포함하기", style=discord.ButtonStyle.success)
     async def include_police(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReportModal(self.cog, set(self.cog.report_roles))); await interaction.delete_original_response()
-    @ui.button(label="❌ 보안팀팀 제외하기", style=discord.ButtonStyle.danger)
+    @ui.button(label="❌ 포장 관리팀 제외하기", style=discord.ButtonStyle.danger)
     async def exclude_police(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReportModal(self.cog, set())); await interaction.delete_original_response()
 
