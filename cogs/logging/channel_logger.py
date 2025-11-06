@@ -46,9 +46,9 @@ class ChannelLogger(commands.Cog):
         user = await self.get_audit_log_user(channel.guild, discord.AuditLogAction.channel_create, channel)
         if not user or user.bot: return
 
-        embed = discord.Embed(title="チャンネル作成 / 채널 생성됨", color=discord.Color.green(), timestamp=datetime.now(timezone.utc))
-        embed.add_field(name="チャンネル / 채널", value=f"{channel.mention} (`{channel.name}`)", inline=False)
-        embed.add_field(name="作成者 / 생성자", value=f"{user.mention} (`{user.id}`)", inline=False)
+        embed = discord.Embed(title="채널 생성됨", color=discord.Color.green(), timestamp=datetime.now(timezone.utc))
+        embed.add_field(name="채널", value=f"{channel.mention} (`{channel.name}`)", inline=False)
+        embed.add_field(name="생성자", value=f"{user.mention} (`{user.id}`)", inline=False)
         await log_channel.send(embed=embed)
 
     @commands.Cog.listener()
@@ -59,9 +59,9 @@ class ChannelLogger(commands.Cog):
         user = await self.get_audit_log_user(channel.guild, discord.AuditLogAction.channel_delete, channel)
         if not user or user.bot: return
         
-        embed = discord.Embed(title="チャンネル削除 / 채널 삭제됨", color=discord.Color.dark_red(), timestamp=datetime.now(timezone.utc))
-        embed.add_field(name="チャンネル名 / 채널 이름", value=f"`{channel.name}`", inline=False)
-        embed.add_field(name="削除者 / 삭제한 사람", value=f"{user.mention} (`{user.id}`)", inline=False)
+        embed = discord.Embed(title="채널 삭제됨", color=discord.Color.dark_red(), timestamp=datetime.now(timezone.utc))
+        embed.add_field(name="채널 이름", value=f"`{channel.name}`", inline=False)
+        embed.add_field(name="삭제한 사람", value=f"{user.mention} (`{user.id}`)", inline=False)
         await log_channel.send(embed=embed)
 
     @commands.Cog.listener()
@@ -72,22 +72,22 @@ class ChannelLogger(commands.Cog):
         user = await self.get_audit_log_user(after.guild, discord.AuditLogAction.channel_update, after)
         if not user or user.bot: return
 
-        embed = discord.Embed(title="チャンネル更新 / 채널 업데이트됨", color=discord.Color.blue(), timestamp=datetime.now(timezone.utc))
+        embed = discord.Embed(title="채널 업데이트됨", color=discord.Color.blue(), timestamp=datetime.now(timezone.utc))
         changes = []
         if before.name != after.name:
-            changes.append(f"**名前 / 이름:** `{before.name}` → `{after.name}`")
+            changes.append(f"**이름:** `{before.name}` → `{after.name}`")
         if before.overwrites != after.overwrites:
-            changes.append("**権限が変更されました。/ 권한이 변경되었습니다.**")
+            changes.append("**권한이 변경되었습니다.**")
         if isinstance(before, discord.TextChannel) and isinstance(after, discord.TextChannel):
             if before.topic != after.topic:
-                changes.append(f"**トピック / 주제:** トピックが変更されました。/ 주제가 변경되었습니다.")
+                changes.append(f"**주제:** 주제가 변경되었습니다.")
         if isinstance(before, discord.VoiceChannel) and isinstance(after, discord.VoiceChannel):
              if before.user_limit != after.user_limit:
-                 changes.append(f"**人数制限 / 인원 제한:** `{before.user_limit}` → `{after.user_limit}`")
+                 changes.append(f"**인원 제한:** `{before.user_limit}` → `{after.user_limit}`")
         if changes:
             embed.description = "\n".join(changes)
-            embed.add_field(name="チャンネル / 채널", value=after.mention, inline=False)
-            embed.add_field(name="編集者 / 수정한 사람", value=f"{user.mention} (`{user.id}`)", inline=False)
+            embed.add_field(name="채널", value=after.mention, inline=False)
+            embed.add_field(name="수정한 사람", value=f"{user.mention} (`{user.id}`)", inline=False)
             await log_channel.send(embed=embed)
 
 async def setup(bot: commands.Bot):
