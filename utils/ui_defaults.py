@@ -87,7 +87,7 @@ UI_ROLE_KEY_MAP = {
         "priority": 10
     },
     "role_guest": {
-        "name": "여행객",
+        "name": "『 🌾：밀가루 』",
         "is_prefix": True,
         "priority": 5
     },
@@ -97,12 +97,12 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_resident_regular": {
-        "name": "단골",
+        "name": "『 🍪：쿠키 』",
         "is_prefix": True,
         "priority": 0
     },
     "role_resident_rookie": {
-        "name": "새내기",
+        "name": "『 🧈：버터 』",
         "is_prefix": True,
         "priority": 0
     },
@@ -173,12 +173,12 @@ UI_ROLE_KEY_MAP = {
 
     # --- 개인 정보 역할 (성별, 연령대) ---
     "role_info_male": {
-        "name": "남자",
+        "name": "『 👦：남자 』",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_female": {
-        "name": "여자",
+        "name": "『 👧：여자 』",
         "is_prefix": False,
         "priority": 0
     },
@@ -193,17 +193,17 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_info_age_80s": {
-        "name": "80",
+        "name": "『 🥪：𝟏𝟗𝟖𝟎 』",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_age_90s": {
-        "name": "90",
+        "name": "『 🥨：𝟏𝟗𝟗𝟎 』",
         "is_prefix": False,
         "priority": 0
     },
     "role_info_age_00s": {
-        "name": "00",
+        "name": "『 🥐：𝟐𝟎𝟎𝟎 』",
         "is_prefix": False,
         "priority": 0
     },
