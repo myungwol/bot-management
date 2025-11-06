@@ -207,10 +207,19 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": False,
         "priority": 0
     },
-
-    # --- 상점/아이템 역할 ---
     "role_personal_room_key": {
         "name": "마이룸 열쇠",
+        "is_prefix": False,
+        "priority": 0
+    },
+    "role_notify_dding": {
+        "name": "⊹ ₊ 띵 동 .ᐟ ⊹",
+        "is_prefix": False,
+        "priority": 0
+    },
+    # --- 상점/아이템 역할 ---
+    "role_notify_welcome": {
+        "name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗",
         "is_prefix": False,
         "priority": 0
     },
