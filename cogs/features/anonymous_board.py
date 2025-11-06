@@ -5,6 +5,7 @@ from discord.ext import commands
 import logging
 import asyncio
 from datetime import datetime, timezone, timedelta
+# ▼▼▼ [핵심 수정] 누락되었던 Optional을 import 합니다. ▼▼▼
 from typing import Optional
 
 from utils.database import (
@@ -16,13 +17,13 @@ from utils.helpers import format_embed_from_db, format_seconds_to_hms
 
 logger = logging.getLogger(__name__)
 
-# 日本標準時(JST)を表すtimezoneオブジェクト
-JST = timezone(timedelta(hours=9))
+# 한국 시간대(KST)를 나타내는 timezone 객체
+KST = timezone(timedelta(hours=9))
 
-class AnonymousModal(ui.Modal, title="匿名メッセージ作成"):
+class AnonymousModal(ui.Modal, title="익명 메시지 작성"):
     content = ui.TextInput(
-        label="内容",
-        placeholder="ここにメッセージを作成してください...",
+        label="내용",
+        placeholder="이곳에 메시지를 작성해주세요...",
         style=discord.TextStyle.paragraph,
         required=True,
         max_length=1500
@@ -45,16 +46,17 @@ class AnonymousModal(ui.Modal, title="匿名メッセージ作成"):
                 anonymous_embed.description = self.content.value
                 anonymous_embed.timestamp = datetime.now(timezone.utc)
             
+            # [수정] 익명 메시지를 보낼 채널을 interaction.channel 대신 self.cog.panel_channel로 명시합니다.
             target_channel = self.cog.panel_channel or interaction.channel
             await self.cog.regenerate_panel(target_channel, last_anonymous_embed=anonymous_embed)
             
-            message = await interaction.followup.send("✅ あなたの匿名メッセージは正常に送信されました。", ephemeral=True, wait=True)
+            message = await interaction.followup.send("✅ 당신의 익명 메시지가 성공적으로 전달되었습니다.", ephemeral=True, wait=True)
             await asyncio.sleep(5)
             await message.delete()
 
         except Exception as e:
             logger.error(f"익명 메시지 제출 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ メッセージを投稿中にエラーが発生しました。", ephemeral=True)
+            await interaction.followup.send("❌ 메시지를 투고하는 중 오류가 발생했습니다.", ephemeral=True)
 
 class AnonymousPanelView(ui.View):
     def __init__(self, cog: 'AnonymousBoard'):
@@ -68,7 +70,7 @@ class AnonymousPanelView(ui.View):
         
         button_info = components[0]
         button = ui.Button(
-            label=button_info.get('label', '匿名で作成する'),
+            label=button_info.get('label'),
             style=discord.ButtonStyle.secondary,
             emoji=button_info.get('emoji'),
             custom_id=button_info.get('component_key')
@@ -80,12 +82,12 @@ class AnonymousPanelView(ui.View):
         already_posted = await has_posted_anonymously_today(interaction.user.id)
         
         if already_posted:
-            now_jst = datetime.now(JST)
-            tomorrow_jst = now_jst.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            time_remaining_seconds = (tomorrow_jst - now_jst).total_seconds()
+            now_kst = datetime.now(KST)
+            tomorrow_kst = now_kst.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            time_remaining_seconds = (tomorrow_kst - now_kst).total_seconds()
             formatted_time = format_seconds_to_hms(time_remaining_seconds)
             
-            await interaction.response.send_message(f"❌ 今日はすでに投稿しました。次の投稿まで **{formatted_time}** 残っています。", ephemeral=True)
+            await interaction.response.send_message(f"❌ 오늘은 이미 글을 작성했습니다. 다음 작성까지 **{formatted_time}** 남았습니다.", ephemeral=True)
             return
             
         await interaction.response.send_modal(AnonymousModal(self.cog))
