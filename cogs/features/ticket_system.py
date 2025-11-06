@@ -12,47 +12,47 @@ from utils.ui_defaults import TICKET_MASTER_ROLES, TICKET_STAFF_GENERAL_ROLES, T
 logger = logging.getLogger(__name__)
 
 class TicketModal(ui.Modal):
-    title_input = ui.TextInput(label="件名", placeholder="チケットの件名を入力してください。", max_length=100)
-    content_input = ui.TextInput(label="内容", placeholder="詳細な内容を入力してください。", style=discord.TextStyle.paragraph, max_length=1000)
+    title_input = ui.TextInput(label="제목", placeholder="티켓 제목을 입력해주세요.", max_length=100)
+    content_input = ui.TextInput(label="내용", placeholder="자세한 내용을 입력해주세요.", style=discord.TextStyle.paragraph, max_length=1000)
     def __init__(self, cog: 'TicketSystem', ticket_type: str, selected_roles: Set[discord.Role]):
-        super().__init__(title=f"{'問い合わせ' if ticket_type == 'inquiry' else '通報'}内容入力", timeout=None)
+        super().__init__(title=f"{'문의' if ticket_type == 'inquiry' else '신고'} 내용 입력", timeout=None)
         self.cog, self.ticket_type, self.selected_roles = cog, ticket_type, selected_roles
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             final_title = self.title_input.value
-            if self.ticket_type == 'report': final_title = f"通報: {self.title_input.value}"
+            if self.ticket_type == 'report': final_title = f"신고: {self.title_input.value}"
             await self.cog.create_ticket(interaction, self.ticket_type, final_title, self.content_input.value, self.selected_roles)
         except Exception as e:
             logger.error(f"TicketModal on_submit에서 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ チケット作成中にエラーが発生しました。", ephemeral=True)
+            await interaction.followup.send("❌ 티켓을 만드는 중 오류가 발생했습니다.", ephemeral=True)
 
 class ReportModal(TicketModal):
     def __init__(self, cog: 'TicketSystem', selected_roles: Set[discord.Role]):
         super().__init__(cog, "report", selected_roles)
-        self.title = "通報内容入力"; self.children[0].label = "対象者"; self.children[0].placeholder = "通報する相手の名前を正確に入力してください。"
+        self.title = "신고 내용 입력"; self.children[0].label = "대상자"; self.children[0].placeholder = "신고할 상대방의 이름을 정확하게 입력해주세요."
 
 class InquiryTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
         self.cog, self.target_type, self.specific_roles = cog, None, set()
-        self.target_select = ui.Select(placeholder="問い合わせる対象を選択してください...", options=[discord.SelectOption(label="村長/副村長へ", value="master"), discord.SelectOption(label="役場職員全体へ", value="general"), discord.SelectOption(label="特定の担当者へ", value="specific")])
+        self.target_select = ui.Select(placeholder="문의할 대상을 선택해주세요...", options=[discord.SelectOption(label="촌장/부촌장에게", value="master"), discord.SelectOption(label="사무소 직원 전체에게", value="general"), discord.SelectOption(label="특정 담당자에게", value="specific")])
         self.target_select.callback = self.select_target_callback; self.add_item(self.target_select)
-        self.proceed_button = ui.Button(label="内容を入力する", style=discord.ButtonStyle.success, row=2)
+        self.proceed_button = ui.Button(label="내용 입력하기", style=discord.ButtonStyle.success, row=2)
         self.proceed_button.callback = self.proceed_callback; self.add_item(self.proceed_button)
     async def select_target_callback(self, interaction: discord.Interaction):
         self.target_type = interaction.data['values'][0]; self.target_select.disabled = True
         if self.target_type == "specific":
             specific_roles = [role for key in TICKET_STAFF_SPECIFIC_ROLES if (role_id := get_id(key)) and (role := self.cog.guild.get_role(role_id))]
             if specific_roles:
-                self.specific_role_select = ui.Select(placeholder="担当者を選択してください（複数選択可能）...", min_values=1, max_values=len(specific_roles), options=[discord.SelectOption(label=role.name, value=str(role.id)) for role in specific_roles])
+                self.specific_role_select = ui.Select(placeholder="담당자를 선택해주세요 (여러 명 선택 가능)...", min_values=1, max_values=len(specific_roles), options=[discord.SelectOption(label=role.name, value=str(role.id)) for role in specific_roles])
                 self.specific_role_select.callback = self.specific_role_callback; self.add_item(self.specific_role_select)
         await interaction.response.edit_message(view=self)
     async def specific_role_callback(self, interaction: discord.Interaction):
         self.specific_roles = {interaction.guild.get_role(int(role_id)) for role_id in interaction.data['values']}; await interaction.response.defer()
     async def proceed_callback(self, interaction: discord.Interaction):
-        if not self.target_type: return await interaction.response.send_message("問い合わせ対象を選択してください。", ephemeral=True)
-        if self.target_type == "specific" and not self.specific_roles: return await interaction.response.send_message("担当者を選択してください。", ephemeral=True)
+        if not self.target_type: return await interaction.response.send_message("문의 대상을 선택해주세요.", ephemeral=True)
+        if self.target_type == "specific" and not self.specific_roles: return await interaction.response.send_message("담당자를 선택해주세요.", ephemeral=True)
         selected_roles: Set[discord.Role] = set()
         if self.target_type == "master": selected_roles.update(self.cog.master_roles)
         elif self.target_type == "general": selected_roles.update(self.cog.staff_general_roles)
@@ -62,10 +62,10 @@ class InquiryTargetSelectView(ui.View):
 class ReportTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180); self.cog = cog
-    @ui.button(label="✅ 警察官を含める", style=discord.ButtonStyle.success)
+    @ui.button(label="✅ 경찰관 포함하기", style=discord.ButtonStyle.success)
     async def include_police(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReportModal(self.cog, set(self.cog.report_roles))); await interaction.delete_original_response()
-    @ui.button(label="❌ 警察官を除外する", style=discord.ButtonStyle.danger)
+    @ui.button(label="❌ 경찰관 제외하기", style=discord.ButtonStyle.danger)
     async def exclude_police(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReportModal(self.cog, set())); await interaction.delete_original_response()
 
@@ -76,11 +76,11 @@ class TicketControlView(ui.View):
         self.ticket_type = ticket_type
         
         if is_locked:
-            lock_button = ui.Button(label="ロック解除", style=discord.ButtonStyle.success, emoji="🔓", custom_id="ticket_toggle_lock")
+            lock_button = ui.Button(label="잠금 해제", style=discord.ButtonStyle.success, emoji="🔓", custom_id="ticket_toggle_lock")
         else:
-            lock_button = ui.Button(label="ロックする", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="ticket_toggle_lock")
+            lock_button = ui.Button(label="잠그기", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="ticket_toggle_lock")
         
-        delete_button = ui.Button(label="削除", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="ticket_delete")
+        delete_button = ui.Button(label="삭제", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="ticket_delete")
 
         lock_button.callback = self.toggle_lock
         delete_button.callback = self.delete
@@ -100,13 +100,13 @@ class TicketControlView(ui.View):
         is_master = await self._check_master_permission(interaction)
         is_handler = await self._check_handler_permission(interaction, self.ticket_type)
         can_lock = is_master or (self.ticket_type == "report" and is_handler)
-        if not can_lock: return await interaction.response.send_message("❌ このチケットを操作する権限がありません。", ephemeral=True)
+        if not can_lock: return await interaction.response.send_message("❌ 이 티켓을 조작할 권한이 없습니다.", ephemeral=True)
 
         thread = interaction.channel
         if not isinstance(thread, discord.Thread): return
 
         ticket_info = self.cog.tickets.get(thread.id)
-        if not ticket_info: return await interaction.response.send_message("❌ このチケットの情報が見つかりません。", ephemeral=True)
+        if not ticket_info: return await interaction.response.send_message("❌ 이 티켓의 정보를 찾을 수 없습니다.", ephemeral=True)
         
         owner = interaction.guild.get_member(ticket_info.get("owner_id"))
         is_currently_locked = ticket_info.get("is_locked", False)
@@ -118,7 +118,7 @@ class TicketControlView(ui.View):
                 if owner: await thread.add_user(owner)
                 await update_ticket_lock_status(thread.id, False)
                 self.cog.tickets[thread.id]['is_locked'] = False
-                await interaction.followup.send(f"✅ チケットのロックを解除しました。{owner.mention if owner else ''}さんを再度招待しました。", ephemeral=True)
+                await interaction.followup.send(f"✅ 티켓의 잠금을 해제했습니다. {owner.mention if owner else ''}님을 다시 초대했습니다.", ephemeral=True)
                 new_view = TicketControlView(self.cog, self.ticket_type, is_locked=False)
             else:
                 all_admin_roles = self.cog.master_roles + self.cog.staff_general_roles + self.cog.staff_specific_roles + self.cog.report_roles
@@ -138,7 +138,7 @@ class TicketControlView(ui.View):
                 await update_ticket_lock_status(thread.id, True)
                 self.cog.tickets[thread.id]['is_locked'] = True
                 removed_names = ", ".join([m.display_name for m in members_to_remove])
-                await interaction.followup.send(f"✅ 管理者以外のメンバー({removed_names})を除外してチケットをロックしました。", ephemeral=True)
+                await interaction.followup.send(f"✅ 관리자 외의 멤버({removed_names})를 제외하고 티켓을 잠갔습니다.", ephemeral=True)
                 new_view = TicketControlView(self.cog, self.ticket_type, is_locked=True)
 
             message_to_edit = await interaction.original_response()
@@ -146,14 +146,14 @@ class TicketControlView(ui.View):
             
         except Exception as e:
             logger.error(f"티켓 잠금/해제 중 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send("❌ チケットを処理中にエラーが発生しました。", ephemeral=True)
+            await interaction.followup.send("❌ 티켓을 처리하는 중 오류가 발생했습니다.", ephemeral=True)
 
     async def delete(self, interaction: discord.Interaction):
         if not await self._check_master_permission(interaction):
-            return await interaction.response.send_message("❌ `村長`、`副村長`のみがこのボタンを使用できます。", ephemeral=True)
-        await interaction.response.send_message(f"✅ 5秒後にこのチケットを削除します。")
+            return await interaction.response.send_message("❌ `촌장`, `부촌장`만 이 버튼을 사용할 수 있습니다.", ephemeral=True)
+        await interaction.response.send_message(f"✅ 5초 후에 이 티켓을 삭제합니다.")
         await asyncio.sleep(5)
-        try: await interaction.channel.delete(reason=f"{interaction.user.display_name}により削除")
+        try: await interaction.channel.delete(reason=f"{interaction.user.display_name}이(가) 삭제")
         except discord.NotFound: pass
 
 class TicketSystem(commands.Cog):
@@ -182,16 +182,16 @@ class TicketSystem(commands.Cog):
     def create_panel_view(self, panel_type: str):
         view = ui.View(timeout=None)
         if panel_type == "inquiry":
-            button = ui.Button(label="問い合わせ/提案", style=discord.ButtonStyle.primary, emoji="📨", custom_id="ticket_inquiry_panel")
+            button = ui.Button(label="문의/건의", style=discord.ButtonStyle.primary, emoji="📨", custom_id="ticket_inquiry_panel")
             async def callback(interaction: discord.Interaction):
-                if self.has_open_ticket(interaction.user, "inquiry"): return await interaction.response.send_message("❌ 既に参加中の問い合わせチケットがあります。", ephemeral=True)
-                await interaction.response.send_message("問い合わせる対象を選択してください。", view=InquiryTargetSelectView(self), ephemeral=True)
+                if self.has_open_ticket(interaction.user, "inquiry"): return await interaction.response.send_message("❌ 이미 참여 중인 문의 티켓이 있습니다.", ephemeral=True)
+                await interaction.response.send_message("문의할 대상을 선택해주세요.", view=InquiryTargetSelectView(self), ephemeral=True)
             button.callback = callback; view.add_item(button)
         elif panel_type == "report":
-            button = ui.Button(label="通報", style=discord.ButtonStyle.danger, emoji="🚨", custom_id="ticket_report_panel")
+            button = ui.Button(label="신고", style=discord.ButtonStyle.danger, emoji="🚨", custom_id="ticket_report_panel")
             async def callback(interaction: discord.Interaction):
-                if self.has_open_ticket(interaction.user, "report"): return await interaction.response.send_message("❌ 既に参加中の通報チケットがあります。", ephemeral=True)
-                await interaction.response.send_message("この通報に`警察官`を含めますか？", view=ReportTargetSelectView(self), ephemeral=True)
+                if self.has_open_ticket(interaction.user, "report"): return await interaction.response.send_message("❌ 이미 참여 중인 신고 티켓이 있습니다.", ephemeral=True)
+                await interaction.response.send_message("이 신고에 `경찰관`을 포함하시겠습니까?", view=ReportTargetSelectView(self), ephemeral=True)
             button.callback = callback; view.add_item(button)
         return view
 
@@ -218,7 +218,7 @@ class TicketSystem(commands.Cog):
         thread: Optional[discord.Thread] = None
         try:
             panel_channel = interaction.channel
-            thread_name = f"[{'問い合わせ' if ticket_type == 'inquiry' else '通報'}] {title}"
+            thread_name = f"[{'문의' if ticket_type == 'inquiry' else '신고'}] {title}"
             thread = await panel_channel.create_thread(name=thread_name, type=discord.ChannelType.private_thread)
             
             await add_ticket(thread.id, interaction.user.id, interaction.guild.id, ticket_type)
@@ -226,15 +226,15 @@ class TicketSystem(commands.Cog):
             self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type, "is_locked": False}
             
             embed = discord.Embed(title=title, description=content, color=discord.Color.blue() if ticket_type == "inquiry" else discord.Color.red())
-            embed.set_author(name=f"{interaction.user.display_name} さんの {ticket_type}", icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None)
+            embed.set_author(name=f"{interaction.user.display_name} 님의 {ticket_type}", icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None)
             await thread.send(embed=embed)
             
             final_roles_to_mention = set(self.master_roles) | selected_roles
             mention_string = ' '.join(role.mention for role in final_roles_to_mention)
             control_view = TicketControlView(self, ticket_type, is_locked=False)
-            await thread.send(f"{interaction.user.mention} {mention_string}\n**[チケット管理パネル]**", view=control_view, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
+            await thread.send(f"{interaction.user.mention} {mention_string}\n**[티켓 관리 패널]**", view=control_view, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
             
-            message = await interaction.followup.send(f"✅ プライベートチケットを作成しました: {thread.mention}", ephemeral=True, wait=True)
+            message = await interaction.followup.send(f"✅ 비공개 티켓을 만들었습니다: {thread.mention}", ephemeral=True, wait=True)
             await asyncio.sleep(5)
             await message.delete()
         except Exception as e:
@@ -242,15 +242,15 @@ class TicketSystem(commands.Cog):
             if thread:
                 logger.warning(f"오류로 인해 방금 생성된 티켓 스레드 '{thread.name}'(ID: {thread.id})을(를) 삭제합니다.")
                 try:
-                    await thread.delete(reason="作成プロセス中のエラーによる自動削除")
+                    await thread.delete(reason="생성 과정 오류로 인한 자동 삭제")
                 except (discord.NotFound, discord.Forbidden):
                     pass
             
             try:
                 if interaction.response.is_done():
-                    await interaction.followup.send("❌ チケット作成中にエラーが発生しました。しばらくしてからもう一度お試しください。", ephemeral=True)
+                    await interaction.followup.send("❌ 티켓을 만드는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
                 else:
-                    await interaction.response.send_message("❌ チケット作成中にエラーが発生しました。しばらくしてからもう一度お試しください。", ephemeral=True)
+                    await interaction.response.send_message("❌ 티켓을 만드는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
             except discord.NotFound:
                 pass
 
@@ -265,9 +265,9 @@ class TicketSystem(commands.Cog):
         view = self.create_panel_view(panel_type)
         embed = None
         if panel_type == "inquiry":
-            embed = discord.Embed(title="サーバーへの問い合わせ/提案", description="下のボタンを押して、サーバー運営に関する意見を送ってください。")
+            embed = discord.Embed(title="서버 문의/건의", description="아래 버튼을 눌러 서버 운영에 대한 의견을 보내주세요.")
         elif panel_type == "report":
-            embed = discord.Embed(title="ユーザー通報", description="サーバー内で不快な思いをしたり、問題を発見した場合は、下のボタンで通報してください。")
+            embed = discord.Embed(title="유저 신고", description="서버 내에서 불편을 겪거나 문제를 발견했다면 아래 버튼으로 신고해주세요.")
         if view and embed:
             try:
                 async for message in channel.history(limit=100):
