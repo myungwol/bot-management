@@ -84,50 +84,50 @@ class VCKickSelect(ui.Select):
         try: await interaction.delete_original_response()
         except discord.NotFound: pass
 
-class VCAddBlacklistSelect(ui.UserSelect):
-    def __init__(self, panel_view: 'ControlPanelView'):
-        self.panel_view = panel_view
-        super().__init__(placeholder="블랙리스트에 추가할 멤버를 선택하세요...", min_values=1, max_values=10)
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
-        if not vc:
-            msg = await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
-            asyncio.create_task(msg.delete(delay=5))
-            return
-        blacklisted = []
-        for member in self.values:
-            if isinstance(member, discord.Member) and member.id != self.panel_view.owner_id:
-                await vc.set_permissions(member, view_channel=False, reason=f"{interaction.user.display_name}에 의한 블랙리스트 추가")
-                if member in vc.members: await member.move_to(None, reason="블랙리스트에 추가됨")
-                blacklisted.append(member.mention)
-        msg = await interaction.followup.send(f"✅ {', '.join(blacklisted)} 님을 블랙리스트에 추가했습니다.", ephemeral=True)
-        asyncio.create_task(msg.delete(delay=5))
-        try: await interaction.delete_original_response()
-        except discord.NotFound: pass
+# class VCAddBlacklistSelect(ui.UserSelect):
+#     def __init__(self, panel_view: 'ControlPanelView'):
+#         self.panel_view = panel_view
+#         super().__init__(placeholder="블랙리스트에 추가할 멤버를 선택하세요...", min_values=1, max_values=10)
+#     async def callback(self, interaction: discord.Interaction):
+#         await interaction.response.defer(ephemeral=True)
+#         vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
+#         if not vc:
+#             msg = await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+#             asyncio.create_task(msg.delete(delay=5))
+#             return
+#         blacklisted = []
+#         for member in self.values:
+#             if isinstance(member, discord.Member) and member.id != self.panel_view.owner_id:
+#                 await vc.set_permissions(member, view_channel=False, reason=f"{interaction.user.display_name}에 의한 블랙리스트 추가")
+#                 if member in vc.members: await member.move_to(None, reason="블랙리스트에 추가됨")
+#                 blacklisted.append(member.mention)
+#         msg = await interaction.followup.send(f"✅ {', '.join(blacklisted)} 님을 블랙리스트에 추가했습니다.", ephemeral=True)
+#         asyncio.create_task(msg.delete(delay=5))
+#         try: await interaction.delete_original_response()
+#         except discord.NotFound: pass
 
-class VCRemoveBlacklistSelect(ui.Select):
-    def __init__(self, panel_view: 'ControlPanelView', blacklisted_members: List[discord.Member]):
-        self.panel_view = panel_view
-        options = [discord.SelectOption(label=member.display_name, value=str(member.id)) for member in blacklisted_members]
-        super().__init__(placeholder="블랙리스트에서 해제할 멤버를 선택하세요...", min_values=1, max_values=len(options), options=options)
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
-        if not vc or not interaction.guild:
-            msg = await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
-            asyncio.create_task(msg.delete(delay=5))
-            return
-        removed = []
-        for member_id_str in self.values:
-            member = interaction.guild.get_member(int(member_id_str))
-            if member:
-                await vc.set_permissions(member, overwrite=None, reason=f"{interaction.user.display_name}에 의한 블랙리스트 해제")
-                removed.append(member.mention)
-        msg = await interaction.followup.send(f"✅ {', '.join(removed)} 님을 블랙리스트에서 해제했습니다.", ephemeral=True)
-        asyncio.create_task(msg.delete(delay=5))
-        try: await interaction.delete_original_response()
-        except discord.NotFound: pass
+# class VCRemoveBlacklistSelect(ui.Select):
+#     def __init__(self, panel_view: 'ControlPanelView', blacklisted_members: List[discord.Member]):
+#         self.panel_view = panel_view
+#         options = [discord.SelectOption(label=member.display_name, value=str(member.id)) for member in blacklisted_members]
+#         super().__init__(placeholder="블랙리스트에서 해제할 멤버를 선택하세요...", min_values=1, max_values=len(options), options=options)
+#     async def callback(self, interaction: discord.Interaction):
+#         await interaction.response.defer(ephemeral=True)
+#         vc = self.panel_view.cog.bot.get_channel(self.panel_view.vc_id)
+#         if not vc or not interaction.guild:
+#             msg = await interaction.followup.send("❌ 채널을 찾을 수 없습니다.", ephemeral=True)
+#             asyncio.create_task(msg.delete(delay=5))
+#             return
+#         removed = []
+#         for member_id_str in self.values:
+#             member = interaction.guild.get_member(int(member_id_str))
+#             if member:
+#                 await vc.set_permissions(member, overwrite=None, reason=f"{interaction.user.display_name}에 의한 블랙리스트 해제")
+#                 removed.append(member.mention)
+#         msg = await interaction.followup.send(f"✅ {', '.join(removed)} 님을 블랙리스트에서 해제했습니다.", ephemeral=True)
+#         asyncio.create_task(msg.delete(delay=5))
+#         try: await interaction.delete_original_response()
+#         except discord.NotFound: pass
 
 class VCOwnerSelect(ui.UserSelect):
     def __init__(self, panel_view: 'ControlPanelView'):
@@ -157,13 +157,13 @@ class ControlPanelView(ui.View):
         if self.channel_type == '마이룸':
             self.add_item(ui.Button(label="초대", style=discord.ButtonStyle.success, emoji="📨", custom_id="vc_invite", row=1))
             self.add_item(ui.Button(label="내보내기", style=discord.ButtonStyle.danger, emoji="👢", custom_id="vc_kick", row=1))
-        elif self.channel_type in ['분수대', '놀이터', '벤치']:
-            self.add_item(ui.Button(label="블랙리스트 추가", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="vc_add_blacklist", row=0))
-            self.add_item(ui.Button(label="블랙리스트 해제", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="vc_remove_blacklist", row=1))
+        # elif self.channel_type in ['분수대', '놀이터', '벤치']:
+            # self.add_item(ui.Button(label="블랙리스트 추가", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="vc_add_blacklist", row=0))
+            # self.add_item(ui.Button(label="블랙리스트 해제", style=discord.ButtonStyle.secondary, emoji="🛡️", custom_id="vc_remove_blacklist", row=1))
         for item in self.children:
             if isinstance(item, ui.Button): item.callback = self.dispatch_button
     async def dispatch_button(self, interaction: discord.Interaction):
-        custom_id = interaction.data.get("custom_id"); dispatch_map = { "vc_edit": self.edit_channel, "vc_transfer": self.transfer_owner, "vc_invite": self.invite_user, "vc_kick": self.kick_user, "vc_add_blacklist": self.add_to_blacklist, "vc_remove_blacklist": self.remove_from_blacklist }
+        custom_id = interaction.data.get("custom_id"); dispatch_map = { "vc_edit": self.edit_channel, "vc_transfer": self.transfer_owner, "vc_invite": self.invite_user, "vc_kick": self.kick_user } #, "vc_add_blacklist": self.add_to_blacklist, "vc_remove_blacklist": self.remove_from_blacklist }
         if callback := dispatch_map.get(custom_id): await callback(interaction)
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         vc = self.cog.bot.get_channel(self.vc_id)
@@ -223,14 +223,14 @@ class ControlPanelView(ui.View):
         invited_members = [ target for target, overwrite in vc.overwrites.items() if isinstance(target, discord.Member) and target.id != self.owner_id and overwrite.connect is True ]
         if not invited_members: return await interaction.response.send_message("ℹ️ 초대된 멤버가 없습니다.", ephemeral=True)
         view = ui.View(timeout=180).add_item(VCKickSelect(self, invited_members)); await interaction.response.send_message("내보낼 멤버를 선택해주세요.", view=view, ephemeral=True)
-    async def add_to_blacklist(self, interaction: discord.Interaction):
-        view = ui.View(timeout=180).add_item(VCAddBlacklistSelect(self)); await interaction.response.send_message("블랙리스트에 추가할 멤버를 선택해주세요.", view=view, ephemeral=True)
-    async def remove_from_blacklist(self, interaction: discord.Interaction):
-        vc = self.cog.bot.get_channel(self.vc_id)
-        if not vc or not interaction.guild: return
-        blacklisted_members = [target for target, overwrite in vc.overwrites.items() if isinstance(target, discord.Member) and overwrite.view_channel is False]
-        if not blacklisted_members: return await interaction.response.send_message("ℹ️ 블랙리스트에 등록된 멤버가 없습니다.", ephemeral=True)
-        view = ui.View(timeout=180).add_item(VCRemoveBlacklistSelect(self, blacklisted_members)); await interaction.response.send_message("블랙리스트에서 해제할 멤버를 선택해주세요.", view=view, ephemeral=True)
+    # async def add_to_blacklist(self, interaction: discord.Interaction):
+    #     view = ui.View(timeout=180).add_item(VCAddBlacklistSelect(self)); await interaction.response.send_message("블랙리스트에 추가할 멤버를 선택해주세요.", view=view, ephemeral=True)
+    # async def remove_from_blacklist(self, interaction: discord.Interaction):
+    #     vc = self.cog.bot.get_channel(self.vc_id)
+    #     if not vc or not interaction.guild: return
+    #     blacklisted_members = [target for target, overwrite in vc.overwrites.items() if isinstance(target, discord.Member) and overwrite.view_channel is False]
+    #     if not blacklisted_members: return await interaction.response.send_message("ℹ️ 블랙리스트에 등록된 멤버가 없습니다.", ephemeral=True)
+    #     view = ui.View(timeout=180).add_item(VCRemoveBlacklistSelect(self, blacklisted_members)); await interaction.response.send_message("블랙리스트에서 해제할 멤버를 선택해주세요.", view=view, ephemeral=True)
 
 class VoiceMaster(commands.Cog):
     def __init__(self, bot: commands.Bot):
