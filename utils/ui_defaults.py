@@ -227,12 +227,12 @@ UI_ROLE_KEY_MAP = {
         "priority": 0
     },
     "role_notify_disboard": {
-        "name": "Disboard",
+        "name": "『 🍨 : 공장 홍보대사 』",
         "is_prefix": False,
         "priority": 0
     },
     "role_notify_up": {
-        "name": "Up",
+        "name": "『 🍭 : 공장 업 』",
         "is_prefix": False,
         "priority": 0
     },
