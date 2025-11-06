@@ -56,26 +56,26 @@ class MessageLogger(commands.Cog):
             if author.bot: return
             
         if deleter:
-            final_deleter_str = f"{author.mention if author else '作成者 / 작성자'} 本人 / 본인" if deleter.id == author_id else deleter.mention
+            final_deleter_str = f"{author.mention if author else '작성자'} 본인" if deleter.id == author_id else deleter.mention
         elif author:
-            final_deleter_str = f"{author.mention} 本人 / 본인"
+            final_deleter_str = f"{author.mention} 본인"
         else:
-            final_deleter_str = "不明 / 알 수 없음"
+            final_deleter_str = "알 수 없음"
 
-        content = message.content if message else "キャッシュされていません / 캐시되지 않음"
+        content = message.content if message else "캐시되지 않음"
         attachments = message.attachments if message else []
         
         desc = (
-            f"**作成者 / 작성자:** {author.mention if author else '不明 / 알 수 없음'}\n"
-            f"**チャンネル / 채널:** <#{payload.channel_id}>\n"
-            f"**削除者 / 삭제한 사람:** {final_deleter_str}\n"
+            f"**작성자:** {author.mention if author else '알 수 없음'}\n"
+            f"**채널:** <#{payload.channel_id}>\n"
+            f"**삭제한 사람:** {final_deleter_str}\n"
             f"━━━━━━━━━━━━━━━━\n"
-            f"**内容 / 내용:**\n>>> {content if content else '内容なし / 내용 없음'}"
+            f"**내용:**\n>>> {content if content else '내용 없음'}"
         )
-        embed = discord.Embed(title="メッセージ削除 / 메시지 삭제됨", description=desc, color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
-        embed.set_footer(text=f"作成者ID / 작성자 ID: {author_id if author_id else '不明 / 알 수 없음'}")
+        embed = discord.Embed(title="메시지 삭제됨", description=desc, color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
+        embed.set_footer(text=f"작성자 ID: {author_id if author_id else '알 수 없음'}")
         if attachments:
-            embed.add_field(name="添付ファイル / 첨부 파일", value="\n".join([f"[{att.filename}]({att.url})" for att in attachments]), inline=False)
+            embed.add_field(name="첨부 파일", value="\n".join([f"[{att.filename}]({att.url})" for att in attachments]), inline=False)
         await log_channel.send(embed=embed)
 
     @commands.Cog.listener()
@@ -85,14 +85,14 @@ class MessageLogger(commands.Cog):
         log_channel = await self.get_log_channel()
         if not log_channel: return
         desc = (
-            f"**作成者 / 작성자:** {after.author.mention}\n"
-            f"**チャンネル / 채널:** {after.channel.mention}\n"
-            f"**[編集後のメッセージへ移動 / 수정된 메시지로 이동]({after.jump_url})**"
+            f"**작성자:** {after.author.mention}\n"
+            f"**채널:** {after.channel.mention}\n"
+            f"**[수정된 메시지로 이동]({after.jump_url})**"
         )
-        embed = discord.Embed(title="メッセージ編集 / 메시지 수정됨", description=desc, color=discord.Color.gold(), timestamp=datetime.now(timezone.utc))
-        embed.add_field(name="編集前 / 수정 전", value=f"```\n{before.content}\n```" if before.content else "内容なし / 내용 없음", inline=False)
-        embed.add_field(name="編集後 / 수정 후", value=f"```\n{after.content}\n```" if after.content else "内容なし / 내용 없음", inline=False)
-        embed.set_footer(text=f"作成者ID / 작성자 ID: {after.author.id}")
+        embed = discord.Embed(title="메시지 수정됨", description=desc, color=discord.Color.gold(), timestamp=datetime.now(timezone.utc))
+        embed.add_field(name="수정 전", value=f"```\n{before.content}\n```" if before.content else "내용 없음", inline=False)
+        embed.add_field(name="수정 후", value=f"```\n{after.content}\n```" if after.content else "내용 없음", inline=False)
+        embed.set_footer(text=f"작성자 ID: {after.author.id}")
         await log_channel.send(embed=embed)
 
 async def setup(bot: commands.Bot):
