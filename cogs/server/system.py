@@ -162,10 +162,7 @@ class ServerSystem(commands.Cog):
         
         role_setup_actions = {
             "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", 
-            "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정",
-            # --- ▼▼▼ [추가] ディス速 역할 설정 추가 ▼▼▼ ---
-            "role_setup:dissoku_reminder_role_id": "[알림] ディス速 VOTE 알림 역할 설정"
-            # --- ▲▲▲ [추가] ▲▲▲ ---
+            "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정"
         }
         
         for key, name in role_setup_actions.items():
@@ -578,21 +575,10 @@ class ServerSystem(commands.Cog):
                         failure_list.append(f"・`{friendly_name}`: 스크립트 오류 발생.")
 
             embed = discord.Embed(title="⚙️ 모든 패널 재설치 결과", color=0x3498DB, timestamp=discord.utils.utcnow())
-
-            if success_list:
-                full_success_text = "\n".join(success_list)
-                for i in range(0, len(full_success_text), 1024):
-                    chunk = full_success_text[i:i+1024]
-                    field_name = "✅ 성공/요청" if i == 0 else "✅ 성공/요청 (계속)"
-                    embed.add_field(name=field_name, value=chunk, inline=False)
-
+            if success_list: embed.add_field(name="✅ 성공/요청", value="\n".join(success_list), inline=False)
             if failure_list:
                 embed.color = 0xED4245
-                full_failure_text = "\n".join(failure_list)
-                for i in range(0, len(full_failure_text), 1024):
-                    chunk = full_failure_text[i:i+1024]
-                    field_name = "❌ 실패" if i == 0 else "❌ 실패 (계속)"
-                    embed.add_field(name=field_name, value=chunk, inline=False)
+                embed.add_field(name="❌ 실패", value="\n".join(failure_list), inline=False)
             
             await interaction.edit_original_response(content="모든 패널 재설치가 완료되었습니다.", embed=embed)
 
