@@ -1544,14 +1544,35 @@ SETUP_COMMAND_MAP = {
         "type": "channel",
         "cog_name": "VoiceLogger",
         "key": "log_channel_voice",
-        "friendly_name": "[로그] 음성 채널 (참여/이동/퇴장)",
+        "friendly_name": "[로그] 음성 채널 활동",
         "channel_type": "text"
     },
-    "log_member": {
+    "log_member_join_leave": {
         "type": "channel",
-        "cog_name": "MemberLogger",
-        "key": "log_channel_member",
-        "friendly_name": "[로그] 멤버 활동 (역할 부여/닉네임)",
+        "cog_name": "JoinLeaveLogger",
+        "key": "log_channel_join_leave",
+        "friendly_name": "[로그] 서버 입장/퇴장",
+        "channel_type": "text"
+    },
+    "log_role": {
+        "type": "channel",
+        "cog_name": "RoleLogger",
+        "key": "log_channel_role",
+        "friendly_name": "[로그] 역할 (변경/부여/제거)",
+        "channel_type": "text"
+    },
+    "log_nickname": {
+        "type": "channel",
+        "cog_name": "NicknameLogger",
+        "key": "log_channel_nickname",
+        "friendly_name": "[로그] 별명 변경",
+        "channel_type": "text"
+    },
+    "log_moderation": {
+        "type": "channel",
+        "cog_name": "ModerationLogger",
+        "key": "log_channel_moderation",
+        "friendly_name": "[로그] 관리 활동 (추방/차단/타임아웃)",
         "channel_type": "text"
     },
     "log_channel": {
@@ -1565,7 +1586,7 @@ SETUP_COMMAND_MAP = {
         "type": "channel",
         "cog_name": "ServerLogger",
         "key": "log_channel_server",
-        "friendly_name": "[로그] 서버 및 역할 관리",
+        "friendly_name": "[로그] 서버 설정 변경",
         "channel_type": "text"
     },
     "log_warning": {
