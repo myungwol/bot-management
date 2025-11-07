@@ -1043,25 +1043,25 @@ UI_EMBEDS = {
         ]
     },
     "embed_reminder_disboard": {
-        "title": "⏰ Disboard BUMP 시간!",
+        "title": "⏰ Disboard BUMP 시간입니다!",
         "description": "서버를 홍보할 시간입니다!\n아래 명령어를 입력해주세요.\n\n> `/bump`",
         "color": 0x5865F2,
         "footer": { "text": "2시간마다 BUMP가 가능합니다." }
     },
     "embed_reminder_dicoall": {
-        "title": "⏰ Dicoall UP 시간!",
+        "title": "⏰ Dicoall UP 시간입니다!",
         "description": "서버 순위를 올릴 시간입니다!\n아래 명령어를 입력해주세요.\n\n> `/up`",
         "color": 0x2ECC71,
         "footer": { "text": "1시간마다 UP이 가능합니다." }
     },
     "embed_reminder_confirmation_disboard": {
-        "title": "✅ BUMP 확인!",
-        "description": "{user_mention}님이 **Disboard BUMP**로 서버를 홍보해주셨습니다.\n2시간 뒤에 다시 알려드릴게요. 감사합니다! 🥰",
+        "title": "서버 갱신 완료!",
+        "description": "DISBOARD에서 확인해 주세요!\n[DISBOARD](https://disboard.org/ko/server/1419879546752077867)",
         "color": 0x5865F2
     },
     "embed_reminder_confirmation_dicoall": {
-        "title": "✅ UP 확인!",
-        "description": "{user_mention}님이 **Dicoall UP**으로 서버 순위를 올려주셨습니다.\n1시간 뒤에 다시 알려드릴게요. 감사합니다! 🥰",
+        "title": "서버 갱신 완료!",
+        "description": "DICOALL에서 확인해 주세요!\n[DICOALL](https://kr.dicoall.com/server/1419879546752077867)",
         "color": 0x2ECC71
     }
 }
