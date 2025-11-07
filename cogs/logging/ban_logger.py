@@ -1,4 +1,5 @@
 # cogs/logging/ban_logger.py
+
 import discord
 from discord.ext import commands
 import logging
@@ -25,6 +26,7 @@ class BanLogger(commands.Cog):
         if not self.log_channel_id: return None
         return self.bot.get_channel(self.log_channel_id)
 
+    # ▼▼▼ [수정] on_member_ban 리스너 전체를 아래 코드로 교체 ▼▼▼
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User | discord.Member):
         log_channel = await self.get_log_channel()
@@ -34,6 +36,9 @@ class BanLogger(commands.Cog):
         try:
             async for entry in guild.audit_logs(action=discord.AuditLogAction.ban, limit=5, after=datetime.now(timezone.utc) - timedelta(seconds=5)):
                 if entry.target and entry.target.id == user.id and not entry.user.bot:
+                    # 임시 캐시에 유저 ID를 추가하여 leave_logger가 중복 기록하는 것을 방지
+                    self.bot.recently_moderated_users.add(user.id)
+
                     embed = discord.Embed(
                         title="🚫 멤버 차단됨",
                         description=f"{user.mention} 님이 서버에서 차단되었습니다.",
@@ -45,6 +50,13 @@ class BanLogger(commands.Cog):
                     if entry.reason:
                         embed.add_field(name="사유", value=entry.reason, inline=False)
                     await log_channel.send(embed=embed)
+
+                    # 10초 후에 캐시에서 ID를 자동으로 제거
+                    async def remove_from_cache():
+                        await asyncio.sleep(10)
+                        self.bot.recently_moderated_users.discard(user.id)
+                    asyncio.create_task(remove_from_cache())
+
                     return
         except discord.Forbidden:
             logger.warning(f"감사 로그 읽기 권한이 없습니다: {guild.name}")
