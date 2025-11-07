@@ -41,7 +41,7 @@ UI_ROLE_KEY_MAP = {
     "role_resident_veteran": {"name": "베테랑", "is_prefix": True, "priority": 4, "prefix_symbol": "veterαn", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_resident_regular": {"name": "『 🍪：쿠키 』", "is_prefix": True, "priority": 3, "prefix_symbol": "🍪", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
     "role_resident_rookie": {"name": "『 🧈：버터 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🧈", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_guest": {"name": "『 🌾：밀가루 』", "is_prefix": True, "priority": 1, "prefix_symbol": "🥛", "prefix_format": "⊰{symbol}⊱", "suffix": " ⸝⁺⊹"},
+    "role_guest": {"name": "『 🌾：밀가루 』", "is_prefix": True, "priority": 1, "prefix_symbol": "🌾", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
 
     # --- 그 외 접두사가 아닌 역할들 (우선순위 0) ---
     "role_staff_secretary": {"name": "『 🍫：기 계 공 정 팀 장 』", "is_prefix": False, "priority": 0},
