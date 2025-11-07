@@ -229,9 +229,14 @@ UI_EMBEDS = {
         "## 👋 다음에 또 만나요\n### **{member_name}**님이 마을을 떠났습니다.\n### 함께했던 모든 순간에 감사드립니다.\n### 앞으로의 여정에 행운이 가득하기를 바랍니다.",
         "color": 0x99AAB5
     },
-    "panel_roles": {
-        "title": "📖 역할 부여",
-        "description": "아래 메뉴에서 카테고리를 선택하고, 자신에게 필요한 역할을 받아가세요.",
+    "panel_notification_roles": {
+        "title": "🔔 알림 역할 부여",
+        "description": "아래 메뉴에서 받고 싶은 알림 역할을 선택하거나 해제할 수 있습니다.",
+        "color": 0x5865F2
+    },
+    "panel_game_roles": {
+        "title": "🎮 게임 역할 부여",
+        "description": "아래 메뉴에서 플레이하는 게임 역할을 선택하여 파티원을 찾아보세요!",
         "color": 0x5865F2
     },
     "panel_onboarding": {
@@ -1007,11 +1012,19 @@ UI_PANEL_COMPONENTS = [
     },
 ]
 SETUP_COMMAND_MAP = {
-    "panel_roles": {
+    "panel_notification_roles": {
         "type": "panel",
         "cog_name": "RolePanel",
-        "key": "auto_role_channel_id",
-        "friendly_name": "역할 자동부여 패널",
+        "key": "notification_role_panel_channel_id", # DB에 채널 ID를 저장할 새로운 키
+        "friendly_name": "[패널] 알림 역할 자동부여",
+        "channel_type": "text"
+    },
+    # ▼▼▼ [추가] 게임 역할 패널 설치 정보 ▼▼▼
+    "panel_game_roles": {
+        "type": "panel",
+        "cog_name": "RolePanel",
+        "key": "game_role_panel_channel_id", # DB에 채널 ID를 저장할 새로운 키
+        "friendly_name": "[패널] 게임 역할 자동부여",
         "channel_type": "text"
     },
     "panel_onboarding": {
@@ -1529,86 +1542,52 @@ ADMIN_ROLE_KEYS = [
     "role_approval"
 ]
 STATIC_AUTO_ROLE_PANELS = {
-    "panel_roles": {
-        "panel_key":
-        "panel_roles",
-        "embed_key":
-        "panel_roles",
+    # ▼▼▼ [수정] 알림 역할 패널 설정 ▼▼▼
+    "panel_notification_roles": {
+        "panel_key": "panel_notification_roles",
+        "embed_key": "panel_notification_roles",
         "categories": [
             {
                 "id": "notifications",
                 "label": "🔔 알림",
                 "description": "받고 싶은 알림을 선택하세요.",
                 "emoji": "🔔"
-            },
+            }
+        ],
+        "roles": {
+            "notifications": [
+                { "role_id_key": "role_notify_dding", "label": "⊹ ₊ 띵 동 .ᐟ ⊹" },
+                { "role_id_key": "role_notify_welcome", "label": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗" },
+                { "role_id_key": "role_notify_disboard", "label": "『 🍨 : 공장 홍보대사 』" },
+                { "role_id_key": "role_notify_up", "label": "『 🍭 : 공장 업 』" },
+            ]
+        }
+    },
+    # ▼▼▼ [추가] 게임 역할 패널 설정 ▼▼▼
+    "panel_game_roles": {
+        "panel_key": "panel_game_roles",
+        "embed_key": "panel_game_roles",
+        "categories": [
             {
                 "id": "games",
                 "label": "🎮 게임",
                 "description": "플레이하는 게임을 선택하세요.",
                 "emoji": "🎮"
-            },
+            }
         ],
         "roles": {
-            "notifications": [
-                {
-                    "role_id_key": "role_notify_dding",
-                    "label": "⊹ ₊ 띵 동 .ᐟ ⊹"
-                },
-                {
-                    "role_id_key": "role_notify_welcome",
-                    "label": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗"
-                },
-                {
-                    "role_id_key": "role_notify_disboard",
-                    "label": "『 🍨 : 공장 홍보대사 』"
-                },
-                {
-                    "role_id_key": "role_notify_up",
-                    "label": "『 🍭 : 공장 업 』"
-                },
-            ],
             "games": [
-                {
-                    "role_id_key": "role_game_tft",
-                    "label": "롤토체스"
-                },
-                {
-                    "role_id_key": "role_game_lol",
-                    "label": "리그오브레전드"
-                },
-                {
-                    "role_id_key": "role_game_valorant",
-                    "label": "발로란트"
-                },
-                {
-                    "role_id_key": "role_game_overwatch",
-                    "label": "오버워치"
-                },
-                {
-                    "role_id_key": "role_game_lostark",
-                    "label": "로스트아크"
-                },
-                {
-                    "role_id_key": "role_game_minecraft",
-                    "label": "마인크래프트"
-                },
-                {
-                    "role_id_key": "role_game_zombi",
-                    "label": "좀비고등학교"
-                },
-                {
-                    "role_id_key": "role_platform_steam",
-                    "label": "스팀 게임"
-                },
-                {
-                    "role_id_key": "role_platform_smartphone",
-                    "label": "모바일 게임"
-                },
-                {
-                    "role_id_key": "role_platform_switch",
-                    "label": "기타 게임"
-                },
-            ],
+                { "role_id_key": "role_game_tft", "label": "롤토체스" },
+                { "role_id_key": "role_game_lol", "label": "리그오브레전드" },
+                { "role_id_key": "role_game_valorant", "label": "발로란트" },
+                { "role_id_key": "role_game_overwatch", "label": "오버워치" },
+                { "role_id_key": "role_game_lostark", "label": "로스트아크" },
+                { "role_id_key": "role_game_minecraft", "label": "마인크래프트" },
+                { "role_id_key": "role_game_zombi", "label": "좀비고등학교" },
+                { "role_id_key": "role_platform_steam", "label": "스팀 게임" },
+                { "role_id_key": "role_platform_smartphone", "label": "모바일 게임" },
+                { "role_id_key": "role_platform_switch", "label": "기타 게임" },
+            ]
         }
     }
 }
