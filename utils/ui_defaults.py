@@ -59,21 +59,16 @@ UI_ROLE_KEY_MAP = {
     "role_notify_friends": {"name": "친구 모집", "is_prefix": False, "priority": 0},
     "role_notify_disboard": {"name": "『 🍨 : 공장 홍보대사 』", "is_prefix": False, "priority": 0},
     "role_notify_up": {"name": "『 🍭 : 공장 업 』", "is_prefix": False, "priority": 0},
-    "role_game_minecraft": {"name": "마인크래프트", "is_prefix": False, "priority": 0},
-    "role_game_valorant": {"name": "발로란트", "is_prefix": False, "priority": 0},
-    "role_game_overwatch": {"name": "오버워치", "is_prefix": False, "priority": 0},
-    "role_game_lol": {"name": "리그 오브 레전드", "is_prefix": False, "priority": 0},
-    "role_game_mahjong": {"name": "마작", "is_prefix": False, "priority": 0},
-    "role_game_amongus": {"name": "어몽어스", "is_prefix": False, "priority": 0},
-    "role_game_mh": {"name": "몬스터 헌터", "is_prefix": False, "priority": 0},
-    "role_game_genshin": {"name": "원신", "is_prefix": False, "priority": 0},
-    "role_game_apex": {"name": "에이펙스 레전드", "is_prefix": False, "priority": 0},
-    "role_game_ggd": {"name": "구스구스덕", "is_prefix": False, "priority": 0},
-    "role_game_gf": {"name": "갈틱폰", "is_prefix": False, "priority": 0},
-    "role_platform_steam": {"name": "스팀", "is_prefix": False, "priority": 0},
-    "role_platform_PC": {"name": "PC", "is_prefix": False, "priority": 0},
-    "role_platform_smartphone": {"name": "스마트폰", "is_prefix": False, "priority": 0},
-    "role_platform_switch": {"name": "콘솔", "is_prefix": False, "priority": 0},
+    "role_game_tft": {"name": "ʚ ♟️：롤토체스 ɞ", "is_prefix": False, "priority": 0},
+    "role_game_lol": {"name": "ʚ ⚔️：리그오브레전드 ɞ", "is_prefix": False, "priority": 0},
+    "role_game_valorant": {"name": "ʚ 🔫：발로란트 ɞ", "is_prefix": False, "priority": 0},
+    "role_game_overwatch": {"name": "ʚ ⏰：오버워치 ɞ", "is_prefix": False, "priority": 0},
+    "role_game_lostark": {"name": "ʚ ⏰：로스트아크 ɞ", "is_prefix": False, "priority": 0},
+    "role_game_minecraft": {"name": "ʚ ⛏️：마인크래프트 ɞ", "is_prefix": False, "priority": 0},
+    "role_game_zombi": {"name": "ʚ 🧟‍♂️：좀비고등학교 ɞ", "is_prefix": False, "priority": 0},
+    "role_platform_steam": {"name": "ʚ 🎮：스팀 게임 ɞ", "is_prefix": False, "priority": 0},
+    "role_platform_smartphone": {"name": "ʚ 🎮：모바일 게임 ɞ", "is_prefix": False, "priority": 0},
+    "role_platform_switch": {"name": "ʚ 🎮：기타 게임 ɞ", "is_prefix": False, "priority": 0},
     "role_warning_level_1": {"name": "『 🚫：경고 1 』", "is_prefix": False, "priority": 0},
     "role_warning_level_2": {"name": "『 🚫：경고 2 』", "is_prefix": False, "priority": 0},
     "role_warning_level_3": {"name": "『 🚫：경고 3 』", "is_prefix": False, "priority": 0},
@@ -1558,26 +1553,30 @@ STATIC_AUTO_ROLE_PANELS = {
         "roles": {
             "notifications": [
                 {
-                    "role_id_key": "role_notify_voice",
-                    "label": "통화 모집"
+                    "role_id_key": "role_notify_dding",
+                    "label": "⊹ ₊ 띵 동 .ᐟ ⊹"
                 },
                 {
-                    "role_id_key": "role_notify_friends",
-                    "label": "친구 모집"
+                    "role_id_key": "role_notify_welcome",
+                    "label": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗"
                 },
                 {
                     "role_id_key": "role_notify_disboard",
-                    "label": "Disboard"
+                    "label": "『 🍨 : 공장 홍보대사 』"
                 },
                 {
                     "role_id_key": "role_notify_up",
-                    "label": "Up"
+                    "label": "『 🍭 : 공장 업 』"
                 },
             ],
             "games": [
                 {
-                    "role_id_key": "role_game_minecraft",
-                    "label": "마인크래프트"
+                    "role_id_key": "role_game_tft",
+                    "label": "롤토체스"
+                },
+                {
+                    "role_id_key": "role_game_lol",
+                    "label": "리그오브레전드"
                 },
                 {
                     "role_id_key": "role_game_valorant",
@@ -1588,52 +1587,28 @@ STATIC_AUTO_ROLE_PANELS = {
                     "label": "오버워치"
                 },
                 {
-                    "role_id_key": "role_game_lol",
-                    "label": "리그 오브 레전드"
+                    "role_id_key": "role_game_lostark",
+                    "label": "로스트아크"
                 },
                 {
-                    "role_id_key": "role_game_mahjong",
-                    "label": "마작"
+                    "role_id_key": "role_game_minecraft",
+                    "label": "마인크래프트"
                 },
                 {
-                    "role_id_key": "role_game_amongus",
-                    "label": "어몽어스"
-                },
-                {
-                    "role_id_key": "role_game_mh",
-                    "label": "몬스터 헌터"
-                },
-                {
-                    "role_id_key": "role_game_genshin",
-                    "label": "원신"
-                },
-                {
-                    "role_id_key": "role_game_apex",
-                    "label": "에이펙스 레전드"
-                },
-                {
-                    "role_id_key": "role_game_ggd",
-                    "label": "구스구스덕"
-                },
-                {
-                    "role_id_key": "role_game_gf",
-                    "label": "갈틱폰"
+                    "role_id_key": "role_game_zombi",
+                    "label": "좀비고등학교"
                 },
                 {
                     "role_id_key": "role_platform_steam",
-                    "label": "스팀"
-                },
-                {
-                    "role_id_key": "role_platform_PC",
-                    "label": "PC"
+                    "label": "스팀 게임"
                 },
                 {
                     "role_id_key": "role_platform_smartphone",
-                    "label": "스마트폰"
+                    "label": "모바일 게임"
                 },
                 {
-                    "role_id_key": "role_platform_console",
-                    "label": "콘솔"
+                    "role_id_key": "role_platform_switch",
+                    "label": "기타 게임"
                 },
             ],
         }
