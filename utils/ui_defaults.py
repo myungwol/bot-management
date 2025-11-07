@@ -56,6 +56,7 @@ UI_ROLE_KEY_MAP = {
     "role_notify_dding": {"name": "⊹ ₊ 띵 동 .ᐟ ⊹", "is_prefix": False, "priority": 0},
     "role_notify_welcome": {"name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗", "is_prefix": False, "priority": 0},
     "role_notify_disboard": {"name": "『 🍨 : 공장 홍보대사 』", "is_prefix": False, "priority": 0},
+    "role_notify_ask": {"name": "『 🍳：에 스 크 알 림 』", "is_prefix": False, "priority": 0},
     "role_notify_up": {"name": "『 🍭 : 공장 업 』", "is_prefix": False, "priority": 0},
     "role_game_tft": {"name": "ʚ ♟️：롤토체스 ɞ", "is_prefix": False, "priority": 0},
     "role_game_lol": {"name": "ʚ ⚔️：리그오브레전드 ɞ", "is_prefix": False, "priority": 0},
@@ -1558,6 +1559,7 @@ STATIC_AUTO_ROLE_PANELS = {
             "notifications": [
                 { "role_id_key": "role_notify_dding", "label": "⊹ ₊ 띵 동 .ᐟ ⊹" },
                 { "role_id_key": "role_notify_welcome", "label": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗" },
+                { "role_id_key": "role_notify_ask", "label": "『 🍳：에 스 크 알 림 』" },
                 { "role_id_key": "role_notify_disboard", "label": "『 🍨 : 공장 홍보대사 』" },
                 { "role_id_key": "role_notify_up", "label": "『 🍭 : 공장 업 』" },
             ]
