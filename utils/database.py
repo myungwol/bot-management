@@ -353,3 +353,35 @@ async def get_user_abilities(user_id: int) -> List[str]:
         return abilities
     _user_abilities_cache[user_id] = ([], now)
     return []
+
+@supabase_retry_handler()
+async def get_last_sent_reminder_info(guild_id: int, reminder_type: str) -> Optional[Dict[str, Any]]:
+    """
+    가장 최근에 비활성화된(즉, 전송이 완료된) 알림의 정보를 가져옵니다.
+    sent_message_id가 있는 것만 가져옵니다.
+    """
+    response = await (
+        supabase.table('reminders')
+        .select('id, sent_message_id')
+        .eq('guild_id', guild_id)
+        .eq('reminder_type', reminder_type)
+        .eq('is_active', False)
+        .not_.is_('sent_message_id', 'null')
+        .order('remind_at', desc=True)
+        .limit(1)
+        .maybe_single()
+        .execute()
+    )
+    return response.data if response and response.data else None
+
+@supabase_retry_handler()
+async def store_sent_reminder_message_id(reminder_id: int, message_id: int):
+    """
+    알림을 보낸 후, 해당 알림 메시지의 ID를 DB에 저장합니다.
+    """
+    await (
+        supabase.table('reminders')
+        .update({"sent_message_id": message_id})
+        .eq('id', reminder_id)
+        .execute()
+    )
