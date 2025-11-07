@@ -29,11 +29,22 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": False,
         "priority": 60
     },
-    "role_premium_booster": {
-        "name": "『 🍩：도넛』",
-        "is_prefix": True,
-        "priority": 55
+
+        # --- 스태프 역할 (이제 접두사로 사용) ---
+    "role_staff_pr": {"name": "『 🍯：시 럽 공 정 팀 』", "is_prefix": True, "priority": 59, "prefix_symbol": "🍯", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    "role_staff_police": {"name": "『 🫙：포 장 관 리 팀 』", "is_prefix": True, "priority": 58, "prefix_symbol": "🫙", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    "role_staff_festival": {"name": "『 🍦：크 림 조 립 팀 』", "is_prefix": True, "priority": 57, "prefix_symbol": "🍦", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    "role_staff_newbie_helper": {"name": "『 🍥：반 죽 제 조 팀 』", "is_prefix": True, "priority": 56, "prefix_symbol": "🍥", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    
+    "role_premium_booster": {"name": "『 🍩：도넛』", "is_prefix": True, "priority": 55, "prefix_symbol": "🍩", "prefix_format": "〚{symbol}〛", "suffix": " ⸝⁺⊹"},
+    "role_resident": {"name": "『 🍪：쿠키 』", "is_prefix": True, "priority": 3, "prefix_symbol": "🍪", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
+    "role_resident_rookie": {"name": "『 🧈：버터 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🧈", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_guest": {
+        "name": "『 🌾：밀가루 』",
+        "is_prefix": False,
+        "priority": 5
     },
+    
     "role_resident_elder": {
         "name": "장로",
         "is_prefix": True,
@@ -60,7 +71,6 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": True,
         "priority": 16
     },
-    # [추가] 요리사 역할
     "role_job_chef": {
         "name": "요리사",
         "is_prefix": True,
@@ -81,95 +91,6 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": True,
         "priority": 15
     },
-    "role_resident": {
-        "name": "주민",
-        "is_prefix": True,
-        "priority": 10
-    },
-    "role_guest": {
-        "name": "『 🌾：밀가루 』",
-        "is_prefix": True,
-        "priority": 5
-    },
-    "role_resident_veteran": {
-        "name": "베테랑",
-        "is_prefix": True,
-        "priority": 0
-    },
-    "role_resident_regular": {
-        "name": "『 🍪：쿠키 』",
-        "is_prefix": True,
-        "priority": 0
-    },
-    "role_resident_rookie": {
-        "name": "『 🧈：버터 』",
-        "is_prefix": True,
-        "priority": 0
-    },
-
-    # --- 그 외 접두사가 아닌 역할들 ---
-    "role_staff_police": {
-        "name": "『 🫙：포 장 관 리 팀 』",
-        "is_prefix": True,
-        "priority": 0
-    },
-    "role_staff_festival": {
-        "name": "『 🍦：크 림 조 립 팀 』",
-        "is_prefix": True,
-        "priority": 0
-    },
-    "role_staff_pr": {
-        "name": "『 🍯：시 럽 공 정 팀 』",
-        "is_prefix": True,
-        "priority": 0
-    },
-    "role_staff_design": {
-        "name": "디자이너",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_staff_secretary": {
-        "name": "『 🍫：기 계 공 정 팀 장 』",
-        "is_prefix": True,
-        "priority": 0
-    },
-    "role_staff_newbie_helper": {
-        "name": "『 🍥：반 죽 제 조 팀 』",
-        "is_prefix": True,
-        "priority": 0
-    },
-
-    # --- 온보딩/역할 패널 구분선 역할 ---
-    "role_onboarding_step_1": {
-        "name": "════════════등급════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_onboarding_step_2": {
-        "name": "════════════정보════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_onboarding_step_3": {
-        "name": "════════════상점════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_onboarding_step_4": {
-        "name": "════════════알림════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_warning_separator": {
-        "name": "════════════벌점════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_shop_separator": {
-        "name": "════════════게임════════════",
-        "is_prefix": False,
-        "priority": 0
-    },
 
     # --- 개인 정보 역할 (성별, 연령대) ---
     "role_info_male": {
@@ -179,11 +100,6 @@ UI_ROLE_KEY_MAP = {
     },
     "role_info_female": {
         "name": "『 👧：여자 』",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_private": {
-        "name": "비공개",
         "is_prefix": False,
         "priority": 0
     },
@@ -207,31 +123,15 @@ UI_ROLE_KEY_MAP = {
         "is_prefix": False,
         "priority": 0
     },
-    "role_personal_room_key": {
-        "name": "마이룸 열쇠",
-        "is_prefix": False,
-        "priority": 0
-    },
+
+    # --- 알림 역할 ---
     "role_notify_dding": {
         "name": "⊹ ₊ 띵 동 .ᐟ ⊹",
         "is_prefix": False,
         "priority": 0
     },
-    # --- 상점/아이템 역할 ---
     "role_notify_welcome": {
         "name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗",
-        "is_prefix": False,
-        "priority": 0
-    },
-
-    # --- 알림 역할 ---
-    "role_notify_voice": {
-        "name": "통화 모집",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_notify_friends": {
-        "name": "친구 모집",
         "is_prefix": False,
         "priority": 0
     },
