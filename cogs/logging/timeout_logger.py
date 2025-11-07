@@ -1,4 +1,5 @@
 # cogs/logging/timeout_logger.py
+
 import discord
 from discord.ext import commands
 import logging
@@ -25,6 +26,7 @@ class TimeoutLogger(commands.Cog):
         if not self.log_channel_id: return None
         return self.bot.get_channel(self.log_channel_id)
 
+    # ▼▼▼ [수정] on_member_update 리스너 전체를 아래 코드로 교체 ▼▼▼
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if before.timed_out_until == after.timed_out_until: return
@@ -35,10 +37,14 @@ class TimeoutLogger(commands.Cog):
         entry = None
         try:
             async for audit_entry in after.guild.audit_logs(action=discord.AuditLogAction.member_update, limit=5, after=datetime.now(timezone.utc) - timedelta(seconds=5)):
+                # 감사 로그의 대상이 일치하고, 실행자가 봇이 아니며, 타임아웃 관련 변경사항이 있는지 확인
                 if audit_entry.target and audit_entry.target.id == after.id and not audit_entry.user.bot:
-                    # 'communication_disabled_until' 속성이 변경되었는지 확인
-                    if isinstance(audit_entry.changes.before, dict) and 'communication_disabled_until' in audit_entry.changes.before:
-                        entry = audit_entry
+                    # [핵심 수정] 올바른 변경사항 확인 방법
+                    for change in audit_entry.changes:
+                        if change.attribute == 'communication_disabled_until':
+                            entry = audit_entry
+                            break
+                    if entry:
                         break
         except discord.Forbidden:
             logger.warning(f"감사 로그 읽기 권한이 없습니다: {after.guild.name}")
@@ -70,7 +76,6 @@ class TimeoutLogger(commands.Cog):
         embed.set_author(name=f"{after.name} ({after.id})", icon_url=after.display_avatar.url if after.display_avatar else None)
         embed.add_field(name="실행자", value=f"{entry.user.mention} (`{entry.user.id}`)", inline=False)
         await log_channel.send(embed=embed)
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(TimeoutLogger(bot))
