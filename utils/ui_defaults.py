@@ -1217,13 +1217,6 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "자기소개 승인/거절 채널",
         "channel_type": "text"
     },
-    "channel_nickname_approval": {
-        "type": "channel",
-        "cog_name": "Nicknames",
-        "key": "nickname_approval_channel_id",
-        "friendly_name": "닉네임 변경 승인 채널",
-        "channel_type": "text"
-    },
     "channel_vc_creator_3p": {
         "type": "channel",
         "cog_name": "VoiceMaster",
