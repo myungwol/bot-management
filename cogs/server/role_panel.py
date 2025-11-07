@@ -75,9 +75,53 @@ class RoleSelectDropdown(ui.Select):
             logger.error(f"역할 패널 업데이트 중 예기치 않은 오류가 발생했습니다: {e}", exc_info=True)
             await interaction.followup.send("❌ 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
 
-class PersistentCategorySelectView(ui.View):
+class RolePanelView(ui.View):
     def __init__(self, panel_config: Dict[str, Any]):
         super().__init__(timeout=None)
+        self.panel_config = panel_config
+        
+        # 드롭다운 대신 버튼을 추가합니다.
+        select_button = ui.Button(
+            label="역할 선택하기",
+            style=discord.ButtonStyle.primary,
+            emoji="✨",
+            # custom_id를 패널 키와 연동하여 고유하게 만듭니다.
+            custom_id=f"role_panel_button:{self.panel_config.get('panel_key')}"
+        )
+        select_button.callback = self.show_category_select
+        self.add_item(select_button)
+
+    async def show_category_select(self, interaction: discord.Interaction):
+        """버튼을 누르면 실행될 콜백 함수"""
+        # 임시 View를 생성하여 카테고리 선택 드롭다운을 보여줍니다.
+        temp_view = TemporaryCategorySelectView(self.panel_config)
+        
+        # 역할 설명 임베드를 가져와 함께 보여줍니다.
+        embed_key = self.panel_config.get("embed_key")
+        embed_data = await get_embed_from_db(embed_key)
+        
+        if not embed_data:
+            embed = discord.Embed(
+                title="오류",
+                description="역할 정보를 불러오는 데 실패했습니다.",
+                color=discord.Color.red()
+            )
+        else:
+            embed = discord.Embed.from_dict(embed_data)
+            embed.title = f"{embed.title} - 카테고리 선택"
+            embed.description = "아래 메뉴에서 역할을 부여받을 카테고리를 선택하세요."
+
+        await interaction.response.send_message(
+            embed=embed,
+            view=temp_view,
+            ephemeral=True
+        )
+
+
+# ▼▼▼ [추가] 임시 메시지로 카테고리 선택 드롭다운을 보여줄 새로운 View 클래스 ▼▼▼
+class TemporaryCategorySelectView(ui.View):
+    def __init__(self, panel_config: Dict[str, Any]):
+        super().__init__(timeout=300) # 5분 후 자동 만료
         self.panel_config = panel_config
         
         options = [
@@ -93,7 +137,7 @@ class PersistentCategorySelectView(ui.View):
         category_select = ui.Select(
             placeholder="역할을 부여받을 카테고리를 선택하세요...",
             options=options,
-            custom_id="persistent_role_category_select",
+            custom_id="temp_role_category_select",
             disabled=not options
         )
         category_select.callback = self.on_category_select
@@ -102,30 +146,25 @@ class PersistentCategorySelectView(ui.View):
     async def on_category_select(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
-        panel_configs = get_config("STATIC_AUTO_ROLE_PANELS", {})
-        if not panel_configs or not isinstance(panel_configs, dict):
-            await interaction.followup.send("❌ 역할 패널 설정이 올바르지 않습니다. 관리자에게 문의해주세요.", ephemeral=True)
-            return
-
-        panel_key = self.panel_config.get("panel_key")
-        panel_config = panel_configs.get(panel_key)
-
-        if not panel_config:
-             await interaction.followup.send("❌ 역할 패널 설정을 찾을 수 없었습니다.", ephemeral=True)
-             return
-
         selected_category_id = interaction.data["values"][0]
-        category_info = next((c for c in panel_config.get("categories", []) if c.get('id') == selected_category_id), None)
+        category_info = next((c for c in self.panel_config.get("categories", []) if c.get('id') == selected_category_id), None)
         if not category_info:
             await interaction.followup.send("❌ 선택한 카테고리 정보를 찾을 수 없었습니다.", ephemeral=True)
             return
             
         category_name = category_info.get('label', '알 수 없는 카테고리')
-        category_roles = panel_config.get("roles", {}).get(selected_category_id, [])
+        category_roles = self.panel_config.get("roles", {}).get(selected_category_id, [])
         
-        temp_view = ui.View(timeout=300)
-        temp_view.add_item(RoleSelectDropdown(interaction.user, category_roles, category_name))
-        await interaction.followup.send("아래 메뉴에서 원하는 역할을 모두 선택한 후, 메뉴 바깥쪽을 클릭하여 닫아주세요.", view=temp_view, ephemeral=True)
+        # 기존 RoleSelectDropdown을 사용하는 임시 View를 생성
+        temp_role_view = ui.View(timeout=300)
+        temp_role_view.add_item(RoleSelectDropdown(interaction.user, category_roles, category_name))
+
+        # 기존 ephemeral 메시지를 수정하여 역할 선택 드롭다운으로 교체
+        await interaction.edit_original_response(
+            content="아래 메뉴에서 원하는 역할을 모두 선택한 후, 메뉴 바깥쪽을 클릭하여 닫아주세요.", 
+            view=temp_role_view,
+            embed=None # 이전 임베드는 숨김
+        )
 
 class RolePanel(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -146,7 +185,8 @@ class RolePanel(commands.Cog):
     async def register_persistent_views(self):
         if self.panel_configs and isinstance(self.panel_configs, dict):
             for config in self.panel_configs.values():
-                self.bot.add_view(PersistentCategorySelectView(config))
+                # ▼▼▼ [수정] 새로운 RolePanelView를 등록합니다. ▼▼▼
+                self.bot.add_view(RolePanelView(config))
             logger.info(f"✅ {len(self.panel_configs)}개의 역할 패널 영구 View가 성공적으로 등록되었습니다.")
         else:
             logger.warning("⚠️ 역할 패널 설정이 없어 영구 View를 등록할 수 없습니다.")
@@ -183,7 +223,10 @@ class RolePanel(commands.Cog):
                 return False
             
             embed = discord.Embed.from_dict(embed_data)
-            view = PersistentCategorySelectView(panel_config)
+            
+            # ▼▼▼ [수정] 새로운 RolePanelView를 사용합니다. ▼▼▼
+            view = RolePanelView(panel_config)
+            
             new_message = await channel.send(embed=embed, view=view)
             
             await save_panel_id(base_panel_key, new_message.id, channel.id)
