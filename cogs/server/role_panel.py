@@ -11,6 +11,7 @@ from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_d
 
 logger = logging.getLogger(__name__)
 
+# 역할 선택 및 부여 로직은 그대로 유지됩니다.
 class RoleSelectDropdown(ui.Select):
     def __init__(self, member: discord.Member, category_roles: List[Dict[str, Any]], category_name: str):
         current_user_role_ids: Set[int] = {r.id for r in member.roles}
@@ -34,16 +35,13 @@ class RoleSelectDropdown(ui.Select):
             else:
                 logger.warning(f"역할 패널: DB에서 '{role_id_key}'에 해당하는 역할 ID를 찾지 못해 드롭다운에 추가할 수 없었습니다.")
 
-        # [✅✅✅ 핵심 수정 ✅✅✅]
-        # min_values=0과 기본값인 required=True가 충돌하여 발생하는 API 오류를 해결합니다.
-        # required=False를 명시적으로 추가하여 '아무것도 선택하지 않음' 상태를 허용합니다.
         super().__init__(
             placeholder=f"{category_name} 역할을 선택하세요 (다중 선택 가능)",
             min_values=0,
-            max_values=len(options) if options else 1, # 선택지가 없으면 비활성화되므로 1로 두어도 안전합니다.
+            max_values=len(options) if options else 1,
             options=options,
             disabled=not options,
-            required=False # 이 옵션을 추가하여 오류를 해결합니다.
+            required=False
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -75,97 +73,51 @@ class RoleSelectDropdown(ui.Select):
             logger.error(f"역할 패널 업데이트 중 예기치 않은 오류가 발생했습니다: {e}", exc_info=True)
             await interaction.followup.send("❌ 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
 
+
+# ▼▼▼ [핵심 수정] RolePanelView의 버튼 콜백 로직을 수정합니다. ▼▼▼
 class RolePanelView(ui.View):
     def __init__(self, panel_config: Dict[str, Any]):
         super().__init__(timeout=None)
         self.panel_config = panel_config
         
-        # 드롭다운 대신 버튼을 추가합니다.
         select_button = ui.Button(
-            label="역할 선택하기",
+            label="✨ 역할 선택하기",
             style=discord.ButtonStyle.primary,
-            emoji="✨",
-            # custom_id를 패널 키와 연동하여 고유하게 만듭니다.
             custom_id=f"role_panel_button:{self.panel_config.get('panel_key')}"
         )
-        select_button.callback = self.show_category_select
+        select_button.callback = self.show_role_select
         self.add_item(select_button)
 
-    async def show_category_select(self, interaction: discord.Interaction):
-        """버튼을 누르면 실행될 콜백 함수"""
-        # 임시 View를 생성하여 카테고리 선택 드롭다운을 보여줍니다.
-        temp_view = TemporaryCategorySelectView(self.panel_config)
-        
-        # 역할 설명 임베드를 가져와 함께 보여줍니다.
-        embed_key = self.panel_config.get("embed_key")
-        embed_data = await get_embed_from_db(embed_key)
-        
-        if not embed_data:
-            embed = discord.Embed(
-                title="오류",
-                description="역할 정보를 불러오는 데 실패했습니다.",
-                color=discord.Color.red()
-            )
-        else:
-            embed = discord.Embed.from_dict(embed_data)
-            embed.title = f"{embed.title} - 카테고리 선택"
-            embed.description = "아래 메뉴에서 역할을 부여받을 카테고리를 선택하세요."
-
-        await interaction.response.send_message(
-            embed=embed,
-            view=temp_view,
-            ephemeral=True
-        )
-
-
-# ▼▼▼ [추가] 임시 메시지로 카테고리 선택 드롭다운을 보여줄 새로운 View 클래스 ▼▼▼
-class TemporaryCategorySelectView(ui.View):
-    def __init__(self, panel_config: Dict[str, Any]):
-        super().__init__(timeout=300) # 5분 후 자동 만료
-        self.panel_config = panel_config
-        
-        options = [
-            discord.SelectOption(
-                label=category.get('label', '이름 없는 카테고리'),
-                value=category.get('id'),
-                emoji=category.get('emoji'),
-                description=category.get('description')
-            )
-            for category in self.panel_config.get("categories", []) if category.get('id') and category.get('label')
-        ]
-        
-        category_select = ui.Select(
-            placeholder="역할을 부여받을 카테고리를 선택하세요...",
-            options=options,
-            custom_id="temp_role_category_select",
-            disabled=not options
-        )
-        category_select.callback = self.on_category_select
-        self.add_item(category_select)
-
-    async def on_category_select(self, interaction: discord.Interaction):
+    async def show_role_select(self, interaction: discord.Interaction):
+        """버튼을 누르면 카테고리 선택 없이 바로 역할 선택 메뉴를 보여줍니다."""
         await interaction.response.defer(ephemeral=True)
+
+        # 설정에서 첫 번째 (그리고 유일한) 카테고리 정보를 가져옵니다.
+        if not self.panel_config.get("categories"):
+            return await interaction.followup.send("❌ 패널 설정에 카테고리가 정의되지 않았습니다.", ephemeral=True)
         
-        selected_category_id = interaction.data["values"][0]
-        category_info = next((c for c in self.panel_config.get("categories", []) if c.get('id') == selected_category_id), None)
-        if not category_info:
-            await interaction.followup.send("❌ 선택한 카테고리 정보를 찾을 수 없었습니다.", ephemeral=True)
-            return
-            
+        category_info = self.panel_config["categories"][0]
+        category_id = category_info.get("id")
         category_name = category_info.get('label', '알 수 없는 카테고리')
-        category_roles = self.panel_config.get("roles", {}).get(selected_category_id, [])
+
+        if not category_id:
+            return await interaction.followup.send("❌ 패널 카테고리 설정에 ID가 없습니다.", ephemeral=True)
+
+        # 해당 카테고리에 속한 역할 목록을 가져옵니다.
+        category_roles = self.panel_config.get("roles", {}).get(category_id, [])
         
-        # 기존 RoleSelectDropdown을 사용하는 임시 View를 생성
+        # 역할 선택 드롭다운을 포함한 임시 View를 생성합니다.
         temp_role_view = ui.View(timeout=300)
         temp_role_view.add_item(RoleSelectDropdown(interaction.user, category_roles, category_name))
 
-        # 기존 ephemeral 메시지를 수정하여 역할 선택 드롭다운으로 교체
-        await interaction.edit_original_response(
-            content="아래 메뉴에서 원하는 역할을 모두 선택한 후, 메뉴 바깥쪽을 클릭하여 닫아주세요.", 
+        await interaction.followup.send(
+            "아래 메뉴에서 원하는 역할을 모두 선택한 후, 메뉴 바깥쪽을 클릭하여 닫아주세요.", 
             view=temp_role_view,
-            embed=None # 이전 임베드는 숨김
+            ephemeral=True
         )
 
+# Cog 클래스는 기존의 register_persistent_views와 regenerate_panel에서
+# RolePanelView를 사용하도록 이미 수정되었으므로, 추가 변경이 필요 없습니다.
 class RolePanel(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -185,13 +137,12 @@ class RolePanel(commands.Cog):
     async def register_persistent_views(self):
         if self.panel_configs and isinstance(self.panel_configs, dict):
             for config in self.panel_configs.values():
-                # ▼▼▼ [수정] 새로운 RolePanelView를 등록합니다. ▼▼▼
                 self.bot.add_view(RolePanelView(config))
             logger.info(f"✅ {len(self.panel_configs)}개의 역할 패널 영구 View가 성공적으로 등록되었습니다.")
         else:
             logger.warning("⚠️ 역할 패널 설정이 없어 영구 View를 등록할 수 없습니다.")
 
-    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_roles") -> bool:
+    async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str) -> bool:
         await self.load_configs()
         if not self.panel_configs:
             logger.error("❌ 역할 패널을 생성할 수 없습니다: DB에 설정 정보가 없습니다.")
@@ -223,10 +174,7 @@ class RolePanel(commands.Cog):
                 return False
             
             embed = discord.Embed.from_dict(embed_data)
-            
-            # ▼▼▼ [수정] 새로운 RolePanelView를 사용합니다. ▼▼▼
             view = RolePanelView(panel_config)
-            
             new_message = await channel.send(embed=embed, view=view)
             
             await save_panel_id(base_panel_key, new_message.id, channel.id)
