@@ -55,8 +55,6 @@ UI_ROLE_KEY_MAP = {
     "role_personal_room_key": {"name": "마이룸 열쇠", "is_prefix": False, "priority": 0},
     "role_notify_dding": {"name": "⊹ ₊ 띵 동 .ᐟ ⊹", "is_prefix": False, "priority": 0},
     "role_notify_welcome": {"name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗", "is_prefix": False, "priority": 0},
-    "role_notify_voice": {"name": "통화 모집", "is_prefix": False, "priority": 0},
-    "role_notify_friends": {"name": "친구 모집", "is_prefix": False, "priority": 0},
     "role_notify_disboard": {"name": "『 🍨 : 공장 홍보대사 』", "is_prefix": False, "priority": 0},
     "role_notify_up": {"name": "『 🍭 : 공장 업 』", "is_prefix": False, "priority": 0},
     "role_game_tft": {"name": "ʚ ♟️：롤토체스 ɞ", "is_prefix": False, "priority": 0},
