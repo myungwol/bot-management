@@ -54,6 +54,9 @@ BOT_VERSION = "v2.6-stability-hotfix" # 안정성 개선 핫픽스 버전
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # ▼▼▼▼▼ [추가] 이 줄을 추가하세요. ▼▼▼▼▼
+        self.recently_moderated_users = set()
+        # ▲▲▲▲▲ [추가] 완료 ▲▲▲▲▲
 
     async def setup_hook(self):
         # [✅ 핵심] 봇 시작 시, 로컬 기본값(ui_defaults.py 등)을 DB에 먼저 동기화합니다.
