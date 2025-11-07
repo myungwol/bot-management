@@ -258,13 +258,13 @@ UI_EMBEDS = {
         "color": 0x2ECC71
     },
     "panel_warning": {
-        "title": "🚨 벌점 관리 패널",
+        "title": "🚨 경고 관리 패널",
         "description":
         "서버 규칙을 위반한 유저에게 아래 버튼을 통해 벌점을 부여할 수 있습니다.\n\n**이 기능은 `포장 관리팀`만 사용할 수 있습니다.**",
         "color": 15548997
     },
     "log_warning": {
-        "title": "🚨 벌점 발급 알림",
+        "title": "🚨 경고고 발급 알림",
         "color": 15548997
     },
     "dm_onboarding_approved": {
@@ -778,7 +778,7 @@ UI_EMBEDS = {
     },
     # ▼▼▼▼▼ [추가] 경고 차감 로그 임베드 ▼▼▼▼▼
     "log_warning_deduct": {
-        "title": "✅ 벌점 차감 알림",
+        "title": "✅ 경고 차감 알림",
         "color": 3066993
     },
     "embed_reminder_disboard": {
