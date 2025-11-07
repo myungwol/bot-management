@@ -11,7 +11,7 @@ UI_ROLE_KEY_MAP = {
     # --- [핵심] 접두사 역할 및 우선순위 ---
     "role_admin_total": {
         "name": "『 ⭐：엔지니어 』",
-        "is_prefix": False,
+        "is_prefix": True,
         "priority": 100, 
         "prefix_symbol": "🌙", 
         "prefix_format": "𐐪{symbol}𐑂", 
