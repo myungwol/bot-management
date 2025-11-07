@@ -223,7 +223,7 @@ class Nicknames(commands.Cog):
     # ... (get_final_nickname, update_nickname, on_member_update 함수는 변경사항 없음) ...
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
         role_configs = get_config("UI_ROLE_KEY_MAP", {})
-        suffix = get_config("NICKNAME_SUFFIX", "") 
+        # suffix = get_config("NICKNAME_SUFFIX", "") # 더 이상 사용되지 않으므로 삭제 가능
         member_role_ids = {role.id for role in member.roles}
         user_prefix_roles = []
         for key, config in role_configs.items():
@@ -231,31 +231,52 @@ class Nicknames(commands.Cog):
             if role_id in member_role_ids and config.get("is_prefix"):
                 user_prefix_roles.append(config)
         highest_priority_role_config = max(user_prefix_roles, key=lambda r: r.get("priority", 0)) if user_prefix_roles else None
+        
         base = ""
         if base_name.strip():
             base = base_name.strip()
         else:
             current_nick = member.nick or member.name
             base = current_nick
-            possible_formats = []
-            for cfg in user_prefix_roles:
-                symbol = cfg.get("prefix_symbol")
-                p_format = cfg.get("prefix_format", "「{symbol}」")
-                s_format = cfg.get("suffix", "")
-                if symbol:
-                    possible_formats.append((p_format.format(symbol=symbol), s_format))
-            for prefix_str, suffix_str in sorted(possible_formats, key=lambda x: len(x[0]) + len(x[1]), reverse=True):
+            
+            # --- ▼▼▼ [핵심 수정] ▼▼▼
+            # 사용자가 현재 가진 역할이 아닌, 시스템에 정의된 모든 접두사를 기준으로 base name을 찾도록 변경합니다.
+            # 이를 통해 사용자가 마지막 접두사 역할을 잃었을 때도 닉네임에서 접두사를 올바르게 제거할 수 있습니다.
+            
+            all_possible_prefixes = []
+            for config in role_configs.values():
+                if config.get("is_prefix"):
+                    symbol = config.get("prefix_symbol")
+                    p_format = config.get("prefix_format", "「{symbol}」")
+                    s_format = config.get("suffix", "")
+                    if symbol:
+                        all_possible_prefixes.append((p_format.format(symbol=symbol), s_format))
+            
+            # 가장 긴 접두사부터 확인하여 정확하게 제거
+            for prefix_str, suffix_str in sorted(all_possible_prefixes, key=lambda x: len(x[0]) + len(x[1]), reverse=True):
                 if current_nick.startswith(f"{prefix_str} ") and current_nick.endswith(suffix_str):
-                    base = current_nick[len(f"{prefix_str} "):-len(suffix_str)]
-                    break
-        final_nick = base
+                    # 접두사와 뒤따르는 공백을 제거
+                    temp_name = current_nick[len(prefix_str) + 1:]
+                    
+                    # 접미사가 있는 경우, 접미사도 제거
+                    if suffix_str:
+                        base = temp_name[:-len(suffix_str)]
+                    else:
+                        base = temp_name
+                    
+                    break # 가장 일치하는 긴 접두사를 찾았으면 종료
+            # --- ▲▲▲ [핵심 수정 완료] ▲▲▲
+
+        final_nick = base.strip() # 추출된 base 이름의 양옆 공백 제거
         if highest_priority_role_config:
             symbol = highest_priority_role_config.get("prefix_symbol")
             prefix_format = highest_priority_role_config.get("prefix_format", "「{symbol}」")
             suffix = highest_priority_role_config.get("suffix", "")
             if symbol:
                 full_prefix = prefix_format.format(symbol=symbol)
-                final_nick = f"{full_prefix} {base}{suffix}"
+                final_nick = f"{full_prefix} {base.strip()}{suffix}"
+        
+        # (이하 닉네임 길이 32자 제한 로직은 동일)
         if len(final_nick) > 32:
             prefix_str = ""
             suffix_str = ""
@@ -267,8 +288,9 @@ class Nicknames(commands.Cog):
                     prefix_str = f"{p_format.format(symbol=symbol)} "
                 suffix_str = s_format
             allowed_base_len = 32 - (len(prefix_str) + len(suffix_str))
-            base = base[:allowed_base_len]
+            base = base.strip()[:allowed_base_len]
             final_nick = f"{prefix_str}{base}{suffix_str}"
+            
         return final_nick
 
     async def update_nickname(self, member: discord.Member, base_name_override: str):
