@@ -1,8 +1,10 @@
 # cogs/logging/leave_logger.py
+
 import discord
 from discord.ext import commands
 import logging
 from datetime import datetime, timezone
+import asyncio
 
 from utils.database import get_id
 
@@ -24,19 +26,17 @@ class LeaveLogger(commands.Cog):
         if not self.log_channel_id: return None
         return self.bot.get_channel(self.log_channel_id)
 
+    # ▼▼▼ [수정] on_member_remove 리스너 전체를 아래 코드로 교체 ▼▼▼
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
         if member.bot: return
         
-        # 추방/차단 로그는 다른 로거에서 처리하므로, 여기서는 자발적인 퇴장만 기록
-        try:
-            # 최근 5초 이내에 발생한 관리 기록이 있으면 퇴장 로그를 남기지 않음
-            async for entry in member.guild.audit_logs(limit=1, actions=[discord.AuditLogAction.kick, discord.AuditLogAction.ban]):
-                if entry.target and entry.target.id == member.id:
-                    if (datetime.now(timezone.utc) - entry.created_at).total_seconds() < 5:
-                        return
-        except discord.Forbidden:
-            pass # 권한이 없으면 일단 진행
+        # 다른 로거가 처리할 시간을 주기 위해 잠시 대기
+        await asyncio.sleep(2)
+
+        # 만약 멤버가 최근에 추방/차단되었다면, 로그를 남기지 않고 종료
+        if hasattr(self.bot, 'recently_moderated_users') and member.id in self.bot.recently_moderated_users:
+            return
 
         log_channel = await self.get_log_channel()
         if not log_channel: return
