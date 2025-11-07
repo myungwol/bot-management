@@ -6,8 +6,10 @@ import asyncio
 import logging
 from typing import Optional, Dict
 from datetime import datetime, timedelta, timezone
+import re
 
-from utils.database import get_id, schedule_reminder, get_due_reminders, deactivate_reminder
+from utils.database import get_id, schedule_reminder, get_due_reminders, deactivate_reminder, get_embed_from_db
+from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
@@ -15,19 +17,17 @@ REMINDER_CONFIG = {
     'disboard': {
         'bot_id': 302050872383242240,
         'cooltime': 7200,  # 2시간
-        'keyword': "서버 갱신 완료!", # Disboard는 그대로 유지
+        'keyword': "서버 갱신 완료!",
         'command': "/bump",
         'name': "Disboard BUMP"
     },
-    # ▼▼▼ [핵심 수정] dissoku 부분을 dicoall 정보로 변경 ▼▼▼
     'dicoall': {
-        'bot_id': 664647740877176832, # Dicoall 봇 ID
+        'bot_id': 664647740877176832,
         'cooltime': 3600,  # 1시간
         'keyword': "서버가 상단에 표시되었습니다.",
         'command': "/up",
-        'name': "Dicoall UP" # 사용자에게 보여질 이름
+        'name': "Dicoall UP"
     }
-    # ▲▲▲ [핵심 수정] 종료 ▲▲▲
 }
 
 class Reminder(commands.Cog):
@@ -46,42 +46,68 @@ class Reminder(commands.Cog):
     async def load_configs(self):
         self.configs['disboard'] = {
             'channel_id': get_id("bump_reminder_channel_id"),
-            'role_id': get_id("bump_reminder_role_id")
+            'role_id': get_id("role_notify_disboard")
         }
-        # [수정] dissoku -> dicoall
         self.configs['dicoall'] = {
             'channel_id': get_id("dicoall_reminder_channel_id"),
-            'role_id': get_id("dicoall_reminder_role_id")
+            'role_id': get_id("role_notify_up")
         }
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        # Dicoall 봇 ID가 맞는지 확인
-        if message.author.id == 664647740877176832:
-            # 어떤 내용이 들어오는지 로그로 출력
-            logger.info(f"Dicoall 봇 메시지 수신. Embed Description: {message.embeds[0].description}")
-    
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
 
-        if not message.embeds[0].description:
-            return
-
         embed_description = message.embeds[0].description
+        if not embed_description:
+            return
 
         for key, config in REMINDER_CONFIG.items():
             if message.author.id == config['bot_id'] and config['keyword'] in embed_description:
+                # 1. 기존 알림 메시지 삭제
+                if (channel_id := self.configs.get(key, {}).get('channel_id')) and (channel := self.bot.get_channel(channel_id)):
+                    try:
+                        async for old_msg in channel.history(limit=50):
+                            if old_msg.author.id == self.bot.user.id and old_msg.embeds:
+                                embed_title = old_msg.embeds[0].title or ""
+                                if config['name'].split(' ')[0] in embed_title:
+                                    await old_msg.delete()
+                                    break
+                    except Exception as e:
+                        logger.warning(f"이전 알림 메시지 삭제 중 오류: {e}")
+
+                # 2. 확인 메시지 전송
+                user_mention = self.find_user_mention_in_embed(embed_description)
+                await self.send_confirmation_message(key, message.channel, user_mention)
+
+                # 3. 다음 알림 예약
                 await self.schedule_new_reminder(key, message.guild)
                 break
 
-    async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
-        if not self.configs.get(reminder_type) or not self.configs[reminder_type].get('channel_id') or not self.configs[reminder_type].get('role_id'):
-            return
+    def find_user_mention_in_embed(self, description: str) -> str:
+        match = re.search(r'<@!?(\d+)>', description)
+        return match.group(0) if match else "누군가"
 
+    async def send_confirmation_message(self, reminder_type: str, channel: discord.TextChannel, user_mention: str):
+        embed_data = await get_embed_from_db("embed_reminder_confirmation")
+        if not embed_data: return
+
+        reminder_name = REMINDER_CONFIG.get(reminder_type, {}).get("name", "알 수 없는 작업")
+        embed = format_embed_from_db(embed_data, user_mention=user_mention, reminder_name=reminder_name)
+        
+        try:
+            confirmation_msg = await channel.send(embed=embed)
+            await asyncio.sleep(60) # 1분 후 확인 메시지 자동 삭제
+            await confirmation_msg.delete()
+        except discord.NotFound:
+            pass # 이미 삭제된 경우
+        except Exception as e:
+            logger.error(f"확인 메시지 전송/삭제 중 오류: {e}", exc_info=True)
+
+    async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
         config = REMINDER_CONFIG[reminder_type]
         remind_at_time = datetime.now(timezone.utc) + timedelta(seconds=config['cooltime'])
-        
         await schedule_reminder(guild.id, reminder_type, remind_at_time)
         logger.info(f"✅ [{guild.name}] 서버의 {config['name']} 알림을 DB에 예약했습니다. (예약 시간: {remind_at_time.strftime('%Y-%m-%d %H:%M:%S')})")
 
@@ -89,13 +115,11 @@ class Reminder(commands.Cog):
     async def check_reminders(self):
         try:
             due_reminders = await get_due_reminders()
-            if not due_reminders:
-                return
+            if not due_reminders: return
 
             for reminder in due_reminders:
                 guild = self.bot.get_guild(reminder['guild_id'])
                 if not guild:
-                    logger.warning(f"알림(ID: {reminder['id']})의 서버(ID: {reminder['guild_id']})를 찾을 수 없어 비활성화합니다.")
                     await deactivate_reminder(reminder['id'])
                     continue
 
@@ -103,23 +127,24 @@ class Reminder(commands.Cog):
                 config = REMINDER_CONFIG.get(reminder_type)
                 reminder_settings = self.configs.get(reminder_type)
 
-                if not config or not reminder_settings:
-                    logger.warning(f"알림(ID: {reminder['id']})의 타입({reminder_type})이 유효하지 않아 비활성화합니다.")
+                if not config or not reminder_settings or not reminder_settings.get('channel_id') or not reminder_settings.get('role_id'):
                     await deactivate_reminder(reminder['id'])
                     continue
                 
                 channel = guild.get_channel(reminder_settings['channel_id'])
                 role = guild.get_role(reminder_settings['role_id'])
-
                 if not channel or not role:
-                    logger.warning(f"{reminder_type} 알림(ID: {reminder['id']})에 필요한 채널/역할을 찾을 수 없어 비활성화합니다.")
                     await deactivate_reminder(reminder['id'])
                     continue
 
                 try:
-                    message = f"⏰ {role.mention} {config['name']} 시간입니다! `{config['command']}`를 입력해주세요!"
-                    await channel.send(message, allowed_mentions=discord.AllowedMentions(roles=True))
-                    logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']})")
+                    embed_key = f"embed_reminder_{reminder_type}"
+                    embed_data = await get_embed_from_db(embed_key)
+                    if embed_data:
+                        embed = format_embed_from_db(embed_data)
+                        await channel.send(content=role.mention, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
+                        logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']})")
+
                 except discord.Forbidden:
                     logger.error(f"채널(ID: {channel.id})에 메시지를 보낼 권한이 없습니다.")
                 except Exception as e:
