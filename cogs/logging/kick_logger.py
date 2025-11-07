@@ -1,4 +1,5 @@
 # cogs/logging/kick_logger.py
+
 import discord
 from discord.ext import commands
 import logging
@@ -25,15 +26,20 @@ class KickLogger(commands.Cog):
         if not self.log_channel_id: return None
         return self.bot.get_channel(self.log_channel_id)
 
+    # ▼▼▼ [수정] on_member_remove 리스너 전체를 아래 코드로 교체 ▼▼▼
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
         log_channel = await self.get_log_channel()
         if not log_channel: return
         
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(1.5) # 감사 로그가 기록될 시간을 줍니다.
         try:
             async for entry in member.guild.audit_logs(action=discord.AuditLogAction.kick, limit=5, after=datetime.now(timezone.utc) - timedelta(seconds=5)):
+                # 감사 로그의 대상이 일치하고, 실행자가 봇이 아닌 경우에만 기록
                 if entry.target and entry.target.id == member.id and not entry.user.bot:
+                    # 임시 캐시에 유저 ID를 추가하여 leave_logger가 중복 기록하는 것을 방지
+                    self.bot.recently_moderated_users.add(member.id)
+                    
                     embed = discord.Embed(
                         title="👢 멤버 추방됨",
                         description=f"{member.mention} 님이 서버에서 추방되었습니다.",
@@ -45,7 +51,14 @@ class KickLogger(commands.Cog):
                     if entry.reason:
                         embed.add_field(name="사유", value=entry.reason, inline=False)
                     await log_channel.send(embed=embed)
-                    return
+                    
+                    # 10초 후에 캐시에서 ID를 자동으로 제거
+                    async def remove_from_cache():
+                        await asyncio.sleep(10)
+                        self.bot.recently_moderated_users.discard(member.id)
+                    asyncio.create_task(remove_from_cache())
+                    
+                    return # 로그를 기록했으므로 함수 종료
         except discord.Forbidden:
             logger.warning(f"감사 로그 읽기 권한이 없습니다: {member.guild.name}")
         except Exception as e:
