@@ -16,17 +16,19 @@ logger = logging.getLogger(__name__)
 REMINDER_CONFIG = {
     'disboard': {
         'bot_id': 302050872383242240,
-        'cooltime': 7200,  # 2시간
+        'cooltime': 7200,
         'keyword': "서버 갱신 완료!",
         'command': "/bump",
-        'name': "Disboard BUMP"
+        'name': "Disboard BUMP",
+        'confirmation_embed_key': "embed_reminder_confirmation_disboard" # [추가] Disboard 전용 확인 임베드 키
     },
     'dicoall': {
         'bot_id': 664647740877176832,
-        'cooltime': 3600,  # 1시간
+        'cooltime': 3600,
         'keyword': "서버가 상단에 표시되었습니다.",
         'command': "/up",
-        'name': "Dicoall UP"
+        'name': "Dicoall UP",
+        'confirmation_embed_key': "embed_reminder_confirmation_dicoall" # [추가] Dicoall 전용 확인 임베드 키
     }
 }
 
@@ -79,7 +81,10 @@ class Reminder(commands.Cog):
 
                 # 2. 확인 메시지 전송
                 user_mention = self.find_user_mention_in_embed(embed_description)
-                await self.send_confirmation_message(key, message.channel, user_mention)
+                # [수정] 설정에 정의된 전용 임베드 키를 사용
+                confirmation_embed_key = config.get('confirmation_embed_key')
+                if confirmation_embed_key:
+                    await self.send_confirmation_message(key, confirmation_embed_key, message.channel, user_mention)
 
                 # 3. 다음 알림 예약
                 await self.schedule_new_reminder(key, message.guild)
@@ -89,8 +94,9 @@ class Reminder(commands.Cog):
         match = re.search(r'<@!?(\d+)>', description)
         return match.group(0) if match else "누군가"
 
-    async def send_confirmation_message(self, reminder_type: str, channel: discord.TextChannel, user_mention: str):
-        embed_data = await get_embed_from_db("embed_reminder_confirmation")
+    # [수정] 함수 인자에 embed_key 추가
+    async def send_confirmation_message(self, reminder_type: str, embed_key: str, channel: discord.TextChannel, user_mention: str):
+        embed_data = await get_embed_from_db(embed_key)
         if not embed_data: return
 
         reminder_name = REMINDER_CONFIG.get(reminder_type, {}).get("name", "알 수 없는 작업")
@@ -98,10 +104,10 @@ class Reminder(commands.Cog):
         
         try:
             confirmation_msg = await channel.send(embed=embed)
-            await asyncio.sleep(60) # 1분 후 확인 메시지 자동 삭제
+            await asyncio.sleep(60)
             await confirmation_msg.delete()
         except discord.NotFound:
-            pass # 이미 삭제된 경우
+            pass
         except Exception as e:
             logger.error(f"확인 메시지 전송/삭제 중 오류: {e}", exc_info=True)
 
