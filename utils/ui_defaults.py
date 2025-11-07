@@ -491,7 +491,10 @@ UI_EMBEDS = {
     "welcome_embed": {
         "description":
         "## 🎉 {guild_name}에 오신 것을 환영합니다!\n### {member_mention}님, 마을 생활을 시작하기 전에,\n### 잠시 시간을 내어 <#1412052194517061652> 채널에서\n### 마을에 대한 안내를 받고 자기소개를 작성 해주세요.\n### 앞으로 즐거운 시간 보내시길 바랍니다! 😊",
-        "color": 0x3498DB
+        "color": 0x3498DB,
+        "image": {
+            "url": "[여기에_환영_이미지_URL을_붙여넣으세요]"
+        }
     },
     "farewell_embed": {
         "description":
