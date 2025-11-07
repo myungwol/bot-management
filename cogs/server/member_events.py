@@ -95,7 +95,7 @@ class MemberEvents(commands.Cog):
                 embed = format_embed_from_db(embed_data, member_mention=member.mention, guild_name=member.guild.name)
                 if member.display_avatar:
                     embed.set_thumbnail(url=member.display_avatar.url)
-                await channel.send(f"환영합니다, {member.mention}님!", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+                await channel.send(f"{member.mention}님, 과자 공장에 오신 것을 환영합니다 :newheart_01:", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
