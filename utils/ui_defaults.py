@@ -1042,6 +1042,11 @@ UI_EMBEDS = {
             { "name": "💧 패자", "value": "{loser_mention}", "inline": True }
         ]
     },
+    # ▼▼▼▼▼ [추가] 경고 차감 로그 임베드 ▼▼▼▼▼
+    "log_warning_deduct": {
+        "title": "✅ 벌점 차감 알림",
+        "color": 3066993
+    },
     "embed_reminder_disboard": {
         "title": "⏰ Disboard BUMP 시간입니다!",
         "description": "서버를 홍보할 시간입니다!\n아래 명령어를 입력해주세요.\n\n> `/bump`",
@@ -1092,11 +1097,21 @@ UI_PANEL_COMPONENTS = [
         "component_key": "issue_warning_button",
         "panel_key": "warning",
         "component_type": "button",
-        "label": "벌점 발급하기",
+        "label": "경고 부여",
         "style": "danger",
         "emoji": "🚨",
         "row": 0,
         "order_in_row": 0
+    },
+    {
+        "component_key": "deduct_warning_button",
+        "panel_key": "warning",
+        "component_type": "button",
+        "label": "경고 차감",
+        "style": "success",
+        "emoji": "✅",
+        "row": 0,
+        "order_in_row": 1
     },
     {
         "component_key": "post_anonymous_message_button",
