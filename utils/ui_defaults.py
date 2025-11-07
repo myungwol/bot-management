@@ -12,7 +12,10 @@ UI_ROLE_KEY_MAP = {
     "role_admin_total": {
         "name": "『 ⭐：엔지니어 』",
         "is_prefix": False,
-        "priority": 100
+        "priority": 100, 
+        "prefix_symbol": "🌙", 
+        "prefix_format": "𐐪{symbol}𐑂", 
+        "suffix": " ⸝⁺⊹"},
     },
     "role_staff_village_chief": {
         "name": "『 🧩：대표 』",
