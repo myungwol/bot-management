@@ -23,7 +23,7 @@ REMINDER_CONFIG = {
     'dicoall': {
         'bot_id': 664647740877176832, # Dicoall 봇 ID
         'cooltime': 3600,  # 1시간
-        'keyword': "서버가 상단에 표시되었습니다. 🎉", # Dicoall의 응답 메시지 키워드
+        'keyword': "서버가 상단에 표시되었습니다.",
         'command': "/up",
         'name': "Dicoall UP" # 사용자에게 보여질 이름
     }
@@ -57,17 +57,20 @@ class Reminder(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        # Dicoall 봇 ID가 맞는지 확인
+        if message.author.id == 664647740877176832:
+            # 어떤 내용이 들어오는지 로그로 출력
+            logger.info(f"Dicoall 봇 메시지 수신. Embed Description: {message.embeds[0].description}")
+    
         if not self.bot.is_ready() or message.guild is None or not message.embeds:
             return
 
-        # [안정성 강화] 임베드가 비어있을 경우를 대비
         if not message.embeds[0].description:
             return
 
         embed_description = message.embeds[0].description
 
         for key, config in REMINDER_CONFIG.items():
-            # [안정성 강화] 봇 ID가 일치하는지 먼저 확인
             if message.author.id == config['bot_id'] and config['keyword'] in embed_description:
                 await self.schedule_new_reminder(key, message.guild)
                 break
