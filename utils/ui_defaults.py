@@ -8,246 +8,78 @@
 # 1. 역할 키 맵 (Role Key Map)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_ROLE_KEY_MAP = {
-    # --- [핵심] 접두사 역할 및 우선순위 ---
-    "role_admin_total": {
-        "name": "『 ⭐：엔지니어 』",
-        "is_prefix": True,
-        "priority": 100, 
-        "prefix_symbol": "🌙", 
-        "prefix_format": "𐐪{symbol}𐑂", 
-        "suffix": " ⸝⁺⊹"},
-    },
-    "role_staff_village_chief": {
-        "name": "『 🧩：대표 』",
-        "is_prefix": False,
-        "priority": 90
-    },
-    "role_staff_deputy_chief": {
-        "name": "『 🌷：부 대 표 』",
-        "is_prefix": False,
-        "priority": 85
-    },
-    "role_approval": {
-        "name": "『🧺：바구니 』",
-        "is_prefix": False,
-        "priority": 60
-    },
-
-        # --- 스태프 역할 (이제 접두사로 사용) ---
-    "role_staff_pr": {"name": "『 🍯：시 럽 공 정 팀 』", "is_prefix": True, "priority": 59, "prefix_symbol": "🍯", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
-    "role_staff_police": {"name": "『 🫙：포 장 관 리 팀 』", "is_prefix": True, "priority": 58, "prefix_symbol": "🫙", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
-    "role_staff_festival": {"name": "『 🍦：크 림 조 립 팀 』", "is_prefix": True, "priority": 57, "prefix_symbol": "🍦", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
-    "role_staff_newbie_helper": {"name": "『 🍥：반 죽 제 조 팀 』", "is_prefix": True, "priority": 56, "prefix_symbol": "🍥", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    # --- 최상위 관리 역할 (접두사 아님) ---
+    "role_staff_village_chief": {"name": "『 🧩：대표 』", "is_prefix": False, "priority": 90},
+    "role_staff_deputy_chief": {"name": "『 🌷：부 대 표 』", "is_prefix": False, "priority": 85},
+    # --- 최상위 접두사 역할 ---
+    "role_admin_total": {"name": "『 ⭐：엔지니어 』", "is_prefix": True, "priority": 100, "prefix_symbol": "🌙", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
     
+    # --- 스태프 접두사 역할 ---
+    "role_staff_pr": {"name": "『 🍯：시 럽 공 정 팀 』", "is_prefix": True, "priority": 61, "prefix_symbol": "🍯", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    "role_staff_police": {"name": "『 🫙：포 장 관 리 팀 』", "is_prefix": True, "priority": 61, "prefix_symbol": "🫙", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    "role_staff_festival": {"name": "『 🍦：크 림 조 립 팀 』", "is_prefix": True, "priority": 61, "prefix_symbol": "🍦", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    "role_staff_newbie_helper": {"name": "『 🍥：반 죽 제 조 팀 』", "is_prefix": True, "priority": 61, "prefix_symbol": "🍥", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+
+    "role_approval": {"name": "『🧺：바구니 』", "is_prefix": False, "priority": 60},
+
+    # --- 일반 접두사 역할 (우선순위 순) ---
     "role_premium_booster": {"name": "『 🍩：도넛』", "is_prefix": True, "priority": 55, "prefix_symbol": "🍩", "prefix_format": "〚{symbol}〛", "suffix": " ⸝⁺⊹"},
-    "role_resident": {"name": "『 🍪：쿠키 』", "is_prefix": True, "priority": 3, "prefix_symbol": "🍪", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
-    "role_resident_rookie": {"name": "『 🧈：버터 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🧈", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_guest": {
-        "name": "『 🌾：밀가루 』",
-        "is_prefix": False,
-        "priority": 5
-    },
+    "role_resident_elder": {"name": "장로", "is_prefix": True, "priority": 50, "prefix_symbol": "📜", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     
-    "role_resident_elder": {
-        "name": "장로",
-        "is_prefix": True,
-        "priority": 50
-    },
-    # [추가] 마스터 셰프 역할
-    "role_job_master_chef": {
-        "name": "마스터 셰프",
-        "is_prefix": True,
-        "priority": 16
-    },
-    "role_job_master_angler": {
-        "name": "강태공",
-        "is_prefix": True,
-        "priority": 16
-    },
-    "role_job_master_farmer": {
-        "name": "대농",
-        "is_prefix": True,
-        "priority": 16
-    },
-    "role_job_expert_miner": {
-        "name": "전문 광부",
-        "is_prefix": True,
-        "priority": 16
-    },
-    "role_job_chef": {
-        "name": "요리사",
-        "is_prefix": True,
-        "priority": 15
-    },
-    "role_job_fisherman": {
-        "name": "낚시꾼",
-        "is_prefix": True,
-        "priority": 15
-    },
-    "role_job_farmer": {
-        "name": "농부",
-        "is_prefix": True,
-        "priority": 15
-    },
-    "role_job_miner": {
-        "name": "광부",
-        "is_prefix": True,
-        "priority": 15
-    },
+    # --- 직업 접두사 역할 ---
+    "role_job_master_chef": {"name": "마스터 셰프", "is_prefix": True, "priority": 16, "prefix_symbol": "‍🍳", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_job_master_angler": {"name": "강태공", "is_prefix": True, "priority": 16, "prefix_symbol": "🏆", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_job_master_farmer": {"name": "대농", "is_prefix": True, "priority": 16, "prefix_symbol": "👑", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_job_expert_miner": {"name": "전문 광부", "is_prefix": True, "priority": 16, "prefix_symbol": "💎", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_job_chef": {"name": "요리사", "is_prefix": True, "priority": 15, "prefix_symbol": "🍳", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_job_fisherman": {"name": "낚시꾼", "is_prefix": True, "priority": 15, "prefix_symbol": "🎣", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_job_farmer": {"name": "농부", "is_prefix": True, "priority": 15, "prefix_symbol": "🌾", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_job_miner": {"name": "광부", "is_prefix": True, "priority": 15, "prefix_symbol": "⛏️", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    
+    # --- 등급 접두사 역할 (우선순위 순) ---
+    "role_resident": {"name": "주민", "is_prefix": True, "priority": 10, "prefix_symbol": "💌", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_resident_veteran": {"name": "베테랑", "is_prefix": True, "priority": 4, "prefix_symbol": "veterαn", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_resident_regular": {"name": "『 🍪：쿠키 』", "is_prefix": True, "priority": 3, "prefix_symbol": "🍪", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
+    "role_resident_rookie": {"name": "『 🧈：버터 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🧈", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_guest": {"name": "『 🌾：밀가루 』", "is_prefix": True, "priority": 1, "prefix_symbol": "🥛", "prefix_format": "⊰{symbol}⊱", "suffix": " ⸝⁺⊹"},
 
-    # --- 개인 정보 역할 (성별, 연령대) ---
-    "role_info_male": {
-        "name": "『 👦：남자 』",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_female": {
-        "name": "『 👧：여자 』",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_70s": {
-        "name": "70",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_80s": {
-        "name": "『 🥪：𝟏𝟗𝟖𝟎 』",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_90s": {
-        "name": "『 🥨：𝟏𝟗𝟗𝟎 』",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_info_age_00s": {
-        "name": "『 🥐：𝟐𝟎𝟎𝟎 』",
-        "is_prefix": False,
-        "priority": 0
-    },
-
-    # --- 알림 역할 ---
-    "role_notify_dding": {
-        "name": "⊹ ₊ 띵 동 .ᐟ ⊹",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_notify_welcome": {
-        "name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_notify_disboard": {
-        "name": "『 🍨 : 공장 홍보대사 』",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_notify_up": {
-        "name": "『 🍭 : 공장 업 』",
-        "is_prefix": False,
-        "priority": 0
-    },
-
-    # --- 게임/플랫폼 역할 ---
-    "role_game_minecraft": {
-        "name": "마인크래프트",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_valorant": {
-        "name": "발로란트",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_overwatch": {
-        "name": "오버워치",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_lol": {
-        "name": "리그 오브 레전드",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_mahjong": {
-        "name": "마작",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_amongus": {
-        "name": "어몽어스",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_mh": {
-        "name": "몬스터 헌터",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_genshin": {
-        "name": "원신",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_apex": {
-        "name": "에이펙스 레전드",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_ggd": {
-        "name": "구스구스덕",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_game_gf": {
-        "name": "갈틱폰",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_platform_steam": {
-        "name": "스팀",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_platform_PC": {
-        "name": "PC",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_platform_smartphone": {
-        "name": "스마트폰",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_platform_switch": {
-        "name": "콘솔",
-        "is_prefix": False,
-        "priority": 0
-    },
-
-    # --- 벌점 역할 ---
-    "role_warning_level_1": {
-        "name": "벌점 1회",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_warning_level_2": {
-        "name": "벌점 2회",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_warning_level_3": {
-        "name": "벌점 3회",
-        "is_prefix": False,
-        "priority": 0
-    },
-    "role_warning_level_4": {
-        "name": "벌점 4회",
-        "is_prefix": False,
-        "priority": 0
-    },
+    # --- 그 외 접두사가 아닌 역할들 (우선순위 0) ---
+    "role_staff_secretary": {"name": "『 🍫：기 계 공 정 팀 장 』", "is_prefix": False, "priority": 0},
+    "role_info_male": {"name": "『 👦：남자 』", "is_prefix": False, "priority": 0},
+    "role_info_female": {"name": "『 👧：여자 』", "is_prefix": False, "priority": 0},
+    "role_info_age_private": {"name": "비공개", "is_prefix": False, "priority": 0},
+    "role_info_age_70s": {"name": "70", "is_prefix": False, "priority": 0},
+    "role_info_age_80s": {"name": "『 🥪：𝟏𝟗𝟖𝟎 』", "is_prefix": False, "priority": 0},
+    "role_info_age_90s": {"name": "『 🥨：𝟏𝟗𝟗𝟎 』", "is_prefix": False, "priority": 0},
+    "role_info_age_00s": {"name": "『 🥐：𝟐𝟎𝟎𝟎 』", "is_prefix": False, "priority": 0},
+    "role_personal_room_key": {"name": "마이룸 열쇠", "is_prefix": False, "priority": 0},
+    "role_notify_dding": {"name": "⊹ ₊ 띵 동 .ᐟ ⊹", "is_prefix": False, "priority": 0},
+    "role_notify_welcome": {"name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗", "is_prefix": False, "priority": 0},
+    "role_notify_voice": {"name": "통화 모집", "is_prefix": False, "priority": 0},
+    "role_notify_friends": {"name": "친구 모집", "is_prefix": False, "priority": 0},
+    "role_notify_disboard": {"name": "『 🍨 : 공장 홍보대사 』", "is_prefix": False, "priority": 0},
+    "role_notify_up": {"name": "『 🍭 : 공장 업 』", "is_prefix": False, "priority": 0},
+    "role_game_minecraft": {"name": "마인크래프트", "is_prefix": False, "priority": 0},
+    "role_game_valorant": {"name": "발로란트", "is_prefix": False, "priority": 0},
+    "role_game_overwatch": {"name": "오버워치", "is_prefix": False, "priority": 0},
+    "role_game_lol": {"name": "리그 오브 레전드", "is_prefix": False, "priority": 0},
+    "role_game_mahjong": {"name": "마작", "is_prefix": False, "priority": 0},
+    "role_game_amongus": {"name": "어몽어스", "is_prefix": False, "priority": 0},
+    "role_game_mh": {"name": "몬스터 헌터", "is_prefix": False, "priority": 0},
+    "role_game_genshin": {"name": "원신", "is_prefix": False, "priority": 0},
+    "role_game_apex": {"name": "에이펙스 레전드", "is_prefix": False, "priority": 0},
+    "role_game_ggd": {"name": "구스구스덕", "is_prefix": False, "priority": 0},
+    "role_game_gf": {"name": "갈틱폰", "is_prefix": False, "priority": 0},
+    "role_platform_steam": {"name": "스팀", "is_prefix": False, "priority": 0},
+    "role_platform_PC": {"name": "PC", "is_prefix": False, "priority": 0},
+    "role_platform_smartphone": {"name": "스마트폰", "is_prefix": False, "priority": 0},
+    "role_platform_switch": {"name": "콘솔", "is_prefix": False, "priority": 0},
+    "role_warning_level_1": {"name": "벌점 1회", "is_prefix": False, "priority": 0},
+    "role_warning_level_2": {"name": "벌점 2회", "is_prefix": False, "priority": 0},
+    "role_warning_level_3": {"name": "벌점 3회", "is_prefix": False, "priority": 0},
+    "role_warning_level_4": {"name": "벌점 4회", "is_prefix": False, "priority": 0},
 }
+
 ONBOARDING_CHOICES = {
     "gender": [{
         "label": "남성",
