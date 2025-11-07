@@ -74,9 +74,9 @@ UI_ROLE_KEY_MAP = {
     "role_platform_PC": {"name": "PC", "is_prefix": False, "priority": 0},
     "role_platform_smartphone": {"name": "스마트폰", "is_prefix": False, "priority": 0},
     "role_platform_switch": {"name": "콘솔", "is_prefix": False, "priority": 0},
-    "role_warning_level_1": {"name": "벌점 1회", "is_prefix": False, "priority": 0},
-    "role_warning_level_2": {"name": "벌점 2회", "is_prefix": False, "priority": 0},
-    "role_warning_level_3": {"name": "벌점 3회", "is_prefix": False, "priority": 0},
+    "role_warning_level_1": {"name": "『 🚫：경고 1 』", "is_prefix": False, "priority": 0},
+    "role_warning_level_2": {"name": "『 🚫：경고 2 』", "is_prefix": False, "priority": 0},
+    "role_warning_level_3": {"name": "『 🚫：경고 3 』", "is_prefix": False, "priority": 0},
     "role_warning_level_4": {"name": "벌점 4회", "is_prefix": False, "priority": 0},
 }
 
