@@ -311,10 +311,21 @@ async def has_posted_anonymously_today(user_id: int) -> bool:
     today_utc_start = today_kst_start.astimezone(timezone.utc)
     response = await supabase.table('anonymous_messages').select('id', count='exact').eq('user_id', user_id).gte('created_at', today_utc_start.isoformat()).limit(1).execute()
     return response.count > 0 if response else False
+# ▼▼▼▼▼ [수정] schedule_reminder 함수 전체를 아래 코드로 교체 ▼▼▼▼▼
 @supabase_retry_handler()
-async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime):
+async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime, confirmation_message_id: Optional[int] = None):
+    # 기존 활성 알림 비활성화
     await supabase.table('reminders').update({"is_active": False}).eq('guild_id', guild_id).eq('reminder_type', reminder_type).eq('is_active', True).execute()
-    await supabase.table('reminders').insert({"guild_id": guild_id, "reminder_type": reminder_type, "remind_at": remind_at.isoformat(), "is_active": True}).execute()
+    
+    # 새 알림 예약 (확인 메시지 ID 포함)
+    await supabase.table('reminders').insert({
+        "guild_id": guild_id, 
+        "reminder_type": reminder_type, 
+        "remind_at": remind_at.isoformat(), 
+        "is_active": True,
+        "confirmation_message_id": confirmation_message_id
+    }).execute()
+# ▲▲▲▲▲ [수정] schedule_reminder 함수 교체 완료 ▲▲▲▲▲
 @supabase_retry_handler()
 async def get_due_reminders() -> List[Dict[str, Any]]:
     now = datetime.now(timezone.utc).isoformat()
@@ -353,19 +364,3 @@ async def get_user_abilities(user_id: int) -> List[str]:
         return abilities
     _user_abilities_cache[user_id] = ([], now)
     return []
-
-# bot-management/utils/database.py 파일에서 아래 함수를 찾아 수정합니다.
-
-@supabase_retry_handler()
-async def schedule_reminder(guild_id: int, reminder_type: str, remind_at: datetime, confirmation_message_id: Optional[int] = None):
-    # 기존 활성 알림 비활성화
-    await supabase.table('reminders').update({"is_active": False}).eq('guild_id', guild_id).eq('reminder_type', reminder_type).eq('is_active', True).execute()
-    
-    # 새 알림 예약 (확인 메시지 ID 포함)
-    await supabase.table('reminders').insert({
-        "guild_id": guild_id, 
-        "reminder_type": reminder_type, 
-        "remind_at": remind_at.isoformat(), 
-        "is_active": True,
-        "confirmation_message_id": confirmation_message_id  # [추가]
-    }).execute()
