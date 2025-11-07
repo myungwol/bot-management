@@ -278,32 +278,67 @@ class Nicknames(commands.Cog):
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
-        prefix_hierarchy = get_config("NICKNAME_PREFIX_HIERARCHY", [])
-        prefix = None
-        member_role_names = {role.name for role in member.roles}
+        role_configs = get_config("UI_ROLE_KEY_MAP", {})
+
+        # 1. 유저가 가진 is_prefix 역할들 중 가장 우선순위 높은 역할 찾기
+        member_role_ids = {role.id for role in member.roles}
+        user_prefix_roles = []
+        for key, config in role_configs.items():
+            role_id = get_id(key)
+            if role_id in member_role_ids and config.get("is_prefix"):
+                user_prefix_roles.append(config)
         
-        for prefix_name in prefix_hierarchy:
-            if prefix_name in member_role_names:
-                prefix = f"{prefix_name}"
-                break
-        
+        highest_priority_role_config = max(user_prefix_roles, key=lambda r: r.get("priority", 0)) if user_prefix_roles else None
+
+        # 2. 순수 이름(base_name) 결정
+        base = ""
         if base_name.strip():
             base = base_name.strip()
         else:
             current_nick = member.nick or member.name
             base = current_nick
-            for p_name in prefix_hierarchy:
-                prefix_to_check = f"{p_name}"
-                if current_nick.startswith(prefix_to_check):
-                    base = re.sub(rf"^{re.escape(prefix_to_check)}\s*", "", current_nick)
+            # 현재 닉네임에서 모든 가능한 접두사/접미사 형식을 제거하여 순수 이름 추출
+            # 가장 긴 형식부터 제거해야 짧은 형식이 먼저 제거되는 오류를 막을 수 있음
+            possible_formats = []
+            for cfg in user_prefix_roles:
+                symbol = cfg.get("prefix_symbol")
+                p_format = cfg.get("prefix_format", "「{symbol}」")
+                s_format = cfg.get("suffix", "")
+                if symbol:
+                    possible_formats.append((p_format.format(symbol=symbol), s_format))
+            
+            # 가장 긴 접두사+접미사 조합부터 확인
+            for prefix_str, suffix_str in sorted(possible_formats, key=lambda x: len(x[0]) + len(x[1]), reverse=True):
+                if current_nick.startswith(f"{prefix_str} ") and current_nick.endswith(suffix_str):
+                    base = current_nick[len(f"{prefix_str} "):-len(suffix_str)]
                     break
-        
-        final_nick = f"{prefix} {base}" if prefix else base
+
+        # 3. 최종 닉네임 조립
+        final_nick = base
+        if highest_priority_role_config:
+            symbol = highest_priority_role_config.get("prefix_symbol")
+            prefix_format = highest_priority_role_config.get("prefix_format", "「{symbol}」") # 기본값
+            suffix = highest_priority_role_config.get("suffix", "") # 기본값
+            if symbol:
+                full_prefix = prefix_format.format(symbol=symbol)
+                final_nick = f"{full_prefix} {base}{suffix}"
+
+        # 4. 디스코드 32자 길이 제한 처리
         if len(final_nick) > 32:
-            prefix_len = len(prefix) if prefix else 0
-            allowed_base_len = 32 - (prefix_len + 1) if prefix else 32
+            prefix_str = ""
+            suffix_str = ""
+            if highest_priority_role_config:
+                symbol = highest_priority_role_config.get("prefix_symbol")
+                p_format = highest_priority_role_config.get("prefix_format", "「{symbol}」")
+                s_format = highest_priority_role_config.get("suffix", "")
+                if symbol:
+                    prefix_str = f"{p_format.format(symbol=symbol)} "
+                suffix_str = s_format
+            
+            allowed_base_len = 32 - (len(prefix_str) + len(suffix_str))
             base = base[:allowed_base_len]
-            final_nick = f"{prefix} {base}" if prefix else base
+            final_nick = f"{prefix_str}{base}{suffix_str}"
+
         return final_nick
 
     async def update_nickname(self, member: discord.Member, base_name_override: str):
