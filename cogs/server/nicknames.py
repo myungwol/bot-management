@@ -145,7 +145,13 @@ class NicknameApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
-    new_name = ui.TextInput(label="새로운 이름", placeholder="이모티콘, 특수문자 사용 불가. 한글 4자/영문 8자까지", required=True, max_length=12)
+    # UI 입력 필드: 최대 길이를 6으로, 안내 문구를 새로운 규칙으로 변경
+    new_name = ui.TextInput(
+        label="새로운 이름", 
+        placeholder="순수 한글 6자 이내로 입력해주세요.", 
+        required=True, 
+        max_length=6
+    )
 
     def __init__(self, cog_instance: 'Nicknames'):
         super().__init__()
@@ -155,15 +161,19 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
         await i.response.defer(ephemeral=True)
         name = self.new_name.value
         
-        pattern_str = r"^[a-zA-Z0-9\uAC00-\uD7A3]+$"
-        max_length = int(get_config("NICKNAME_MAX_WEIGHTED_LENGTH", 8))
-
+        # 검증 로직 1: 순수 한글로만 이루어져 있는지 확인
+        # ^[...]+$ : 처음부터 끝까지 [] 안의 문자로만 1번 이상 반복
+        # \uAC00-\uD7A3 : 한글 음절 범위
+        pattern_str = r"^[\uAC00-\uD7A3]+$"
         if not re.match(pattern_str, name):
-            return await i.followup.send("❌ 오류: 이름에 이모티콘이나 특수문자는 사용할 수 없습니다.", ephemeral=True)
+            return await i.followup.send("❌ 오류: 이름은 한글로만 구성되어야 합니다. (공백, 특수문자, 영문, 숫자 불가)", ephemeral=True)
         
-        if (length := self.nicknames_cog.calculate_weighted_length(name)) > max_length:
-            return await i.followup.send(f"❌ 오류: 이름 길이가 규칙을 초과했습니다. (현재: **{length}/{max_length}**)", ephemeral=True)
+        # 검증 로직 2: 이름 길이를 6자로 제한 (단순 길이 비교)
+        max_length = 6
+        if len(name) > max_length:
+            return await i.followup.send(f"❌ 오류: 이름은 최대 {max_length}자까지 가능합니다. (현재: {len(name)}자)", ephemeral=True)
 
+        # --- 이하 로직은 기존과 동일 ---
         if not self.nicknames_cog.approval_channel_id or not self.nicknames_cog.approval_role_id:
             return await i.followup.send("오류: 닉네임 기능이 올바르게 설정되지 않았습니다.", ephemeral=True)
         if not (ch := i.guild.get_channel(self.nicknames_cog.approval_channel_id)):
