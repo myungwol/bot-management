@@ -20,7 +20,7 @@ REMINDER_CONFIG = {
         'keyword': "서버 갱신 완료!",
         'command': "/bump",
         'name': "Disboard BUMP",
-        'confirmation_embed_key': "embed_reminder_confirmation_disboard" # [추가] Disboard 전용 확인 임베드 키
+        'confirmation_embed_key': "embed_reminder_confirmation_disboard"
     },
     'dicoall': {
         'bot_id': 664647740877176832,
@@ -28,7 +28,7 @@ REMINDER_CONFIG = {
         'keyword': "서버가 상단에 표시되었습니다.",
         'command': "/up",
         'name': "Dicoall UP",
-        'confirmation_embed_key': "embed_reminder_confirmation_dicoall" # [추가] Dicoall 전용 확인 임베드 키
+        'confirmation_embed_key': "embed_reminder_confirmation_dicoall"
     }
 }
 
@@ -67,54 +67,44 @@ class Reminder(commands.Cog):
 
         for key, config in REMINDER_CONFIG.items():
             if message.author.id == config['bot_id'] and config['keyword'] in embed_description:
-                # 1. 기존 알림 메시지 삭제
-                if (channel_id := self.configs.get(key, {}).get('channel_id')) and (channel := self.bot.get_channel(channel_id)):
-                    try:
-                        async for old_msg in channel.history(limit=50):
-                            if old_msg.author.id == self.bot.user.id and old_msg.embeds:
-                                embed_title = old_msg.embeds[0].title or ""
-                                if config['name'].split(' ')[0] in embed_title:
-                                    await old_msg.delete()
-                                    break
-                    except Exception as e:
-                        logger.warning(f"이전 알림 메시지 삭제 중 오류: {e}")
-
-                # 2. 확인 메시지 전송
+                
+                # 1. 확인 메시지 전송 및 ID 저장
                 user_mention = self.find_user_mention_in_embed(embed_description)
-                # [수정] 설정에 정의된 전용 임베드 키를 사용
                 confirmation_embed_key = config.get('confirmation_embed_key')
+                confirmation_msg = None
                 if confirmation_embed_key:
-                    await self.send_confirmation_message(key, confirmation_embed_key, message.channel, user_mention)
+                    confirmation_msg = await self.send_confirmation_message(key, confirmation_embed_key, message.channel, user_mention)
 
-                # 3. 다음 알림 예약
-                await self.schedule_new_reminder(key, message.guild)
+                # 2. 다음 알림 예약 (확인 메시지 ID와 함께)
+                confirmation_msg_id = confirmation_msg.id if confirmation_msg else None
+                await self.schedule_new_reminder(key, message.guild, confirmation_msg_id)
                 break
 
     def find_user_mention_in_embed(self, description: str) -> str:
         match = re.search(r'<@!?(\d+)>', description)
         return match.group(0) if match else "누군가"
 
-    # [수정] 함수 인자에 embed_key 추가
-    async def send_confirmation_message(self, reminder_type: str, embed_key: str, channel: discord.TextChannel, user_mention: str):
+    async def send_confirmation_message(self, reminder_type: str, embed_key: str, channel: discord.TextChannel, user_mention: str) -> Optional[discord.Message]:
         embed_data = await get_embed_from_db(embed_key)
-        if not embed_data: return
+        if not embed_data: return None
 
         reminder_name = REMINDER_CONFIG.get(reminder_type, {}).get("name", "알 수 없는 작업")
         embed = format_embed_from_db(embed_data, user_mention=user_mention, reminder_name=reminder_name)
         
         try:
+            # [수정] 메시지를 보내고, 메시지 객체를 반환 (더 이상 여기서 삭제하지 않음)
             confirmation_msg = await channel.send(embed=embed)
-            await asyncio.sleep(60)
-            await confirmation_msg.delete()
-        except discord.NotFound:
-            pass
+            return confirmation_msg
         except Exception as e:
-            logger.error(f"확인 메시지 전송/삭제 중 오류: {e}", exc_info=True)
+            logger.error(f"확인 메시지 전송 중 오류: {e}", exc_info=True)
+            return None
 
-    async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild):
+    # [수정] confirmation_message_id 인자 추가
+    async def schedule_new_reminder(self, reminder_type: str, guild: discord.Guild, confirmation_message_id: Optional[int] = None):
         config = REMINDER_CONFIG[reminder_type]
         remind_at_time = datetime.now(timezone.utc) + timedelta(seconds=config['cooltime'])
-        await schedule_reminder(guild.id, reminder_type, remind_at_time)
+        # [수정] DB에 저장할 때 확인 메시지 ID도 함께 전달
+        await schedule_reminder(guild.id, reminder_type, remind_at_time, confirmation_message_id)
         logger.info(f"✅ [{guild.name}] 서버의 {config['name']} 알림을 DB에 예약했습니다. (예약 시간: {remind_at_time.strftime('%Y-%m-%d %H:%M:%S')})")
 
     @tasks.loop(seconds=10.0)
@@ -142,6 +132,20 @@ class Reminder(commands.Cog):
                 if not channel or not role:
                     await deactivate_reminder(reminder['id'])
                     continue
+
+                # ▼▼▼ [핵심 수정] 새 알림을 보내기 전, 이전 확인 메시지 삭제 ▼▼▼
+                if confirmation_msg_id := reminder.get('confirmation_message_id'):
+                    try:
+                        # 히스토리에서 메시지를 찾는 대신, ID로 직접 가져와서 삭제
+                        old_confirmation_msg = await channel.fetch_message(confirmation_msg_id)
+                        await old_confirmation_msg.delete()
+                    except discord.NotFound:
+                        pass # 이미 삭제된 경우 괜찮음
+                    except discord.Forbidden:
+                        logger.warning(f"채널(ID: {channel.id})에서 이전 확인 메시지(ID: {confirmation_msg_id})를 삭제할 권한이 없습니다.")
+                    except Exception as e:
+                        logger.error(f"이전 확인 메시지(ID: {confirmation_msg_id}) 삭제 중 오류 발생: {e}", exc_info=True)
+                # ▲▲▲ [핵심 수정] 완료 ▲▲▲
 
                 try:
                     embed_key = f"embed_reminder_{reminder_type}"
