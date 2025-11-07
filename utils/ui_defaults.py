@@ -1547,11 +1547,39 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 음성 채널 활동",
         "channel_type": "text"
     },
-    "log_member_join_leave": {
+    "log_join": {
         "type": "channel",
-        "cog_name": "JoinLeaveLogger",
-        "key": "log_channel_join_leave",
-        "friendly_name": "[로그] 서버 입장/퇴장",
+        "cog_name": "JoinLogger",
+        "key": "log_channel_join",
+        "friendly_name": "[로그] 서버 입장",
+        "channel_type": "text"
+    },
+    "log_leave": {
+        "type": "channel",
+        "cog_name": "LeaveLogger",
+        "key": "log_channel_leave",
+        "friendly_name": "[로그] 서버 퇴장",
+        "channel_type": "text"
+    },
+    "log_kick": {
+        "type": "channel",
+        "cog_name": "KickLogger",
+        "key": "log_channel_kick",
+        "friendly_name": "[로그] 서버 추방",
+        "channel_type": "text"
+    },
+    "log_ban": {
+        "type": "channel",
+        "cog_name": "BanLogger",
+        "key": "log_channel_ban",
+        "friendly_name": "[로그] 서버 차단",
+        "channel_type": "text"
+    },
+    "log_timeout": {
+        "type": "channel",
+        "cog_name": "TimeoutLogger",
+        "key": "log_channel_timeout",
+        "friendly_name": "[로그] 타임아웃",
         "channel_type": "text"
     },
     "log_role": {
@@ -1566,13 +1594,6 @@ SETUP_COMMAND_MAP = {
         "cog_name": "NicknameLogger",
         "key": "log_channel_nickname",
         "friendly_name": "[로그] 별명 변경",
-        "channel_type": "text"
-    },
-    "log_moderation": {
-        "type": "channel",
-        "cog_name": "ModerationLogger",
-        "key": "log_channel_moderation",
-        "friendly_name": "[로그] 관리 활동 (추방/차단/타임아웃)",
         "channel_type": "text"
     },
     "log_channel": {
