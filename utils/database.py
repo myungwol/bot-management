@@ -85,22 +85,15 @@ def supabase_retry_handler(retries: int = 3, delay: int = 2):
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 3. 데이터 로드 및 동기화
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# ▼▼▼▼▼ [수정] sync_defaults_to_db 함수 전체를 아래 코드로 교체합니다. ▼▼▼▼▼
 async def sync_defaults_to_db():
     logger.info("------ [ 기본값 DB 동기화 시작 ] ------")
     try:
-        role_name_map = {key: info["name"] for key, info in UI_ROLE_KEY_MAP.items()}
+        # 새로운 UI_ROLE_KEY_MAP 전체를 DB에 동기화
+        await save_config_to_db("UI_ROLE_KEY_MAP", UI_ROLE_KEY_MAP)
         
-        prefix_hierarchy = sorted(
-            [info["name"] for info in UI_ROLE_KEY_MAP.values() if info.get("is_prefix")],
-            key=lambda name: next((info.get("priority", 0) for info in UI_ROLE_KEY_MAP.values() if info["name"] == name), 0),
-            reverse=True
-        )
-        
-        # ▼▼▼▼▼ 핵심 수정 ▼▼▼▼▼
-        # 모든 비동기 DB 저장 작업을 하나의 asyncio.gather로 묶어 병렬 처리합니다.
+        # 병렬 처리로 나머지 설정 동기화
         await asyncio.gather(
-            save_config_to_db("ROLE_KEY_MAP", role_name_map),
-            save_config_to_db("NICKNAME_PREFIX_HIERARCHY", prefix_hierarchy),
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
             save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP),
@@ -111,7 +104,6 @@ async def sync_defaults_to_db():
             save_config_to_db("ONBOARDING_CHOICES", ONBOARDING_CHOICES),
             save_config_to_db("BOSS_REWARD_TIERS", BOSS_REWARD_TIERS)
         )
-        # ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
         all_channel_keys = [info['key'] for info in SETUP_COMMAND_MAP.values()]
@@ -121,7 +113,7 @@ async def sync_defaults_to_db():
         if placeholder_records:
             await supabase.table('channel_configs').upsert(placeholder_records, on_conflict="channel_key", ignore_duplicates=True).execute()
 
-        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 역할 패널/게임/나이/온보딩/보스 보상 설정 동기화 완료.")
+        logger.info(f"✅ 설정, 임베드({len(UI_EMBEDS)}개), 컴포넌트({len(UI_PANEL_COMPONENTS)}개), 및 기타 UI 기본값 동기화 완료.")
 
     except Exception as e:
         logger.error(f"❌ 기본값 DB 동기화 중 치명적 오류 발생: {e}", exc_info=True)
