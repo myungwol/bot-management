@@ -277,17 +277,16 @@ class Nicknames(commands.Cog):
         self.vice_master_role_id = get_id("role_staff_deputy_chief")
         logger.info("[Nicknames Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
 
+    # ▼▼▼▼▼ [수정] get_final_nickname 함수 전체를 아래 코드로 교체합니다. ▼▼▼▼▼
     async def get_final_nickname(self, member: discord.Member, base_name: str = "") -> str:
         role_configs = get_config("UI_ROLE_KEY_MAP", {})
 
         # 1. 유저가 가진 is_prefix 역할들 중 가장 우선순위 높은 역할 찾기
         member_role_ids = {role.id for role in member.roles}
-        user_prefix_roles = []
-        for key, config in role_configs.items():
-            role_id = get_id(key)
-            if role_id in member_role_ids and config.get("is_prefix"):
-                user_prefix_roles.append(config)
-        
+        user_prefix_roles = [
+            cfg for key, cfg in role_configs.items()
+            if (role_id := get_id(key)) and role_id in member_role_ids and cfg.get("is_prefix")
+        ]
         highest_priority_role_config = max(user_prefix_roles, key=lambda r: r.get("priority", 0)) if user_prefix_roles else None
 
         # 2. 순수 이름(base_name) 결정
@@ -297,28 +296,45 @@ class Nicknames(commands.Cog):
         else:
             current_nick = member.nick or member.name
             base = current_nick
-            # 현재 닉네임에서 모든 가능한 접두사/접미사 형식을 제거하여 순수 이름 추출
-            # 가장 긴 형식부터 제거해야 짧은 형식이 먼저 제거되는 오류를 막을 수 있음
-            possible_formats = []
-            for cfg in user_prefix_roles:
+
+            # 모든 가능한 접두사/접미사 형식을 전체 설정에서 가져옴
+            all_possible_strips = []
+            for cfg in role_configs.values():
+                if not cfg.get("is_prefix"):
+                    continue
+                
+                # 새로운 형식: 「{symbol}」 이름 ⸝⁺⊹
                 symbol = cfg.get("prefix_symbol")
                 p_format = cfg.get("prefix_format", "「{symbol}」")
                 s_format = cfg.get("suffix", "")
                 if symbol:
-                    possible_formats.append((p_format.format(symbol=symbol), s_format))
-            
-            # 가장 긴 접두사+접미사 조합부터 확인
-            for prefix_str, suffix_str in sorted(possible_formats, key=lambda x: len(x[0]) + len(x[1]), reverse=True):
-                if current_nick.startswith(f"{prefix_str} ") and current_nick.endswith(suffix_str):
-                    base = current_nick[len(f"{prefix_str} "):-len(suffix_str)]
-                    break
+                    all_possible_strips.append({'prefix': f"{p_format.format(symbol=symbol)} ", 'suffix': s_format})
 
+                # 이전 형식 (하위 호환성): 『 🍪：쿠키 』 이름
+                old_prefix_name = cfg.get("name")
+                if old_prefix_name:
+                    all_possible_strips.append({'prefix': f"{old_prefix_name} ", 'suffix': ''})
+
+            # 가장 긴 접두사+접미사 조합부터 확인하여 제거
+            for strip_info in sorted(all_possible_strips, key=lambda x: len(x['prefix']) + len(x['suffix']), reverse=True):
+                prefix_str = strip_info['prefix']
+                suffix_str = strip_info['suffix']
+                
+                # 접미사가 있을 경우
+                if suffix_str and current_nick.startswith(prefix_str) and current_nick.endswith(suffix_str):
+                    base = current_nick[len(prefix_str):-len(suffix_str) if len(suffix_str) > 0 else None].strip()
+                    break # 가장 긴 것 하나만 제거하고 종료
+                # 접미사가 없을 경우 (이전 형식)
+                elif not suffix_str and current_nick.startswith(prefix_str):
+                    base = current_nick[len(prefix_str):].strip()
+                    break
+        
         # 3. 최종 닉네임 조립
         final_nick = base
         if highest_priority_role_config:
             symbol = highest_priority_role_config.get("prefix_symbol")
-            prefix_format = highest_priority_role_config.get("prefix_format", "「{symbol}」") # 기본값
-            suffix = highest_priority_role_config.get("suffix", "") # 기본값
+            prefix_format = highest_priority_role_config.get("prefix_format", "「{symbol}」")
+            suffix = highest_priority_role_config.get("suffix", "")
             if symbol:
                 full_prefix = prefix_format.format(symbol=symbol)
                 final_nick = f"{full_prefix} {base}{suffix}"
@@ -336,6 +352,7 @@ class Nicknames(commands.Cog):
                 suffix_str = s_format
             
             allowed_base_len = 32 - (len(prefix_str) + len(suffix_str))
+            if allowed_base_len < 0: allowed_base_len = 0
             base = base[:allowed_base_len]
             final_nick = f"{prefix_str}{base}{suffix_str}"
 
