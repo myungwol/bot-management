@@ -144,11 +144,23 @@ class InquiryTargetSelectView(ui.View):
 
 
 class ReportTargetSelectView(ui.View):
-    def __init__(self, cog: 'TicketSystem'): super().__init__(timeout=180); self.cog = cog
+    def __init__(self, cog: 'TicketSystem'):
+        super().__init__(timeout=180)
+        self.cog = cog
+
+    # ▼▼▼ [수정 후] 아래 두 함수로 교체하세요 ▼▼▼
     @ui.button(label="✅ 포장 관리팀 포함하기", style=discord.ButtonStyle.success)
-    async def include_police(self, interaction: discord.Interaction, button: ui.Button): await interaction.response.send_modal(ReportModal(self, include_police=True)); await interaction.delete_original_response()
+    async def include_police(self, interaction: discord.Interaction, button: ui.Button):
+        # self 대신 self.cog를 전달하도록 수정
+        await interaction.response.send_modal(ReportModal(self.cog, include_police=True))
+        await interaction.delete_original_response()
+
     @ui.button(label="❌ 포장 관리팀 제외하기", style=discord.ButtonStyle.danger)
-    async def exclude_police(self, interaction: discord.Interaction, button: ui.Button): await interaction.response.send_modal(ReportModal(self, include_police=False)); await interaction.delete_original_response()
+    async def exclude_police(self, interaction: discord.Interaction, button: ui.Button):
+        # self 대신 self.cog를 전달하도록 수정
+        await interaction.response.send_modal(ReportModal(self.cog, include_police=False))
+        await interaction.delete_original_response()
+    # ▲▲▲ [수정 후] 완료 ▲▲▲
 
 
 class TicketControlView(ui.View):
