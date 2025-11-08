@@ -88,11 +88,13 @@ class ApplicationDepartmentSelectView(ui.View):
 
         # Select 메뉴를 위한 클래스를 내부에서 정의합니다.
         class DepartmentSelect(ui.Select):
+            # ▼▼▼ [수정 후] 아래 내용으로 교체하세요 ▼▼▼
             async def callback(view_self, interaction: discord.Interaction):
-                # self.view는 이 Select를 포함하고 있는 ApplicationDepartmentSelectView를 가리킵니다.
-                self.view.selected_department_key = view_self.values[0]
-                self.view.proceed_button.disabled = False
-                await interaction.response.edit_message(view=self.view)
+                # self가 ApplicationDepartmentSelectView 객체이므로 .view를 제거합니다.
+                self.selected_department_key = view_self.values[0]
+                self.proceed_button.disabled = False
+                await interaction.response.edit_message(view=self)
+            # ▲▲▲ [수정 후] 완료 ▲▲▲
         
         self.department_select = DepartmentSelect(placeholder="지원할 부서를 선택해주세요...", options=options)
         self.add_item(self.department_select)
