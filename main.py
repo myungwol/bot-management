@@ -56,12 +56,13 @@ class MyBot(commands.Bot):
     async def setup_hook(self):
         # 1. DB에 기본값을 동기화하고, 동시에 로컬 캐시를 채웁니다.
         await sync_defaults_to_db()
-        # [핵심] 시작 시 DB를 다시 읽어오지 않아 ui_defaults.py의 값이 캐시에 유지되도록 합니다.
+        # 2. DB에서 값을 읽어와 로컬 캐시를 '업데이트'합니다. (덮어쓰기 X)
+        await load_all_data_from_db()
 
-        # 2. 모든 기능(Cogs) 로드
+        # 3. 모든 기능(Cogs) 로드
         await self.load_all_extensions()
         
-        # 3. 영구 View 등록
+        # 4. 영구 View 등록
         cogs_with_persistent_views = [
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "ItemSystem", "AnonymousBoard", 
@@ -117,7 +118,7 @@ async def on_ready():
     logger.info(f"✅ 현재 UTC 시간: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("==================================================")
     
-    # Cog의 load_configs를 수동으로 호출하여 캐시가 준비된 후에 설정값을 불러오도록 합니다.
+    # 캐시가 완전히 준비된 후에, 각 Cog가 필요한 설정을 불러오도록 합니다.
     logger.info("------ [ 모든 Cog 설정 로드 시작 ] ------")
     for cog_name, cog in bot.cogs.items():
         if hasattr(cog, 'load_configs'):
