@@ -53,15 +53,17 @@ class MyBot(commands.Bot):
         super().__init__(*args, **kwargs)
         self.recently_moderated_users = set()
 
+    # ▼▼▼ [수정 1/2] setup_hook 함수를 아래 내용으로 교체 ▼▼▼
     async def setup_hook(self):
-        # 1. DB 기본값 동기화
+        # 1. DB에 기본값을 동기화하고, 동시에 로컬 캐시를 채웁니다.
         await sync_defaults_to_db()
-        # 2. 초기 데이터 캐시 로드
-        await load_all_data_from_db()
-        # 3. 모든 기능(Cogs) 로드 (이 과정에서 각 Cog의 cog_load가 실행됨)
+        # [핵심] 여기서 DB를 다시 읽어오지 않습니다. 
+        # 이렇게 하면 ui_defaults.py의 값이 캐시에 그대로 유지됩니다.
+
+        # 2. 모든 기능(Cogs) 로드
         await self.load_all_extensions()
         
-        # 4. 영구 View 등록
+        # 3. 영구 View 등록
         cogs_with_persistent_views = [
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "ItemSystem", "AnonymousBoard", 
@@ -80,7 +82,7 @@ class MyBot(commands.Bot):
         
         if registered_views_count > 0:
             logger.info(f"✅ 총 {registered_views_count}개의 Cog에서 영구 View를 성공적으로 등록했습니다.")
-
+    # ▲▲▲ [수정 완료] ▲▲▲
     # 5분마다 DB 캐시를 새로고침하는 백그라운드 작업
     @tasks.loop(minutes=5)
     async def refresh_cache_periodically(self):
