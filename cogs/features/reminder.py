@@ -152,8 +152,17 @@ class Reminder(commands.Cog):
                     embed_data = await get_embed_from_db(embed_key)
                     if embed_data:
                         embed = format_embed_from_db(embed_data)
-                        await channel.send(content=role.mention, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
-                        logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']})")
+                        
+                        # ▼▼▼ [핵심 수정] 메시지를 변수에 저장하고, ID를 DB에 업데이트 ▼▼▼
+                        reminder_msg = await channel.send(content=role.mention, embed=embed, allowed_mentions=discord.AllowedMentions(roles=True))
+                        
+                        # DB에 메시지 ID를 기록
+                        await supabase.table('reminders').update({
+                            "reminder_message_id": reminder_msg.id
+                        }).eq('id', reminder['id']).execute()
+                        # ▲▲▲ [수정 완료] ▲▲▲
+
+                        logger.info(f"✅ [{guild.name}] 서버에 {config['name']} 알림을 보냈습니다. (ID: {reminder['id']}, MsgID: {reminder_msg.id})")
 
                 except discord.Forbidden:
                     logger.error(f"채널(ID: {channel.id})에 메시지를 보낼 권한이 없습니다.")
