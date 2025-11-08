@@ -215,7 +215,7 @@ class VoiceMaster(commands.Cog):
             # 사용자가 이미 이동했을 수 있으므로, 생성 채널에 남아있는지 확인하는 대신 오류 발생 시 연결을 끊습니다.
             if member.voice: await member.move_to(None, reason="임시 채널 생성 오류")
 
-    # ▼▼▼ [핵심 수정 2/2] 자동 정렬 로직을 추가합니다. ▼▼▼
+    # ▼▼▼ [핵심 수정] 정렬 로직을 더 정확하게 수정합니다. ▼▼▼
     async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
         guild = member.guild
         channel_type = config.get("type")
@@ -230,27 +230,33 @@ class VoiceMaster(commands.Cog):
             base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
             vc_name = f"{type_info['emoji']}ㆍ{base_name}"
             
-        # 위치 계산
+        # --- 위치 계산 로직 시작 ---
+        
         final_position = creator_channel.position + 1 # 기본 위치 (게임방 또는 fallback)
 
         # 고정 채널(믹서, 라인, 샘플룸)에만 정렬 로직 적용
         if channel_type in CHANNEL_SORT_ORDER:
-            # 기준점: '샘플룸 생성' 채널. 없으면 현재 생성 채널을 기준으로 삼음
-            anchor_ch_id = get_id("vc_creator_sample")
+            # 기준점: '소형믹서 생성' 채널. 이 채널을 기준으로 모든 정렬이 시작됨.
+            anchor_ch_id = get_id("vc_creator_mixer") 
             anchor_ch = guild.get_channel(anchor_ch_id) if anchor_ch_id else creator_channel
             
             if anchor_ch:
                 base_position = anchor_ch.position
-                position_offset = 1
+                position_offset = 1 # 기준 채널 바로 아래부터 시작
                 
-                # 정해진 순서대로, 현재 생성된 채널 수를 세어 위치를 계산
+                # CHANNEL_SORT_ORDER에 정의된 순서대로 순회하며 위치를 계산
                 for sort_type in CHANNEL_SORT_ORDER:
+                    # 현재 만들려는 채널의 순서가 되면, 계산을 멈추고 해당 위치를 사용
+                    if sort_type == channel_type:
+                        break
+                    
+                    # 자신의 순서가 되기 전까지, 다른 타입의 채널이 몇 개 있는지 세어서 offset에 더함
                     count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == sort_type)
                     position_offset += count
-                    if sort_type == channel_type:
-                        break # 자신의 순서까지 계산하고 중단
                 
                 final_position = base_position + position_offset
+
+        # --- 위치 계산 로직 종료 ---
 
         return await guild.create_voice_channel(
             name=vc_name, 
