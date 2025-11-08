@@ -326,6 +326,14 @@ async def get_due_reminders() -> List[Dict[str, Any]]:
 @supabase_retry_handler()
 async def deactivate_reminder(reminder_id: int):
     await supabase.table('reminders').update({"is_active": False}).eq('id', reminder_id).execute()
+
+# ▼▼▼ [핵심 추가] 이 함수를 추가하세요. ▼▼▼
+@supabase_retry_handler()
+async def set_reminder_message_id(reminder_id: int, message_id: int):
+    """특정 알림에 대해 발송된 알림 메시지의 ID를 DB에 기록합니다."""
+    await supabase.table('reminders').update({"reminder_message_id": message_id}).eq('id', reminder_id).execute()
+# ▲▲▲ [추가 완료] ▲▲▲
+
 @supabase_retry_handler()
 async def update_wallet(user: discord.User, amount: int) -> Optional[dict]:
     params = {'p_user_id': str(user.id), 'p_amount': amount}
