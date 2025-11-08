@@ -215,7 +215,7 @@ class VoiceMaster(commands.Cog):
             # 사용자가 이미 이동했을 수 있으므로, 생성 채널에 남아있는지 확인하는 대신 오류 발생 시 연결을 끊습니다.
             if member.voice: await member.move_to(None, reason="임시 채널 생성 오류")
 
-    # ▼▼▼ [최종 수정] 정렬 로직을 다시 작성합니다. ▼▼▼
+    # ▼▼▼ [최종 수정] '생성 후 이동' 방식으로 정렬 로직을 다시 작성합니다. ▼▼▼
     async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
         guild = member.guild
         channel_type = config.get("type")
@@ -230,8 +230,15 @@ class VoiceMaster(commands.Cog):
             base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
             vc_name = f"{type_info['emoji']}ㆍ{base_name}"
             
-        # --- 최종 위치 계산 로직 ---
-        
+        # --- 1단계: 채널을 먼저 기본 위치에 생성 ---
+        vc = await guild.create_voice_channel(
+            name=vc_name, 
+            category=target_category, 
+            user_limit=type_info["user_limit"],
+            reason=f"{member.display_name}의 요청 (1/2: 생성)"
+        )
+
+        # --- 2단계: 이동할 최종 위치 계산 ---
         final_position = creator_channel.position + 1 # 기본 위치 (게임방 또는 fallback)
 
         if channel_type in CHANNEL_SORT_ORDER:
@@ -240,46 +247,25 @@ class VoiceMaster(commands.Cog):
             anchor_ch = guild.get_channel(anchor_ch_id) if anchor_ch_id else creator_channel
             
             if anchor_ch:
-                # 1. 현재 존재하는 모든 임시 채널 객체를 가져옵니다.
-                all_temp_vc_objects = [
-                    ch for ch_id in self.temp_channels
-                    if (ch := guild.get_channel(ch_id)) and isinstance(ch, discord.VoiceChannel)
-                ]
-
-                # 2. 각 그룹별 채널의 현재 위치를 리스트로 저장합니다.
-                positions_by_type = {
-                    "line": sorted([c.position for c in all_temp_vc_objects if self.temp_channels[c.id].get("type") == "line"]),
-                    "sample": sorted([c.position for c in all_temp_vc_objects if self.temp_channels[c.id].get("type") == "sample"]),
-                }
-
-                # 3. 모든 임시 채널의 가장 마지막 위치를 계산합니다.
-                bottom_position = anchor_ch.position + len(all_temp_vc_objects) + 1
+                base_position = anchor_ch.position
+                
+                # 생성된 채널을 제외하고, 기존 채널들의 개수를 셉니다.
+                mixer_count = sum(1 for tc_id, tc_info in self.temp_channels.items() if tc_info.get("type") == "mixer" and tc_id != vc.id)
+                line_count = sum(1 for tc_id, tc_info in self.temp_channels.items() if tc_info.get("type") == "line" and tc_id != vc.id)
                 
                 if channel_type == "mixer":
-                    # 라인 그룹의 시작 위치 또는 샘플룸 그룹의 시작 위치를 찾습니다.
-                    first_line_pos = positions_by_type["line"][0] if positions_by_type["line"] else bottom_position
-                    first_sample_pos = positions_by_type["sample"][0] if positions_by_type["sample"] else bottom_position
-                    # 둘 중 더 위에 있는 위치에 삽입합니다.
-                    final_position = min(first_line_pos, first_sample_pos)
-                
+                    final_position = base_position + 1
                 elif channel_type == "line":
-                    # 샘플룸 그룹의 시작 위치를 찾습니다.
-                    first_sample_pos = positions_by_type["sample"][0] if positions_by_type["sample"] else bottom_position
-                    final_position = first_sample_pos
-                
+                    final_position = base_position + 1 + mixer_count
                 elif channel_type == "sample":
-                    # 샘플룸은 항상 가장 마지막에 위치합니다.
-                    final_position = bottom_position
+                    final_position = base_position + 1 + mixer_count + line_count
         
-        # --- 위치 계산 로직 종료 ---
+        # --- 3단계: 계산된 위치로 채널 이동 ---
+        # 채널이 이미 올바른 위치에 있을 수 있으므로, 다를 경우에만 edit를 호출합니다.
+        if vc.position != final_position:
+            await vc.edit(position=final_position, reason=f"{member.display_name}의 요청 (2/2: 정렬)")
 
-        return await guild.create_voice_channel(
-            name=vc_name, 
-            category=target_category, 
-            user_limit=type_info["user_limit"],
-            position=final_position,
-            reason=f"{member.display_name}의 요청"
-        )
+        return vc
 
     async def _send_control_panel(self, vc: discord.VoiceChannel, owner: discord.Member) -> discord.Message:
         embed = discord.Embed(title=f"환영합니다, {get_clean_display_name(owner)}님!", description="이곳은 당신의 개인 채널입니다.\n아래 버튼으로 채널을 관리할 수 있습니다.", color=0x7289DA)
