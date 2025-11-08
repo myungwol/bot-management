@@ -45,6 +45,8 @@ except Exception as e:
 _bot_configs_cache: Dict[str, Any] = {}
 _channel_id_cache: Dict[str, int] = {}
 _user_abilities_cache: Dict[int, tuple[List[str], float]] = {}
+# ▼▼▼ [추가] 고정 임베드 메시지 캐시 ▼▼▼
+_sticky_messages_cache: Dict[int, Dict[str, Any]] = {}
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 2. DB 오류 처리 데코레이터
@@ -121,7 +123,13 @@ async def sync_defaults_to_db():
 
 async def load_all_data_from_db():
     logger.info("------ [ 모든 DB 데이터 캐시 로드 시작 ] ------")
-    await asyncio.gather(load_bot_configs_from_db(), load_channel_ids_from_db())
+    # ▼▼▼ [수정] load_sticky_messages_from_db() 추가 ▼▼▼
+    await asyncio.gather(
+        load_bot_configs_from_db(), 
+        load_channel_ids_from_db(),
+        load_sticky_messages_from_db()
+    )
+    # ▲▲▲ [수정 완료] ▲▲▲
     logger.info("------ [ 모든 DB 데이터 캐시 로드 완료 ] ------")
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -371,3 +379,35 @@ async def get_user_abilities(user_id: int) -> List[str]:
         return abilities
     _user_abilities_cache[user_id] = ([], now)
     return []
+@supabase_retry_handler()
+async def load_sticky_messages_from_db():
+    """DB에서 모든 고정 임베드 메시지 설정을 불러와 캐시에 저장합니다."""
+    global _sticky_messages_cache
+    response = await supabase.table('sticky_messages').select('*').execute()
+    if response and response.data:
+        _sticky_messages_cache = {item['channel_id']: item for item in response.data}
+        logger.info(f"✅ {len(_sticky_messages_cache)}개의 고정 임베드 메시지 설정을 DB에서 캐시로 로드했습니다.")
+    else:
+        _sticky_messages_cache = {}
+
+@supabase_retry_handler()
+async def set_sticky_message(channel_id: int, message_id: int, guild_id: int, embed_data: dict):
+    """채널에 대한 고정 임베드 메시지를 설정(추가/수정)합니다."""
+    global _sticky_messages_cache
+    record = {
+        "channel_id": channel_id,
+        "message_id": message_id,
+        "guild_id": guild_id,
+        "embed_data": embed_data
+    }
+    await supabase.table('sticky_messages').upsert(record).execute()
+    _sticky_messages_cache[channel_id] = record
+    logger.info(f"📌 채널(ID: {channel_id})에 고정 임베드 메시지(ID: {message_id})를 설정했습니다.")
+
+@supabase_retry_handler()
+async def remove_sticky_message(channel_id: int):
+    """채널의 고정 임베드 메시지 설정을 삭제합니다."""
+    global _sticky_messages_cache
+    await supabase.table('sticky_messages').delete().eq('channel_id', channel_id).execute()
+    _sticky_messages_cache.pop(channel_id, None)
+    logger.info(f"📌 채널(ID: {channel_id})의 고정 임베드 메시지 설정을 삭제했습니다.")
