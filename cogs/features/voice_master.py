@@ -215,8 +215,7 @@ class VoiceMaster(commands.Cog):
             # 사용자가 이미 이동했을 수 있으므로, 생성 채널에 남아있는지 확인하는 대신 오류 발생 시 연결을 끊습니다.
             if member.voice: await member.move_to(None, reason="임시 채널 생성 오류")
 
-    # ▼▼▼ [핵심 수정] 정렬 로직을 더 정확하게 수정합니다. ▼▼▼
-    # ▼▼▼ [핵심 수정] 정렬 로직을 더 정확하게 수정합니다. ▼▼▼
+    # ▼▼▼ [핵심 수정] 정렬 로직을 최종적으로 수정합니다. ▼▼▼
     async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
         guild = member.guild
         channel_type = config.get("type")
@@ -231,37 +230,35 @@ class VoiceMaster(commands.Cog):
             base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
             vc_name = f"{type_info['emoji']}ㆍ{base_name}"
             
-        # --- 위치 계산 로직 시작 ---
+        # --- 최종 위치 계산 로직 ---
         
         final_position = creator_channel.position + 1 # 기본 위치 (게임방 또는 fallback)
 
         # 고정 채널(믹서, 라인, 샘플룸)에만 정렬 로직 적용
         if channel_type in CHANNEL_SORT_ORDER:
-            # 기준점: '샘플룸 생성' 채널. 이 채널을 기준으로 모든 정렬이 시작됨.
+            # 기준점: '샘플룸 생성' 채널. 모든 임시 채널은 이 채널 아래에 정렬됩니다.
             anchor_ch_id = get_id("vc_creator_sample")
-            # 기준 채널이 설정되지 않았다면, 현재 입장한 생성 채널을 임시 기준으로 삼음
             anchor_ch = guild.get_channel(anchor_ch_id) if anchor_ch_id else creator_channel
             
             if anchor_ch:
-                insertion_point = anchor_ch.position
+                # 기준점의 현재 위치
+                base_position = anchor_ch.position
                 
-                # 현재 생성된 각 채널 타입의 개수를 셉니다.
+                # 현재 생성된 각 채널 타입의 개수를 정확히 셉니다.
                 mixer_count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == "mixer")
                 line_count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == "line")
                 
-                # 생성하려는 채널 타입에 따라 삽입 위치를 조정합니다.
+                # 생성하려는 채널 타입에 따라 삽입할 위치를 결정합니다.
                 if channel_type == "mixer":
-                    # 믹서는 기준점 바로 아래에 위치해야 하므로, 오프셋을 더하지 않습니다.
-                    pass
+                    # 믹서는 항상 기준점 바로 아래에 삽입됩니다.
+                    final_position = base_position + 1
                 elif channel_type == "line":
-                    # 라인은 모든 믹서 채널들 다음에 위치해야 합니다.
-                    insertion_point += mixer_count
+                    # 라인은 모든 믹서 채널들 다음에 삽입됩니다.
+                    final_position = base_position + 1 + mixer_count
                 elif channel_type == "sample":
-                    # 샘플룸은 모든 믹서와 라인 채널들 다음에 위치해야 합니다.
-                    insertion_point += mixer_count + line_count
-                
-                final_position = insertion_point + 1
-
+                    # 샘플룸은 모든 믹서와 라인 채널들 다음에 삽입됩니다.
+                    final_position = base_position + 1 + mixer_count + line_count
+        
         # --- 위치 계산 로직 종료 ---
 
         return await guild.create_voice_channel(
