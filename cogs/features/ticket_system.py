@@ -72,43 +72,65 @@ class StaffApplicationModal_Part1(ui.Modal, title="관리자 지원서 (1/2)"):
         await interaction.response.send_modal(StaffApplicationModal_Part2(self.cog, part1_data, self.department_key))
 
 
-# --- ▼▼▼ [신규] 관리자 신청 부서 선택 View ▼▼▼ ---
+# ▼▼▼ [수정 후] 아래 클래스로 교체하세요 ▼▼▼
 class ApplicationDepartmentSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
         self.cog = cog
         self.selected_department_key: Optional[str] = None
         
-        # ui_defaults.py에 정의된 부서 정보로 드롭다운 옵션 생성
-        departments = get_config("TICKET_APPLICATION_DEPARTMENTS", {})
-        options = [
-            discord.SelectOption(
-                label=info['label'],
-                value=key,
-                description=info['description'],
-                emoji=info.get('emoji')
-            ) for key, info in departments.items()
-        ]
-
-        self.department_select = ui.Select(placeholder="지원할 부서를 선택해주세요...", options=options)
-        self.department_select.callback = self.on_department_select
-        self.add_item(self.department_select)
-
+        # __init__ 단계에서는 버튼만 추가합니다.
         self.proceed_button = ui.Button(label="지원서 작성하기", style=discord.ButtonStyle.success, disabled=True)
         self.proceed_button.callback = self.on_proceed
         self.add_item(self.proceed_button)
+        
+        # View가 사용자에게 보여지기 직전에 호출될 함수를 설정합니다.
+        self.on_timeout = self.disable_all_items
+        self.on_error = self.disable_all_items
 
-    async def on_department_select(self, interaction: discord.Interaction, select: ui.Select):
-        self.selected_department_key = select.values[0]
+    # View가 사용자에게 보내지기 전에 호출되는 함수
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # 이 View에 select 메뉴가 이미 있는지 확인합니다.
+        # select 메뉴가 없다면 (즉, 처음 로드될 때), 동적으로 생성합니다.
+        if not any(isinstance(child, ui.Select) for child in self.children):
+            departments = get_config("TICKET_APPLICATION_DEPARTMENTS", {})
+            if not departments:
+                await interaction.response.send_message("❌ 관리자 신청 부서 정보를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
+                return False
+
+            options = [
+                discord.SelectOption(
+                    label=info['label'], value=key,
+                    description=info['description'], emoji=info.get('emoji')
+                ) for key, info in departments.items()
+            ]
+
+            department_select = ui.Select(placeholder="지원할 부서를 선택해주세요...", options=options)
+            department_select.callback = self.on_department_select
+            
+            # 드롭다운 메뉴를 View의 맨 앞에 추가합니다.
+            self.add_item(department_select, row=0)
+
+        return True # 상호작용을 계속 진행
+
+    async def on_department_select(self, interaction: discord.Interaction):
+        # 콜백 함수는 이제 interaction만 받습니다. select 객체는 interaction.data를 통해 접근합니다.
+        self.selected_department_key = interaction.data['values'][0]
         self.proceed_button.disabled = False
         await interaction.response.edit_message(view=self)
 
-    async def on_proceed(self, interaction: discord.Interaction, button: ui.Button):
+    async def on_proceed(self, interaction: discord.Interaction):
         if not self.selected_department_key:
             return
         await interaction.response.send_modal(StaffApplicationModal_Part1(self.cog, self.selected_department_key))
         await interaction.delete_original_response()
-# --- ▲▲▲ [신규] 클래스 추가 완료 ---
+        
+    async def disable_all_items(self, interaction: Optional[discord.Interaction] = None):
+        for item in self.children:
+            item.disabled = True
+        if interaction:
+            await interaction.edit_original_response(view=self)
+# ▲▲▲ [수정 후] 완료 ▲▲▲
 
 
 class InquiryModal(ui.Modal):
