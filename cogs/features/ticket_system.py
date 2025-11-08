@@ -12,7 +12,6 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# --- ▼▼▼ [신규] 관리자 신청 모달 ▼▼▼ ---
 class StaffApplicationModal(ui.Modal, title="관리자 지원서"):
     name_age = ui.TextInput(label="이름 / 나이", placeholder="예: 김마을 / 25", required=True, max_length=50)
     motivation = ui.TextInput(label="지원 동기", placeholder="어떤 계기로 지원하게 되셨나요?", style=discord.TextStyle.paragraph, required=True, max_length=1000)
@@ -25,7 +24,6 @@ class StaffApplicationModal(ui.Modal, title="관리자 지원서"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         try:
-            # 관리자 신청은 대표/부대표에게만 전달됩니다.
             target_roles = set(self.cog.master_roles)
             await self.cog.create_ticket(
                 interaction=interaction,
@@ -80,13 +78,38 @@ class ReportModal(ui.Modal, title="신고 내용 입력"):
             logger.error(f"신고 Modal on_submit에서 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ 티켓을 만드는 중 오류가 발생했습니다.", ephemeral=True)
 
+# --- ▼▼▼ [오류 수정] 아래 클래스 2개를 완전히 새로 설계했습니다. ▼▼▼
 
-# ▼▼▼ [수정] 이 클래스 전체를 아래 내용으로 교체해주세요. ▼▼▼
+class SpecificLeaderSelect(ui.Select):
+    """'특정 부서 팀장'을 선택하기 위한 전용 Select UI 클래스"""
+    def __init__(self, parent_view: 'InquiryTargetSelectView'):
+        self.parent_view = parent_view
+        
+        leader_options = [discord.SelectOption(label=role.name, value=str(role.id)) for role in self.parent_view.cog.leader_roles]
+        
+        super().__init__(
+            placeholder="담당 팀장을 선택해주세요 (여러 명 선택 가능)...",
+            min_values=1,
+            max_values=len(leader_options) if leader_options else 1,
+            options=leader_options,
+            disabled=not leader_options
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        # 이 함수는 ui.Select를 상속받았기 때문에 self는 Select 객체 자신입니다.
+        # self.values로 선택된 역할 ID 목록에 접근할 수 있습니다.
+        self.parent_view.selected_roles = {interaction.guild.get_role(int(role_id)) for role_id in self.values}
+        await interaction.response.defer()
+
+
 class InquiryTargetSelectView(ui.View):
+    """'문의/건의' 버튼을 눌렀을 때 나오는 대상 선택 View"""
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
         self.cog = cog
         self.selected_roles: Set[discord.Role] = set()
+        # '내용 입력하기' 버튼을 미리 추가해둡니다.
+        self.add_item(self.proceed_button)
 
     @ui.select(
         placeholder="문의할 대상을 선택해주세요...",
@@ -99,12 +122,12 @@ class InquiryTargetSelectView(ui.View):
     async def select_target_callback(self, interaction: discord.Interaction, select: ui.Select):
         target_type = select.values[0]
         
-        # 이전 컴포넌트들 제거 (팀장 선택 메뉴가 있다면)
-        # self.children 리스트를 직접 수정하는 대신 clear_items()와 add_item()을 사용합니다.
-        # 이렇게 하면 View의 상태가 더 안정적으로 관리됩니다.
-        original_select = self.children[0]
+        # View를 재구성하기 위해 아이템들을 정리합니다.
+        # (기존 선택 메뉴와 내용 입력 버튼은 유지해야 함)
+        main_select = self.children[0]
+        proceed_btn = self.proceed_button
         self.clear_items()
-        self.add_item(original_select)
+        self.add_item(main_select)
 
         if target_type == "master":
             self.selected_roles = set(self.cog.master_roles)
@@ -112,36 +135,22 @@ class InquiryTargetSelectView(ui.View):
             self.selected_roles = set(self.cog.leader_roles)
         elif target_type == "specific":
             self.selected_roles = set()
-            leader_options = [discord.SelectOption(label=role.name, value=str(role.id)) for role in self.cog.leader_roles]
-            if not leader_options:
-                 # 상호작용이 이미 응답되었을 수 있으므로 followup.send를 사용합니다.
-                 await interaction.response.send_message("❌ 현재 문의 가능한 팀장 역할이 설정되지 않았습니다.", ephemeral=True)
-                 return
-            
-            leader_select = ui.Select(placeholder="담당 팀장을 선택해주세요 (여러 명 선택 가능)...", min_values=1, max_values=len(leader_options), options=leader_options)
-            # 콜백 함수를 올바르게 지정합니다.
-            leader_select.callback = self.specific_leader_callback
-            self.add_item(leader_select)
+            # 위에서 새로 정의한 SpecificLeaderSelect 클래스의 인스턴스를 추가합니다.
+            self.add_item(SpecificLeaderSelect(self))
 
-        # 내용 입력 버튼을 항상 마지막에 추가하여 순서를 유지합니다.
-        self.add_item(self.proceed_button)
+        # 내용 입력 버튼을 다시 추가하여 항상 맨 아래에 오도록 합니다.
+        self.add_item(proceed_btn)
         await interaction.response.edit_message(view=self)
 
-    # 이 함수가 이전에 문제가 되었던 부분입니다.
-    async def specific_leader_callback(self, interaction: discord.Interaction, select: ui.Select):
-        self.selected_roles = {interaction.guild.get_role(int(role_id)) for role_id in select.values}
-        # 이 콜백은 단순히 값을 저장하므로, defer()로 응답만 해주면 됩니다.
-        await interaction.response.defer()
-
-    # proceed_callback을 __init__에서 분리하여 @ui.button으로 명시합니다.
+    # proceed_button을 클래스의 정식 버튼 멤버로 정의합니다.
     @ui.button(label="내용 입력하기", style=discord.ButtonStyle.success, row=4)
     async def proceed_button(self, interaction: discord.Interaction, button: ui.Button):
         if not self.selected_roles:
-            return await interaction.response.send_message("문의 대상을 선택해주세요.", ephemeral=True)
+            return await interaction.response.send_message("문의 대상을 먼저 선택해주세요.", ephemeral=True)
         await interaction.response.send_modal(InquiryModal(self.cog, self.selected_roles))
         await interaction.delete_original_response()
-# ▲▲▲ [수정] 클래스 교체 완료 ▲▲▲
 
+# --- ▲▲▲ [오류 수정 완료] ---
 
 class ReportTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
@@ -150,17 +159,16 @@ class ReportTargetSelectView(ui.View):
 
     @ui.button(label="✅ 포장 관리팀 포함하기", style=discord.ButtonStyle.success)
     async def include_police(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_modal(ReportModal(self.cog, include_police=True))
+        await interaction.response.send_modal(ReportModal(self, include_police=True))
         await interaction.delete_original_response()
 
     @ui.button(label="❌ 포장 관리팀 제외하기", style=discord.ButtonStyle.danger)
     async def exclude_police(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_modal(ReportModal(self.cog, include_police=False))
+        await interaction.response.send_modal(ReportModal(self, include_police=False))
         await interaction.delete_original_response()
 
 
 class TicketControlView(ui.View):
-    # ... (이 클래스는 기존 코드와 동일하므로 변경 없음) ...
     def __init__(self, cog: 'TicketSystem', ticket_type: str, is_locked: bool = False):
         super().__init__(timeout=None)
         self.cog = cog
