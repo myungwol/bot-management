@@ -138,10 +138,15 @@ async def load_all_data_from_db():
 @supabase_retry_handler()
 async def load_bot_configs_from_db():
     global _bot_configs_cache
-    response = await supabase.table('bot_configs').select('config_key, config_value').execute()
+    response = await supabase.table('bot_configs').select('config_key', 'config_value').execute()
     if response and response.data:
-        _bot_configs_cache = {item['config_key']: item['config_value'] for item in response.data}
-        logger.info(f"✅ {len(_bot_configs_cache)}개의 봇 설정을 DB에서 캐시로 로드했습니다.")
+        # ▼▼▼ [수정 후] 아래 내용으로 교체하세요 ▼▼▼
+        # 기존 캐시를 덮어쓰는 대신, DB에서 가져온 값으로 업데이트합니다.
+        # 이렇게 하면 sync_defaults_to_db가 미리 넣어둔 기본값이 보존됩니다.
+        db_configs = {item['config_key']: item['config_value'] for item in response.data}
+        _bot_configs_cache.update(db_configs)
+        # ▲▲▲ [수정 후] 완료 ▲▲▲
+        logger.info(f"✅ {len(_bot_configs_cache)}개의 봇 설정을 DB에서 캐시로 로드/업데이트했습니다.")
 
 @supabase_retry_handler()
 async def save_config_to_db(key: str, value: Any):
