@@ -9,11 +9,9 @@ import logging.handlers
 from datetime import datetime, timezone
 from typing import Optional
 from discord.ext import commands, tasks
-# [✅ 수정] 두 함수 모두 사용하므로 그대로 둡니다.
 from utils.database import load_all_data_from_db, sync_defaults_to_db
 
 # --- 중앙 로깅 설정 ---
-# [✅ 가독성 개선] 로그 포맷을 더 간결하고 명확하게 변경합니다.
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(name)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 log_handler = logging.StreamHandler()
 log_handler.setFormatter(log_formatter)
@@ -24,7 +22,6 @@ if root_logger.hasHandlers():
     root_logger.handlers.clear()
 root_logger.addHandler(log_handler)
 
-# [✅ 가독성 개선] 불필요한 라이브러리의 상세 로그를 비활성화하여 핵심 로그만 볼 수 있도록 합니다.
 logging.getLogger('discord').setLevel(logging.WARNING)
 logging.getLogger('discord.http').setLevel(logging.WARNING)
 logging.getLogger('websockets').setLevel(logging.WARNING)
@@ -48,26 +45,27 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.voice_states = True
-BOT_VERSION = "v2.6-stability-hotfix" # 안정성 개선 핫픽스 버전
+BOT_VERSION = "v2.6-stability-hotfix"
 
+# --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.recently_moderated_users = set()
 
-    # ▼▼▼ [수정 1/2] setup_hook 함수를 아래 내용으로 교체 ▼▼▼
     async def setup_hook(self):
-        # [핵심 수정] Cogs나 View가 로드되기 전에, DB 동기화와 캐시 로드를 먼저 실행합니다.
+        # 1. DB 기본값 동기화
         await sync_defaults_to_db()
+        # 2. 초기 데이터 캐시 로드
         await load_all_data_from_db()
-
-        # DB와 캐시가 준비된 후에 Cog들을 로드합니다.
+        # 3. 모든 기능(Cogs) 로드 (이 과정에서 각 Cog의 cog_load가 실행됨)
         await self.load_all_extensions()
         
+        # 4. 영구 View 등록
         cogs_with_persistent_views = [
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "ItemSystem", "AnonymousBoard", 
-            "WarningSystem", "VoiceMaster"
+            "WarningSystem", "VoiceMaster", "StickyEmbed"
         ]
         
         registered_views_count = 0
@@ -82,27 +80,37 @@ class MyBot(commands.Bot):
         
         if registered_views_count > 0:
             logger.info(f"✅ 총 {registered_views_count}개의 Cog에서 영구 View를 성공적으로 등록했습니다.")
-    # ▲▲▲ [수정 완료] ▲▲▲
 
+    # 5분마다 DB 캐시를 새로고침하는 백그라운드 작업
     @tasks.loop(minutes=5)
     async def refresh_cache_periodically(self):
-        # ... (이 함수는 변경 없음) ...
         logger.info("🔄 주기적인 DB 캐시 새로고침을 시작합니다...")
         await load_all_data_from_db()
         logger.info("🔄 주기적인 DB 캐시 새로고침이 완료되었습니다.")
 
-    @refresh_cache_periodically.before_loop
-    async def before_refresh_cache(self):
-        # ... (이 함수는 변경 없음) ...
-        await self.wait_until_ready()
-
     async def load_all_extensions(self):
-        # ... (이 함수는 변경 없음) ...
         logger.info("------ [ Cog 로드 시작 ] ------")
+        cogs_dir = 'cogs'
+        loaded_count, failed_count = 0, 0
+        for root, dirs, files in os.walk(cogs_dir):
+            if '__pycache__' in dirs:
+                dirs.remove('__pycache__')
+            
+            for filename in files:
+                if filename.endswith('.py') and not filename.startswith('__'):
+                    extension_path = os.path.join(root, filename).replace(os.path.sep, '.')[:-3]
+                    try:
+                        await self.load_extension(extension_path)
+                        logger.info(f" M> Cog 로드 성공: {extension_path}")
+                        loaded_count += 1
+                    except Exception as e:
+                        logger.error(f" M> Cog 로드 실패: {extension_path} | {e}", exc_info=True)
+                        failed_count += 1
+        logger.info(f"------ [ Cog 로드 완료 | 성공: {loaded_count} / 실패: {failed_count} ] ------")
 
 bot = MyBot(command_prefix="/", intents=intents)
 
-# ▼▼▼ [수정 2/2] on_ready 함수에서 중복되는 캐시 로드 코드를 제거 ▼▼▼
+# --- ▼▼▼ [핵심 수정] on_ready 함수를 매우 단순하게 변경 ▼▼▼ ---
 @bot.event
 async def on_ready():
     logger.info("==================================================")
@@ -111,27 +119,12 @@ async def on_ready():
     logger.info(f"✅ 현재 UTC 시간: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("==================================================")
     
-    # [핵심 수정] 이 부분의 캐시 로드는 setup_hook으로 이동했으므로 삭제합니다.
-    # await load_all_data_from_db() 
-    
-    logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
-    refreshed_cogs_count = 0
-    for cog_name, cog in bot.cogs.items():
-        if hasattr(cog, 'load_configs'):
-            try: 
-                await cog.load_configs()
-                refreshed_cogs_count += 1
-            except Exception as e: 
-                logger.error(f"❌ '{cog_name}' Cog 설정 새로고침 중 오류: {e}", exc_info=True)
-
-    if refreshed_cogs_count > 0:
-        logger.info(f"✅ 총 {refreshed_cogs_count}개의 Cog 설정이 새로고침되었습니다.")
-    logger.info("------ [ 모든 Cog 설정 새로고침 완료 ] ------")
-    
+    # 주기적 캐시 새로고침 루프를 시작합니다.
     if not bot.refresh_cache_periodically.is_running():
         bot.refresh_cache_periodically.start()
         logger.info("✅ 주기적인 DB 캐시 새로고침 루프를 시작합니다.")
 
+    # 슬래시 명령어를 동기화합니다.
     try:
         if TEST_GUILD_ID:
             guild = discord.Object(id=TEST_GUILD_ID)
@@ -142,7 +135,6 @@ async def on_ready():
             logger.info(f"✅ {len(synced)}개의 슬래시 명령어를 전체 서버에 동기화했습니다.")
     except Exception as e: 
         logger.error(f"❌ 명령어 동기화 중 오류가 발생했습니다: {e}", exc_info=True)
-# ▲▲▲ [수정 완료] ▲▲▲
 
 async def main():
     async with bot:
