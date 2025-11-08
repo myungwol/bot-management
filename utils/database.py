@@ -134,15 +134,17 @@ async def load_all_data_from_db():
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 4. 설정 (bot_configs) 관련 함수
-# ▼▼▼ [수정 2/2] load_bot_configs_from_db 함수를 아래 내용으로 교체 ▼▼▼
+# ▼▼▼ [수정 1/2] load_bot_configs_from_db 함수를 아래 내용으로 교체 ▼▼▼
 @supabase_retry_handler()
 async def load_bot_configs_from_db():
     global _bot_configs_cache
     response = await supabase.table('bot_configs').select('config_key', 'config_value').execute()
     if response and response.data:
-        # 주기적 동기화 시에는 DB의 내용으로 캐시를 완전히 덮어쓰는 것이 맞습니다.
-        _bot_configs_cache = {item['config_key']: item['config_value'] for item in response.data}
-        logger.info(f"✅ {len(_bot_configs_cache)}개의 봇 설정을 DB에서 캐시로 로드했습니다.")
+        # DB에서 가져온 값으로 기존 캐시를 업데이트(병합)합니다.
+        # 이렇게 하면 sync_defaults_to_db가 미리 넣어둔 기본값이 보존됩니다.
+        db_configs = {item['config_key']: item['config_value'] for item in response.data}
+        _bot_configs_cache.update(db_configs)
+        logger.info(f"✅ {len(db_configs)}개의 봇 설정을 DB에서 캐시로 로드/업데이트했습니다.")
 # ▲▲▲ [수정 완료] ▲▲▲
 
 @supabase_retry_handler()
