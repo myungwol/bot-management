@@ -252,36 +252,63 @@ class TicketSystem(commands.Cog):
     async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, title: str, content: Union[str, Dict], selected_roles: Set[discord.Role], embed_key: Optional[str] = None, department_key: Optional[str] = None):
         thread: Optional[discord.Thread] = None
         try:
-            panel_channel = interaction.channel; type_map = {"inquiry": "문의", "report": "신고", "application": "지원"}
+            panel_channel = interaction.channel
+            type_map = {"inquiry": "문의", "report": "신고", "application": "지원"}
             thread_name = f"[{type_map.get(ticket_type, '티켓')}] {title}"
             thread = await panel_channel.create_thread(name=thread_name, type=discord.ChannelType.private_thread)
+            
             await add_ticket(thread.id, interaction.user.id, interaction.guild.id, ticket_type)
             self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type, "is_locked": False}
-            embed_to_send = None; final_roles_to_mention = set(self.master_roles)
+            
+            embed_to_send = None
+            final_roles_to_mention = set(self.master_roles)
+
             if ticket_type == "application" and isinstance(content, dict) and department_key:
-                departments = get_config("TICKET_APPLICATION_DEPARTMENTS", {}); dept_info = departments.get(department_key)
+                departments = get_config("TICKET_APPLICATION_DEPARTMENTS", {})
+                dept_info = departments.get(department_key)
                 embed_data = await get_embed_from_db(embed_key)
                 if embed_data and dept_info:
                     embed_to_send = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
-                    embed_to_send.set_author(name=f"{interaction.user.display_name} ({interaction.user.id})", icon_url=interaction.user.display_avatar.url); embed_to_send.timestamp = discord.utils.utcnow()
-                    for name, value in content.items(): embed_to_send.add_field(name=name, value=value or "내용 없음", inline=False)
-                    if team_role_id := get_id(dept_info['team_role_key']):
-                        if team_role := interaction.guild.get_role(team_role_id): selected_roles.add(team_role)
+                    embed_to_send.set_author(name=f"{interaction.user.display_name} ({interaction.user.id})", icon_url=interaction.user.display_avatar.url)
+                    embed_to_send.timestamp = discord.utils.utcnow()
+                    for name, value in content.items():
+                        embed_to_send.add_field(name=name, value=value or "내용 없음", inline=False)
+                    
+                    # --- ▼▼▼ [핵심 수정] 팀원 역할 멘션 부분을 주석 처리합니다. ▼▼▼ ---
+                    # if team_role_id := get_id(dept_info['team_role_key']):
+                    #     if team_role := interaction.guild.get_role(team_role_id): 
+                    #         selected_roles.add(team_role)
+                    # --- ▲▲▲ [수정 완료] ▲▲▲ ---
+                        
+                    # 팀장 역할은 계속 멘션하도록 유지합니다.
                     if leader_role_id := get_id(dept_info['leader_role_key']):
-                        if leader_role := interaction.guild.get_role(leader_role_id): selected_roles.add(leader_role)
+                        if leader_role := interaction.guild.get_role(leader_role_id): 
+                            selected_roles.add(leader_role)
+
             elif ticket_type in ["inquiry", "report"]:
-                color = {"inquiry": 0x3498DB, "report": 0xE74C3C}; embed_to_send = discord.Embed(title=title, description=str(content), color=color.get(ticket_type, 0x99AAB5))
-                embed_to_send.set_author(name=f"{interaction.user.display_name} 님의 {type_map.get(ticket_type)}", icon_url=interaction.user.display_avatar.url); embed_to_send.timestamp = discord.utils.utcnow()
+                color = {"inquiry": 0x3498DB, "report": 0xE74C3C}
+                embed_to_send = discord.Embed(title=title, description=str(content), color=color.get(ticket_type, 0x99AAB5))
+                embed_to_send.set_author(name=f"{interaction.user.display_name} 님의 {type_map.get(ticket_type)}", icon_url=interaction.user.display_avatar.url)
+                embed_to_send.timestamp = discord.utils.utcnow()
+
             await thread.send(embed=embed_to_send)
-            final_roles_to_mention.update(selected_roles); mention_string = ' '.join(role.mention for role in final_roles_to_mention if role)
+            
+            final_roles_to_mention.update(selected_roles)
+            mention_string = ' '.join(role.mention for role in final_roles_to_mention if role)
             control_view = TicketControlView(self, ticket_type, is_locked=False)
             await thread.send(f"{interaction.user.mention} {mention_string}\n**[티켓 관리 패널]**", view=control_view, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
+            
             message = await interaction.followup.send(f"✅ 비공개 티켓을 만들었습니다: {thread.mention}", ephemeral=True, wait=True)
-            await asyncio.sleep(5); await message.delete()
+            await asyncio.sleep(5)
+            await message.delete()
+
         except Exception as e:
             logger.error(f"티켓 생성 중 오류 발생: {e}", exc_info=True)
-            if thread: await thread.delete(reason="생성 과정 오류로 인한 자동 삭제")
-            if interaction.response.is_done(): await interaction.followup.send("❌ 티켓을 만드는 중 오류가 발생했습니다.", ephemeral=True)
+            if thread: 
+                await thread.delete(reason="생성 과정 오류로 인한 자동 삭제")
+            if interaction.response.is_done(): 
+                await interaction.followup.send("❌ 티켓을 만드는 중 오류가 발생했습니다.", ephemeral=True)
+    # ▲▲▲ [수정 완료] ▲▲▲
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
         if thread.id in self.tickets: self.tickets.pop(thread.id, None); await remove_ticket(thread.id)
