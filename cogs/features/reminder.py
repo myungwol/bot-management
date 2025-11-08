@@ -68,7 +68,27 @@ class Reminder(commands.Cog):
         for key, config in REMINDER_CONFIG.items():
             if message.author.id == config['bot_id'] and config['keyword'] in embed_description:
                 
+                # ▼▼▼ [핵심 추가] 이전 알림 메시지를 찾아 삭제하는 로직 ▼▼▼
+                try:
+                    # 현재 활성화된 알림 중, 방금 보냈던 알림 메시지 ID를 찾습니다.
+                    response = await supabase.table('reminders').select('id, reminder_message_id') \
+                        .eq('guild_id', message.guild.id) \
+                        .eq('reminder_type', key) \
+                        .eq('is_active', True) \
+                        .not_.is_('reminder_message_id', 'null') \
+                        .order('created_at', desc=True).limit(1).single().execute()
+                    
+                    if response and response.data and (msg_id := response.data.get('reminder_message_id')):
+                        original_reminder_msg = await message.channel.fetch_message(msg_id)
+                        await original_reminder_msg.delete()
+                except discord.NotFound:
+                    pass # 이미 삭제된 경우
+                except Exception as e:
+                    logger.warning(f"이전 알림 메시지(ID: {msg_id}) 삭제 중 오류: {e}")
+                # ▲▲▲ [추가 완료] ▲▲▲
+
                 # 1. 확인 메시지 전송 및 ID 저장
+                # (기존 코드와 동일)
                 user_mention = self.find_user_mention_in_embed(embed_description)
                 confirmation_embed_key = config.get('confirmation_embed_key')
                 confirmation_msg = None
@@ -76,6 +96,7 @@ class Reminder(commands.Cog):
                     confirmation_msg = await self.send_confirmation_message(key, confirmation_embed_key, message.channel, user_mention)
 
                 # 2. 다음 알림 예약 (확인 메시지 ID와 함께)
+                # (기존 코드와 동일)
                 confirmation_msg_id = confirmation_msg.id if confirmation_msg else None
                 await self.schedule_new_reminder(key, message.guild, confirmation_msg_id)
                 break
