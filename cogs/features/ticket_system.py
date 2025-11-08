@@ -226,23 +226,46 @@ class MainTicketPanelView(ui.View):
 
 
 class TicketSystem(commands.Cog):
-    # ... (이하 TicketSystem 클래스의 모든 내용은 이전과 동일하게 유지) ...
+    # ▼▼▼ [수정] __init__ 함수와 load_configs 함수를 교체 ▼▼▼
     def __init__(self, bot: commands.Bot):
-        self.bot = bot; self.tickets: Dict[int, Dict] = {}; self.master_roles: List[discord.Role] = []
-        self.report_roles: List[discord.Role] = []; self.leader_roles: List[discord.Role] = []
-        self.guild: Optional[discord.Guild] = None; self.view_instance: Optional[MainTicketPanelView] = None
+        self.bot = bot
+        self.tickets: Dict[int, Dict] = {}
+        self.master_roles: List[discord.Role] = []
+        self.report_roles: List[discord.Role] = []
+        self.leader_roles: List[discord.Role] = []
+        self.guild: Optional[discord.Guild] = None
+        self.view_instance: Optional[MainTicketPanelView] = None
+        # 부서 정보를 저장할 인스턴스 변수 추가
+        self.departments: Dict[str, Any] = {}
         logger.info("TicketSystem Cog가 성공적으로 초기화되었습니다.")
-    async def cog_load(self): await self.load_configs(); await self.register_persistent_views(); self.bot.loop.create_task(self.sync_tickets_from_db())
-    async def register_persistent_views(self): self.view_instance = MainTicketPanelView(self); self.bot.add_view(self.view_instance); logger.info("✅ 통합 티켓 시스템의 영구 View가 성공적으로 등록되었습니다.")
+
+    async def cog_load(self):
+        await self.load_configs()
+        await self.register_persistent_views()
+        self.bot.loop.create_task(self.sync_tickets_from_db())
+
+    async def register_persistent_views(self):
+        self.view_instance = MainTicketPanelView(self)
+        self.bot.add_view(self.view_instance)
+        logger.info("✅ 통합 티켓 시스템의 영구 View가 성공적으로 등록되었습니다.")
+        
     async def load_configs(self):
+        # Cog가 로드될 때 DB에서 부서 정보를 미리 가져와 저장합니다.
+        self.departments = get_config("TICKET_APPLICATION_DEPARTMENTS", {})
+        
         panel_channel_id = get_id("ticket_main_panel_channel_id")
-        if panel_channel_id and (channel := self.bot.get_channel(panel_channel_id)): self.guild = channel.guild
+        if panel_channel_id and (channel := self.bot.get_channel(panel_channel_id)):
+            self.guild = channel.guild
+        
         if self.guild:
             self.master_roles = [role for key in TICKET_MASTER_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
             self.report_roles = [role for key in TICKET_REPORT_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
             self.leader_roles = [role for key in TICKET_LEADER_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
-            logger.info(f"[TicketSystem] 역할 로드 완료 (대표: {len(self.master_roles)}, 신고: {len(self.report_roles)}, 팀장: {len(self.leader_roles)})")
-        else: logger.warning("[TicketSystem] 티켓 패널 채널이 설정되지 않아 길드 정보를 불러올 수 없습니다.")
+            logger.info(f"[TicketSystem] 역할 및 부서 정보 로드 완료 (부서: {len(self.departments)}개)")
+        else:
+            logger.warning("[TicketSystem] 티켓 패널 채널이 설정되지 않아 길드 정보를 불러올 수 없습니다.")
+    # ▲▲▲ [수정 완료] ▲▲▲
+
     def has_open_ticket(self, user: discord.Member, ticket_type: str):
         for thread_id, ticket_info in self.tickets.items():
             if ticket_info.get("owner_id") == user.id and ticket_info.get("ticket_type") == ticket_type and self.guild and self.guild.get_thread(thread_id): return True
