@@ -1223,32 +1223,33 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "자기소개 승인/거절 채널",
         "channel_type": "text"
     },
-    "channel_vc_creator_3p": {
+    # ▼▼▼ [추가] 새로운 음성 채널 생성기 설정 4개를 추가합니다. ▼▼▼
+    "channel_vc_creator_mixer": {
         "type": "channel",
         "cog_name": "VoiceMaster",
-        "key": "vc_creator_channel_id_3p",
-        "friendly_name": "음성 채널 자동 생성 (게임)",
+        "key": "vc_creator_mixer",
+        "friendly_name": "[음성] 소형믹서 생성",
         "channel_type": "voice"
     },
-    "channel_vc_creator_4p": {
+    "channel_vc_creator_line": {
         "type": "channel",
         "cog_name": "VoiceMaster",
-        "key": "vc_creator_channel_id_4p",
-        "friendly_name": "음성 채널 자동 생성 (광장)",
+        "key": "vc_creator_line",
+        "friendly_name": "[음성] 미니라인 생성",
         "channel_type": "voice"
     },
-    "channel_vc_creator_newbie": {
+    "channel_vc_creator_sample": {
         "type": "channel",
         "cog_name": "VoiceMaster",
-        "key": "vc_creator_channel_id_벤치",
-        "friendly_name": "[음성 채널] 뉴비 전용 생성기",
+        "key": "vc_creator_sample",
+        "friendly_name": "[음성] 샘플룸 생성",
         "channel_type": "voice"
     },
-    "channel_vc_creator_vip": {
+    "channel_vc_creator_game": {
         "type": "channel",
         "cog_name": "VoiceMaster",
-        "key": "vc_creator_channel_id_마이룸",
-        "friendly_name": "[음성 채널] VIP 전용 생성기",
+        "key": "vc_creator_game",
+        "friendly_name": "[음성] 게임방 생성",
         "channel_type": "voice"
     },
     "log_nickname": {
