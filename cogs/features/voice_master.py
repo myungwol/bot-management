@@ -10,9 +10,14 @@ from typing import Dict, Optional, Any, Set
 import asyncio
 import time
 
-from utils.database import get_id, add_temp_channel, update_temp_channel_owner, remove_temp_channel, remove_multiple_temp_channels
+# ▼▼▼ [핵심 수정] 누락된 함수들을 import 목록에 추가합니다. ▼▼▼
+from utils.database import (
+    get_id, get_all_temp_channels, add_temp_channel, 
+    update_temp_channel_owner, remove_temp_channel, remove_multiple_temp_channels
+)
 from utils.helpers import get_clean_display_name
 from utils.ui_defaults import ADMIN_ROLE_KEYS
+# ▲▲▲ [수정 완료] ▲▲▲
 
 logger = logging.getLogger(__name__)
 
