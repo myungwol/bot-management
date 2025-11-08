@@ -134,7 +134,6 @@ async def load_all_data_from_db():
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 4. 설정 (bot_configs) 관련 함수
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # ▼▼▼ [수정 2/2] load_bot_configs_from_db 함수를 아래 내용으로 교체 ▼▼▼
 @supabase_retry_handler()
 async def load_bot_configs_from_db():
