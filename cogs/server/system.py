@@ -558,14 +558,12 @@ class ServerSystem(commands.Cog):
                             failure_list.append(f"・`{friendly_name}`: 채널이 설정되지 않았거나 찾을 수 없습니다.")
                             continue
                         
-                        success = False
-                        if cog_name == "TicketSystem":
-                            panel_type = key.replace("panel_", "")
-                            success = await cog.regenerate_panel(target_channel, panel_type=panel_type)
-                        else:
-                            success = await cog.regenerate_panel(target_channel, panel_key=key)
+                        # ▼▼▼ [수정 후] 아래 한 줄로 교체하세요 ▼▼▼
+                        success = await cog.regenerate_panel(target_channel, panel_key=key)
+                        # ▲▲▲ [수정 후] 완료 ▲▲▲
                         
                         if success: success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
+                        
                         else: failure_list.append(f"・`{friendly_name}`: 재설치 중 알 수 없는 오류가 발생했습니다.")
                         
                         await asyncio.sleep(1)
