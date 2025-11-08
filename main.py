@@ -50,19 +50,18 @@ intents.message_content = True
 intents.voice_states = True
 BOT_VERSION = "v2.6-stability-hotfix" # 안정성 개선 핫픽스 버전
 
-# --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # ▼▼▼▼▼ [추가] 이 줄을 추가하세요. ▼▼▼▼▼
         self.recently_moderated_users = set()
-        # ▲▲▲▲▲ [추가] 완료 ▲▲▲▲▲
 
+    # ▼▼▼ [수정 1/2] setup_hook 함수를 아래 내용으로 교체 ▼▼▼
     async def setup_hook(self):
-        # [✅ 핵심] 봇 시작 시, 로컬 기본값(ui_defaults.py 등)을 DB에 먼저 동기화합니다.
+        # [핵심 수정] Cogs나 View가 로드되기 전에, DB 동기화와 캐시 로드를 먼저 실행합니다.
         await sync_defaults_to_db()
+        await load_all_data_from_db()
 
-        # DB 동기화 후, Cog들을 로드합니다.
+        # DB와 캐시가 준비된 후에 Cog들을 로드합니다.
         await self.load_all_extensions()
         
         cogs_with_persistent_views = [
@@ -83,59 +82,27 @@ class MyBot(commands.Bot):
         
         if registered_views_count > 0:
             logger.info(f"✅ 총 {registered_views_count}개의 Cog에서 영구 View를 성공적으로 등록했습니다.")
-
-    # ▼▼▼ [핵심 수정] on_ready 메소드를 삭제하고, 관련 로직을 아래 @bot.event on_ready 함수로 통합합니다. ▼▼▼
-    # async def on_ready(self):
-    #     if not self.refresh_cache_periodically.is_running():
-    #         self.refresh_cache_periodically.start()
-    #         logger.info("✅ 주기적인 DB 캐시 새로고침 루프를 시작합니다.")
+    # ▲▲▲ [수정 완료] ▲▲▲
 
     @tasks.loop(minutes=5)
     async def refresh_cache_periodically(self):
-        """5분마다 DB에서 최신 설정을 불러와 캐시를 갱신합니다."""
+        # ... (이 함수는 변경 없음) ...
         logger.info("🔄 주기적인 DB 캐시 새로고침을 시작합니다...")
         await load_all_data_from_db()
         logger.info("🔄 주기적인 DB 캐시 새로고침이 완료되었습니다.")
 
     @refresh_cache_periodically.before_loop
     async def before_refresh_cache(self):
-        """봇이 완전히 준비될 때까지 기다립니다."""
+        # ... (이 함수는 변경 없음) ...
         await self.wait_until_ready()
 
     async def load_all_extensions(self):
+        # ... (이 함수는 변경 없음) ...
         logger.info("------ [ Cog 로드 시작 ] ------")
-        cogs_dir = 'cogs'
-        if not os.path.isdir(cogs_dir):
-            logger.critical(f"❌ Cogs 디렉토리를 찾을 수 없습니다: '{cogs_dir}'")
-            return
-
-        loaded_count = 0
-        failed_count = 0
-        # [✅ 안정성 개선] os.walk를 사용하여 모든 하위 폴더의 Cog를 안정적으로 찾도록 변경합니다.
-        for root, dirs, files in os.walk(cogs_dir):
-            # __pycache__ 폴더는 탐색에서 제외합니다.
-            if '__pycache__' in dirs:
-                dirs.remove('__pycache__')
-            
-            for filename in files:
-                if filename.endswith('.py') and not filename.startswith('__'):
-                    path = os.path.join(root, filename)
-                    # 파일 경로를 모듈 경로로 변환합니다 (e.g., cogs/server/system.py -> cogs.server.system)
-                    extension_path = os.path.splitext(path)[0].replace(os.path.sep, '.')
-                    
-                    try:
-                        await self.load_extension(extension_path)
-                        logger.info(f" M> Cog 로드 성공: {extension_path}")
-                        loaded_count += 1
-                    except Exception as e:
-                        logger.error(f" M> Cog 로드 실패: {extension_path} | {e}", exc_info=True)
-                        failed_count += 1
-        
-        logger.info(f"------ [ Cog 로드 완료 | 성공: {loaded_count} / 실패: {failed_count} ] ------")
 
 bot = MyBot(command_prefix="/", intents=intents)
 
-# ▼▼▼ [핵심 수정] on_ready 이벤트를 이 함수로 통합합니다. ▼▼▼
+# ▼▼▼ [수정 2/2] on_ready 함수에서 중복되는 캐시 로드 코드를 제거 ▼▼▼
 @bot.event
 async def on_ready():
     logger.info("==================================================")
@@ -144,8 +111,8 @@ async def on_ready():
     logger.info(f"✅ 현재 UTC 시간: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("==================================================")
     
-    # DB 동기화가 끝난 후, 캐시를 로드합니다.
-    await load_all_data_from_db()
+    # [핵심 수정] 이 부분의 캐시 로드는 setup_hook으로 이동했으므로 삭제합니다.
+    # await load_all_data_from_db() 
     
     logger.info("------ [ 모든 Cog 설정 새로고침 시작 ] ------")
     refreshed_cogs_count = 0
@@ -161,7 +128,6 @@ async def on_ready():
         logger.info(f"✅ 총 {refreshed_cogs_count}개의 Cog 설정이 새로고침되었습니다.")
     logger.info("------ [ 모든 Cog 설정 새로고침 완료 ] ------")
     
-    # [수정] 주기적 캐시 새로고침 루프를 여기서 시작합니다.
     if not bot.refresh_cache_periodically.is_running():
         bot.refresh_cache_periodically.start()
         logger.info("✅ 주기적인 DB 캐시 새로고침 루프를 시작합니다.")
@@ -176,6 +142,7 @@ async def on_ready():
             logger.info(f"✅ {len(synced)}개의 슬래시 명령어를 전체 서버에 동기화했습니다.")
     except Exception as e: 
         logger.error(f"❌ 명령어 동기화 중 오류가 발생했습니다: {e}", exc_info=True)
+# ▲▲▲ [수정 완료] ▲▲▲
 
 async def main():
     async with bot:
