@@ -54,6 +54,7 @@ class MyBot(commands.Bot):
         self.recently_moderated_users = set()
 
     # ▼▼▼ [수정 1/2] setup_hook 함수를 아래 내용으로 교체 ▼▼▼
+    # ▼▼▼ [수정 1/2] setup_hook 함수를 아래 내용으로 교체 ▼▼▼
     async def setup_hook(self):
         # 1. DB에 기본값을 동기화하고, 동시에 로컬 캐시를 채웁니다.
         await sync_defaults_to_db()
