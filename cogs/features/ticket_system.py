@@ -81,6 +81,7 @@ class ReportModal(ui.Modal, title="신고 내용 입력"):
             await interaction.followup.send("❌ 티켓을 만드는 중 오류가 발생했습니다.", ephemeral=True)
 
 
+# ▼▼▼ [수정] 이 클래스 전체를 아래 내용으로 교체해주세요. ▼▼▼
 class InquiryTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
@@ -99,8 +100,11 @@ class InquiryTargetSelectView(ui.View):
         target_type = select.values[0]
         
         # 이전 컴포넌트들 제거 (팀장 선택 메뉴가 있다면)
+        # self.children 리스트를 직접 수정하는 대신 clear_items()와 add_item()을 사용합니다.
+        # 이렇게 하면 View의 상태가 더 안정적으로 관리됩니다.
+        original_select = self.children[0]
         self.clear_items()
-        self.add_item(select) # 원래 선택 메뉴는 유지
+        self.add_item(original_select)
 
         if target_type == "master":
             self.selected_roles = set(self.cog.master_roles)
@@ -110,29 +114,33 @@ class InquiryTargetSelectView(ui.View):
             self.selected_roles = set()
             leader_options = [discord.SelectOption(label=role.name, value=str(role.id)) for role in self.cog.leader_roles]
             if not leader_options:
+                 # 상호작용이 이미 응답되었을 수 있으므로 followup.send를 사용합니다.
                  await interaction.response.send_message("❌ 현재 문의 가능한 팀장 역할이 설정되지 않았습니다.", ephemeral=True)
                  return
             
             leader_select = ui.Select(placeholder="담당 팀장을 선택해주세요 (여러 명 선택 가능)...", min_values=1, max_values=len(leader_options), options=leader_options)
+            # 콜백 함수를 올바르게 지정합니다.
             leader_select.callback = self.specific_leader_callback
             self.add_item(leader_select)
 
+        # 내용 입력 버튼을 항상 마지막에 추가하여 순서를 유지합니다.
+        self.add_item(self.proceed_button)
         await interaction.response.edit_message(view=self)
 
-    # ▼▼▼ [수정 후] 아래 내용으로 교체하세요 ▼▼▼
+    # 이 함수가 이전에 문제가 되었던 부분입니다.
     async def specific_leader_callback(self, interaction: discord.Interaction, select: ui.Select):
-        # 1. select 인자 추가
-        # 2. interaction.data['values'] 대신 select.values 사용
         self.selected_roles = {interaction.guild.get_role(int(role_id)) for role_id in select.values}
-        await interaction.response.defer() # 응답을 지연시켜 상호작용 실패를 방지
-    # ▲▲▲ [수정 후] 완료 ▲▲▲
+        # 이 콜백은 단순히 값을 저장하므로, defer()로 응답만 해주면 됩니다.
+        await interaction.response.defer()
 
+    # proceed_callback을 __init__에서 분리하여 @ui.button으로 명시합니다.
     @ui.button(label="내용 입력하기", style=discord.ButtonStyle.success, row=4)
-    async def proceed_callback(self, interaction: discord.Interaction):
+    async def proceed_button(self, interaction: discord.Interaction, button: ui.Button):
         if not self.selected_roles:
             return await interaction.response.send_message("문의 대상을 선택해주세요.", ephemeral=True)
         await interaction.response.send_modal(InquiryModal(self.cog, self.selected_roles))
         await interaction.delete_original_response()
+# ▲▲▲ [수정] 클래스 교체 완료 ▲▲▲
 
 
 class ReportTargetSelectView(ui.View):
