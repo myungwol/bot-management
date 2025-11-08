@@ -215,7 +215,9 @@ class VoiceMaster(commands.Cog):
             # 사용자가 이미 이동했을 수 있으므로, 생성 채널에 남아있는지 확인하는 대신 오류 발생 시 연결을 끊습니다.
             if member.voice: await member.move_to(None, reason="임시 채널 생성 오류")
 
-    # ▼▼▼ [최종 수정] '생성 후 이동' 방식으로 정렬 로직을 다시 작성합니다. ▼▼▼
+# cogs/features/voice_master.py
+
+    # ▼▼▼ [최종 수정] 그룹 내 순서까지 완벽하게 정렬하는 로직으로 교체합니다. ▼▼▼
     async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
         guild = member.guild
         channel_type = config.get("type")
@@ -230,7 +232,7 @@ class VoiceMaster(commands.Cog):
             base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
             vc_name = f"{type_info['emoji']}ㆍ{base_name}"
             
-        # --- 1단계: 채널을 먼저 기본 위치에 생성 ---
+        # 1단계: 채널을 먼저 기본 위치에 생성
         vc = await guild.create_voice_channel(
             name=vc_name, 
             category=target_category, 
@@ -238,32 +240,30 @@ class VoiceMaster(commands.Cog):
             reason=f"{member.display_name}의 요청 (1/2: 생성)"
         )
 
-        # --- 2단계: 이동할 최종 위치 계산 ---
-        final_position = creator_channel.position + 1 # 기본 위치 (게임방 또는 fallback)
+        # 2단계: 이동할 최종 위치 계산
+        final_position = creator_channel.position + 1
 
         if channel_type in CHANNEL_SORT_ORDER:
-            # 기준점: '샘플룸 생성' 채널.
             anchor_ch_id = get_id("vc_creator_sample")
             anchor_ch = guild.get_channel(anchor_ch_id) if anchor_ch_id else creator_channel
             
             if anchor_ch:
                 base_position = anchor_ch.position
                 
-                # 생성된 채널을 제외하고, 기존 채널들의 개수를 셉니다.
-                mixer_count = sum(1 for tc_id, tc_info in self.temp_channels.items() if tc_info.get("type") == "mixer" and tc_id != vc.id)
-                line_count = sum(1 for tc_id, tc_info in self.temp_channels.items() if tc_info.get("type") == "line" and tc_id != vc.id)
-                
+                # 생성된 채널을 '포함하여' 각 채널 타입의 개수를 셉니다.
+                mixer_count = sum(1 for tc_id, tc_info in self.temp_channels.items() if tc_info.get("type") == "mixer") + (1 if channel_type == "mixer" else 0)
+                line_count = sum(1 for tc_id, tc_info in self.temp_channels.items() if tc_info.get("type") == "line") + (1 if channel_type == "line" else 0)
+                sample_count = sum(1 for tc_id, tc_info in self.temp_channels.items() if tc_info.get("type") == "sample") + (1 if channel_type == "sample" else 0)
+
                 if channel_type == "mixer":
-                    final_position = base_position + 1
+                    final_position = base_position + mixer_count
                 elif channel_type == "line":
-                    final_position = base_position + 1 + mixer_count
+                    final_position = base_position + mixer_count + line_count
                 elif channel_type == "sample":
-                    final_position = base_position + 1 + mixer_count + line_count
+                    final_position = base_position + mixer_count + line_count + sample_count
         
-        # --- 3단계: 계산된 위치로 채널 이동 ---
-        # 채널이 이미 올바른 위치에 있을 수 있으므로, 다를 경우에만 edit를 호출합니다.
-        if vc.position != final_position:
-            await vc.edit(position=final_position, reason=f"{member.display_name}의 요청 (2/2: 정렬)")
+        # 3단계: 계산된 위치로 채널 이동
+        await vc.edit(position=final_position, reason=f"{member.display_name}의 요청 (2/2: 정렬)")
 
         return vc
 
