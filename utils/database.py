@@ -251,8 +251,15 @@ async def get_all_temp_channels() -> List[Dict[str, Any]]:
     response = await supabase.table('temp_voice_channels').select('*').execute()
     return response.data if response and response.data else []
 @supabase_retry_handler()
-async def add_temp_channel(channel_id: int, owner_id: int, guild_id: int, message_id: int, channel_type: str):
-    await supabase.table('temp_voice_channels').insert({"channel_id": channel_id, "owner_id": owner_id, "guild_id": guild_id, "message_id": message_id, "channel_type": channel_type}).execute()
+async def add_temp_channel(channel_id: int, owner_id: int, guild_id: int, message_id: Optional[int], channel_type: str):
+    # ▼▼▼ [수정] message_id가 None일 경우 0을 대신 삽입합니다. ▼▼▼
+    await supabase.table('temp_voice_channels').insert({
+        "channel_id": channel_id, 
+        "owner_id": owner_id, 
+        "guild_id": guild_id, 
+        "message_id": message_id or 0, 
+        "channel_type": channel_type
+    }).execute()
 @supabase_retry_handler()
 async def update_temp_channel_owner(channel_id: int, new_owner_id: int):
     await supabase.table('temp_voice_channels').update({"owner_id": new_owner_id}).eq('channel_id', channel_id).execute()
