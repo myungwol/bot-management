@@ -53,13 +53,10 @@ class MyBot(commands.Bot):
         super().__init__(*args, **kwargs)
         self.recently_moderated_users = set()
 
-    # ▼▼▼ [수정 1/2] setup_hook 함수를 아래 내용으로 교체 ▼▼▼
-    # ▼▼▼ [수정 1/2] setup_hook 함수를 아래 내용으로 교체 ▼▼▼
-   async def setup_hook(self):
+    async def setup_hook(self):
         # 1. DB에 기본값을 동기화하고, 동시에 로컬 캐시를 채웁니다.
         await sync_defaults_to_db()
-        # [핵심] 여기서 DB를 다시 읽어오지 않습니다. 
-        # 이렇게 하면 ui_defaults.py의 값이 캐시에 그대로 유지됩니다.
+        # [핵심] 시작 시 DB를 다시 읽어오지 않아 ui_defaults.py의 값이 캐시에 유지되도록 합니다.
 
         # 2. 모든 기능(Cogs) 로드
         await self.load_all_extensions()
@@ -83,8 +80,7 @@ class MyBot(commands.Bot):
         
         if registered_views_count > 0:
             logger.info(f"✅ 총 {registered_views_count}개의 Cog에서 영구 View를 성공적으로 등록했습니다.")
-    # ▲▲▲ [수정 완료] ▲▲▲
-    # 5분마다 DB 캐시를 새로고침하는 백그라운드 작업
+
     @tasks.loop(minutes=5)
     async def refresh_cache_periodically(self):
         logger.info("🔄 주기적인 DB 캐시 새로고침을 시작합니다...")
@@ -113,7 +109,6 @@ class MyBot(commands.Bot):
 
 bot = MyBot(command_prefix="/", intents=intents)
 
-# --- ▼▼▼ [핵심 수정] on_ready 함수를 매우 단순하게 변경 ▼▼▼ ---
 @bot.event
 async def on_ready():
     logger.info("==================================================")
@@ -122,6 +117,16 @@ async def on_ready():
     logger.info(f"✅ 현재 UTC 시간: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("==================================================")
     
+    # Cog의 load_configs를 수동으로 호출하여 캐시가 준비된 후에 설정값을 불러오도록 합니다.
+    logger.info("------ [ 모든 Cog 설정 로드 시작 ] ------")
+    for cog_name, cog in bot.cogs.items():
+        if hasattr(cog, 'load_configs'):
+            try: 
+                await cog.load_configs()
+            except Exception as e: 
+                logger.error(f"❌ '{cog_name}' Cog 설정 로드 중 오류: {e}", exc_info=True)
+    logger.info("------ [ 모든 Cog 설정 로드 완료 ] ------")
+
     # 주기적 캐시 새로고침 루프를 시작합니다.
     if not bot.refresh_cache_periodically.is_running():
         bot.refresh_cache_periodically.start()
