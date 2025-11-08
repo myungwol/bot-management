@@ -241,16 +241,18 @@ class VoiceMaster(commands.Cog):
         type_info = CHANNEL_TYPE_INFO[channel_type]
         target_category = creator_channel.category or (guild.get_channel(self.default_category_id) if self.default_category_id else None)
         
-        base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
-        vc_name = f"{type_info['emoji']}ㆍ{base_name}"
+        # --- ▼▼▼ [핵심 수정] 이름 생성 로직을 단순화합니다. ▼▼▼
         
-        # 고정 이름 채널에 번호 붙이기
+        # 이름 변경이 불가능한 고정 채널의 경우
         if not type_info["name_editable"]:
-            channels_in_category = target_category.voice_channels if target_category else guild.voice_channels
-            prefix_to_check = f"{type_info['emoji']}ㆍ{base_name}"
-            existing_numbers = [int(ch.name.split('-')[-1]) for ch in channels_in_category if ch.name.startswith(prefix_to_check) and ch.name.split('-')[-1].isdigit()]
-            next_number = max(existing_numbers) + 1 if existing_numbers else 1
-            vc_name = f"{prefix_to_check}-{next_number}"
+            base_name = type_info["default_name"]
+            vc_name = f"{type_info['emoji']}₊꒱ {base_name} 사용 중"
+        # 이름 변경이 가능한 게임 채널의 경우
+        else:
+            base_name = type_info["default_name"].format(member_name=get_clean_display_name(member))
+            vc_name = f"{type_info['emoji']}ㆍ{base_name}"
+            
+        # --- ▲▲▲ [수정 완료] ▲▲▲
 
         return await guild.create_voice_channel(
             name=vc_name, 
