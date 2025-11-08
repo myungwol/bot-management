@@ -104,13 +104,15 @@ class SpecificLeaderSelect(ui.Select):
 
 class InquiryTargetSelectView(ui.View):
     """'문의/건의' 버튼을 눌렀을 때 나오는 대상 선택 View"""
+    
+    # ▼▼▼ [수정 후] 아래 내용으로 교체하세요 ▼▼▼
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
         self.cog = cog
         self.selected_roles: Set[discord.Role] = set()
-        # '내용 입력하기' 버튼을 미리 추가해둡니다.
-        self.add_item(self.proceed_button)
-
+        # @ui.button 데코레이터가 버튼을 자동으로 추가하므로 이 줄은 삭제합니다.
+    # ▲▲▲ [수정 후] 완료 ▲▲▲
+    
     @ui.select(
         placeholder="문의할 대상을 선택해주세요...",
         options=[
