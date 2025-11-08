@@ -216,6 +216,7 @@ class VoiceMaster(commands.Cog):
             if member.voice: await member.move_to(None, reason="임시 채널 생성 오류")
 
     # ▼▼▼ [핵심 수정] 정렬 로직을 더 정확하게 수정합니다. ▼▼▼
+    # ▼▼▼ [핵심 수정] 정렬 로직을 더 정확하게 수정합니다. ▼▼▼
     async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
         guild = member.guild
         channel_type = config.get("type")
@@ -236,25 +237,30 @@ class VoiceMaster(commands.Cog):
 
         # 고정 채널(믹서, 라인, 샘플룸)에만 정렬 로직 적용
         if channel_type in CHANNEL_SORT_ORDER:
-            # 기준점: '소형믹서 생성' 채널. 이 채널을 기준으로 모든 정렬이 시작됨.
-            anchor_ch_id = get_id("vc_creator_mixer") 
+            # 기준점: '샘플룸 생성' 채널. 이 채널을 기준으로 모든 정렬이 시작됨.
+            anchor_ch_id = get_id("vc_creator_sample")
+            # 기준 채널이 설정되지 않았다면, 현재 입장한 생성 채널을 임시 기준으로 삼음
             anchor_ch = guild.get_channel(anchor_ch_id) if anchor_ch_id else creator_channel
             
             if anchor_ch:
-                base_position = anchor_ch.position
-                position_offset = 1 # 기준 채널 바로 아래부터 시작
+                insertion_point = anchor_ch.position
                 
-                # CHANNEL_SORT_ORDER에 정의된 순서대로 순회하며 위치를 계산
-                for sort_type in CHANNEL_SORT_ORDER:
-                    # 현재 만들려는 채널의 순서가 되면, 계산을 멈추고 해당 위치를 사용
-                    if sort_type == channel_type:
-                        break
-                    
-                    # 자신의 순서가 되기 전까지, 다른 타입의 채널이 몇 개 있는지 세어서 offset에 더함
-                    count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == sort_type)
-                    position_offset += count
+                # 현재 생성된 각 채널 타입의 개수를 셉니다.
+                mixer_count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == "mixer")
+                line_count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == "line")
                 
-                final_position = base_position + position_offset
+                # 생성하려는 채널 타입에 따라 삽입 위치를 조정합니다.
+                if channel_type == "mixer":
+                    # 믹서는 기준점 바로 아래에 위치해야 하므로, 오프셋을 더하지 않습니다.
+                    pass
+                elif channel_type == "line":
+                    # 라인은 모든 믹서 채널들 다음에 위치해야 합니다.
+                    insertion_point += mixer_count
+                elif channel_type == "sample":
+                    # 샘플룸은 모든 믹서와 라인 채널들 다음에 위치해야 합니다.
+                    insertion_point += mixer_count + line_count
+                
+                final_position = insertion_point + 1
 
         # --- 위치 계산 로직 종료 ---
 
