@@ -234,30 +234,42 @@ class VoiceMaster(commands.Cog):
         
         final_position = creator_channel.position + 1 # 기본 위치 (게임방 또는 fallback)
 
-        # 고정 채널(믹서, 라인, 샘플룸)에만 정렬 로직 적용
         if channel_type in CHANNEL_SORT_ORDER:
-            # 기준점: '샘플룸 생성' 채널. 모든 임시 채널은 이 채널 아래에 정렬됩니다.
+            # 기준점: '샘플룸 생성' 채널.
             anchor_ch_id = get_id("vc_creator_sample")
             anchor_ch = guild.get_channel(anchor_ch_id) if anchor_ch_id else creator_channel
             
             if anchor_ch:
-                # 기준점의 현재 위치 + 1 (바로 아래칸)을 기본 삽입 위치로 설정
-                insertion_point = anchor_ch.position + 1
+                # 1. 현재 존재하는 모든 임시 채널 객체를 가져옵니다.
+                all_temp_vc_objects = [
+                    ch for ch_id in self.temp_channels
+                    if (ch := guild.get_channel(ch_id)) and isinstance(ch, discord.VoiceChannel)
+                ]
+
+                # 2. 각 그룹별 채널의 현재 위치를 리스트로 저장합니다.
+                positions_by_type = {
+                    "line": sorted([c.position for c in all_temp_vc_objects if self.temp_channels[c.id].get("type") == "line"]),
+                    "sample": sorted([c.position for c in all_temp_vc_objects if self.temp_channels[c.id].get("type") == "sample"]),
+                }
+
+                # 3. 모든 임시 채널의 가장 마지막 위치를 계산합니다.
+                bottom_position = anchor_ch.position + len(all_temp_vc_objects) + 1
                 
-                # 현재 생성된 각 채널 타입의 개수를 셉니다.
-                mixer_count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == "mixer")
-                line_count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == "line")
-                
-                # 생성하려는 채널 타입에 따라 삽입 위치를 결정합니다.
                 if channel_type == "mixer":
-                    # 믹서는 항상 그룹의 최상단(insertion_point)에 위치합니다.
-                    final_position = insertion_point
+                    # 라인 그룹의 시작 위치 또는 샘플룸 그룹의 시작 위치를 찾습니다.
+                    first_line_pos = positions_by_type["line"][0] if positions_by_type["line"] else bottom_position
+                    first_sample_pos = positions_by_type["sample"][0] if positions_by_type["sample"] else bottom_position
+                    # 둘 중 더 위에 있는 위치에 삽입합니다.
+                    final_position = min(first_line_pos, first_sample_pos)
+                
                 elif channel_type == "line":
-                    # 라인은 모든 믹서 채널들 바로 다음에 위치해야 합니다.
-                    final_position = insertion_point + mixer_count
+                    # 샘플룸 그룹의 시작 위치를 찾습니다.
+                    first_sample_pos = positions_by_type["sample"][0] if positions_by_type["sample"] else bottom_position
+                    final_position = first_sample_pos
+                
                 elif channel_type == "sample":
-                    # 샘플룸은 모든 믹서와 라인 채널들 다음에 위치해야 합니다.
-                    final_position = insertion_point + mixer_count + line_count
+                    # 샘플룸은 항상 가장 마지막에 위치합니다.
+                    final_position = bottom_position
         
         # --- 위치 계산 로직 종료 ---
 
