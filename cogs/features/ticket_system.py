@@ -191,7 +191,7 @@ class TicketSystem(commands.Cog):
             button = ui.Button(label="신고", style=discord.ButtonStyle.danger, emoji="🚨", custom_id="ticket_report_panel")
             async def callback(interaction: discord.Interaction):
                 if self.has_open_ticket(interaction.user, "report"): return await interaction.response.send_message("❌ 이미 참여 중인 신고 티켓이 있습니다.", ephemeral=True)
-                await interaction.response.send_message("이 신고에 `경찰관`을 포함하시겠습니까?", view=ReportTargetSelectView(self), ephemeral=True)
+                await interaction.response.send_message("이 신고에 `포장 관리팀`을 포함하시겠습니까?", view=ReportTargetSelectView(self), ephemeral=True)
             button.callback = callback; view.add_item(button)
         return view
 
