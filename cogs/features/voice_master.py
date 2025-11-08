@@ -86,9 +86,17 @@ class ControlPanelView(ui.View):
 
 class VoiceMaster(commands.Cog):
     def __init__(self, bot: commands.Bot):
-        self.bot = bot; self.creator_channel_configs: Dict[int, Dict] = {}; self.temp_channels: Dict[int, Dict[str, Any]] = {}
-        self.user_channel_map: Dict[int, int] = {}; self.active_creations: Set[int] = set()
-        self.admin_role_ids: List[int] = []; self.default_category_id: Optional[int] = None
+        self.bot = bot
+        self.creator_channel_configs: Dict[int, Dict] = {}
+        self.temp_channels: Dict[int, Dict[str, Any]] = {}
+        self.user_channel_map: Dict[int, int] = {}
+        self.active_creations: Set[int] = set()
+        
+        # ▼▼▼ [추가] 쿨타임 저장을 위한 딕셔너리 ▼▼▼
+        self.vc_creation_cooldowns: Dict[int, float] = {}
+        
+        self.admin_role_ids: List[int] = []
+        self.default_category_id: Optional[int] = None
         logger.info("VoiceMaster Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
@@ -121,20 +129,50 @@ class VoiceMaster(commands.Cog):
         if zombie_channel_ids: await remove_multiple_temp_channels(zombie_channel_ids)
         logger.info(f"[VoiceMaster] 임시 채널 동기화 완료. (활성: {len(self.temp_channels)} / 정리: {len(zombie_channel_ids)})")
 
+    # ▼▼▼ on_voice_state_update 함수 전체를 교체합니다. ▼▼▼
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         if member.bot or before.channel == after.channel: return
+        
         try:
+            # 채널 퇴장 시 삭제 로직
             if before.channel and before.channel.id in self.temp_channels:
                 await self._delete_temp_channel(before.channel)
+
+            # 채널 생성 로직
             if after.channel and after.channel.id in self.creator_channel_configs:
                 if member.id in self.active_creations: return
-                if member.id in self.user_channel_map: await member.move_to(None, reason="이미 다른 개인 채널을 소유 중"); return
+                
+                # --- ▼▼▼ [핵심 수정] 개수 제한 제거 및 쿨타임 적용 ▼▼▼
+                
+                # 1. 쿨타임(60초)을 확인합니다.
+                cooldown_seconds = 60
+                now = time.monotonic()
+                last_creation_time = self.vc_creation_cooldowns.get(member.id, 0)
+
+                if (now - last_creation_time) < cooldown_seconds:
+                    remaining = int(cooldown_seconds - (now - last_creation_time)) + 1
+                    try:
+                        await member.send(f"❌ 음성 채널 생성은 {cooldown_seconds}초에 한 번만 가능합니다. {remaining}초 후에 다시 시도해주세요.")
+                    except discord.Forbidden:
+                        pass
+                    await member.move_to(None, reason=f"음성 채널 생성 쿨타임 ({remaining}초 남음)")
+                    return
+                
+                # 2. '이미 채널을 소유하고 있는지' 확인하는 로직을 삭제했습니다.
+                
+                # 3. 쿨타임을 갱신합니다.
+                self.vc_creation_cooldowns[member.id] = now
+
+                # --- ▲▲▲ [수정 완료] ▲▲▲
+
                 self.active_creations.add(member.id)
                 await self._create_temp_channel_flow(member, self.creator_channel_configs[after.channel.id], after.channel)
                 self.active_creations.discard(member.id)
+        
         except Exception as e:
-            self.active_creations.discard(member.id); logger.error(f"on_voice_state_update 이벤트 처리 중 오류: {e}", exc_info=True)
+            self.active_creations.discard(member.id)
+            logger.error(f"on_voice_state_update 이벤트 처리 중 오류: {e}", exc_info=True)
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
