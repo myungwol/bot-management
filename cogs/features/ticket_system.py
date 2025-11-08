@@ -192,7 +192,6 @@ class TicketControlView(ui.View):
         try: await interaction.channel.delete(reason=f"{interaction.user.display_name}이(가) 삭제")
         except discord.NotFound: pass
 
-
 class MainTicketPanelView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=None)
@@ -224,7 +223,6 @@ class MainTicketPanelView(ui.View):
         # 부서 정보를 담아 View를 생성하고 사용자에게 보냅니다.
         view = ApplicationDepartmentSelectView(self.cog, departments)
         await interaction.response.send_message("어떤 부서에 지원하시겠습니까?", view=view, ephemeral=True)
-# ▲▲▲ [수정 완료] ▲▲▲
 
 class TicketSystem(commands.Cog):
     # ▼▼▼ [수정 2/2] __init__ 함수와 load_configs 함수를 아래 내용으로 교체 ▼▼▼
@@ -263,7 +261,7 @@ class TicketSystem(commands.Cog):
         else:
             logger.warning("[TicketSystem] 티켓 패널 채널이 설정되지 않아 길드 정보를 불러올 수 없습니다.")
     # ▲▲▲ [수정 완료] ▲▲▲
-
+    
     def has_open_ticket(self, user: discord.Member, ticket_type: str):
         for thread_id, ticket_info in self.tickets.items():
             if ticket_info.get("owner_id") == user.id and ticket_info.get("ticket_type") == ticket_type and self.guild and self.guild.get_thread(thread_id): return True
