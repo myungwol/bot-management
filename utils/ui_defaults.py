@@ -8,11 +8,21 @@
 # 1. 역할 키 맵 (Role Key Map)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_ROLE_KEY_MAP = {
-    # --- 최상위 관리 역할 (접두사 아님) ---
+    # --- 최상위 관리 역할 ---
     "role_staff_village_chief": {"name": "『 🧩：대표 』", "is_prefix": False, "priority": 90},
     "role_staff_deputy_chief": {"name": "『 🌷：부 대 표 』", "is_prefix": False, "priority": 85},
+    
+    # ▼▼▼ [수정] 팀장 역할 그룹 추가 ▼▼▼
+    "role_staff_leader_machine": {"name": "『 🍫：기 계 공 정 팀 장 』", "is_prefix": False, "priority": 71},
+    "role_staff_leader_syrup": {"name": "『 🍯：시 럽 공 정 팀 장 』", "is_prefix": False, "priority": 70},
+    "role_staff_leader_packaging": {"name": "『 🫙：포 장 관 리 팀 장 』", "is_prefix": False, "priority": 70},
+    "role_staff_leader_cream": {"name": "『 🍦：크 림 조 립 팀 장 』", "is_prefix": False, "priority": 70},
+    "role_staff_leader_dough": {"name": "『 🍥：반 죽 제 조 팀 장 』", "is_prefix": False, "priority": 70},
+    # ▲▲▲ [수정 완료] ▲▲▲
+
     # --- 최상위 접두사 역할 ---
     "role_admin_total": {"name": "『 ⭐：엔지니어 』", "is_prefix": True, "priority": 100, "prefix_symbol": "🌙", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
+    
     
     # --- 스태프 접두사 역할 ---
     "role_staff_pr": {"name": "『 🍯：시 럽 공 정 팀 』", "is_prefix": True, "priority": 61, "prefix_symbol": "🍯", "prefix_format": "𐐪{symbol}𐑂", "suffix": " ⸝⁺⊹"},
@@ -44,7 +54,6 @@ UI_ROLE_KEY_MAP = {
     "role_guest": {"name": "『 🌾：밀가루 』", "is_prefix": True, "priority": 1, "prefix_symbol": "🌾", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
 
     # --- 그 외 접두사가 아닌 역할들 (우선순위 0) ---
-    "role_staff_secretary": {"name": "『 🍫：기 계 공 정 팀 장 』", "is_prefix": False, "priority": 0},
     "role_info_male": {"name": "『 👦：남자 』", "is_prefix": False, "priority": 0},
     "role_info_female": {"name": "『 👧：여자 』", "is_prefix": False, "priority": 0},
     "role_info_age_private": {"name": "비공개", "is_prefix": False, "priority": 0},
@@ -267,7 +276,7 @@ UI_EMBEDS = {
         "color": 15548997
     },
     "log_warning": {
-        "title": "🚨 경고고 발급 알림",
+        "title": "🚨 경고 발급 알림",
         "color": 15548997
     },
     "dm_onboarding_approved": {
@@ -805,6 +814,18 @@ UI_EMBEDS = {
         "title": "서버 갱신 완료!",
         "description": "DICOALL에서 확인해 주세요!\n[DICOALL](https://kr.dicoall.com/server/1419879546752077867)",
         "color": 0x2ECC71
+    },
+    # ▼▼▼ [추가] 새로운 티켓 패널 및 관리자 신청 관련 임베드 ▼▼▼
+    "panel_ticket_main": {
+        "title": "📨 고객 지원 센터",
+        "description": "서버 이용 중 궁금한 점, 불편한 점이 있거나 새로운 아이디어가 있다면 언제든지 찾아주세요.\n\n> **문의/건의**: 서버 운영, 이벤트, 봇 기능 등 궁금한 점이나 건의사항을 보냅니다.\n> **신고**: 서버 규칙 위반 사례를 목격했거나 유저 간 분쟁 발생 시 제보합니다.\n> **관리자 신청**: 마을을 위해 함께 일하고 싶다면 관리자(스태프)로 지원할 수 있습니다.",
+        "color": 0x5865F2,
+        "footer": { "text": "아래 버튼을 눌러 티켓을 생성해주세요." }
+    },
+    "embed_ticket_staff_application": {
+        "title": "📝 새로운 관리자 지원서",
+        "description": "{member_mention}님이 마을의 새로운 스태프로 지원했습니다.",
+        "color": 0xFEE75C
     }
 }
 
@@ -1010,6 +1031,37 @@ UI_PANEL_COMPONENTS = [
         "row": 0,
         "order_in_row": 0
     },
+    # ▼▼▼ [추가] 새로운 티켓 패널 버튼 3개 ▼▼▼
+    {
+        "component_key": "ticket_create_inquiry",
+        "panel_key": "ticket_main",
+        "component_type": "button",
+        "label": "문의/건의",
+        "style": "primary",
+        "emoji": "📨",
+        "row": 0,
+        "order_in_row": 0
+    },
+    {
+        "component_key": "ticket_create_report",
+        "panel_key": "ticket_main",
+        "component_type": "button",
+        "label": "신고",
+        "style": "danger",
+        "emoji": "🚨",
+        "row": 0,
+        "order_in_row": 1
+    },
+    {
+        "component_key": "ticket_create_application",
+        "panel_key": "ticket_main",
+        "component_type": "button",
+        "label": "관리자 신청",
+        "style": "success",
+        "emoji": "✨",
+        "row": 0,
+        "order_in_row": 2
+    },
 ]
 SETUP_COMMAND_MAP = {
     "panel_notification_roles": {
@@ -1181,18 +1233,19 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 거래 기록",
         "channel_type": "text"
     },
-    "panel_inquiry": {
+    # ▼▼▼ [수정] 기존 티켓 패널 설정을 새로운 통합 패널로 변경 ▼▼▼
+    "panel_ticket_main": {
         "type": "panel",
         "cog_name": "TicketSystem",
-        "key": "inquiry_panel_channel_id",
-        "friendly_name": "[티켓] 문의/건의 패널",
+        "key": "ticket_main_panel_channel_id",
+        "friendly_name": "[패널] 통합 티켓 시스템",
         "channel_type": "text"
     },
-    "panel_report": {
-        "type": "panel",
+    "log_staff_application": {
+        "type": "channel",
         "cog_name": "TicketSystem",
-        "key": "report_panel_channel_id",
-        "friendly_name": "[티켓] 유저 신고 패널",
+        "key": "staff_application_log_channel_id",
+        "friendly_name": "[로그] 관리자 지원서 기록",
         "channel_type": "text"
     },
     "channel_new_welcome": {
@@ -1957,3 +2010,18 @@ BOSS_REWARD_TIERS = {
         # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
     ]
 }
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 5. 티켓 시스템 역할 그룹 (Ticket System Role Groups)
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# ▼▼▼ [수정] 티켓 시스템 역할 그룹 전체를 아래 내용으로 교체 ▼▼▼
+TICKET_MASTER_ROLES = ["role_staff_village_chief", "role_staff_deputy_chief"]
+TICKET_REPORT_ROLES = ["role_staff_police"]
+
+# 문의/건의 시 '특정 담당 관리자에게'를 선택했을 때 표시될 팀장 역할 목록
+TICKET_LEADER_ROLES = [
+    "role_staff_leader_machine",
+    "role_staff_leader_syrup",
+    "role_staff_leader_packaging",
+    "role_staff_leader_cream",
+    "role_staff_leader_dough"
+]
