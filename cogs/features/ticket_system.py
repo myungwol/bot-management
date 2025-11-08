@@ -200,33 +200,34 @@ class MainTicketPanelView(ui.View):
 
     @ui.button(label="문의/건의", style=discord.ButtonStyle.primary, emoji="📨", custom_id="ticket_create_inquiry")
     async def inquiry(self, interaction: discord.Interaction, button: ui.Button):
-        if self.cog.has_open_ticket(interaction.user, "inquiry"): return await interaction.response.send_message("❌ 이미 참여 중인 문의/건의 티켓이 있습니다.", ephemeral=True)
+        if self.cog.has_open_ticket(interaction.user, "inquiry"):
+            return await interaction.response.send_message("❌ 이미 참여 중인 문의/건의 티켓이 있습니다.", ephemeral=True)
         await interaction.response.send_message("문의할 대상을 선택해주세요.", view=InquiryTargetSelectView(self.cog), ephemeral=True)
 
     @ui.button(label="신고", style=discord.ButtonStyle.danger, emoji="🚨", custom_id="ticket_create_report")
     async def report(self, interaction: discord.Interaction, button: ui.Button):
-        if self.cog.has_open_ticket(interaction.user, "report"): return await interaction.response.send_message("❌ 이미 참여 중인 신고 티켓이 있습니다.", ephemeral=True)
+        if self.cog.has_open_ticket(interaction.user, "report"):
+            return await interaction.response.send_message("❌ 이미 참여 중인 신고 티켓이 있습니다.", ephemeral=True)
         await interaction.response.send_message("이 신고에 `포장 관리팀`을 포함하시겠습니까?", view=ReportTargetSelectView(self.cog), ephemeral=True)
     
-    # --- ▼▼▼ [수정] 관리자 신청 버튼 콜백을 새로운 View 생성 로직으로 변경 ▼▼▼ ---
     @ui.button(label="관리자 신청", style=discord.ButtonStyle.success, emoji="✨", custom_id="ticket_create_application")
     async def application(self, interaction: discord.Interaction, button: ui.Button):
         if self.cog.has_open_ticket(interaction.user, "application"):
             return await interaction.response.send_message("❌ 이미 제출한 지원서가 처리 대기 중입니다.", ephemeral=True)
 
-        # 버튼을 누르는 시점에 DB에서 최신 부서 정보를 가져옵니다.
+        # 버튼을 누르는 시점에 DB 캐시에서 직접 부서 정보를 가져옵니다.
         departments = get_config("TICKET_APPLICATION_DEPARTMENTS", {})
         if not departments:
+            logger.warning("관리자 신청 실패: DB 캐시에서 'TICKET_APPLICATION_DEPARTMENTS' 설정을 찾을 수 없거나 비어있습니다.")
             return await interaction.response.send_message("❌ 현재 관리자 신청이 불가능합니다. 부서 정보를 불러올 수 없습니다.", ephemeral=True)
 
         # 부서 정보를 담아 View를 생성하고 사용자에게 보냅니다.
         view = ApplicationDepartmentSelectView(self.cog, departments)
         await interaction.response.send_message("어떤 부서에 지원하시겠습니까?", view=view, ephemeral=True)
-    # --- ▲▲▲ [수정 완료] ---
-
+# ▲▲▲ [수정 완료] ▲▲▲
 
 class TicketSystem(commands.Cog):
-    # ▼▼▼ [수정] __init__ 함수와 load_configs 함수를 교체 ▼▼▼
+    # ▼▼▼ [수정 2/2] __init__ 함수와 load_configs 함수를 아래 내용으로 교체 ▼▼▼
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.tickets: Dict[int, Dict] = {}
@@ -235,12 +236,11 @@ class TicketSystem(commands.Cog):
         self.leader_roles: List[discord.Role] = []
         self.guild: Optional[discord.Guild] = None
         self.view_instance: Optional[MainTicketPanelView] = None
-        # 부서 정보를 저장할 인스턴스 변수 추가
-        self.departments: Dict[str, Any] = {}
+        # self.departments 변수는 더 이상 필요 없으므로 삭제합니다.
         logger.info("TicketSystem Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self):
-        await self.load_configs()
+        # load_configs를 여기서 호출하지 않습니다. main.py의 on_ready에서 호출됩니다.
         await self.register_persistent_views()
         self.bot.loop.create_task(self.sync_tickets_from_db())
 
@@ -250,9 +250,7 @@ class TicketSystem(commands.Cog):
         logger.info("✅ 통합 티켓 시스템의 영구 View가 성공적으로 등록되었습니다.")
         
     async def load_configs(self):
-        # Cog가 로드될 때 DB에서 부서 정보를 미리 가져와 저장합니다.
-        self.departments = get_config("TICKET_APPLICATION_DEPARTMENTS", {})
-        
+        # 부서 정보를 불러오는 코드를 삭제합니다.
         panel_channel_id = get_id("ticket_main_panel_channel_id")
         if panel_channel_id and (channel := self.bot.get_channel(panel_channel_id)):
             self.guild = channel.guild
@@ -261,7 +259,7 @@ class TicketSystem(commands.Cog):
             self.master_roles = [role for key in TICKET_MASTER_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
             self.report_roles = [role for key in TICKET_REPORT_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
             self.leader_roles = [role for key in TICKET_LEADER_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
-            logger.info(f"[TicketSystem] 역할 및 부서 정보 로드 완료 (부서: {len(self.departments)}개)")
+            logger.info(f"[TicketSystem] 역할 정보 로드 완료.")
         else:
             logger.warning("[TicketSystem] 티켓 패널 채널이 설정되지 않아 길드 정보를 불러올 수 없습니다.")
     # ▲▲▲ [수정 완료] ▲▲▲
