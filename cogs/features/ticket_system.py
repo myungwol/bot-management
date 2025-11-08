@@ -119,9 +119,13 @@ class InquiryTargetSelectView(ui.View):
 
         await interaction.response.edit_message(view=self)
 
+    # ▼▼▼ [수정 후] 아래 내용으로 교체하세요 ▼▼▼
     async def specific_leader_callback(self, interaction: discord.Interaction, select: ui.Select):
+        # 1. select 인자 추가
+        # 2. interaction.data['values'] 대신 select.values 사용
         self.selected_roles = {interaction.guild.get_role(int(role_id)) for role_id in select.values}
-        await interaction.response.defer() # 선택 완료
+        await interaction.response.defer() # 응답을 지연시켜 상호작용 실패를 방지
+    # ▲▲▲ [수정 후] 완료 ▲▲▲
 
     @ui.button(label="내용 입력하기", style=discord.ButtonStyle.success, row=4)
     async def proceed_callback(self, interaction: discord.Interaction):
