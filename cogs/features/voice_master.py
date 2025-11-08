@@ -215,7 +215,7 @@ class VoiceMaster(commands.Cog):
             # 사용자가 이미 이동했을 수 있으므로, 생성 채널에 남아있는지 확인하는 대신 오류 발생 시 연결을 끊습니다.
             if member.voice: await member.move_to(None, reason="임시 채널 생성 오류")
 
-    # ▼▼▼ [핵심 수정] 정렬 로직을 최종적으로 수정합니다. ▼▼▼
+    # ▼▼▼ [최종 수정] 정렬 로직을 다시 작성합니다. ▼▼▼
     async def _create_discord_channel(self, member: discord.Member, config: Dict, creator_channel: discord.VoiceChannel) -> discord.VoiceChannel:
         guild = member.guild
         channel_type = config.get("type")
@@ -241,23 +241,23 @@ class VoiceMaster(commands.Cog):
             anchor_ch = guild.get_channel(anchor_ch_id) if anchor_ch_id else creator_channel
             
             if anchor_ch:
-                # 기준점의 현재 위치
-                base_position = anchor_ch.position
+                # 기준점의 현재 위치 + 1 (바로 아래칸)을 기본 삽입 위치로 설정
+                insertion_point = anchor_ch.position + 1
                 
-                # 현재 생성된 각 채널 타입의 개수를 정확히 셉니다.
+                # 현재 생성된 각 채널 타입의 개수를 셉니다.
                 mixer_count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == "mixer")
                 line_count = sum(1 for tc in self.temp_channels.values() if tc.get("type") == "line")
                 
-                # 생성하려는 채널 타입에 따라 삽입할 위치를 결정합니다.
+                # 생성하려는 채널 타입에 따라 삽입 위치를 결정합니다.
                 if channel_type == "mixer":
-                    # 믹서는 항상 기준점 바로 아래에 삽입됩니다.
-                    final_position = base_position + 1
+                    # 믹서는 항상 그룹의 최상단(insertion_point)에 위치합니다.
+                    final_position = insertion_point
                 elif channel_type == "line":
-                    # 라인은 모든 믹서 채널들 다음에 삽입됩니다.
-                    final_position = base_position + 1 + mixer_count
+                    # 라인은 모든 믹서 채널들 바로 다음에 위치해야 합니다.
+                    final_position = insertion_point + mixer_count
                 elif channel_type == "sample":
-                    # 샘플룸은 모든 믹서와 라인 채널들 다음에 삽입됩니다.
-                    final_position = base_position + 1 + mixer_count + line_count
+                    # 샘플룸은 모든 믹서와 라인 채널들 다음에 위치해야 합니다.
+                    final_position = insertion_point + mixer_count + line_count
         
         # --- 위치 계산 로직 종료 ---
 
