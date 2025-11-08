@@ -3,8 +3,7 @@ import discord
 from discord import ui
 from discord.ext import commands
 import logging
-from typing import Dict, Any, List, Optional, Set
-import asyncio
+from typing import Dict, Any, List, Optional, Set, Union
 
 from utils.database import get_id, add_ticket, remove_ticket, get_all_tickets, remove_multiple_tickets, update_ticket_lock_status, get_embed_from_db, save_panel_id, get_panel_id
 from utils.ui_defaults import TICKET_MASTER_ROLES, TICKET_REPORT_ROLES, TICKET_LEADER_ROLES
@@ -12,10 +11,17 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
+# --- ▼▼▼ [수정] 관리자 신청 모달을 새로운 양식으로 전면 교체 ▼▼▼ ---
 class StaffApplicationModal(ui.Modal, title="관리자 지원서"):
-    name_age = ui.TextInput(label="이름 / 나이", placeholder="예: 김마을 / 25", required=True, max_length=50)
-    motivation = ui.TextInput(label="지원 동기", placeholder="어떤 계기로 지원하게 되셨나요?", style=discord.TextStyle.paragraph, required=True, max_length=1000)
-    experience = ui.TextInput(label="경력 혹은 각오", placeholder="다른 서버 경험이나, 앞으로의 각오를 자유롭게 적어주세요.", style=discord.TextStyle.paragraph, required=True, max_length=1000)
+    name = ui.TextInput(label="이름", placeholder="신청자의 본명을 입력해주세요.", required=True)
+    age = ui.TextInput(label="나이", placeholder="만 나이를 숫자로 입력해주세요.", required=True)
+    gender = ui.TextInput(label="성별", placeholder="예: 남성, 여성", required=True)
+    department = ui.TextInput(label="지원 부서", placeholder="예: 반죽 제조 팀, 시럽 공정 팀 등", required=True)
+    has_exp = ui.TextInput(label="지원 부서 경력 유/무", placeholder="예: 유 / 무", max_length=2, required=True)
+    exp_details = ui.TextInput(label="◟ 경력 (자세히)", placeholder="경력이 없다면 '없음'으로 기재, 있다면 자세히 서술해주세요.", style=discord.TextStyle.paragraph, required=True)
+    other_server_staff = ui.TextInput(label="현재 타섭 관리진 유/무", placeholder="예: 유 / 무", max_length=2, required=True)
+    activity_time = ui.TextInput(label="주 활동 시간대", placeholder="예: 평일 저녁, 주말 오후 등 자유롭게 기재", required=True)
+    resolve = ui.TextInput(label="각오", placeholder="마지막으로 관리자로서의 각오를 들려주세요.", style=discord.TextStyle.paragraph, required=True)
 
     def __init__(self, cog: 'TicketSystem'):
         super().__init__()
@@ -24,18 +30,33 @@ class StaffApplicationModal(ui.Modal, title="관리자 지원서"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         try:
+            # 제출된 내용을 딕셔너리 형태로 구조화합니다.
+            application_data = {
+                "이름": self.name.value,
+                "나이": self.age.value,
+                "성별": self.gender.value,
+                "지원 부서": self.department.value,
+                "지원 부서 경력 유/무": self.has_exp.value,
+                "◟ 경력 (자세히)": self.exp_details.value,
+                "현재 타섭 관리진 유/무": self.other_server_staff.value,
+                "주 활동 시간대": self.activity_time.value,
+                "각오": self.resolve.value
+            }
+            
+            # 관리자 신청은 대표/부대표에게만 전달됩니다.
             target_roles = set(self.cog.master_roles)
             await self.cog.create_ticket(
                 interaction=interaction,
                 ticket_type="application",
                 title=f"{interaction.user.display_name}님의 관리자 지원",
-                content=f"**이름/나이:**\n{self.name_age.value}\n\n**지원 동기:**\n{self.motivation.value}\n\n**경력/각오:**\n{self.experience.value}",
+                content=application_data,  # 구조화된 데이터를 전달
                 selected_roles=target_roles,
                 embed_key="embed_ticket_staff_application"
             )
         except Exception as e:
             logger.error(f"관리자 지원서 제출 중 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ 지원서를 제출하는 중 오류가 발생했습니다.", ephemeral=True)
+# --- ▲▲▲ [수정 완료] ---
 
 
 class InquiryModal(ui.Modal):
@@ -78,7 +99,6 @@ class ReportModal(ui.Modal, title="신고 내용 입력"):
             logger.error(f"신고 Modal on_submit에서 오류: {e}", exc_info=True)
             await interaction.followup.send("❌ 티켓을 만드는 중 오류가 발생했습니다.", ephemeral=True)
 
-# --- ▼▼▼ [오류 수정] 아래 클래스 2개를 완전히 새로 설계했습니다. ▼▼▼
 
 class SpecificLeaderSelect(ui.Select):
     """'특정 부서 팀장'을 선택하기 위한 전용 Select UI 클래스"""
@@ -96,23 +116,17 @@ class SpecificLeaderSelect(ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        # 이 함수는 ui.Select를 상속받았기 때문에 self는 Select 객체 자신입니다.
-        # self.values로 선택된 역할 ID 목록에 접근할 수 있습니다.
         self.parent_view.selected_roles = {interaction.guild.get_role(int(role_id)) for role_id in self.values}
         await interaction.response.defer()
 
 
 class InquiryTargetSelectView(ui.View):
     """'문의/건의' 버튼을 눌렀을 때 나오는 대상 선택 View"""
-    
-    # ▼▼▼ [수정 후] 아래 내용으로 교체하세요 ▼▼▼
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
         self.cog = cog
         self.selected_roles: Set[discord.Role] = set()
-        # @ui.button 데코레이터가 버튼을 자동으로 추가하므로 이 줄은 삭제합니다.
-    # ▲▲▲ [수정 후] 완료 ▲▲▲
-    
+
     @ui.select(
         placeholder="문의할 대상을 선택해주세요...",
         options=[
@@ -124,10 +138,7 @@ class InquiryTargetSelectView(ui.View):
     async def select_target_callback(self, interaction: discord.Interaction, select: ui.Select):
         target_type = select.values[0]
         
-        # View를 재구성하기 위해 아이템들을 정리합니다.
-        # (기존 선택 메뉴와 내용 입력 버튼은 유지해야 함)
         main_select = self.children[0]
-        proceed_btn = self.proceed_button
         self.clear_items()
         self.add_item(main_select)
 
@@ -137,14 +148,11 @@ class InquiryTargetSelectView(ui.View):
             self.selected_roles = set(self.cog.leader_roles)
         elif target_type == "specific":
             self.selected_roles = set()
-            # 위에서 새로 정의한 SpecificLeaderSelect 클래스의 인스턴스를 추가합니다.
             self.add_item(SpecificLeaderSelect(self))
 
-        # 내용 입력 버튼을 다시 추가하여 항상 맨 아래에 오도록 합니다.
-        self.add_item(proceed_btn)
+        self.add_item(self.proceed_button)
         await interaction.response.edit_message(view=self)
 
-    # proceed_button을 클래스의 정식 버튼 멤버로 정의합니다.
     @ui.button(label="내용 입력하기", style=discord.ButtonStyle.success, row=4)
     async def proceed_button(self, interaction: discord.Interaction, button: ui.Button):
         if not self.selected_roles:
@@ -152,7 +160,6 @@ class InquiryTargetSelectView(ui.View):
         await interaction.response.send_modal(InquiryModal(self.cog, self.selected_roles))
         await interaction.delete_original_response()
 
-# --- ▲▲▲ [오류 수정 완료] ---
 
 class ReportTargetSelectView(ui.View):
     def __init__(self, cog: 'TicketSystem'):
@@ -171,6 +178,7 @@ class ReportTargetSelectView(ui.View):
 
 
 class TicketControlView(ui.View):
+    # ... (이 클래스는 변경 없음) ...
     def __init__(self, cog: 'TicketSystem', ticket_type: str, is_locked: bool = False):
         super().__init__(timeout=None)
         self.cog = cog
@@ -259,6 +267,7 @@ class TicketControlView(ui.View):
 
 
 class MainTicketPanelView(ui.View):
+    # ... (이 클래스는 변경 없음) ...
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=None)
         self.cog = cog
@@ -284,6 +293,7 @@ class MainTicketPanelView(ui.View):
 
 class TicketSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
+        # ... (이 클래스의 __init__, cog_load, register_persistent_views, load_configs, has_open_ticket, sync_tickets_from_db 는 변경 없음) ...
         self.bot = bot
         self.tickets: Dict[int, Dict] = {}
         self.master_roles: List[discord.Role] = []
@@ -339,7 +349,8 @@ class TicketSystem(commands.Cog):
         if zombie_ids: await remove_multiple_tickets(zombie_ids)
         logger.info(f"[TicketSystem] 기존 티켓 동기화 완료: {len(self.tickets)}개")
 
-    async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, title: str, content: str, selected_roles: Set[discord.Role], embed_key: Optional[str] = None):
+    # --- ▼▼▼ [수정] create_ticket 함수를 새로운 양식에 맞게 개선 ▼▼▼
+    async def create_ticket(self, interaction: discord.Interaction, ticket_type: str, title: str, content: Union[str, Dict], selected_roles: Set[discord.Role], embed_key: Optional[str] = None):
         thread: Optional[discord.Thread] = None
         try:
             panel_channel = interaction.channel
@@ -351,18 +362,20 @@ class TicketSystem(commands.Cog):
             self.tickets[thread.id] = {"thread_id": thread.id, "owner_id": interaction.user.id, "ticket_type": ticket_type, "is_locked": False}
             
             embed_to_send = None
-            if embed_key: # 관리자 신청서 같은 커스텀 임베드 사용
+            if embed_key and isinstance(content, dict): # 관리자 신청서
                 embed_data = await get_embed_from_db(embed_key)
                 if embed_data:
                     embed_to_send = format_embed_from_db(embed_data, member_mention=interaction.user.mention)
-                    # 지원서 내용 추가
-                    for field_title, field_value in zip(["이름/나이", "지원 동기", "경력/각오"], content.split("\n\n")):
-                        embed_to_send.add_field(name=field_title.replace("**",""), value=field_value.split(":**\n")[1], inline=False)
+                    embed_to_send.set_author(name=f"{interaction.user.display_name} ({interaction.user.id})", icon_url=interaction.user.display_avatar.url)
+                    embed_to_send.timestamp = discord.utils.utcnow()
+                    for name, value in content.items():
+                        embed_to_send.add_field(name=name, value=value or "내용 없음", inline=False)
             
-            if not embed_to_send: # 일반 문의/신고
-                color = {"inquiry": 0x3498DB, "report": 0xE74C3C, "application": 0xFEE75C}
-                embed_to_send = discord.Embed(title=title, description=content, color=color.get(ticket_type, 0x99AAB5))
+            if not embed_to_send: # 일반 문의/신고 (content가 문자열일 경우)
+                color = {"inquiry": 0x3498DB, "report": 0xE74C3C}
+                embed_to_send = discord.Embed(title=title, description=str(content), color=color.get(ticket_type, 0x99AAB5))
                 embed_to_send.set_author(name=f"{interaction.user.display_name} 님의 {type_map.get(ticket_type)}", icon_url=interaction.user.display_avatar.url)
+                embed_to_send.timestamp = discord.utils.utcnow()
 
             await thread.send(embed=embed_to_send)
             
@@ -381,6 +394,7 @@ class TicketSystem(commands.Cog):
                 await thread.delete(reason="생성 과정 오류로 인한 자동 삭제")
             if interaction.response.is_done():
                 await interaction.followup.send("❌ 티켓을 만드는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", ephemeral=True)
+    # --- ▲▲▲ [수정 완료] ---
             
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
@@ -389,12 +403,14 @@ class TicketSystem(commands.Cog):
             await remove_ticket(thread.id)
             
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_ticket_main") -> bool:
+        # ... (이 함수는 변경 없음) ...
         if not isinstance(channel, discord.TextChannel): return False
         
         base_panel_key = panel_key.replace("panel_", "")
         embed_key = panel_key
         
         try:
+            # 기존 패널 메시지 삭제
             panel_info = get_panel_id(base_panel_key)
             if panel_info and (old_id := panel_info.get('message_id')):
                 try:
@@ -408,7 +424,11 @@ class TicketSystem(commands.Cog):
                 return False
 
             embed = discord.Embed.from_dict(embed_data)
-            await channel.send(embed=embed, view=self.view_instance)
+            
+            # 새 메시지를 보내고 DB에 message_id를 저장합니다.
+            new_message = await channel.send(embed=embed, view=self.view_instance)
+            await save_panel_id(base_panel_key, new_message.id, channel.id)
+            
             logger.info(f"✅ '{panel_key}' 패널을 #{channel.name} 채널에 성공적으로 새로 생성했습니다.")
             return True
         except Exception as e:
