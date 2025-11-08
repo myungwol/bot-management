@@ -4,13 +4,13 @@ from discord import ui
 from discord.ext import commands
 import logging
 from typing import Dict, Any, List, Optional, Set, Union
+import asyncio  # <--- 이 줄을 추가해주세요.
 
 from utils.database import get_id, add_ticket, remove_ticket, get_all_tickets, remove_multiple_tickets, update_ticket_lock_status, get_embed_from_db, save_panel_id, get_panel_id, get_config
 from utils.ui_defaults import TICKET_MASTER_ROLES, TICKET_REPORT_ROLES, TICKET_LEADER_ROLES
 from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
-
 
 class StaffApplicationModal_Part2(ui.Modal, title="관리자 지원서 (2/2)"):
     exp_details = ui.TextInput(label="◟ 경력 (자세히)", placeholder="경력이 없다면 '없음'으로 기재, 있다면 자세히 서술해주세요.", style=discord.TextStyle.paragraph, required=True)
