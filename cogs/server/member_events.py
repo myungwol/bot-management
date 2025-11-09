@@ -89,8 +89,7 @@ class MemberEvents(commands.Cog):
 
         current_member_roles = set(member.roles)
         existing_reward_roles = [role for role in current_member_roles if role.id in valid_boost_roles_by_id]
-        logger.info(f"현재 보유 중인 부스트 역할: {[r.name for r in existing_reward_roles]}")
-
+        
         highest_level = 0
         for role in existing_reward_roles:
             match = re.search(r'역할선택권\s*(\d+)', role.name)
@@ -98,54 +97,53 @@ class MemberEvents(commands.Cog):
                 level = int(match.group(1))
                 if level > highest_level:
                     highest_level = level
-        logger.info(f"계산된 현재 최고 레벨: {highest_level}")
-
-        new_level = highest_level + 2
-        logger.info(f"새로 지급할 목표 레벨: {new_level}")
         
-        role_to_add = boost_ticket_roles_by_level.get(new_level) if new_level <= 10 else None
-        
-        # --- ▼▼▼ [핵심 수정] 최고 레벨 도달 시 프로세스 종료 ---
-        if not role_to_add and highest_level >= 10:
+        # --- ▼▼▼ [핵심 수정] 최고 레벨 도달 시의 로직 변경 ---
+        if highest_level >= 10:
             logger.info("이미 최고 레벨(10)에 도달하여 역할을 변경하지 않습니다.")
-            # 알림 채널에 메시지를 보내 사용자가 알 수 있도록 합니다.
             boost_channel_id = get_id("boost_log_channel_id")
             if boost_channel := self.bot.get_channel(boost_channel_id):
                 try:
                     await boost_channel.send(f"🎉 {member.mention}님은 이미 최고 부스트 레벨 보상을 모두 받으셨습니다! 서버를 계속 후원해주셔서 감사합니다! 💖")
                 except discord.Forbidden:
                     pass
-            return # 함수를 여기서 종료합니다.
+            return
+
+        new_level = highest_level + 2
+        
+        # 만약 계산된 레벨이 10을 초과하면, 10으로 고정합니다.
+        if new_level > 10:
+            new_level = 10
         # --- ▲▲▲ [수정 완료] ---
+            
+        logger.info(f"계산된 현재 최고 레벨: {highest_level}")
+        logger.info(f"새로 지급할 목표 레벨: {new_level}")
+        
+        role_to_add = boost_ticket_roles_by_level.get(new_level)
+        logger.info(f"새로 지급할 역할 객체: {role_to_add.name if role_to_add else '없음'}")
 
         roles_to_remove_set = set(existing_reward_roles)
         final_roles = list(current_member_roles - roles_to_remove_set)
         if role_to_add:
             final_roles.append(role_to_add)
 
-        logger.info(f"제거될 역할: {[r.name for r in existing_reward_roles]}")
-        logger.info(f"추가될 역할: {role_to_add.name if role_to_add else '없음'}")
-
         try:
             await member.edit(roles=final_roles, reason="서버 부스트 보상 업데이트")
-            logger.info("member.edit() 호출 성공.")
             
             boost_channel_id = get_id("boost_log_channel_id")
             if boost_channel := self.bot.get_channel(boost_channel_id):
                 embed_data = await get_embed_from_db("log_boost_start")
                 if embed_data:
                     final_reward_roles = [role_to_add] if role_to_add else []
-                    roles_list_str = "\n".join([f"- {role.mention}" for role in final_reward_roles]) if final_reward_roles else "오류: 지급할 역할 없음"
+                    roles_list_str = "\n".join([f"- {role.mention}" for role in final_reward_roles])
                     embed = format_embed_from_db(embed_data, member_mention=member.mention, member_name=member.display_name, roles_list=roles_list_str)
                     await boost_channel.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
-        except discord.Forbidden:
-            logger.error(f"{member.display_name}님의 부스트 보상 처리 중 권한 오류 발생")
         except Exception as e:
             logger.error(f"{member.display_name}님에게 부스트 보상 지급 중 오류 발생: {e}", exc_info=True)
         
         logger.info(f"--- 부스트 보상 지급 프로세스 종료: {member.display_name} ---")
     # ▲▲▲ [수정 완료] ▲▲▲
-
+    
     # --- ▼▼▼ [핵심 추가] 테스트 전용 함수 ---
     async def run_boost_test(self, member: discord.Member):
         # 단순히 부스트 시작 로직을 호출합니다.
