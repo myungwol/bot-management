@@ -824,7 +824,7 @@ UI_EMBEDS = {
     },
     "embed_ticket_staff_application": {
         "title": "📝 새로운 관리자 지원서",
-        "description": "{member_mention}님이 마을의 새로운 스태프로 지원했습니다.",
+        "description": "{member_mention}님이 서버의 새로운 관리자로 지원했습니다.",
         "color": 0xFEE75C
     }
 }
