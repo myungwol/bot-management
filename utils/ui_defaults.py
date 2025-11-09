@@ -2038,7 +2038,7 @@ TICKET_APPLICATION_DEPARTMENTS = {
 #    },
     "newbie": {
         "label": "안내/뉴관",
-        "description": "새로운 주민의 적응을 돕고 서버를 안내합니다.",
+        "description": "새로운 베이커리의 적응을 돕고 서버를 안내합니다.",
         "emoji": "🍥",
         "team_role_key": "role_staff_newbie_helper",
         "leader_role_key": "role_staff_leader_dough"
