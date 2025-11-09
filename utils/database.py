@@ -110,6 +110,8 @@ async def sync_defaults_to_db():
             save_config_to_db("BOSS_REWARD_TIERS", BOSS_REWARD_TIERS),
             # ▼▼▼ [추가] 이 줄을 추가해주세요 ▼▼▼
             save_config_to_db("TICKET_APPLICATION_DEPARTMENTS", TICKET_APPLICATION_DEPARTMENTS)
+            save_config_to_db("TICKET_DEPARTMENT_MANAGERS", TICKET_DEPARTMENT_MANAGERS)
+
         )
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
