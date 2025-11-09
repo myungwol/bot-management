@@ -1581,6 +1581,14 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 친구 초대 이벤트",
         "channel_type": "text"
     },
+    # ▼▼▼ [추가] 이 부분을 추가해주세요 ▼▼▼
+    "log_boost": {
+        "type": "channel",
+        "cog_name": "MemberEvents",
+        "key": "boost_log_channel_id",
+        "friendly_name": "[로그] 서버 부스트 활동",
+        "channel_type": "text"
+    },
     "panel_incubator": {
         "type": "panel",
         "cog_name": "PetSystem",
