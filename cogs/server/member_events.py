@@ -103,8 +103,7 @@ class MemberEvents(commands.Cog):
                     current_reward_roles = sorted(existing_reward_roles + final_roles_to_add, key=lambda r: r.name)
                     roles_list_str = "\n".join([f"- {role.mention}" for role in current_reward_roles]) if current_reward_roles else "지급된 역할 없음"
                     embed = format_embed_from_db(embed_data, member_mention=member.mention, roles_list=roles_list_str)
-                    if member.display_avatar:
-                        embed.set_author(name=member.display_name, icon_url=member.display_avatar.url)
+
                     await boost_channel.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
             else:
                 logger.warning("부스트 로그 채널이 설정되지 않아 부스트 시작 알림을 보낼 수 없습니다.")
