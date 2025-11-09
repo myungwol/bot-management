@@ -53,6 +53,19 @@ UI_ROLE_KEY_MAP = {
     "role_resident_rookie": {"name": "『 🧈：버터 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🧈", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_guest": {"name": "『 🌾：밀가루 』", "is_prefix": True, "priority": 1, "prefix_symbol": "🌾", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
 
+    # ▼▼▼ [추가] 부스트 보상 역할 10개 ▼▼▼
+    "role_boost_ticket_1": {"name": "♡。💌：역할선택권 1 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_2": {"name": "♡。💌：역할선택권 2 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_3": {"name": "♡。💌：역할선택권 3 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_4": {"name": "♡。💌：역할선택권 4 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_5": {"name": "♡。💌：역할선택권 5 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_6": {"name": "♡。💌：역할선택권 6 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_7": {"name": "♡。💌：역할선택권 7 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_8": {"name": "♡。💌：역할선택권 8 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_9": {"name": "♡。💌：역할선택권 9 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_boost_ticket_10": {"name": "♡。💌：역할선택권 10 ໒꒱", "is_prefix": False, "priority": 0},
+    # ▲▲▲ [추가 완료] ▲▲▲
+    
     # --- 그 외 접두사가 아닌 역할들 (우선순위 0) ---
     "role_info_male": {"name": "『 👦：남자 』", "is_prefix": False, "priority": 0},
     "role_info_female": {"name": "『 👧：여자 』", "is_prefix": False, "priority": 0},
@@ -826,7 +839,16 @@ UI_EMBEDS = {
         "title": "📝 새로운 관리자 지원서",
         "description": "{member_mention}님이 서버의 새로운 관리자로 지원했습니다.",
         "color": 0xFEE75C
-    }
+    },
+    # ▼▼▼ [추가] 부스트 감사 DM 임베드 ▼▼▼
+    "dm_boost_reward": {
+        "title": "───────────── · · ୨୧ · · ─────────────",
+        "description": "**{member_name}** 님\n공장의 **도넛**이 되신 것을 환영합니다.\n\n공장의 도넛이 된 {member_name} 님을 위한 선물!\n\n### ꒰ 부스트 혜택 ꒱\nA. <@&1426938324546879608> 역할 <a:newheart_01:1427212124588998706>\n\nB. 멤버 목록 상단 배치\n\nC. 부스트 전용 괄호 및 이모지 변경\n\nD. 이벤트 진행시 혜택 지급\n\nE. <@&1419879547171508264> \n╰ ⁠：<#1419879550191534181> 중 선택 - ( 준 비 중 )\n\nF. 바구니에 담길 수 있는 특별 권한\n╰ ⁠：바구니 선택 가능",
+        "color": 0xF47FFF,
+    },
+    # ▲▲▲ [추가 완료] ▲▲▲
+
+    # ... (기존의 모든 다른 UI_EMBEDS 내용은 그대로 유지) ...
 }
 
 
