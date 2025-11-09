@@ -119,45 +119,82 @@ class MemberEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
+        # 부스트 상태가 변경되지 않았으면 아무것도 하지 않음
         if before.premium_since == after.premium_since:
             return
 
-        key_role_id = get_id("role_personal_room_key")
-        if not key_role_id:
-            logger.warning("부스트 감지: '개인 방 열쇠' 역할의 ID가 DB에 설정되지 않았습니다.")
+        # 부스트 보상 역할 키 목록
+        boost_ticket_role_keys = [f"role_boost_ticket_{i}" for i in range(1, 11)]
+        all_reward_role_keys = ["role_personal_room_key"] + boost_ticket_role_keys
+
+        all_reward_role_ids = {get_id(key) for key in all_reward_role_keys if get_id(key)}
+        if not all_reward_role_ids:
+            logger.warning("부스트 감지: 보상 역할을 DB에서 찾을 수 없습니다. '/admin setup'으로 역할 동기화가 필요합니다.")
             return
 
-        key_role = after.guild.get_role(key_role_id)
-        if not key_role:
-            logger.warning(f"부스트 감지: 서버에서 '개인 방 열쇠' 역할(ID: {key_role_id})을 찾을 수 없습니다.")
-            return
-
+        # --- 시나리오 1: 사용자가 새로 부스트를 시작했을 때 ---
         if before.premium_since is None and after.premium_since is not None:
-            if key_role not in after.roles:
-                try:
-                    await after.add_roles(key_role, reason="서버 부스트 시작")
-                    logger.info(f"{after.display_name}님이 서버 부스트를 시작하여 '개인 방 열쇠' 역할을 지급했습니다.")
-                    try:
-                        await after.send(
-                            f"🎉 **{after.guild.name}** 서버를 부스트해주셔서 감사합니다!\n"
-                            "혜택으로 **개인 음성 채널**을 만들 수 있는 `개인 방 열쇠` 역할이 부여되었습니다."
-                        )
-                    except discord.Forbidden:
-                        logger.warning(f"{after.display_name}님에게 DM을 보낼 수 없어 부스트 감사 메시지를 보내지 못했습니다.")
-                except discord.Forbidden:
-                    logger.error(f"{after.display_name}님에게 '개인 방 열쇠' 역할을 지급하지 못했습니다. (권한 부족)")
-                except Exception as e:
-                    logger.error(f"{after.display_name}님에게 역할 지급 중 오류 발생: {e}", exc_info=True)
+            logger.info(f"{after.display_name}님이 서버 부스트를 시작했습니다. 보상 지급을 시작합니다.")
+            
+            # 1. 현재 사용자가 가진 보상 역할 수를 계산합니다.
+            existing_reward_roles = [role for role in after.roles if role.id in all_reward_role_ids]
+            num_existing_tickets = sum(1 for role in existing_reward_roles if get_id("role_personal_room_key") != role.id)
 
+            # 2. 새로 지급할 역할 2개를 결정합니다. (최대 10개까지)
+            roles_to_add_keys = []
+            if num_existing_tickets < 10:
+                roles_to_add_keys.append(f"role_boost_ticket_{num_existing_tickets + 1}")
+            if num_existing_tickets + 1 < 10:
+                roles_to_add_keys.append(f"role_boost_ticket_{num_existing_tickets + 2}")
+
+            # '마이룸 열쇠' 역할은 항상 지급
+            roles_to_add_keys.append("role_personal_room_key")
+
+            # 3. discord.Role 객체로 변환
+            final_roles_to_add = []
+            for key in set(roles_to_add_keys): # 중복 방지
+                role_id = get_id(key)
+                if role_id and (role := after.guild.get_role(role_id)):
+                    if role not in after.roles: # 이미 가지고 있으면 추가하지 않음
+                        final_roles_to_add.append(role)
+            
+            # 4. 역할 지급 및 DM 발송
+            try:
+                if final_roles_to_add:
+                    await after.add_roles(*final_roles_to_add, reason="서버 부스트 보상 지급")
+                    logger.info(f"{after.display_name}님에게 다음 역할을 지급했습니다: {[r.name for r in final_roles_to_add]}")
+                
+                # DM 발송
+                embed_data = await get_embed_from_db("dm_boost_reward")
+                if embed_data:
+                    # 지급된 모든 보상 역할 목록 생성 (원래 있던 것 + 새로 받은 것)
+                    current_reward_roles = sorted(existing_reward_roles + final_roles_to_add, key=lambda r: r.name)
+                    roles_list_str = "\n".join([f"- {role.mention}" for role in current_reward_roles]) if current_reward_roles else "지급된 역할 없음"
+                    
+                    embed = format_embed_from_db(embed_data, member_name=after.display_name, guild_name=after.guild.name, roles_list=roles_list_str)
+                    await after.send(embed=embed)
+
+            except discord.Forbidden:
+                logger.error(f"{after.display_name}님에게 부스트 보상 역할을 지급하거나 DM을 보내지 못했습니다. (권한 부족)")
+            except Exception as e:
+                logger.error(f"{after.display_name}님에게 부스트 보상 지급 중 오류 발생: {e}", exc_info=True)
+
+        # --- 시나리오 2: 사용자가 부스트를 중지했을 때 ---
         elif before.premium_since is not None and after.premium_since is None:
-            if key_role in after.roles:
+            logger.info(f"{after.display_name}님이 서버 부스트를 중지하여 보상 역할을 회수합니다.")
+            
+            roles_to_remove = [role for role in after.roles if role.id in all_reward_role_ids]
+            
+            if roles_to_remove:
                 try:
-                    await after.remove_roles(key_role, reason="서버 부스트 중지")
-                    logger.info(f"{after.display_name}님이 서버 부스트를 중지하여 '개인 방 열쇠' 역할을 회수했습니다.")
+                    await after.remove_roles(*roles_to_remove, reason="서버 부스트 중지")
+                    logger.info(f"{after.display_name}님에게서 다음 역할을 회수했습니다: {[r.name for r in roles_to_remove]}")
                 except discord.Forbidden:
-                    logger.error(f"{after.display_name}님의 '개인 방 열쇠' 역할을 회수하지 못했습니다. (권한 부족)")
+                    logger.error(f"{after.display_name}님의 부스트 보상 역할을 회수하지 못했습니다. (권한 부족)")
                 except Exception as e:
                     logger.error(f"{after.display_name}님의 역할 회수 중 오류 발생: {e}", exc_info=True)
+    # ▲▲▲ [수정 완료] ▲▲▲
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemberEvents(bot))
