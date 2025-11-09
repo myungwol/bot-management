@@ -107,11 +107,11 @@ async def sync_defaults_to_db():
             save_config_to_db("AGE_ROLE_MAPPING", AGE_ROLE_MAPPING),
             save_config_to_db("GAME_CONFIG", GAME_CONFIG),
             save_config_to_db("ONBOARDING_CHOICES", ONBOARDING_CHOICES),
+            # ▼▼▼ [수정 후] 이 라인 끝에 쉼표(,)를 추가하세요 ▼▼▼
             save_config_to_db("BOSS_REWARD_TIERS", BOSS_REWARD_TIERS),
-            # ▼▼▼ [추가] 이 줄을 추가해주세요 ▼▼▼
-            save_config_to_db("TICKET_APPLICATION_DEPARTMENTS", TICKET_APPLICATION_DEPARTMENTS)
+            # ▲▲▲ [수정 후] 완료 ▲▲▲
+            save_config_to_db("TICKET_APPLICATION_DEPARTMENTS", TICKET_APPLICATION_DEPARTMENTS),
             save_config_to_db("TICKET_DEPARTMENT_MANAGERS", TICKET_DEPARTMENT_MANAGERS)
-
         )
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
