@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 import logging
 from typing import Optional, List
+import re # <-- 정규표현식을 위해 re 모듈을 import 합니다.
 
 from utils.helpers import format_embed_from_db
 from utils.database import get_id, get_embed_from_db, supabase, get_config, backup_member_data, get_member_backup, delete_member_backup
@@ -69,54 +70,46 @@ class MemberEvents(commands.Cog):
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 await channel.send(embed=embed)
 
+    # ▼▼▼ [수정] 이 함수 전체를 아래 내용으로 교체해주세요. ▼▼▼
     async def _handle_boost_start(self, member: discord.Member):
         logger.info(f"--- 부스트 보상 지급 프로세스 시작: {member.display_name} ---")
         
         try:
             guild = self.bot.get_guild(member.guild.id)
-            if not guild:
-                logger.error(f"부스트 핸들러: 길드를 찾을 수 없습니다 (ID: {member.guild.id})")
-                return
+            if not guild: return
             member = await guild.fetch_member(member.id)
         except Exception as e:
             logger.error(f"부스트 핸들러: 최신 멤버 정보를 가져오는 중 오류: {e}")
             return
 
-        # 1. 유효한 부스트 역할 목록을 준비합니다.
         boost_ticket_roles_by_level = { i: guild.get_role(get_id(f"role_boost_ticket_{i}")) for i in range(1, 11) }
         valid_boost_roles_by_id = {role.id for role in boost_ticket_roles_by_level.values() if role}
         if not valid_boost_roles_by_id:
             logger.warning("부스트 감지: DB에 설정된 보상 역할을 서버에서 찾을 수 없습니다.")
             return
 
-        # 2. 사용자가 현재 가진 부스트 역할을 확인합니다.
         current_member_roles = set(member.roles)
         existing_reward_roles = [role for role in current_member_roles if role.id in valid_boost_roles_by_id]
         logger.info(f"현재 보유 중인 부스트 역할: {[r.name for r in existing_reward_roles]}")
 
-        # 3. 현재 최고 레벨을 계산합니다.
+        # --- ▼▼▼ [핵심 수정] 최고 레벨 계산 로직 변경 ▼▼▼ ---
         highest_level = 0
         for role in existing_reward_roles:
-            try:
-                # 역할 이름에서 숫자만 추출 (예: "역할선택권 10 ໒꒱" -> 10)
-                level_str = ''.join(filter(str.isdigit, role.name))
-                if level_str:
-                    level = int(level_str)
-                    if level > highest_level:
-                        highest_level = level
-            except (ValueError, TypeError):
-                continue
+            # 정규표현식을 사용해 '역할선택권' 바로 뒤의 숫자만 정확히 찾습니다.
+            match = re.search(r'역할선택권\s*(\d+)', role.name)
+            if match:
+                level = int(match.group(1))
+                if level > highest_level:
+                    highest_level = level
+        # --- ▲▲▲ [수정 완료] ▲▲▲
         logger.info(f"계산된 현재 최고 레벨: {highest_level}")
 
-        # 4. 새로 지급할 역할의 레벨과 객체를 결정합니다.
         new_level = highest_level + 2
         logger.info(f"새로 지급할 목표 레벨: {new_level}")
         
         role_to_add = boost_ticket_roles_by_level.get(new_level) if new_level <= 10 else None
         logger.info(f"새로 지급할 역할 객체: {role_to_add.name if role_to_add else '없음 (최고 레벨 도달)'}")
 
-        # 5. 최종적으로 멤버가 가져야 할 역할 목록을 구성합니다.
-        # (현재 모든 역할 - 기존 부스트 역할 + 새로운 부스트 역할)
         final_roles = list(current_member_roles - set(existing_reward_roles))
         if role_to_add:
             final_roles.append(role_to_add)
@@ -125,11 +118,9 @@ class MemberEvents(commands.Cog):
         logger.info(f"추가될 역할: {role_to_add.name if role_to_add else '없음'}")
 
         try:
-            # 6. member.edit()으로 역할 목록을 한 번에 업데이트합니다.
             await member.edit(roles=final_roles, reason="서버 부스트 보상 업데이트")
             logger.info("member.edit() 호출 성공.")
             
-            # 7. 알림 메시지 발송
             boost_channel_id = get_id("boost_log_channel_id")
             if boost_channel := self.bot.get_channel(boost_channel_id):
                 embed_data = await get_embed_from_db("log_boost_start")
@@ -147,7 +138,6 @@ class MemberEvents(commands.Cog):
             logger.error(f"{member.display_name}님에게 부스트 보상 지급 중 오류 발생: {e}", exc_info=True)
         
         logger.info(f"--- 부스트 보상 지급 프로세스 종료: {member.display_name} ---")
-    # ▲▲▲ [수정 완료] ▲▲▲
 
     # --- ▼▼▼ [핵심 추가] 테스트 전용 함수 ---
     async def run_boost_test(self, member: discord.Member):
