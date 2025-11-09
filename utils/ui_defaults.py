@@ -2029,13 +2029,13 @@ TICKET_LEADER_ROLES = [
 # ▼▼▼ [핵심] 관리자 신청 부서 정보 ▼▼▼
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 TICKET_APPLICATION_DEPARTMENTS = {
-    "pr": {
-        "label": "홍보",
-        "description": "SNS, 서버 홍보 등 대외 활동을 담당합니다.",
-        "emoji": "🍯",
-        "team_role_key": "role_staff_pr",
-        "leader_role_key": "role_staff_leader_syrup"
-    },
+#    "pr": {
+#        "label": "홍보",
+#        "description": "SNS, 서버 홍보 등 대외 활동을 담당합니다.",
+#        "emoji": "🍯",
+#        "team_role_key": "role_staff_pr",
+#        "leader_role_key": "role_staff_leader_syrup"
+#    },
     "newbie": {
         "label": "안내/뉴관",
         "description": "새로운 주민의 적응을 돕고 서버를 안내합니다.",
@@ -2043,13 +2043,13 @@ TICKET_APPLICATION_DEPARTMENTS = {
         "team_role_key": "role_staff_newbie_helper",
         "leader_role_key": "role_staff_leader_dough"
     },
-    "police": {
-        "label": "보안",
-        "description": "서버 내 규칙 위반을 단속하고 분쟁을 중재합니다.",
-        "emoji": "🫙",
-        "team_role_key": "role_staff_police",
-        "leader_role_key": "role_staff_leader_packaging"
-    },
+#    "police": {
+#        "label": "보안",
+#        "description": "서버 내 규칙 위반을 단속하고 분쟁을 중재합니다.",
+#        "emoji": "🫙",
+#        "team_role_key": "role_staff_police",
+#        "leader_role_key": "role_staff_leader_packaging"
+#    },
     "festival": {
         "label": "기획/내전",
         "description": "다양한 서버 이벤트와 내전(게임)을 기획하고 진행합니다.",
