@@ -127,20 +127,17 @@ class SpecificLeaderSelect(ui.Select):
 
 
 class InquiryTargetSelectView(ui.View):
-    # ▼▼▼ [수정 1/2] __init__ 함수를 교체 ▼▼▼
     def __init__(self, cog: 'TicketSystem'):
         super().__init__(timeout=180)
         self.cog = cog
         self.selected_roles: Set[discord.Role] = set()
 
-        # 새로운 옵션을 포함하여 Select 메뉴를 생성합니다.
         self.target_select = ui.Select(
             placeholder="문의할 대상을 선택해주세요...",
             options=[
                 discord.SelectOption(label="대표/부대표에게", value="master", emoji="🧩"),
                 discord.SelectOption(label="특정 부서 팀장에게", value="specific", emoji="👤"),
                 discord.SelectOption(label="모든 팀장에게", value="all_leaders", emoji="👥"),
-                # 새로운 옵션 추가
                 discord.SelectOption(label="모든 부서 관리자에게", value="all_managers", emoji="🏢")
             ]
         )
@@ -151,31 +148,37 @@ class InquiryTargetSelectView(ui.View):
         self.proceed_button.callback = self.proceed_callback
         self.add_item(self.proceed_button)
 
-    # ▼▼▼ [수정 2/2] select_target_callback 함수를 교체 ▼▼▼
     async def select_target_callback(self, interaction: discord.Interaction, select: ui.Select):
         target_type = select.values[0]
         
-        # View를 재구성하기 위해 아이템들을 정리합니다.
         self.clear_items()
-        self.add_item(self.target_select) # 메인 선택 메뉴는 유지
+        self.add_item(self.target_select)
 
         if target_type == "master":
             self.selected_roles = set(self.cog.master_roles)
         elif target_type == "all_leaders":
             self.selected_roles = set(self.cog.leader_roles)
-        elif target_type == "all_managers": # 새로운 옵션에 대한 처리 추가
+        elif target_type == "all_managers":
             self.selected_roles = set(self.cog.department_manager_roles)
         elif target_type == "specific":
             self.selected_roles = set()
-            # '특정 부서 팀장' 선택 시, 팀장 선택 메뉴 추가
             leader_select = SpecificLeaderSelect(self)
             if not leader_select.options:
                 await interaction.response.send_message("❌ 현재 문의 가능한 팀장 역할이 설정되지 않았습니다.", ephemeral=True)
                 return
             self.add_item(leader_select)
 
-        self.add_item(self.proceed_button) # 내용 입력 버튼 다시 추가
+        self.add_item(self.proceed_button)
         await interaction.response.edit_message(view=self)
+
+    # --- ▼▼▼ [핵심] 누락되었던 이 함수를 다시 추가합니다. ▼▼▼ ---
+    async def proceed_callback(self, interaction: discord.Interaction):
+        if not self.selected_roles:
+            return await interaction.response.send_message("문의 대상을 먼저 선택해주세요.", ephemeral=True)
+        await interaction.response.send_modal(InquiryModal(self.cog, self.selected_roles))
+        await interaction.delete_original_response()
+    # --- ▲▲▲ [추가 완료] ---
+# ▲▲▲ [수정 완료] ▲▲▲
 
 
 class ReportTargetSelectView(ui.View):
