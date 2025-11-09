@@ -70,6 +70,7 @@ class MemberEvents(commands.Cog):
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 await channel.send(embed=embed)
 
+    # ▼▼▼ [수정] 이 함수 전체를 아래 내용으로 교체해주세요. ▼▼▼
     async def _handle_boost_start(self, member: discord.Member):
         logger.info(f"--- 부스트 보상 지급 프로세스 시작: {member.display_name} ---")
         
@@ -98,46 +99,56 @@ class MemberEvents(commands.Cog):
                 if level > highest_level:
                     highest_level = level
         
-        # --- ▼▼▼ [핵심 수정] 최고 레벨 도달 시의 로직 변경 ---
-        if highest_level >= 10:
-            logger.info("이미 최고 레벨(10)에 도달하여 역할을 변경하지 않습니다.")
-            boost_channel_id = get_id("boost_log_channel_id")
-            if boost_channel := self.bot.get_channel(boost_channel_id):
-                try:
-                    await boost_channel.send(f"🎉 {member.mention}님은 이미 최고 부스트 레벨 보상을 모두 받으셨습니다! 서버를 계속 후원해주셔서 감사합니다! 💖")
-                except discord.Forbidden:
-                    pass
-            return
-
-        new_level = highest_level + 2
+        # --- ▼▼▼ [핵심 수정] 역할 변경 및 알림 로직 통합 ▼▼▼ ---
         
-        # 만약 계산된 레벨이 10을 초과하면, 10으로 고정합니다.
-        if new_level > 10:
-            new_level = 10
-        # --- ▲▲▲ [수정 완료] ---
-            
-        logger.info(f"계산된 현재 최고 레벨: {highest_level}")
-        logger.info(f"새로 지급할 목표 레벨: {new_level}")
-        
-        role_to_add = boost_ticket_roles_by_level.get(new_level)
-        logger.info(f"새로 지급할 역할 객체: {role_to_add.name if role_to_add else '없음'}")
-
+        role_to_add = None
         roles_to_remove_set = set(existing_reward_roles)
-        final_roles = list(current_member_roles - roles_to_remove_set)
-        if role_to_add:
-            final_roles.append(role_to_add)
+        final_roles_for_embed = []
 
-        try:
+        # 시나리오 1: 아직 최고 레벨이 아닐 때 (레벨업 진행)
+        if highest_level < 10:
+            new_level = highest_level + 2
+            if new_level > 10:
+                new_level = 10
+            
+            role_to_add = boost_ticket_roles_by_level.get(new_level)
+            
+            # 최종 역할 목록 계산 및 역할 변경
+            final_roles = list(current_member_roles - roles_to_remove_set)
+            if role_to_add:
+                final_roles.append(role_to_add)
             await member.edit(roles=final_roles, reason="서버 부스트 보상 업데이트")
             
+            # 임베드에 표시될 역할은 새로 추가된 역할입니다.
+            final_roles_for_embed = [role_to_add] if role_to_add else []
+
+        # 시나리오 2: 이미 최고 레벨일 때 (역할 변경 없음)
+        else:
+            logger.info("이미 최고 레벨(10)에 도달하여 역할 변경은 없습니다.")
+            # 임베드에 표시될 역할은 현재 가지고 있는 최고 레벨 역할입니다.
+            final_roles_for_embed = existing_reward_roles
+
+        # --- 알림 메시지 발송 (공통 로직) ---
+        try:
             boost_channel_id = get_id("boost_log_channel_id")
             if boost_channel := self.bot.get_channel(boost_channel_id):
                 embed_data = await get_embed_from_db("log_boost_start")
                 if embed_data:
-                    final_reward_roles = [role_to_add] if role_to_add else []
-                    roles_list_str = "\n".join([f"- {role.mention}" for role in final_reward_roles])
-                    embed = format_embed_from_db(embed_data, member_mention=member.mention, member_name=member.display_name, roles_list=roles_list_str)
+                    roles_list_str = "\n".join([f"- {role.mention}" for role in final_roles_for_embed]) if final_roles_for_embed else "최고 레벨 달성!"
+                    
+                    embed = format_embed_from_db(
+                        embed_data, 
+                        member_mention=member.mention, 
+                        member_name=member.display_name,
+                        roles_list=roles_list_str
+                    )
+                    
                     await boost_channel.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+            else:
+                logger.warning("부스트 로그 채널이 설정되지 않아 알림을 보낼 수 없습니다.")
+
+        except discord.Forbidden:
+            logger.error(f"{member.display_name}님의 부스트 보상 처리 중 권한 오류 발생")
         except Exception as e:
             logger.error(f"{member.display_name}님에게 부스트 보상 지급 중 오류 발생: {e}", exc_info=True)
         
