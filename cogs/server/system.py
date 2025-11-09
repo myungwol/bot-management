@@ -204,24 +204,24 @@ class ServerSystem(commands.Cog):
                     level: Optional[app_commands.Range[int, 1, None]] = None,
                     stat_type: Optional[str] = None, template: Optional[str] = None):
         
-        # ▼▼▼ [수정] 이 함수 전체의 들여쓰기를 수정했습니다. ▼▼▼
         await interaction.response.defer(ephemeral=True)
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
 
+        # --- ▼▼▼ [핵심 수정] boost_test 로직 변경 ---
         if action == "boost_test":
             if not user:
                 return await interaction.followup.send("❌ 이 테스트를 실행하려면 `user` 옵션에 대상을 지정해야 합니다.", ephemeral=True)
             
             member_events_cog = self.bot.get_cog("MemberEvents")
-            if member_events_cog and hasattr(member_events_cog, 'on_member_update'):
-                before_state = user
-                after_state = user._update(premium_since=discord.utils.utcnow())
-                self.bot.dispatch('member_update', before_state, after_state)
+            if member_events_cog and hasattr(member_events_cog, 'run_boost_test'):
+                # MemberEvents Cog의 테스트 함수를 직접 호출합니다.
+                await member_events_cog.run_boost_test(user)
                 await interaction.followup.send(f"✅ {user.mention}님에게 부스트 보상 지급 테스트를 실행했습니다. 설정된 채널을 확인해주세요.", ephemeral=True)
             else:
                 await interaction.followup.send("❌ `MemberEvents` Cog를 찾을 수 없어 테스트를 실행할 수 없습니다.", ephemeral=True)
             return
+        # --- ▲▲▲ [수정 완료] ---
 
         if action.startswith("channel_setup:"):
             setting_key = action.split(":", 1)[1]
