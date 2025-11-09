@@ -2025,6 +2025,13 @@ TICKET_LEADER_ROLES = [
     "role_staff_leader_cream",
     "role_staff_leader_dough"
 ]
+# ▼▼▼ [추가] 이 부분을 추가해주세요 ▼▼▼
+# '모든 부서 관리자에게' 선택 시 멘션될 역할 목록
+TICKET_DEPARTMENT_MANAGERS = [
+    "role_staff_village_chief",
+    "role_staff_deputy_chief",
+    "role_approval" # '바구니' 역할
+]
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # ▼▼▼ [핵심] 관리자 신청 부서 정보 ▼▼▼
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
