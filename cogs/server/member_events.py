@@ -118,16 +118,17 @@ class MemberEvents(commands.Cog):
                 await channel.send(embed=embed)
 
     @commands.Cog.listener()
+    # ▼▼▼ [수정] 이 함수 전체를 아래 내용으로 교체해주세요. ▼▼▼
+    @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         # 부스트 상태가 변경되지 않았으면 아무것도 하지 않음
         if before.premium_since == after.premium_since:
             return
 
-        # 부스트 보상 역할 키 목록
+        # 부스트 보상 역할 키 목록 ('마이룸 열쇠' 제외)
         boost_ticket_role_keys = [f"role_boost_ticket_{i}" for i in range(1, 11)]
-        all_reward_role_keys = ["role_personal_room_key"] + boost_ticket_role_keys
-
-        all_reward_role_ids = {get_id(key) for key in all_reward_role_keys if get_id(key)}
+        
+        all_reward_role_ids = {get_id(key) for key in boost_ticket_role_keys if get_id(key)}
         if not all_reward_role_ids:
             logger.warning("부스트 감지: 보상 역할을 DB에서 찾을 수 없습니다. '/admin setup'으로 역할 동기화가 필요합니다.")
             return
@@ -136,9 +137,9 @@ class MemberEvents(commands.Cog):
         if before.premium_since is None and after.premium_since is not None:
             logger.info(f"{after.display_name}님이 서버 부스트를 시작했습니다. 보상 지급을 시작합니다.")
             
-            # 1. 현재 사용자가 가진 보상 역할 수를 계산합니다.
+            # 1. 현재 사용자가 가진 '역할선택권' 역할의 수를 계산합니다.
             existing_reward_roles = [role for role in after.roles if role.id in all_reward_role_ids]
-            num_existing_tickets = sum(1 for role in existing_reward_roles if get_id("role_personal_room_key") != role.id)
+            num_existing_tickets = len(existing_reward_roles)
 
             # 2. 새로 지급할 역할 2개를 결정합니다. (최대 10개까지)
             roles_to_add_keys = []
@@ -147,15 +148,12 @@ class MemberEvents(commands.Cog):
             if num_existing_tickets + 1 < 10:
                 roles_to_add_keys.append(f"role_boost_ticket_{num_existing_tickets + 2}")
 
-            # '마이룸 열쇠' 역할은 항상 지급
-            roles_to_add_keys.append("role_personal_room_key")
-
             # 3. discord.Role 객체로 변환
             final_roles_to_add = []
-            for key in set(roles_to_add_keys): # 중복 방지
+            for key in roles_to_add_keys:
                 role_id = get_id(key)
                 if role_id and (role := after.guild.get_role(role_id)):
-                    if role not in after.roles: # 이미 가지고 있으면 추가하지 않음
+                    if role not in after.roles:
                         final_roles_to_add.append(role)
             
             # 4. 역할 지급 및 DM 발송
@@ -193,7 +191,6 @@ class MemberEvents(commands.Cog):
                     logger.error(f"{after.display_name}님의 부스트 보상 역할을 회수하지 못했습니다. (권한 부족)")
                 except Exception as e:
                     logger.error(f"{after.display_name}님의 역할 회수 중 오류 발생: {e}", exc_info=True)
-    # ▲▲▲ [수정 완료] ▲▲▲
 
 
 async def setup(bot: commands.Bot):
