@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class StaffApplicationModal(ui.Modal, title="관리자 지원서"):
-    name = ui.TextInput(label="이름 / 나이 / 성별", placeholder="예: 김마을 / 25 / 남성", required=True)
+    name = ui.TextInput(label="이름 / 나이 / 성별", placeholder="예: 김쿠키 / 25 / 남성", required=True)
     experience = ui.TextInput(label="지원 부서 경력 유/무", placeholder="예: 유 (자세히 서술) / 무", style=discord.TextStyle.paragraph, required=True)
     other_server_staff = ui.TextInput(label="현재 타섭 관리진 유/무", placeholder="예: 유 / 무", max_length=2, required=True)
     activity_time = ui.TextInput(label="주 활동 시간대", placeholder="예: 평일 저녁, 주말 오후 등 자유롭게 기재", required=True)
