@@ -155,11 +155,6 @@ class MemberEvents(commands.Cog):
         logger.info(f"--- 부스트 보상 지급 프로세스 종료: {member.display_name} ---")
     # ▲▲▲ [수정 완료] ▲▲▲
     
-    # --- ▼▼▼ [핵심 추가] 테스트 전용 함수 ---
-    async def run_boost_test(self, member: discord.Member):
-        # 단순히 부스트 시작 로직을 호출합니다.
-        await self._handle_boost_start(member)
-    
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if before.premium_since == after.premium_since:
