@@ -70,17 +70,14 @@ class MemberEvents(commands.Cog):
                 await channel.send(embed=embed)
 
     # ▼▼▼ [수정] 이 함수 전체를 아래 내용으로 교체해주세요. ▼▼▼
+    # ▼▼▼ [수정] 이 함수 전체를 아래 내용으로 교체해주세요. ▼▼▼
     async def _handle_boost_start(self, member: discord.Member):
         logger.info(f"{member.display_name}님이 서버 부스트를 시작했습니다. 보상 지급을 시작합니다.")
         
-        # 역할 키와 실제 역할 객체를 { 역할 번호: 역할 객체 } 형태로 매핑합니다.
-        # 예: { 2: <Role id=... name='역할선택권 2'>, 4: <Role id=... name='역할선택권 4'> }
         boost_ticket_roles_by_level = {
             i: member.guild.get_role(get_id(f"role_boost_ticket_{i}"))
             for i in range(1, 11)
         }
-        
-        # 유효한 역할 객체만 필터링합니다.
         valid_boost_roles_by_id = {role.id for role in boost_ticket_roles_by_level.values() if role}
         if not valid_boost_roles_by_id:
             logger.warning("부스트 감지: 보상 역할을 DB에서 찾을 수 없습니다.")
@@ -89,43 +86,41 @@ class MemberEvents(commands.Cog):
         boost_channel_id = get_id("boost_log_channel_id")
         boost_channel = self.bot.get_channel(boost_channel_id) if boost_channel_id else None
 
-        # 1. 사용자가 현재 가지고 있는 '역할선택권' 역할을 찾습니다. (어차피 1개만 있어야 정상)
-        existing_reward_roles = [role for role in member.roles if role.id in valid_boost_roles_by_id]
+        # 1. 사용자의 현재 역할 목록을 세트(set)으로 만듭니다.
+        current_member_roles = set(member.roles)
+        
+        # 2. 현재 가지고 있는 '역할선택권' 역할을 찾습니다.
+        existing_reward_roles = [role for role in current_member_roles if role.id in valid_boost_roles_by_id]
 
-        # 2. 현재 가진 역할 중 가장 높은 레벨(숫자)을 찾습니다. 없으면 0입니다.
         highest_level = 0
         for role in existing_reward_roles:
             try:
-                # 역할 이름에서 숫자만 추출합니다. 예: "역할선택권 10 ໒꒱" -> 10
                 level = int(''.join(filter(str.isdigit, role.name)))
                 if level > highest_level:
                     highest_level = level
             except (ValueError, TypeError):
                 continue
         
-        # 3. 새로 지급할 역할의 레벨을 계산합니다. (기존 최고 레벨 + 2)
         new_level = highest_level + 2
         
-        # 4. 새로 지급할 역할과 회수할 역할을 결정합니다.
-        role_to_add = None
-        if new_level <= 10:
-            role_to_add = boost_ticket_roles_by_level.get(new_level)
-
-        roles_to_remove = existing_reward_roles
+        # 3. 새로 지급할 역할과 회수할 역할을 결정합니다.
+        role_to_add = boost_ticket_roles_by_level.get(new_level) if new_level <= 10 else None
+        roles_to_remove_set = set(existing_reward_roles)
         
+        # 4. 최종적으로 사용자가 가져야 할 역할 목록을 계산합니다.
+        # (현재 역할 - 제거할 역할) + 추가할 역할
+        final_roles = (current_member_roles - roles_to_remove_set)
+        if role_to_add:
+            final_roles.add(role_to_add)
+
         try:
-            # 5. 역할 변경 실행: 먼저 회수하고, 그 다음에 지급합니다.
-            if roles_to_remove:
-                await member.remove_roles(*roles_to_remove, reason="서버 부스트 보상 등급 변경 (이전 역할 회수)")
-            
-            if role_to_add:
-                await member.add_roles(role_to_add, reason="서버 부스트 보상 지급")
+            # 5. member.edit()으로 한 번에 역할 변경을 적용합니다.
+            await member.edit(roles=list(final_roles), reason="서버 부스트 보상 업데이트")
             
             # 6. 알림 메시지 발송
             if boost_channel:
                 embed_data = await get_embed_from_db("log_boost_start")
                 if embed_data:
-                    # 최종적으로 지급된 역할 1개만 목록에 표시합니다.
                     final_reward_roles = [role_to_add] if role_to_add else []
                     roles_list_str = "\n".join([f"- {role.mention}" for role in final_reward_roles]) if final_reward_roles else "최고 레벨에 도달했습니다."
                     
@@ -144,7 +139,6 @@ class MemberEvents(commands.Cog):
             logger.error(f"{member.display_name}님의 부스트 보상 처리 중 권한 오류 발생")
         except Exception as e:
             logger.error(f"{member.display_name}님에게 부스트 보상 지급 중 오류 발생: {e}", exc_info=True)
-    # ▲▲▲ [수정 완료] ▲▲▲
 
     # --- ▼▼▼ [핵심 추가] 테스트 전용 함수 ---
     async def run_boost_test(self, member: discord.Member):
