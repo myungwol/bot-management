@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional, Set, Union
 import asyncio
 
 from utils.database import get_id, add_ticket, remove_ticket, get_all_tickets, remove_multiple_tickets, update_ticket_lock_status, get_embed_from_db, save_panel_id, get_panel_id, get_config
-from utils.ui_defaults import TICKET_MASTER_ROLES, TICKET_REPORT_ROLES, TICKET_LEADER_ROLES
+from utils.ui_defaults import TICKET_MASTER_ROLES, TICKET_REPORT_ROLES, TICKET_LEADER_ROLES, TICKET_DEPARTMENT_MANAGERS
 from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
@@ -127,20 +127,55 @@ class SpecificLeaderSelect(ui.Select):
 
 
 class InquiryTargetSelectView(ui.View):
+    # ▼▼▼ [수정 1/2] __init__ 함수를 교체 ▼▼▼
     def __init__(self, cog: 'TicketSystem'):
-        super().__init__(timeout=180); self.cog = cog; self.selected_roles: Set[discord.Role] = set()
-    @ui.select(placeholder="문의할 대상을 선택해주세요...", options=[discord.SelectOption(label="대표/부대표에게", value="master", emoji="🧩"), discord.SelectOption(label="특정 부서 팀장에게", value="specific", emoji="👤"), discord.SelectOption(label="모든 팀장에게", value="all_leaders", emoji="👥")])
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.selected_roles: Set[discord.Role] = set()
+
+        # 새로운 옵션을 포함하여 Select 메뉴를 생성합니다.
+        self.target_select = ui.Select(
+            placeholder="문의할 대상을 선택해주세요...",
+            options=[
+                discord.SelectOption(label="대표/부대표에게", value="master", emoji="🧩"),
+                discord.SelectOption(label="특정 부서 팀장에게", value="specific", emoji="👤"),
+                discord.SelectOption(label="모든 팀장에게", value="all_leaders", emoji="👥"),
+                # 새로운 옵션 추가
+                discord.SelectOption(label="모든 부서 관리자에게", value="all_managers", emoji="🏢")
+            ]
+        )
+        self.target_select.callback = self.select_target_callback
+        self.add_item(self.target_select)
+
+        self.proceed_button = ui.Button(label="내용 입력하기", style=discord.ButtonStyle.success, row=4)
+        self.proceed_button.callback = self.proceed_callback
+        self.add_item(self.proceed_button)
+
+    # ▼▼▼ [수정 2/2] select_target_callback 함수를 교체 ▼▼▼
     async def select_target_callback(self, interaction: discord.Interaction, select: ui.Select):
-        target_type = select.values[0]; main_select = self.children[0]
-        self.clear_items(); self.add_item(main_select)
-        if target_type == "master": self.selected_roles = set(self.cog.master_roles)
-        elif target_type == "all_leaders": self.selected_roles = set(self.cog.leader_roles)
-        elif target_type == "specific": self.selected_roles = set(); self.add_item(SpecificLeaderSelect(self))
-        self.add_item(self.proceed_button); await interaction.response.edit_message(view=self)
-    @ui.button(label="내용 입력하기", style=discord.ButtonStyle.success, row=4)
-    async def proceed_button(self, interaction: discord.Interaction, button: ui.Button):
-        if not self.selected_roles: return await interaction.response.send_message("문의 대상을 먼저 선택해주세요.", ephemeral=True)
-        await interaction.response.send_modal(InquiryModal(self.cog, self.selected_roles)); await interaction.delete_original_response()
+        target_type = select.values[0]
+        
+        # View를 재구성하기 위해 아이템들을 정리합니다.
+        self.clear_items()
+        self.add_item(self.target_select) # 메인 선택 메뉴는 유지
+
+        if target_type == "master":
+            self.selected_roles = set(self.cog.master_roles)
+        elif target_type == "all_leaders":
+            self.selected_roles = set(self.cog.leader_roles)
+        elif target_type == "all_managers": # 새로운 옵션에 대한 처리 추가
+            self.selected_roles = set(self.cog.department_manager_roles)
+        elif target_type == "specific":
+            self.selected_roles = set()
+            # '특정 부서 팀장' 선택 시, 팀장 선택 메뉴 추가
+            leader_select = SpecificLeaderSelect(self)
+            if not leader_select.options:
+                await interaction.response.send_message("❌ 현재 문의 가능한 팀장 역할이 설정되지 않았습니다.", ephemeral=True)
+                return
+            self.add_item(leader_select)
+
+        self.add_item(self.proceed_button) # 내용 입력 버튼 다시 추가
+        await interaction.response.edit_message(view=self)
 
 
 class ReportTargetSelectView(ui.View):
@@ -219,23 +254,43 @@ class MainTicketPanelView(ui.View):
 
 
 class TicketSystem(commands.Cog):
-    # ... (기존과 동일) ...
+    # ▼▼▼ [수정] __init__ 과 load_configs 함수를 교체 ▼▼▼
     def __init__(self, bot: commands.Bot):
-        self.bot = bot; self.tickets: Dict[int, Dict] = {}; self.master_roles: List[discord.Role] = []
-        self.report_roles: List[discord.Role] = []; self.leader_roles: List[discord.Role] = []
-        self.guild: Optional[discord.Guild] = None; self.view_instance: Optional[MainTicketPanelView] = None
+        self.bot = bot
+        self.tickets: Dict[int, Dict] = {}
+        self.master_roles: List[discord.Role] = []
+        self.report_roles: List[discord.Role] = []
+        self.leader_roles: List[discord.Role] = []
+        # '모든 부서 관리자' 역할을 저장할 리스트 추가
+        self.department_manager_roles: List[discord.Role] = []
+        self.guild: Optional[discord.Guild] = None
+        self.view_instance: Optional[MainTicketPanelView] = None
+        self.departments: Dict[str, Any] = {}
         logger.info("TicketSystem Cog가 성공적으로 초기화되었습니다.")
-    async def cog_load(self): await self.register_persistent_views(); self.bot.loop.create_task(self.sync_tickets_from_db())
+
+    async def cog_load(self):
+        # 순서 변경: Cog 로드 시 바로 설정 로드
+        await self.load_configs()
+        await self.register_persistent_views()
+        self.bot.loop.create_task(self.sync_tickets_from_db())
     async def register_persistent_views(self): self.view_instance = MainTicketPanelView(self); self.bot.add_view(self.view_instance); logger.info("✅ 통합 티켓 시스템의 영구 View가 성공적으로 등록되었습니다.")
     async def load_configs(self):
+        self.departments = get_config("TICKET_APPLICATION_DEPARTMENTS", {})
         panel_channel_id = get_id("ticket_main_panel_channel_id")
-        if panel_channel_id and (channel := self.bot.get_channel(panel_channel_id)): self.guild = channel.guild
+        if panel_channel_id and (channel := self.bot.get_channel(panel_channel_id)):
+            self.guild = channel.guild
+        
         if self.guild:
             self.master_roles = [role for key in TICKET_MASTER_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
             self.report_roles = [role for key in TICKET_REPORT_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
             self.leader_roles = [role for key in TICKET_LEADER_ROLES if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
-            logger.info(f"[TicketSystem] 역할 정보 로드 완료.")
-        else: logger.warning("[TicketSystem] 티켓 패널 채널이 설정되지 않아 길드 정보를 불러올 수 없습니다.")
+            # 새로 추가한 역할 그룹 로드
+            self.department_manager_roles = [role for key in TICKET_DEPARTMENT_MANAGERS if (role_id := get_id(key)) and (role := self.guild.get_role(role_id))]
+            
+            logger.info(f"[TicketSystem] 역할 및 부서 정보 로드 완료 (부서 관리자: {len(self.department_manager_roles)}개)")
+        else:
+            logger.warning("[TicketSystem] 티켓 패널 채널이 설정되지 않아 길드 정보를 불러올 수 없습니다.")
+    # ▲▲▲ [수정 완료] ▲▲▲
     def has_open_ticket(self, user: discord.Member, ticket_type: str):
         for thread_id, ticket_info in self.tickets.items():
             if ticket_info.get("owner_id") == user.id and ticket_info.get("ticket_type") == ticket_type and self.guild and self.guild.get_thread(thread_id): return True
