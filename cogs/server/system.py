@@ -36,58 +36,50 @@ async def is_admin(interaction: discord.Interaction) -> bool:
         raise app_commands.CheckFailure("이 명령어를 실행할 관리자 권한이 없습니다.")
     return True
 
+
 class TemplateEditModal(ui.Modal, title="임베드 템플릿 편집"):
+    # ... (이 클래스는 변경 없음) ...
     title_input = ui.TextInput(label="제목", placeholder="임베드 제목을 입력하세요.", required=False, max_length=256)
     description_input = ui.TextInput(label="설명", placeholder="임베드 설명을 입력하세요.", style=discord.TextStyle.paragraph, required=False, max_length=4000)
     color_input = ui.TextInput(label="색상 (16진수 코드)", placeholder="예: #5865F2 (비워두면 기본 색상)", required=False, max_length=7)
     image_url_input = ui.TextInput(label="이미지 URL", placeholder="임베드에 표시할 이미지 URL을 입력하세요.", required=False)
     thumbnail_url_input = ui.TextInput(label="썸네일 URL", placeholder="오른쪽 상단에 표시할 썸네일 이미지 URL을 입력하세요.", required=False)
-
     def __init__(self, existing_embed: discord.Embed):
-        super().__init__()
-        self.embed: Optional[discord.Embed] = None
-        self.title_input.default = existing_embed.title
+        super().__init__(); self.embed: Optional[discord.Embed] = None; self.title_input.default = existing_embed.title
         self.description_input.default = existing_embed.description
         if existing_embed.color: self.color_input.default = str(existing_embed.color)
         if existing_embed.image and existing_embed.image.url: self.image_url_input.default = existing_embed.image.url
         if existing_embed.thumbnail and existing_embed.thumbnail.url: self.thumbnail_url_input.default = existing_embed.thumbnail.url
-
     async def on_submit(self, interaction: discord.Interaction):
-        if not self.title_input.value and not self.description_input.value and not self.image_url_input.value:
-            return await interaction.response.send_message("❌ 제목, 설명, 이미지 URL 중 하나는 반드시 입력해야 합니다.", ephemeral=True)
+        if not self.title_input.value and not self.description_input.value and not self.image_url_input.value: return await interaction.response.send_message("❌ 제목, 설명, 이미지 URL 중 하나는 반드시 입력해야 합니다.", ephemeral=True)
         try:
-            color = discord.Color.default()
+            color = discord.Color.default(); 
             if self.color_input.value: color = discord.Color(int(self.color_input.value.replace("#", ""), 16))
             embed = discord.Embed(title=self.title_input.value or None, description=self.description_input.value or None, color=color)
             if self.image_url_input.value: embed.set_image(url=self.image_url_input.value)
             if self.thumbnail_url_input.value: embed.set_thumbnail(url=self.thumbnail_url_input.value)
-            self.embed = embed
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            await interaction.response.send_message("❌ 임베드를 만드는 중 오류가 발생했습니다.", ephemeral=True)
+            self.embed = embed; await interaction.response.defer(ephemeral=True)
+        except Exception: await interaction.response.send_message("❌ 임베드를 만드는 중 오류가 발생했습니다.", ephemeral=True)
+
 
 class EmbedTemplateSelectView(ui.View):
+    # ... (이 클래스는 변경 없음) ...
     def __init__(self, all_embeds: List[Dict[str, Any]]):
-        super().__init__(timeout=300)
-        self.all_embeds = {e['embed_key']: e['embed_data'] for e in all_embeds}
+        super().__init__(timeout=300); self.all_embeds = {e['embed_key']: e['embed_data'] for e in all_embeds}
         options = [discord.SelectOption(label=key, description=data.get('title', '제목 없음')[:100]) for key, data in self.all_embeds.items()]
         for i in range(0, len(options), 25):
             select = ui.Select(placeholder=f"편집할 임베드 템플릿을 선택하세요... ({i//25 + 1})", options=options[i:i+25])
-            select.callback = self.select_callback
-            self.add_item(select)
-
+            select.callback = self.select_callback; self.add_item(select)
     async def select_callback(self, interaction: discord.Interaction):
-        embed_key = interaction.data['values'][0]
-        embed_data = self.all_embeds.get(embed_key)
+        embed_key = interaction.data['values'][0]; embed_data = self.all_embeds.get(embed_key)
         if not embed_data: return await interaction.response.send_message("❌ 템플릿을 찾을 수 없습니다.", ephemeral=True)
-        modal = TemplateEditModal(discord.Embed.from_dict(embed_data))
-        await interaction.response.send_modal(modal)
-        await modal.wait()
+        modal = TemplateEditModal(discord.Embed.from_dict(embed_data)); await interaction.response.send_modal(modal); await modal.wait()
         if modal.embed:
-            await save_embed_to_db(embed_key, modal.embed.to_dict())
+            await save_embed_to_db(embed_key, modal.embed.to_dict()); 
             for item in self.children: item.disabled = True
             await interaction.edit_original_response(view=self)
-            await interaction.followup.send(f"✅ 임베드 템플릿 `{embed_key}`가 성공적으로 업데이트되었습니다.\n`/admin setup`으로 관련 패널을 재설치하면 변경사항이 적용됩니다.", embed=modal.embed, ephemeral=True)
+            await interaction.followup.send(f"✅ 임베드 템플릿 `{embed_key}`가 성공적으로 업데이트되었습니다.", embed=modal.embed, ephemeral=True)
+
 
 class ServerSystem(commands.Cog):
     admin_group = app_commands.Group(name="admin", description="서버 관리용 명령어입니다.", default_permissions=discord.Permissions(manage_guild=True))
@@ -97,77 +89,50 @@ class ServerSystem(commands.Cog):
         logger.info("System (통합 관리 명령어) Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        # ... (이 함수는 변경 없음) ...
         if isinstance(error, app_commands.CheckFailure): 
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            if not interaction.response.is_done(): await interaction.response.send_message(f"❌ {error}", ephemeral=True)
         elif isinstance(error, app_commands.MissingPermissions): 
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ 이 명령어를 사용하려면 다음 권한이 필요합니다: `{', '.join(error.missing_permissions)}`", ephemeral=True)
+            if not interaction.response.is_done(): await interaction.response.send_message(f"❌ 이 명령어를 사용하려면 다음 권한이 필요합니다: `{', '.join(error.missing_permissions)}`", ephemeral=True)
         else:
             logger.error(f"'{interaction.command.qualified_name}' 명령어 처리 중 오류 발생: {error}", exc_info=True)
-            if not interaction.response.is_done(): 
-                await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
-            else: 
-                await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            if not interaction.response.is_done(): await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            else: await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
 
     @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
+    # ... (이 함수는 변경 없음) ...
     @app_commands.rename(amount='개수', user='유저')
-    @app_commands.describe(
-        amount="삭제할 메시지의 개수를 입력하세요. (최대 100개)",
-        user="특정 유저의 메시지만 삭제하려면 선택하세요."
-    )
+    @app_commands.describe(amount="삭제할 메시지의 개수를 입력하세요. (최대 100개)", user="특정 유저의 메시지만 삭제하려면 선택하세요.")
     @app_commands.check(is_admin)
     async def purge(self, interaction: discord.Interaction, amount: app_commands.Range[int, 1, 100], user: Optional[discord.Member] = None):
         await interaction.response.defer(ephemeral=True)
         channel = interaction.channel
-        if not isinstance(channel, discord.TextChannel):
-            await interaction.followup.send("❌ 이 명령어는 일반 텍스트 채널에서만 사용할 수 있습니다.", ephemeral=True)
-            return
-
+        if not isinstance(channel, discord.TextChannel): return await interaction.followup.send("❌ 이 명령어는 일반 텍스트 채널에서만 사용할 수 있습니다.", ephemeral=True)
         try:
-            check_func = lambda m: m.author == user if user else lambda m: True
+            check_func = (lambda m: m.author == user) if user else (lambda m: True)
             deleted_messages = await channel.purge(limit=amount, check=check_func)
-
-            if user:
-                response_message = f"✅ {user.mention}님의 메시지 {len(deleted_messages)}개를 삭제했습니다."
-            else:
-                response_message = f"✅ 메시지 {len(deleted_messages)}개를 삭제했습니다."
-            
-            if len(deleted_messages) < amount:
-                response_message += "\nℹ️ 14일이 지난 메시지는 삭제할 수 없습니다."
-
+            response_message = f"✅ {user.mention}님의 메시지 {len(deleted_messages)}개를 삭제했습니다." if user else f"✅ 메시지 {len(deleted_messages)}개를 삭제했습니다."
+            if len(deleted_messages) < amount: response_message += "\nℹ️ 14일이 지난 메시지는 삭제할 수 없습니다."
             await interaction.followup.send(response_message, ephemeral=True)
+        except discord.Forbidden: await interaction.followup.send("❌ 봇에게 '메시지 관리' 권한이 없습니다.", ephemeral=True)
+        except Exception as e: logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True); await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
 
-        except discord.Forbidden:
-            await interaction.followup.send("❌ 봇에게 '메시지 관리' 권한이 없습니다. 서버 설정에서 권한을 확인해주세요.", ephemeral=True)
-        except Exception as e:
-            logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
-    
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        choices = []
-        
+        # ▼▼▼ [수정] 자동완성 목록에 'boost_test' 추가 ▼▼▼
         extended_admin_map = ADMIN_ACTION_MAP.copy()
         extended_admin_map["boss_reset_check_test"] = "[보스] 리셋 루프 즉시 실행 (테스트용)"
-
-        for key, name in extended_admin_map.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
+        extended_admin_map["boost_test"] = "[부스트] 부스트 보상 지급 테스트 (1회)" # 추가
+        
+        choices = [app_commands.Choice(name=name, value=key) for key, name in extended_admin_map.items() if current.lower() in name.lower()]
         
         for key, info in SETUP_COMMAND_MAP.items():
             prefix = "[패널]" if info.get("type") == "panel" else "[채널]"
             choice_name = f"{prefix} {info.get('friendly_name', key)} 설정"
-            if current.lower() in choice_name.lower():
-                choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
+            if current.lower() in choice_name.lower(): choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
         
-        role_setup_actions = {
-            "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", 
-            "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정"
-        }
-        
+        role_setup_actions = {"role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정"}
         for key, name in role_setup_actions.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
+            if current.lower() in name.lower(): choices.append(app_commands.Choice(name=name, value=key))
         
         return sorted(choices, key=lambda c: c.name)[:25]
 
@@ -206,10 +171,32 @@ class ServerSystem(commands.Cog):
                     amount: Optional[app_commands.Range[int, 1, None]] = None,
                     level: Optional[app_commands.Range[int, 1, None]] = None,
                     stat_type: Optional[str] = None, template: Optional[str] = None):
+                    user: Optional[discord.Member] = None,
         await interaction.response.defer(ephemeral=True)
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
 
+        # ▼▼▼ [수정] boost_test 액션 처리 로직 추가 ▼▼▼
+        if action == "boost_test":
+            if not user:
+                return await interaction.followup.send("❌ 이 테스트를 실행하려면 `user` 옵션에 대상을 지정해야 합니다.", ephemeral=True)
+            
+            # MemberEvents Cog를 찾아서 가상 이벤트를 발생시킵니다.
+            member_events_cog = self.bot.get_cog("MemberEvents")
+            if member_events_cog and hasattr(member_events_cog, 'on_member_update'):
+                # 'before'는 부스트 안 한 상태, 'after'는 부스트 한 상태로 가상 객체를 만듭니다.
+                # after.premium_since를 현재 시간으로 설정하여 "새로 부스트한" 것으로 인식시킵니다.
+                before_state = user
+                after_state = user._update(premium_since=discord.utils.utcnow())
+
+                # on_member_update 함수를 직접 호출하여 이벤트를 트리거합니다.
+                self.bot.dispatch('member_update', before_state, after_state)
+                
+                await interaction.followup.send(f"✅ {user.mention}님에게 부스트 보상 지급 테스트를 실행했습니다. 설정된 채널을 확인해주세요.", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ `MemberEvents` Cog를 찾을 수 없어 테스트를 실행할 수 없습니다.", ephemeral=True)
+            return
+        # ▲▲▲ [수정 완료] ▲▲▲
         # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
         # 임시로 사용할 액션을 추가하여 DB 설정을 직접 수정합니다.
         if action == "fix_boss_reward_tiers":
