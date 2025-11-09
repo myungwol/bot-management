@@ -85,7 +85,15 @@ class MemberEvents(commands.Cog):
     # ▼▼▼ [수정] 이 함수 전체를 아래 내용으로 교체해주세요. ▼▼▼
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
-        if before.premium_since == after.premium_since:
+        # [핵심 수정] 테스트 명령어 실행 시 after가 완전한 Member 객체가 아닐 수 있으므로,
+        # guild에서 최신 Member 객체를 다시 가져와 안전하게 사용합니다.
+        guild = self.bot.get_guild(after.guild.id)
+        if not guild: return
+        after_member = guild.get_member(after.id)
+        if not after_member: return # 멤버가 서버에 없는 경우
+
+        # 실제 부스트 상태 변경이 있었는지 확인
+        if before.premium_since == after_member.premium_since:
             return
 
         boost_ticket_role_keys = [f"role_boost_ticket_{i}" for i in range(1, 11)]
@@ -94,76 +102,69 @@ class MemberEvents(commands.Cog):
             logger.warning("부스트 감지: 보상 역할을 DB에서 찾을 수 없습니다.")
             return
 
-        # [핵심 수정 1] 이벤트 발생 시점에 DB 캐시에서 최신 채널 ID를 다시 가져옵니다.
         boost_channel_id = get_id("boost_log_channel_id")
         boost_channel = self.bot.get_channel(boost_channel_id) if boost_channel_id else None
 
         # --- 시나리오 1: 사용자가 새로 부스트를 시작했을 때 ---
-        if before.premium_since is None and after.premium_since is not None:
-            logger.info(f"{after.display_name}님이 서버 부스트를 시작했습니다. 보상 지급을 시작합니다.")
+        if before.premium_since is None and after_member.premium_since is not None:
+            logger.info(f"{after_member.display_name}님이 서버 부스트를 시작했습니다. 보상 지급을 시작합니다.")
             
-            existing_reward_roles = [role for role in after.roles if role.id in all_reward_role_ids]
+            existing_reward_roles = [role for role in after_member.roles if role.id in all_reward_role_ids]
             num_existing_tickets = len(existing_reward_roles)
 
-            # [핵심 수정 2] 역할 지급 로직을 단순하고 명확하게 변경
             roles_to_add_keys = []
-            # 지급할 첫 번째 역할 번호
             first_role_num = num_existing_tickets + 1
-            if first_role_num <= 10:
-                roles_to_add_keys.append(f"role_boost_ticket_{first_role_num}")
-            
-            # 지급할 두 번째 역할 번호
+            if first_role_num <= 10: roles_to_add_keys.append(f"role_boost_ticket_{first_role_num}")
             second_role_num = num_existing_tickets + 2
-            if second_role_num <= 10:
-                roles_to_add_keys.append(f"role_boost_ticket_{second_role_num}")
+            if second_role_num <= 10: roles_to_add_keys.append(f"role_boost_ticket_{second_role_num}")
 
-            final_roles_to_add = [role for key in roles_to_add_keys if (role_id := get_id(key)) and (role := after.guild.get_role(role_id)) and role not in after.roles]
+            final_roles_to_add = [role for key in roles_to_add_keys if (role_id := get_id(key)) and (role := guild.get_role(role_id)) and role not in after_member.roles]
             
             try:
                 if final_roles_to_add:
-                    await after.add_roles(*final_roles_to_add, reason="서버 부스트 보상 지급")
+                    await after_member.add_roles(*final_roles_to_add, reason="서버 부스트 보상 지급")
                 
                 if boost_channel:
                     embed_data = await get_embed_from_db("log_boost_start")
                     if embed_data:
                         current_reward_roles = sorted(existing_reward_roles + final_roles_to_add, key=lambda r: r.name)
                         roles_list_str = "\n".join([f"- {role.mention}" for role in current_reward_roles]) if current_reward_roles else "지급된 역할 없음"
-                        embed = format_embed_from_db(embed_data, member_mention=after.mention, roles_list=roles_list_str)
-                        if after.display_avatar:
-                            embed.set_author(name=after.display_name, icon_url=after.display_avatar.url)
-                        await boost_channel.send(content=after.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+                        embed = format_embed_from_db(embed_data, member_mention=after_member.mention, roles_list=roles_list_str)
+                        if after_member.display_avatar:
+                            embed.set_author(name=after_member.display_name, icon_url=after_member.display_avatar.url)
+                        await boost_channel.send(content=after_member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
                 else:
                     logger.warning("부스트 로그 채널이 설정되지 않아 부스트 시작 알림을 보낼 수 없습니다.")
 
             except discord.Forbidden:
-                logger.error(f"{after.display_name}님의 부스트 보상 처리 중 권한 오류 발생")
+                logger.error(f"{after_member.display_name}님의 부스트 보상 처리 중 권한 오류 발생")
             except Exception as e:
-                logger.error(f"{after.display_name}님에게 부스트 보상 지급 중 오류 발생: {e}", exc_info=True)
+                logger.error(f"{after_member.display_name}님에게 부스트 보상 지급 중 오류 발생: {e}", exc_info=True)
 
         # --- 시나리오 2: 사용자가 부스트를 중지했을 때 ---
-        elif before.premium_since is not None and after.premium_since is None:
-            logger.info(f"{after.display_name}님이 서버 부스트를 중지하여 보상 역할을 회수합니다.")
+        elif before.premium_since is not None and after_member.premium_since is None:
+            logger.info(f"{after_member.display_name}님이 서버 부스트를 중지하여 보상 역할을 회수합니다.")
             
-            roles_to_remove = [role for role in after.roles if role.id in all_reward_role_ids]
+            roles_to_remove = [role for role in after_member.roles if role.id in all_reward_role_ids]
             
             try:
                 if roles_to_remove:
-                    await after.remove_roles(*roles_to_remove, reason="서버 부스트 중지")
+                    await after_member.remove_roles(*roles_to_remove, reason="서버 부스트 중지")
                 
                 if boost_channel:
                     embed_data = await get_embed_from_db("log_boost_stop")
                     if embed_data:
-                        embed = format_embed_from_db(embed_data, member_mention=after.mention)
-                        if after.display_avatar:
-                            embed.set_author(name=after.display_name, icon_url=after.display_avatar.url)
+                        embed = format_embed_from_db(embed_data, member_mention=after_member.mention)
+                        if after_member.display_avatar:
+                            embed.set_author(name=after_member.display_name, icon_url=after_member.display_avatar.url)
                         await boost_channel.send(embed=embed)
                 else:
                     logger.warning("부스트 로그 채널이 설정되지 않아 부스트 중지 알림을 보낼 수 없습니다.")
                     
             except discord.Forbidden:
-                logger.error(f"{after.display_name}님의 부스트 보상 역할을 회수하지 못했습니다. (권한 부족)")
+                logger.error(f"{after_member.display_name}님의 부스트 보상 역할을 회수하지 못했습니다. (권한 부족)")
             except Exception as e:
-                logger.error(f"{after.display_name}님의 역할 회수 중 오류 발생: {e}", exc_info=True)
+                logger.error(f"{after_member.display_name}님의 역할 회수 중 오류 발생: {e}", exc_info=True)
     # ▲▲▲ [수정 완료] ▲▲▲
 
 async def setup(bot: commands.Bot):
