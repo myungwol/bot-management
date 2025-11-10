@@ -39,16 +39,7 @@ class JoinLogger(commands.Cog):
         embed.set_author(name=f"{member.name} ({member.id})", icon_url=member.display_avatar.url if member.display_avatar else None)
         embed.add_field(name="계정 생성일", value=discord.utils.format_dt(member.created_at, style='F'))
         
-        tracker_cog = self.bot.get_cog("InviteTracker")
-        if tracker_cog:
-            invite = await tracker_cog.get_invite_for_member(member)
-            if invite and invite.inviter:
-                invite_info = f"`{invite.code}` (초대자: {invite.inviter.mention})"
-            elif invite:
-                invite_info = f"`{invite.code}`"
-            else:
-                invite_info = "알 수 없음"
-            embed.add_field(name="초대 정보", value=invite_info, inline=False)
+        # 초대 정보 관련 로직이 여기서 제거되었습니다.
 
         await log_channel.send(embed=embed)
 
