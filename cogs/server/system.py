@@ -733,11 +733,11 @@ class ServerSystem(commands.Cog):
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
             
-    # ▼▼▼▼▼ [핵심 추가] 이 새로운 명령어를 클래스 내부에 추가합니다. ▼▼▼▼▼
-    @admin_group.command(name="check_roles", description="[진단용] 주요 역할의 코드-서버-DB 동기화 상태를 확인합니다.")
-    @app_commands.check(is_admin)
-    async def check_roles(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+    # ▼▼▼▼▼ 이 부분의 들여쓰기를 확인해주세요 ▼▼▼▼▼
+    @admin_group.command(name="check_roles", description="[진단용] 주요 역할의 코드-서버-DB 동기화 상태를 확인합니다.") # ◀ (들여쓰기 1단계)
+    @app_commands.check(is_admin)                                                                 # ◀ (들여쓰기 1단계)
+    async def check_roles(self, interaction: discord.Interaction):                                # ◀ (들여쓰기 1단계)
+        await interaction.response.defer(ephemeral=True)  
 
         role_keys_to_check = {
             "성별(남)": "role_info_male",
@@ -783,9 +783,15 @@ class ServerSystem(commands.Cog):
             timestamp=datetime.now(timezone.utc)
         )
         embed.set_footer(text="'상태'가 '🔴 불일치'인 경우, 역할 이름이 정확한지 확인 후 /admin setup의 roles_sync를 다시 실행하세요.")
-        await interaction.followup.send(embed=embed, ephemeral=True)
-    # ▲▲▲▲▲ [추가 완료] ▲▲▲▲▲
+        await interaction.followup.send(embed=embed, ephemeral=True) # ◀ (들여쓰기 2단계)
+    # ▲▲▲▲▲ 확인 완료 ▲▲▲▲▲
 
-    @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
-async def setup(bot: commands.Bot):
-    await bot.add_cog(ServerSystem(bot))
+    @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)") # ◀ (들여쓰기 1단계)
+    @app_commands.rename(amount='개수', user='유저')
+    @app_commands.describe(...)
+    @app_commands.check(is_admin)
+    async def purge(self, interaction: discord.Interaction, amount: app_commands.Range[int, 1, 100], user: Optional[discord.Member] = None): # ◀ (들여쓰기 1단계)
+        await interaction.response.defer(ephemeral=True) # ◀ (들여쓰기 2단계)
+
+async def setup(bot: commands.Bot): # ◀ 클래스 밖 (들여쓰기 없음)
+    await bot.add_cog(ServerSystem(bot)) # ◀ (들여쓰기 1단계)
