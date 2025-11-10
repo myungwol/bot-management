@@ -733,5 +733,59 @@ class ServerSystem(commands.Cog):
         else:
             await interaction.followup.send("❌ 알 수 없는 작업입니다. 목록에서 올바른 작업을 선택해주세요.", ephemeral=True)
             
+    # ▼▼▼▼▼ [핵심 추가] 이 새로운 명령어를 클래스 내부에 추가합니다. ▼▼▼▼▼
+    @admin_group.command(name="check_roles", description="[진단용] 주요 역할의 코드-서버-DB 동기화 상태를 확인합니다.")
+    @app_commands.check(is_admin)
+    async def check_roles(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        role_keys_to_check = {
+            "성별(남)": "role_info_male",
+            "성별(여)": "role_info_female",
+            "나이(10대)": "role_age_10s",
+            "나이(20대)": "role_age_20s",
+            "나이(30대)": "role_age_30s",
+        }
+
+        ui_role_map = get_config("UI_ROLE_KEY_MAP", {})
+        
+        results = []
+        for name, key in role_keys_to_check.items():
+            # 1. 코드(ui_defaults.py)에 정의된 이름
+            code_name = ui_role_map.get(key, {}).get("name", "정의되지 않음")
+            
+            # 2. 서버에서 이름으로 역할 찾기
+            server_role = discord.utils.get(interaction.guild.roles, name=code_name)
+            server_status = f"✅ 발견 (ID: {server_role.id})" if server_role else "❌ 없음"
+            
+            # 3. DB(캐시)에 저장된 ID 가져오기
+            db_id = get_id(key)
+            db_status = f"✅ 저장됨 (ID: {db_id})" if db_id else "❌ 없음"
+            
+            # 4. 상태 비교
+            status = "🔴 불일치"
+            if server_role and db_id and server_role.id == db_id:
+                status = "🟢 일치"
+            elif not server_role and not db_id:
+                status = "🟡 둘 다 없음"
+
+            results.append(f"| {name.ljust(8)} | `{code_name}` | {server_status.ljust(15)} | {db_status.ljust(15)} | {status} |")
+
+        header = "| 구분         | 코드에 정의된 이름              | 서버에서 발견        | DB에 저장됨          | 상태     |\n" + \
+                 "|--------------|---------------------------------|----------------------|----------------------|----------|"
+        
+        description = "\n".join(results)
+        
+        embed = discord.Embed(
+            title="[진단] 주요 역할 동기화 상태",
+            description=f"```markdown\n{header}\n{description}\n```",
+            color=discord.Color.gold(),
+            timestamp=datetime.now(timezone.utc)
+        )
+        embed.set_footer(text="'상태'가 '🔴 불일치'인 경우, 역할 이름이 정확한지 확인 후 /admin setup의 roles_sync를 다시 실행하세요.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+    # ▲▲▲▲▲ [추가 완료] ▲▲▲▲▲
+
+    @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
 async def setup(bot: commands.Bot):
     await bot.add_cog(ServerSystem(bot))
