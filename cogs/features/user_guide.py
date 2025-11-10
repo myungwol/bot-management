@@ -18,108 +18,114 @@ class InteractiveGuideView:
     pass
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
-    name = ui.TextInput(label="이름", placeholder="마을에서 사용할 이름을 알려주세요.", required=True)
+    name = ui.TextInput(label="이름", placeholder="공장에서 사용할 이름을 알려주세요.", required=True)
     birth_year = ui.TextInput(label="출생년도 (YY)", placeholder="예: 98, 05 (2자리로 입력)", required=True, min_length=2, max_length=2)
     gender = ui.TextInput(label="성별", placeholder="성별을 알려주세요.", required=True, max_length=10)
-    join_path = ui.TextInput(label="가입 경로", placeholder="어떻게 우리 마을을 알게 되셨나요?", style=discord.TextStyle.paragraph, required=True)
+    join_path = ui.TextInput(label="가입 경로", placeholder="어떻게 우리 공장을 알게 되셨나요?", style=discord.TextStyle.paragraph, required=True)
 
     def __init__(self, guide_view: InteractiveGuideView):
         super().__init__()
         self.guide_view = guide_view
 
-    # ▼▼▼▼▼ [핵심 수정] on_submit 메소드 전체를 아래 내용으로 교체합니다. ▼▼▼▼▼
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         member = interaction.user
 
-        # --- 1. 기존에 봇이 보냈던 확인 메시지들 삭제 ---
         if self.guide_view.last_confirmation_message_id:
-            try:
-                old_msg = await interaction.channel.fetch_message(self.guide_view.last_confirmation_message_id)
-                await old_msg.delete()
-            except discord.NotFound:
-                pass # 이미 삭제된 경우엔 그냥 넘어감
+            try: await (await interaction.channel.fetch_message(self.guide_view.last_confirmation_message_id)).delete()
+            except discord.NotFound: pass
         if self.guide_view.last_role_message_id:
-            try:
-                old_role_msg = await interaction.channel.fetch_message(self.guide_view.last_role_message_id)
-                await old_role_msg.delete()
-            except discord.NotFound:
-                pass
+            try: await (await interaction.channel.fetch_message(self.guide_view.last_role_message_id)).delete()
+            except discord.NotFound: pass
 
-        # --- 2. 역할 부여 로직 (기존과 동일) ---
         roles_to_add = []
         assigned_role_names = []
+        failed_role_names = [] # 역할 부여 실패 시 이름을 저장할 리스트
         current_year = datetime.now().year
         year_of_birth = 0
 
-        # 성별 역할
+        # 성별 역할 처리
         gender_text = self.gender.value.strip().lower()
         if any(k in gender_text for k in ['남자', '남성', '남']):
-            if (rid := get_id("role_info_male")) and (r := member.guild.get_role(rid)): roles_to_add.append(r); assigned_role_names.append(r.name)
+            role_id = get_id("role_info_male")
+            if role_id and (role := member.guild.get_role(role_id)): roles_to_add.append(role); assigned_role_names.append(role.name)
+            else: failed_role_names.append("남자")
         elif any(k in gender_text for k in ['여자', '여성', '여']):
-            if (rid := get_id("role_info_female")) and (r := member.guild.get_role(rid)): roles_to_add.append(r); assigned_role_names.append(r.name)
+            role_id = get_id("role_info_female")
+            if role_id and (role := member.guild.get_role(role_id)): roles_to_add.append(role); assigned_role_names.append(role.name)
+            else: failed_role_names.append("여자")
 
-        # 나이 역할
+        # 나이 역할 처리
         try:
             yy = int(self.birth_year.value)
             year_of_birth = (1900 + yy) if yy > (current_year % 100) else (2000 + yy)
             age = current_year - year_of_birth + 1
             age_brackets = get_config("AGE_BRACKET_ROLES", [])
+            
+            # ▼▼▼▼▼ [핵심 수정 1/3] 역할 부여 실패 시 원인을 기록하는 로직 추가 ▼▼▼▼▼
+            target_bracket = None
             for bracket in age_brackets:
                 if bracket['min_age'] <= age <= bracket['max_age']:
-                    if (rid := get_id(bracket['key'])) and (r := member.guild.get_role(rid)): roles_to_add.append(r); assigned_role_names.append(r.name)
+                    target_bracket = bracket
                     break
+            
+            if target_bracket:
+                role_id = get_id(target_bracket['key'])
+                if role_id and (role := member.guild.get_role(role_id)):
+                    roles_to_add.append(role)
+                    assigned_role_names.append(role.name)
+                else:
+                    # 역할을 찾지 못했을 때 실패 목록에 추가
+                    age_role_map = {"role_age_10s": "10대", "role_age_20s": "20대", "role_age_30s": "30대", "role_age_40s": "40대 이상"}
+                    failed_role_names.append(age_role_map.get(target_bracket['key'], "알 수 없는 나이"))
+            # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
+                    
         except ValueError:
             await interaction.followup.send("❌ 출생년도는 2자리 숫자로만 입력해주세요 (예: 99, 01).", ephemeral=True); return
         except Exception as e:
             logger.error(f"나이 역할 처리 중 오류: {e}")
-        
-        # 역할 실제 부여
+
         if roles_to_add:
             try: await member.add_roles(*roles_to_add, reason="유저 안내 자기소개서 작성")
             except discord.Forbidden: await interaction.followup.send("❌ 역할 부여에 실패했습니다. 봇의 권한을 확인해주세요.", ephemeral=True)
 
-        # --- 3. 새로운 확인 메시지 전송 및 ID 저장 ---
-        calculated_age = current_year - year_of_birth + 1
-        confirmation_message = f"{interaction.user.mention}/{self.name.value}/{calculated_age}세/{self.gender.value}/{self.join_path.value}"
+        # ▼▼▼▼▼ [핵심 수정 2/3] 확인 메시지에 계산된 나이 대신 원본 입력값을 사용 ▼▼▼▼▼
+        confirmation_message = (
+            f"{interaction.user.mention}/{self.name.value}/{self.birth_year.value}/"
+            f"{self.gender.value}/{self.join_path.value}"
+        )
+        # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
         
-        # 메시지를 보내고, 그 메시지 객체를 변수에 저장
         sent_conf_msg = await interaction.channel.send(confirmation_message)
-        # View에 메시지 ID 저장
         self.guide_view.last_confirmation_message_id = sent_conf_msg.id
 
+        role_message_content = []
         if assigned_role_names:
-            sent_role_msg = await interaction.channel.send(f"✅ 자기소개서를 바탕으로 역할이 부여되었습니다: `{'`, `'.join(assigned_role_names)}`")
-            # View에 메시지 ID 저장
+            role_message_content.append(f"✅ 자기소개서를 바탕으로 역할이 부여되었습니다: `{'`, `'.join(assigned_role_names)}`")
+        if failed_role_names:
+            role_message_content.append(f"⚠️ 역할을 찾지 못해 부여에 실패했습니다: `{'`, `'.join(failed_role_names)}`\n(역할 이름이 정확한지 또는 역할 동기화가 되었는지 확인해주세요.)")
+        
+        if role_message_content:
+            sent_role_msg = await interaction.channel.send("\n".join(role_message_content))
             self.guide_view.last_role_message_id = sent_role_msg.id
         else:
             self.guide_view.last_role_message_id = None
 
-        # --- 4. 버튼 비활성화 및 View 중단 로직 (제거됨) ---
-        # 이 부분에 있던 코드를 제거하여 버튼이 계속 활성화되도록 함
+        # ▼▼▼▼▼ [핵심 수정 3/3] 마지막 ephemeral 메시지 전송 로직 제거 ▼▼▼▼▼
+        # await interaction.followup.send("✅ 자기소개서가 제출/수정 되었습니다!", ephemeral=True)
+        # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
 
-        await interaction.followup.send("✅ 자기소개서가 제출/수정 되었습니다!", ephemeral=True)
-    # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
-
-# ▼▼▼▼▼ [핵심 수정] InteractiveGuideView에 메시지 ID를 저장할 변수 추가 ▼▼▼▼▼
 class InteractiveGuideView(ui.View):
     def __init__(self, cog: 'UserGuide', user: discord.Member, steps_data: List[Dict[str, Any]]):
         super().__init__(timeout=600)
-        self.cog = cog
-        self.user = user
-        self.steps_data = steps_data
-        self.current_step = 0
-        self.message: Optional[discord.Message] = None
-        # 봇이 보낸 확인 메시지들의 ID를 저장할 변수
+        self.cog = cog; self.user = user; self.steps_data = steps_data
+        self.current_step = 0; self.message: Optional[discord.Message] = None
         self.last_confirmation_message_id: Optional[int] = None
         self.last_role_message_id: Optional[int] = None
         self._update_buttons()
-# ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user.id:
-            await interaction.response.send_message("❌ 다른 사람의 안내 가이드 버튼은 누를 수 없습니다.", ephemeral=True)
-            return False
+    async def interaction_check(self, i: discord.Interaction) -> bool:
+        if i.user.id != self.user.id:
+            await i.response.send_message("❌ 다른 사람의 안내 가이드 버튼은 누를 수 없습니다.", ephemeral=True); return False
         return True
     def _get_current_embed(self) -> discord.Embed:
         return format_embed_from_db(self.steps_data[self.current_step], member_name=self.user.display_name)
@@ -146,7 +152,6 @@ class InteractiveGuideView(ui.View):
             for item in self.children: item.disabled = True
             try: await self.message.edit(view=self)
             except (discord.NotFound, discord.HTTPException): pass
-
 # (이 아래의 UserGuidePanelView, UserGuide Cog 클래스는 이전 답변과 동일하게 유지됩니다)
 class UserGuidePanelView(ui.View):
     def __init__(self, cog: 'UserGuide'):
