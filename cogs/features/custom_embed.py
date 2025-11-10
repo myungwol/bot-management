@@ -169,24 +169,44 @@ class CustomEmbed(commands.Cog):
         logger.info("[CustomEmbed Cog] 데이터베이스로부터 설정을 성공적으로 로드했습니다.")
         
     async def edit_embed_message(self, interaction: discord.Interaction, message: discord.Message):
-        if not isinstance(interaction.user, discord.Member) or not any(role.id in self.sender_role_ids for role in interaction.user.roles):
-            return await interaction.response.send_message("❌ 이 기능을 실행할 권한이 없습니다.", ephemeral=True)
-        
-        if message.author.id != self.bot.user.id or not message.embeds:
-            return await interaction.response.send_message("❌ 봇이 보낸 임베드 메시지에만 사용할 수 있습니다.", ephemeral=True)
+        # --- ▼▼▼▼▼ 이 함수 전체를 아래 내용으로 교체합니다. ▼▼▼▼▼ ---
+        try:
+            if not isinstance(interaction.user, discord.Member) or not any(role.id in self.sender_role_ids for role in interaction.user.roles):
+                return await interaction.response.send_message("❌ 이 기능을 실행할 권한이 없습니다.", ephemeral=True)
             
-        modal = EmbedCreatorModal(self, existing_embed=message.embeds[0])
-        await interaction.response.send_modal(modal)
-        await modal.wait()
-        
-        if modal.embed:
-            try:
-                await message.edit(embed=modal.embed)
-                await interaction.followup.send("✅ 임베드 메시지를 성공적으로 수정했습니다.", ephemeral=True)
-            except Exception as e:
-                logger.error(f"임베드 수정 중 오류: {e}", exc_info=True)
-                await interaction.followup.send("❌ 메시지를 수정하는 중 오류가 발생했습니다.", ephemeral=True)
+            if message.author.id != self.bot.user.id or not message.embeds:
+                return await interaction.response.send_message("❌ 봇이 보낸 임베드 메시지에만 사용할 수 있습니다.", ephemeral=True)
                 
+            modal = EmbedCreatorModal(self, existing_embed=message.embeds[0])
+            await interaction.response.send_modal(modal)
+            await modal.wait()
+            
+            if modal.embed:
+                await message.edit(embed=modal.embed)
+                # modal.wait() 이후에는 원래 interaction이 만료되었을 수 있으므로 followup으로 응답합니다.
+                await interaction.followup.send("✅ 임베드 메시지를 성공적으로 수정했습니다.", ephemeral=True)
+
+        except discord.errors.NotFound as e:
+            # 3초 타임아웃으로 "Unknown Interaction" 오류가 발생하면 이 예외가 발생합니다.
+            if e.code == 10062:
+                logger.warning(f"임베드 편집 상호작용이 3초를 초과하여 타임아웃되었습니다. (사용자: {interaction.user})")
+                try:
+                    # 이미 응답을 시도하다 실패했으므로 followup.send를 사용해야 합니다.
+                    await interaction.followup.send("⏳ 처리 시간이 초과되었습니다. 명령어를 다시 시도해주세요.", ephemeral=True)
+                except discord.errors.NotFound:
+                    # followup.send 마저 실패하는 최악의 경우를 대비합니다.
+                    pass
+            else:
+                # 다른 NotFound 오류(예: 메시지를 찾을 수 없음)는 그대로 로그에 남깁니다.
+                logger.error(f"임베드 편집 중 예상치 못한 NotFound 오류: {e}", exc_info=True)
+
+        except Exception as e:
+            logger.error(f"임베드 편집 중 오류: {e}", exc_info=True)
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ 메시지를 수정하는 중 오류가 발생했습니다.", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ 메시지를 수정하는 중 오류가 발생했습니다.", ephemeral=True)
+
     # [✅✅✅ 핵심 수정 부분]
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = None) -> bool:
         # panel_key = "custom_embed" # panel_key를 인수로 받으므로 이 줄은 더 이상 필요 없을 수 있습니다.
