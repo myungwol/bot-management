@@ -14,32 +14,42 @@ from utils.helpers import format_embed_from_db
 
 logger = logging.getLogger(__name__)
 
-# 자기소개서 작성을 위한 Modal 클래스
+# --- Forward declaration ---
+class GuideThreadView:
+    pass
+
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
     name = ui.TextInput(label="이름", placeholder="마을에서 사용할 이름을 알려주세요.", required=True)
     birth_year = ui.TextInput(label="출생년도 (YY)", placeholder="예: 98, 05 (2자리로 입력)", required=True, min_length=2, max_length=2)
     gender = ui.TextInput(label="성별", placeholder="성별을 알려주세요.", required=True, max_length=10)
     join_path = ui.TextInput(label="가입 경로", placeholder="어떻게 우리 마을을 알게 되셨나요?", style=discord.TextStyle.paragraph, required=True)
 
-    def __init__(self, cog: 'UserGuide'):
+    def __init__(self, guide_view: 'GuideThreadView'):
         super().__init__()
-        self.cog = cog
+        self.guide_view = guide_view
 
+    # ▼▼▼▼▼ [핵심 수정] on_submit 메소드 전체를 아래 내용으로 교체합니다. ▼▼▼▼▼
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         member = interaction.user
 
-        # 이전 확인 메시지들을 모두 삭제
-        async for msg in interaction.channel.history(limit=5):
-            if msg.author.id == self.cog.bot.user.id and msg.id != interaction.message.id:
-                if msg.embeds and "역할이 부여되었습니다" in msg.embeds[0].title: continue # 역할 부여 성공 메시지는 남겨둘 수 있음 (선택)
-                await msg.delete()
+        # 1. 기존에 봇이 보냈던 확인 메시지들 삭제
+        if self.guide_view.last_confirmation_message_id:
+            try:
+                old_msg = await interaction.channel.fetch_message(self.guide_view.last_confirmation_message_id)
+                await old_msg.delete()
+            except (discord.NotFound, discord.HTTPException): pass
+        if self.guide_view.last_role_message_id:
+            try:
+                old_role_msg = await interaction.channel.fetch_message(self.guide_view.last_role_message_id)
+                await old_role_msg.delete()
+            except (discord.NotFound, discord.HTTPException): pass
 
-        # 역할 부여 로직
+        # 2. 역할 부여 로직 (기존과 동일)
         roles_to_add = []; assigned_role_names = []; failed_role_details = []
         current_year = datetime.now().year
         year_of_birth = 0
-
+        
         gender_text = self.gender.value.strip().lower()
         if any(k in gender_text for k in ['남자', '남성', '남']):
             if (rid := get_id("role_info_male")) and (r := member.guild.get_role(rid)): roles_to_add.append(r); assigned_role_names.append(r.name)
@@ -47,7 +57,7 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
         elif any(k in gender_text for k in ['여자', '여성', '여']):
             if (rid := get_id("role_info_female")) and (r := member.guild.get_role(rid)): roles_to_add.append(r); assigned_role_names.append(r.name)
             else: failed_role_details.append("성별(여)")
-
+        
         try:
             yy = int(self.birth_year.value)
             year_of_birth = (1900 + yy) if yy > (current_year % 100) else (2000 + yy)
@@ -60,36 +70,42 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
                     if (rid := get_id(target_bracket['key'])) and (r := member.guild.get_role(rid)): roles_to_add.append(r); assigned_role_names.append(r.name)
                     else: failed_role_details.append(f"{age//10 * 10}대")
         except ValueError: await interaction.followup.send("❌ 출생년도는 2자리 숫자로 입력해주세요.", ephemeral=True); return
-        except Exception as e: logger.error(f"나이 역할 처리 중 오류: {e}")
-
+        
         if roles_to_add: await member.add_roles(*roles_to_add, reason="유저 안내 자기소개서 작성")
 
-        # ▼▼▼▼▼ [핵심 수정 1/2] 메시지 전송 순서 변경 ▼▼▼▼▼
-        # 1. 역할 부여 결과 메시지 먼저 전송
+        # 3. 새로운 확인 메시지 전송 및 ID 저장
         role_message_content = []
         if assigned_role_names: role_message_content.append(f"✅ 역할이 부여되었습니다: `{'`, `'.join(assigned_role_names)}`")
         if failed_role_details: role_message_content.append(f"⚠️ 일부 역할 부여에 실패했습니다: `{'`, `'.join(failed_role_details)}`")
-        if role_message_content: await interaction.channel.send("\n".join(role_message_content))
-
-        # 2. 유저 정보 확인 메시지 나중에 전송
-        confirmation_message = f"{interaction.user.mention}/{self.name.value}/{self.birth_year.value}/{self.gender.value}/{self.join_path.value}"
-        await interaction.channel.send(confirmation_message)
-        # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
         
-        # 제출 후 버튼 제거
-        await interaction.message.edit(view=None)
+        sent_role_msg = None
+        if role_message_content:
+            sent_role_msg = await interaction.channel.send("\n".join(role_message_content))
+        
+        confirmation_message = f"{interaction.user.mention}/{self.name.value}/{self.birth_year.value}/{self.gender.value}/{self.join_path.value}"
+        sent_conf_msg = await interaction.channel.send(confirmation_message)
 
-# ▼▼▼▼▼ [핵심 수정 2/2] 스레드 내 View를 상태 없는 영구 View로 변경 ▼▼▼▼▼
+        # View에 새로 생성된 메시지들의 ID를 저장
+        self.guide_view.last_role_message_id = sent_role_msg.id if sent_role_msg else None
+        self.guide_view.last_confirmation_message_id = sent_conf_msg.id
+
+        # 4. 버튼 제거 로직 삭제됨
+    # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
+
 class GuideThreadView(ui.View):
     def __init__(self, cog: 'UserGuide'):
         super().__init__(timeout=None)
         self.cog = cog
+        # 재제출 시 삭제할 메시지 ID를 저장하기 위한 변수 추가
+        self.last_confirmation_message_id: Optional[int] = None
+        self.last_role_message_id: Optional[int] = None
 
     async def _get_steps_and_page(self, interaction: discord.Interaction):
+        # ... (이전과 동일)
         steps = await self.cog.get_guide_steps()
         if not interaction.message.embeds: return None, 0, 0
         footer_text = interaction.message.embeds[0].footer.text
-        match = re.match(r"(\d+)/(\d+)", footer_text)
+        match = re.search(r"(\d+)/(\d+)", footer_text)
         current_page = int(match.group(1)) - 1 if match else 0
         total_pages = len(steps)
         return steps, current_page, total_pages
@@ -98,13 +114,15 @@ class GuideThreadView(ui.View):
     async def go_previous(self, interaction: discord.Interaction, button: ui.Button):
         steps, current_page, total_pages = await self._get_steps_and_page(interaction)
         if not steps or current_page <= 0: return await interaction.response.defer()
-        
         new_page = current_page - 1
         new_embed = format_embed_from_db(steps[new_page], member_name=interaction.user.display_name)
         
-        is_last = new_page == total_pages - 1
-        self.children[2].disabled = False # 다음/작성 버튼 활성화
-        self.children[0].disabled = new_page == 0 # 이전 버튼 비활성화
+        # 버튼 상태 업데이트
+        for item in self.children:
+            if isinstance(item, ui.Button):
+                if item.custom_id == "guide_persistent_prev": item.disabled = (new_page == 0)
+                elif item.custom_id == "guide_persistent_next": item.disabled = (new_page == total_pages - 1)
+                elif item.custom_id == "guide_persistent_intro": item.disabled = (new_page != total_pages - 1)
         
         await interaction.response.edit_message(embed=new_embed, view=self)
 
@@ -112,23 +130,22 @@ class GuideThreadView(ui.View):
     async def go_next(self, interaction: discord.Interaction, button: ui.Button):
         steps, current_page, total_pages = await self._get_steps_and_page(interaction)
         if not steps or current_page >= total_pages - 1: return await interaction.response.defer()
-
         new_page = current_page + 1
         new_embed = format_embed_from_db(steps[new_page], member_name=interaction.user.display_name)
         
-        is_last = new_page == total_pages - 1
-        self.children[0].disabled = False # 이전 버튼 활성화
-        if is_last: # 마지막 페이지면 '다음'을 '작성'으로 교체 (이 예제에서는 버튼 3개를 미리 만듦)
-            self.children[1].disabled = True
-            self.children[2].disabled = False
-        
+        # 버튼 상태 업데이트
+        for item in self.children:
+            if isinstance(item, ui.Button):
+                if item.custom_id == "guide_persistent_prev": item.disabled = (new_page == 0)
+                elif item.custom_id == "guide_persistent_next": item.disabled = (new_page == total_pages - 1)
+                elif item.custom_id == "guide_persistent_intro": item.disabled = (new_page != total_pages - 1)
+
         await interaction.response.edit_message(embed=new_embed, view=self)
 
     @ui.button(label="자기소개서 작성하기", style=discord.ButtonStyle.success, emoji="📝", custom_id="guide_persistent_intro", disabled=True)
     async def open_intro_form(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_modal(IntroductionFormModal(self.cog))
-
-# 나머지 코드는 이전과 거의 동일하지만, View를 사용하는 부분이 변경됩니다.
+        await interaction.response.send_modal(IntroductionFormModal(self))
+        
 class UserGuidePanelView(ui.View):
     def __init__(self, cog: 'UserGuide'):
         super().__init__(timeout=None); self.cog = cog
