@@ -27,7 +27,7 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
         super().__init__()
         self.guide_view = guide_view
 
-    # ▼▼▼▼▼ on_submit 메소드만 아래 내용으로 교체합니다. ▼▼▼▼▼
+    # ▼▼▼▼▼ on_submit 메소드 전체를 아래 내용으로 교체합니다. (변수명 오류 수정) ▼▼▼▼▼
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         member = interaction.user
@@ -40,7 +40,6 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             try: await (await interaction.channel.fetch_message(self.guide_view.last_role_message_id)).delete()
             except discord.NotFound: pass
 
-        # [버그 수정] 변수를 함수 시작 부분에서 미리 선언합니다.
         roles_to_add = []; assigned_role_names = []; failed_role_details = []
         current_year = datetime.now().year
         year_of_birth = 0
@@ -64,7 +63,7 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             
             age_brackets = get_config("AGE_BRACKET_ROLES", [])
             if not age_brackets:
-                logger.warning("DB에서 AGE_BRACKET_ROLES 설정을 불러오지 못했습니다. Supabase 테이블을 확인해주세요.")
+                logger.warning("DB에서 AGE_BRACKET_ROLES 설정을 불러오지 못했습니다.")
                 failed_role_details.append("나이대 역할 설정(AGE_BRACKET_ROLES) 없음")
             else:
                 target_bracket = next((b for b in sorted(age_brackets, key=lambda x: x['min_age']) if b['min_age'] <= age <= b['max_age']), None)
@@ -92,7 +91,10 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
 
         role_message_content = []
         if assigned_role_names: role_message_content.append(f"✅ 역할이 부여되었습니다: `{'`, `'.join(assigned_role_names)}`")
-        if failed_role_details: role_message_content.append(f"⚠️ 일부 역할 부여에 실패했습니다: `{'`, `'.join(failed_role_details)}`\n(관리자에게 이 메시지를 보여주세요.)")
+        
+        # [버그 수정] failed_role_names -> failed_role_details 로 변수명 수정
+        if failed_role_details: 
+            role_message_content.append(f"⚠️ 일부 역할 부여에 실패했습니다: `{'`, `'.join(failed_role_details)}`\n(관리자에게 이 메시지를 보여주세요.)")
         
         if role_message_content:
             sent_role_msg = await interaction.channel.send("\n".join(role_message_content))
