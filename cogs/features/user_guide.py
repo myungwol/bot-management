@@ -18,6 +18,7 @@ class InteractiveGuideView:
     pass
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
+    # ... (TextInput 필드들은 그대로) ...
     name = ui.TextInput(label="이름", placeholder="마을에서 사용할 이름을 알려주세요.", required=True)
     birth_year = ui.TextInput(label="출생년도 (YY)", placeholder="예: 98, 05 (2자리로 입력)", required=True, min_length=2, max_length=2)
     gender = ui.TextInput(label="성별", placeholder="성별을 알려주세요.", required=True, max_length=10)
@@ -27,10 +28,12 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
         super().__init__()
         self.guide_view = guide_view
 
+    # ▼▼▼▼▼ on_submit 메소드만 아래 내용으로 교체합니다. ▼▼▼▼▼
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         member = interaction.user
 
+        # 이전 확인 메시지 삭제
         if self.guide_view.last_confirmation_message_id:
             try: await (await interaction.channel.fetch_message(self.guide_view.last_confirmation_message_id)).delete()
             except discord.NotFound: pass
@@ -38,9 +41,7 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             try: await (await interaction.channel.fetch_message(self.guide_view.last_role_message_id)).delete()
             except discord.NotFound: pass
 
-        roles_to_add = []
-        assigned_role_names = []
-        failed_role_names = [] # 역할 부여 실패 시 이름을 저장할 리스트
+        roles_to_add = []; assigned_role_names = []; failed_role_details = [] # 실패 원인을 자세히 저장
         current_year = datetime.now().year
         year_of_birth = 0
 
@@ -49,37 +50,33 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
         if any(k in gender_text for k in ['남자', '남성', '남']):
             role_id = get_id("role_info_male")
             if role_id and (role := member.guild.get_role(role_id)): roles_to_add.append(role); assigned_role_names.append(role.name)
-            else: failed_role_names.append("남자")
+            else: failed_role_details.append(f"성별(남) [ID: {role_id or ' 없음'}]")
         elif any(k in gender_text for k in ['여자', '여성', '여']):
             role_id = get_id("role_info_female")
             if role_id and (role := member.guild.get_role(role_id)): roles_to_add.append(role); assigned_role_names.append(role.name)
-            else: failed_role_names.append("여자")
+            else: failed_role_details.append(f"성별(여) [ID: {role_id or ' 없음'}]")
 
         # 나이 역할 처리
         try:
             yy = int(self.birth_year.value)
             year_of_birth = (1900 + yy) if yy > (current_year % 100) else (2000 + yy)
             age = current_year - year_of_birth + 1
+            
             age_brackets = get_config("AGE_BRACKET_ROLES", [])
-            
-            # ▼▼▼▼▼ [핵심 수정 1/3] 역할 부여 실패 시 원인을 기록하는 로직 추가 ▼▼▼▼▼
-            target_bracket = None
-            for bracket in age_brackets:
-                if bracket['min_age'] <= age <= bracket['max_age']:
-                    target_bracket = bracket
-                    break
-            
-            if target_bracket:
-                role_id = get_id(target_bracket['key'])
-                if role_id and (role := member.guild.get_role(role_id)):
-                    roles_to_add.append(role)
-                    assigned_role_names.append(role.name)
-                else:
-                    # 역할을 찾지 못했을 때 실패 목록에 추가
-                    age_role_map = {"role_age_10s": "10대", "role_age_20s": "20대", "role_age_30s": "30대", "role_age_40s": "40대 이상"}
-                    failed_role_names.append(age_role_map.get(target_bracket['key'], "알 수 없는 나이"))
-            # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
-                    
+            if not age_brackets:
+                logger.warning("DB에서 AGE_BRACKET_ROLES 설정을 불러오지 못했습니다.")
+                failed_role_details.append("나이대 역할 설정(AGE_BRACKET_ROLES) 없음")
+            else:
+                target_bracket = next((b for b in sorted(age_brackets, key=lambda x: x['min_age']) if b['min_age'] <= age <= b['max_age']), None)
+                if target_bracket:
+                    role_id = get_id(target_bracket['key'])
+                    if role_id and (role := member.guild.get_role(role_id)):
+                        roles_to_add.append(role)
+                        assigned_role_names.append(role.name)
+                    else:
+                        age_role_map = {"role_age_10s": "10대", "role_age_20s": "20대", "role_age_30s": "30대", "role_age_40s": "40대 이상"}
+                        role_name = age_role_map.get(target_bracket['key'], "알 수 없는 나이")
+                        failed_role_details.append(f"{role_name} [ID: {role_id or ' 없음'}]")
         except ValueError:
             await interaction.followup.send("❌ 출생년도는 2자리 숫자로만 입력해주세요 (예: 99, 01).", ephemeral=True); return
         except Exception as e:
@@ -89,12 +86,20 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             try: await member.add_roles(*roles_to_add, reason="유저 안내 자기소개서 작성")
             except discord.Forbidden: await interaction.followup.send("❌ 역할 부여에 실패했습니다. 봇의 권한을 확인해주세요.", ephemeral=True)
 
-        # ▼▼▼▼▼ [핵심 수정 2/3] 확인 메시지에 계산된 나이 대신 원본 입력값을 사용 ▼▼▼▼▼
-        confirmation_message = (
-            f"{interaction.user.mention}/{self.name.value}/{self.birth_year.value}/"
-            f"{self.gender.value}/{self.join_path.value}"
-        )
-        # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
+        confirmation_message = f"{interaction.user.mention}/{self.name.value}/{self.birth_year.value}/{self.gender.value}/{self.join_path.value}"
+        sent_conf_msg = await interaction.channel.send(confirmation_message)
+        self.guide_view.last_confirmation_message_id = sent_conf_msg.id
+
+        role_message_content = []
+        if assigned_role_names: role_message_content.append(f"✅ 역할이 부여되었습니다: `{'`, `'.join(assigned_role_names)}`")
+        if failed_role_details: role_message_content.append(f"⚠️ 일부 역할 부여에 실패했습니다: `{'`, `'.join(failed_role_details)}`\n(관리자에게 이 메시지를 보여주세요.)")
+        
+        if role_message_content:
+            sent_role_msg = await interaction.channel.send("\n".join(role_message_content))
+            self.guide_view.last_role_message_id = sent_role_msg.id
+        else:
+            self.guide_view.last_role_message_id = None
+    # ▲▲▲▲▲ 교체 완료 ▲▲▲▲▲
         
         sent_conf_msg = await interaction.channel.send(confirmation_message)
         self.guide_view.last_confirmation_message_id = sent_conf_msg.id
