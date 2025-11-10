@@ -103,7 +103,12 @@ UI_ROLE_KEY_MAP = {
     "role_warning_level_3": {"name": "『 🚫：경고 3 』", "is_prefix": False, "priority": 0},
     "role_warning_level_4": {"name": "벌점 4회", "is_prefix": False, "priority": 0},
 }
-
+AGE_BRACKET_ROLES = [
+    {"key": "role_age_10s", "min_age": 10, "max_age": 19},
+    {"key": "role_age_20s", "min_age": 20, "max_age": 29},
+    {"key": "role_age_30s", "min_age": 30, "max_age": 39},
+    {"key": "role_age_40s", "min_age": 40, "max_age": 99} # 40대 이상은 모두 이 역할을 받음
+]
 ONBOARDING_CHOICES = {
     "gender": [{
         "label": "남성",
