@@ -21,7 +21,7 @@ from .ui_defaults import (
     ONBOARDING_CHOICES, STATIC_AUTO_ROLE_PANELS, BOSS_REWARD_TIERS,
     TICKET_APPLICATION_DEPARTMENTS,
     # ▼▼▼ [추가] 이 줄을 추가해주세요 ▼▼▼
-    TICKET_DEPARTMENT_MANAGERS
+    TICKET_DEPARTMENT_MANAGERS,AGE_BRACKET_ROLES  
 )
 # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
 
