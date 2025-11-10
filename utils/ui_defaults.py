@@ -176,6 +176,20 @@ USABLE_ITEMS = {
 }
 
 UI_EMBEDS = {
+    "panel_user_guide": {
+        "title": "✨ 신규 유저 안내",
+        "description": "서버에 처음 오셨나요? 궁금한 점이 있나요?\n\n> 아래 버튼을 누르면 **담당 스태프와 함께하는 비공개 안내 스레드**가 생성됩니다.\n> 서버 이용에 대해 궁금한 모든 것을 편하게 질문해보세요!",
+        "color": 0x5865F2,
+        "footer": { "text": "언제나 여러분의 즐거운 마을 생활을 응원합니다." }
+    },
+    # ▲▲▲▲▲ [추가 완료] ▲▲▲▲▲
+    
+    # ▼▼▼▼▼ [추가] 안내 스레드 내부 환영 임베드 ▼▼▼▼▼
+    "embed_user_guide_welcome": {
+        "title": "{member_name}님, 마을에 오신 것을 환영합니다!",
+        "description": "이곳은 **{member_name}**님과 **{staff_role_mention}** 스태프만 볼 수 있는 비공개 공간입니다.\n\n서버 이용에 대해 궁금한 점이 있다면 무엇이든 편하게 질문해주세요.\n담당 스태프가 확인 후 친절하게 답변해 드릴 거예요! 😊\n\n**[유용한 채널 안내]**\n> 📜 <#1412052221209608273> : 가장 먼저 읽어봐야 할 마을의 규칙!\n> 🎭 <#1412052301115424799> : 알림, 게임 등 원하는 역할을 받을 수 있는 곳\n> ✒️ <#1412052293096050729> : 마을에서 사용할 멋진 이름을 신청하는 곳",
+        "color": 0x2ECC71
+    },
     "onboarding_guide_server": {
         "title": "",
         "description":
@@ -854,6 +868,16 @@ UI_EMBEDS = {
 
 UI_PANEL_COMPONENTS = [
     {
+        "component_key": "start_user_guide",
+        "panel_key": "user_guide",
+        "component_type": "button",
+        "label": "안내 시작하기",
+        "style": "success",
+        "emoji": "👋",
+        "row": 0,
+        "order_in_row": 0
+    },
+    {
         "component_key": "start_onboarding_guide",
         "panel_key": "onboarding",
         "component_type": "button",
@@ -1086,6 +1110,13 @@ UI_PANEL_COMPONENTS = [
     },
 ]
 SETUP_COMMAND_MAP = {
+    "panel_user_guide": {
+        "type": "panel",
+        "cog_name": "UserGuide",
+        "key": "user_guide_panel_channel_id",
+        "friendly_name": "[패널] 신규 유저 안내",
+        "channel_type": "text"
+    },
     "panel_notification_roles": {
         "type": "panel",
         "cog_name": "RolePanel",
