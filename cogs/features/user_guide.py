@@ -18,7 +18,6 @@ class InteractiveGuideView:
     pass
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
-    # ... (TextInput 필드들은 그대로) ...
     name = ui.TextInput(label="이름", placeholder="마을에서 사용할 이름을 알려주세요.", required=True)
     birth_year = ui.TextInput(label="출생년도 (YY)", placeholder="예: 98, 05 (2자리로 입력)", required=True, min_length=2, max_length=2)
     gender = ui.TextInput(label="성별", placeholder="성별을 알려주세요.", required=True, max_length=10)
@@ -41,7 +40,8 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             try: await (await interaction.channel.fetch_message(self.guide_view.last_role_message_id)).delete()
             except discord.NotFound: pass
 
-        roles_to_add = []; assigned_role_names = []; failed_role_details = [] # 실패 원인을 자세히 저장
+        # [버그 수정] 변수를 함수 시작 부분에서 미리 선언합니다.
+        roles_to_add = []; assigned_role_names = []; failed_role_details = []
         current_year = datetime.now().year
         year_of_birth = 0
 
@@ -64,7 +64,7 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             
             age_brackets = get_config("AGE_BRACKET_ROLES", [])
             if not age_brackets:
-                logger.warning("DB에서 AGE_BRACKET_ROLES 설정을 불러오지 못했습니다.")
+                logger.warning("DB에서 AGE_BRACKET_ROLES 설정을 불러오지 못했습니다. Supabase 테이블을 확인해주세요.")
                 failed_role_details.append("나이대 역할 설정(AGE_BRACKET_ROLES) 없음")
             else:
                 target_bracket = next((b for b in sorted(age_brackets, key=lambda x: x['min_age']) if b['min_age'] <= age <= b['max_age']), None)
@@ -99,7 +99,6 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             self.guide_view.last_role_message_id = sent_role_msg.id
         else:
             self.guide_view.last_role_message_id = None
-    # ▲▲▲▲▲ 교체 완료 ▲▲▲▲▲
         
         sent_conf_msg = await interaction.channel.send(confirmation_message)
         self.guide_view.last_confirmation_message_id = sent_conf_msg.id
