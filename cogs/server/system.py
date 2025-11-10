@@ -98,116 +98,83 @@ class ServerSystem(commands.Cog):
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.CheckFailure): 
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            if not interaction.response.is_done(): await interaction.response.send_message(f"❌ {error}", ephemeral=True)
         elif isinstance(error, app_commands.MissingPermissions): 
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ 이 명령어를 사용하려면 다음 권한이 필요합니다: `{', '.join(error.missing_permissions)}`", ephemeral=True)
+            if not interaction.response.is_done(): await interaction.response.send_message(f"❌ 이 명령어를 사용하려면 다음 권한이 필요합니다: `{', '.join(error.missing_permissions)}`", ephemeral=True)
         else:
             logger.error(f"'{interaction.command.qualified_name}' 명령어 처리 중 오류 발생: {error}", exc_info=True)
-            if not interaction.response.is_done(): 
-                await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
-            else: 
-                await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            if not interaction.response.is_done(): await interaction.response.send_message("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            else: await interaction.followup.send("❌ 명령어를 처리하는 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+
+    @admin_group.command(name="check_roles", description="[진단용] 주요 역할의 코드-서버-DB 동기화 상태를 확인합니다.")
+    @app_commands.check(is_admin)
+    async def check_roles(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        role_keys_to_check = { "성별(남)": "role_info_male", "성별(여)": "role_info_female", "나이(10대)": "role_age_10s", "나이(20대)": "role_age_20s", "나이(30대)": "role_age_30s", }
+        ui_role_map = get_config("UI_ROLE_KEY_MAP", {})
+        results = []
+        for name, key in role_keys_to_check.items():
+            code_name = ui_role_map.get(key, {}).get("name", "정의되지 않음")
+            server_role = discord.utils.get(interaction.guild.roles, name=code_name)
+            server_status = f"✅ 발견 (ID: {server_role.id})" if server_role else "❌ 없음"
+            db_id = get_id(key); db_status = f"✅ 저장됨 (ID: {db_id})" if db_id else "❌ 없음"
+            status = "🔴 불일치";
+            if server_role and db_id and server_role.id == db_id: status = "🟢 일치"
+            elif not server_role and not db_id: status = "🟡 둘 다 없음"
+            results.append(f"| {name.ljust(8)} | `{code_name}` | {server_status.ljust(15)} | {db_status.ljust(15)} | {status} |")
+        header = "| 구분         | 코드에 정의된 이름              | 서버에서 발견        | DB에 저장됨          | 상태     |\n|--------------|---------------------------------|----------------------|----------------------|----------|"
+        embed = discord.Embed(title="[진단] 주요 역할 동기화 상태", description=f"```markdown\n{header}\n{'\n'.join(results)}\n```", color=discord.Color.gold(), timestamp=datetime.now(timezone.utc))
+        embed.set_footer(text="'상태'가 '🔴 불일치'인 경우, 역할 이름이 정확한지 확인 후 /admin setup의 roles_sync를 다시 실행하세요.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @admin_group.command(name="purge", description="채널의 메시지를 삭제합니다. (별칭: clean)")
     @app_commands.rename(amount='개수', user='유저')
-    @app_commands.describe(
-        amount="삭제할 메시지의 개수를 입력하세요. (최대 100개)",
-        user="특정 유저의 메시지만 삭제하려면 선택하세요."
-    )
+    @app_commands.describe(amount="삭제할 메시지의 개수를 입력하세요. (최대 100개)", user="특정 유저의 메시지만 삭제하려면 선택하세요.")
     @app_commands.check(is_admin)
     async def purge(self, interaction: discord.Interaction, amount: app_commands.Range[int, 1, 100], user: Optional[discord.Member] = None):
         await interaction.response.defer(ephemeral=True)
-        channel = interaction.channel
-        if not isinstance(channel, discord.TextChannel):
-            await interaction.followup.send("❌ 이 명령어는 일반 텍스트 채널에서만 사용할 수 있습니다.", ephemeral=True)
-            return
-
+        if not isinstance(interaction.channel, discord.TextChannel): await interaction.followup.send("❌ 이 명령어는 일반 텍스트 채널에서만 사용할 수 있습니다.", ephemeral=True); return
         try:
-            check_func = (lambda m: m.author == user) if user else (lambda m: True)
-            deleted_messages = await channel.purge(limit=amount, check=check_func)
-
-            response_message = f"✅ 메시지 {len(deleted_messages)}개를 삭제했습니다."
-            if user:
-                response_message = f"✅ {user.mention}님의 메시지 {len(deleted_messages)}개를 삭제했습니다."
-            
-            if len(deleted_messages) < amount:
-                response_message += "\nℹ️ 14일이 지난 메시지는 삭제할 수 없습니다."
-
-            await interaction.followup.send(response_message, ephemeral=True)
-
-        except discord.Forbidden:
-            await interaction.followup.send("❌ 봇에게 '메시지 관리' 권한이 없습니다. 서버 설정에서 권한을 확인해주세요.", ephemeral=True)
-        except Exception as e:
-            logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
-            await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
-    # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
+            deleted = await interaction.channel.purge(limit=amount, check=(lambda m: m.author == user) if user else (lambda m: True))
+            msg = f"✅ 메시지 {len(deleted)}개를 삭제했습니다."
+            if user: msg = f"✅ {user.mention}님의 메시지 {len(deleted)}개를 삭제했습니다."
+            if len(deleted) < amount: msg += "\nℹ️ 14일이 지난 메시지는 삭제할 수 없습니다."
+            await interaction.followup.send(msg, ephemeral=True)
+        except discord.Forbidden: await interaction.followup.send("❌ 봇에게 '메시지 관리' 권한이 없습니다. 서버 설정에서 권한을 확인해주세요.", ephemeral=True)
+        except Exception as e: logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True); await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
     
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
-        
-        extended_admin_map = ADMIN_ACTION_MAP.copy()
-        extended_admin_map["boss_reset_check_test"] = "[보스] 리셋 루프 즉시 실행 (테스트용)"
-
+        extended_admin_map = {**ADMIN_ACTION_MAP, "boss_reset_check_test": "[보스] 리셋 루프 즉시 실행 (테스트용)"}
         for key, name in extended_admin_map.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
-        
+            if current.lower() in name.lower(): choices.append(app_commands.Choice(name=name, value=key))
         for key, info in SETUP_COMMAND_MAP.items():
             prefix = "[패널]" if info.get("type") == "panel" else "[채널]"
             choice_name = f"{prefix} {info.get('friendly_name', key)} 설정"
-            if current.lower() in choice_name.lower():
-                choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
-        
-        role_setup_actions = {
-            "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", 
-            "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정"
-        }
-        
+            if current.lower() in choice_name.lower(): choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
+        role_setup_actions = {"role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", "role_setup:dicoall_reminder_role_id": "[알림] Dicoall UP 알림 역할 설정"}
         for key, name in role_setup_actions.items():
-            if current.lower() in name.lower():
-                choices.append(app_commands.Choice(name=name, value=key))
-        
+            if current.lower() in name.lower(): choices.append(app_commands.Choice(name=name, value=key))
         return sorted(choices, key=lambda c: c.name)[:25]
 
     @admin_group.command(name="setup", description="봇의 모든 설정을 관리합니다.")
     @app_commands.describe(
-        action="실행할 작업을 선택하세요.",
-        boss_type="[보스] 대상으로 할 보스의 종류를 선택하세요.",
-        channel="[채널/통계] 작업에 필요한 채널을 선택하세요.",
-        role="[역할/통계] 작업에 필요한 역할을 선택하세요.",
-        user="[코인/XP/레벨/펫] 대상을 지정하세요.",
-        amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.",
-        level="[레벨/펫] 설정할 레벨을 입력하세요.",
-        stat_type="[통계] 표시할 통계 유형을 선택하세요.",
-        template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)"
+        action="실행할 작업을 선택하세요.", boss_type="[보스] 대상으로 할 보스의 종류를 선택하세요.", channel="[채널/통계] 작업에 필요한 채널을 선택하세요.",
+        role="[역할/통계] 작업에 필요한 역할을 선택하세요.", user="[코인/XP/레벨/펫] 대상을 지정하세요.", amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.",
+        level="[레벨/펫] 설정할 레벨을 입력하세요.", stat_type="[통계] 표시할 통계 유형을 선택하세요.", template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)"
     )
     @app_commands.autocomplete(action=setup_action_autocomplete)
     @app_commands.choices(
-        stat_type=[
-            app_commands.Choice(name="[설정] 전체 멤버 수 (봇 포함)", value="total"),
-            app_commands.Choice(name="[설정] 유저 수 (봇 제외)", value="humans"),
-            app_commands.Choice(name="[설정] 봇 수", value="bots"),
-            app_commands.Choice(name="[설정] 서버 부스트 수", value="boosters"),
-            app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"),
-            app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove")
-        ],
-        boss_type=[
-            app_commands.Choice(name="주간 보스", value="weekly"),
-            app_commands.Choice(name="월간 보스", value="monthly"),
-        ]
+        stat_type=[ app_commands.Choice(name="[설정] 전체 멤버 수 (봇 포함)", value="total"), app_commands.Choice(name="[설정] 유저 수 (봇 제외)", value="humans"), app_commands.Choice(name="[설정] 봇 수", value="bots"), app_commands.Choice(name="[설정] 서버 부스트 수", value="boosters"), app_commands.Choice(name="[설정] 특정 역할 멤버 수", value="role"), app_commands.Choice(name="[삭제] 이 채널의 통계 설정 삭제", value="remove")],
+        boss_type=[ app_commands.Choice(name="주간 보스", value="weekly"), app_commands.Choice(name="월간 보스", value="monthly")]
     )
     @app_commands.check(is_admin)
     async def setup(self, interaction: discord.Interaction, action: str,
-                    boss_type: Optional[str] = None,
-                    channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None,
+                    boss_type: Optional[str] = None, channel: Optional[discord.abc.GuildChannel] = None,
                     role: Optional[discord.Role] = None, user: Optional[discord.Member] = None,
-                    amount: Optional[app_commands.Range[int, 1, None]] = None,
-                    level: Optional[app_commands.Range[int, 1, None]] = None,
+                    amount: Optional[app_commands.Range[int, 1, None]] = None, level: Optional[app_commands.Range[int, 1, None]] = None,
                     stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
-        
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
 
         # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
