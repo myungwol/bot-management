@@ -18,10 +18,10 @@ class InteractiveGuideView:
     pass
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
-    name = ui.TextInput(label="이름", placeholder="공장에서 사용할 이름을 알려주세요.", required=True)
+    name = ui.TextInput(label="이름", placeholder="마을에서 사용할 이름을 알려주세요.", required=True)
     birth_year = ui.TextInput(label="출생년도 (YY)", placeholder="예: 98, 05 (2자리로 입력)", required=True, min_length=2, max_length=2)
     gender = ui.TextInput(label="성별", placeholder="성별을 알려주세요.", required=True, max_length=10)
-    join_path = ui.TextInput(label="가입 경로", placeholder="어떻게 우리 공장을 알게 되셨나요?", style=discord.TextStyle.paragraph, required=True)
+    join_path = ui.TextInput(label="가입 경로", placeholder="어떻게 우리 마을을 알게 되셨나요?", style=discord.TextStyle.paragraph, required=True)
 
     def __init__(self, guide_view: InteractiveGuideView):
         super().__init__()
