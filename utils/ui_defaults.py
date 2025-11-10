@@ -66,15 +66,13 @@ UI_ROLE_KEY_MAP = {
     "role_boost_ticket_10": {"name": "♡。💌：역할선택권 10 ໒꒱", "is_prefix": False, "priority": 0},
     # ▲▲▲ [추가 완료] ▲▲▲
     
-    # --- 그 외 접두사가 아닌 역할들 (우선순위 0) ---
-    "role_info_male": {"name": "『 👦：남자 』", "is_prefix": False, "priority": 0},
-    "role_info_female": {"name": "『 👧：여자 』", "is_prefix": False, "priority": 0},
+    # ... (기존 역할들) ...
     "role_info_age_private": {"name": "비공개", "is_prefix": False, "priority": 0},
-    "role_info_age_70s": {"name": "70", "is_prefix": False, "priority": 0},
-    "role_info_age_80s": {"name": "『 🥪：𝟏𝟗𝟖𝟎 』", "is_prefix": False, "priority": 0},
-    "role_info_age_90s": {"name": "『 🥨：𝟏𝟗𝟗𝟎 』", "is_prefix": False, "priority": 0},
-    "role_info_age_00s": {"name": "『 🥐：𝟐𝟎𝟎𝟎 』", "is_prefix": False, "priority": 0},
-    "role_personal_room_key": {"name": "마이룸 열쇠", "is_prefix": False, "priority": 0},
+    "role_age_10s": {"name": "10대", "is_prefix": False, "priority": 0},
+    "role_age_20s": {"name": "20대", "is_prefix": False, "priority": 0},
+    "role_age_30s": {"name": "30대", "is_prefix": False, "priority": 0},
+
+    
     "role_notify_dding": {"name": "⊹ ₊ 띵 동 .ᐟ ⊹", "is_prefix": False, "priority": 0},
     "role_notify_welcome": {"name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗", "is_prefix": False, "priority": 0},
     "role_notify_disboard": {"name": "『 🍨 : 공장 홍보대사 』", "is_prefix": False, "priority": 0},
