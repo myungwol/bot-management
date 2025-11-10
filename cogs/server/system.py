@@ -125,13 +125,12 @@ class ServerSystem(commands.Cog):
             return
 
         try:
-            check_func = lambda m: m.author == user if user else lambda m: True
+            check_func = (lambda m: m.author == user) if user else (lambda m: True)
             deleted_messages = await channel.purge(limit=amount, check=check_func)
 
+            response_message = f"✅ 메시지 {len(deleted_messages)}개를 삭제했습니다."
             if user:
                 response_message = f"✅ {user.mention}님의 메시지 {len(deleted_messages)}개를 삭제했습니다."
-            else:
-                response_message = f"✅ 메시지 {len(deleted_messages)}개를 삭제했습니다."
             
             if len(deleted_messages) < amount:
                 response_message += "\nℹ️ 14일이 지난 메시지는 삭제할 수 없습니다."
@@ -143,6 +142,7 @@ class ServerSystem(commands.Cog):
         except Exception as e:
             logger.error(f"메시지 삭제 중 오류 발생: {e}", exc_info=True)
             await interaction.followup.send("❌ 메시지를 삭제하는 중 오류가 발생했습니다.", ephemeral=True)
+    # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
     
     async def setup_action_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         choices = []
