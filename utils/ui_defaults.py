@@ -1383,6 +1383,14 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 서버 입장",
         "channel_type": "text"
     },
+    # ▼▼▼▼▼ 이 부분을 추가해주세요 ▼▼▼▼▼
+    "log_channel_invite": {
+        "type": "channel",
+        "cog_name": "InviteLogger",
+        "key": "log_channel_invite",
+        "friendly_name": "[로그] 초대 링크 추적",
+        "channel_type": "text"
+    },
     "log_leave": {
         "type": "channel",
         "cog_name": "LeaveLogger",
