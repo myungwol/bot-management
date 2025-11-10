@@ -66,7 +66,8 @@ class MyBot(commands.Bot):
         cogs_with_persistent_views = [
             "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
             "CustomEmbed", "ItemSystem", "AnonymousBoard", 
-            "WarningSystem", "VoiceMaster", "StickyEmbed"
+            "WarningSystem", "VoiceMaster", "StickyEmbed",
+            "UserGuide" # <--- 이 부분을 추가해주세요!
         ]
         
         registered_views_count = 0
