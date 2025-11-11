@@ -64,7 +64,7 @@ class MyBot(commands.Bot):
         
         # 4. 영구 View 등록
         cogs_with_persistent_views = [
-            "RolePanel", "Onboarding", "Nicknames", "TicketSystem", 
+            "RolePanel", "Onboarding", "NicknameChanger", "TicketSystem", 
             "CustomEmbed", "ItemSystem", "AnonymousBoard", 
             "WarningSystem", "VoiceMaster", "StickyEmbed",
             "UserGuide" # <--- 이 부분을 추가해주세요!
