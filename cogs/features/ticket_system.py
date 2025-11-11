@@ -166,23 +166,17 @@ class TicketControlView(ui.View):
         lock_button.callback = self.toggle_lock; delete_button.callback = self.delete; self.add_item(lock_button); self.add_item(delete_button)
     
     async def _check_master_permission(self, interaction: discord.Interaction) -> bool:
-        # 이 유저가 마스터 역할을 가지고 있는지 확인
         if not isinstance(interaction.user, discord.Member): return False
         return any(role in interaction.user.roles for role in self.cog.master_roles)
 
     async def _check_handler_permission(self, interaction: discord.Interaction, ticket_type: str) -> bool:
-        # 이 유저가 해당 티켓 타입의 담당자인지 확인
         if not isinstance(interaction.user, discord.Member): return False
         handler_roles = set()
-        if ticket_type == "report":
-            handler_roles.update(self.cog.report_roles)
-        elif ticket_type == "inquiry":
-            # 문의 티켓은 리더 역할 그룹이 처리
-            handler_roles.update(self.cog.leader_roles)
-        # 여기에 다른 티켓 타입에 대한 담당자 역할 그룹을 추가할 수 있습니다.
+        if ticket_type == "report": handler_roles.update(self.cog.report_roles)
+        elif ticket_type == "inquiry": handler_roles.update(self.cog.leader_roles)
         return not handler_roles.isdisjoint(interaction.user.roles)
 
-    # ▼▼▼▼▼ [핵심 수정] toggle_lock 메소드 전체를 아래 내용으로 교체합니다. ▼▼▼▼▼
+    # ▼▼▼▼▼ [핵심 수정] toggle_lock 메소드 전체를 다시 한번 교체합니다. ▼▼▼▼▼
     async def toggle_lock(self, interaction: discord.Interaction):
         can_lock = await self._check_master_permission(interaction) or await self._check_handler_permission(interaction, self.ticket_type)
         if not can_lock:
@@ -200,8 +194,7 @@ class TicketControlView(ui.View):
         try:
             if is_currently_locked:
                 # --- 잠금 해제 로직 ---
-                if owner:
-                    await thread.add_user(owner)
+                if owner: await thread.add_user(owner)
                 await update_ticket_lock_status(thread.id, False)
                 self.cog.tickets[thread.id]['is_locked'] = False
                 await interaction.followup.send("✅ 티켓의 잠금을 해제했습니다.", ephemeral=True)
@@ -211,12 +204,13 @@ class TicketControlView(ui.View):
                 all_admin_roles = set(self.cog.master_roles + self.cog.leader_roles + self.cog.report_roles + self.cog.department_manager_roles)
                 all_admin_role_ids = {role.id for role in all_admin_roles if role}
                 
-                # [버그 수정] thread.fetch_members() 앞에 await를 추가하고, 일반 for 루프 사용
-                members_in_thread = await thread.fetch_members()
+                thread_members = await thread.fetch_members()
                 
                 members_to_remove = []
-                for member in members_in_thread:
-                    if not member.bot and all_admin_role_ids.isdisjoint({r.id for r in member.roles}):
+                for thread_member in thread_members:
+                    # [버그 수정] guild.get_member를 통해 완전한 Member 객체를 가져옵니다.
+                    member = interaction.guild.get_member(thread_member.id)
+                    if member and not member.bot and all_admin_role_ids.isdisjoint({r.id for r in member.roles}):
                         members_to_remove.append(member)
 
                 for member in members_to_remove:
@@ -227,7 +221,6 @@ class TicketControlView(ui.View):
                 await interaction.followup.send("✅ 관리자 외의 멤버를 제외하고 티켓을 잠갔습니다.", ephemeral=True)
                 new_view = TicketControlView(self.cog, self.ticket_type, is_locked=True)
             
-            # 메시지를 찾아서 view를 업데이트
             original_response = await interaction.original_response()
             await original_response.edit(view=new_view)
 
@@ -238,7 +231,6 @@ class TicketControlView(ui.View):
     # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
             
     async def delete(self, interaction: discord.Interaction):
-        # ... (delete 메소드는 변경 없음) ...
         if not await self._check_master_permission(interaction): return await interaction.response.send_message("❌ `대표`, `부대표`만 이 버튼을 사용할 수 있습니다.", ephemeral=True)
         await interaction.response.send_message(f"✅ 5초 후에 이 티켓을 삭제합니다."); await asyncio.sleep(5);
         try: await interaction.channel.delete(reason=f"{interaction.user.display_name}이(가) 삭제")
