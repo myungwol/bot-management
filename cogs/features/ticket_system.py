@@ -177,7 +177,17 @@ class TicketControlView(ui.View):
                 if owner: await thread.add_user(owner); await update_ticket_lock_status(thread.id, False); self.cog.tickets[thread.id]['is_locked'] = False
                 await interaction.followup.send(f"✅ 티켓의 잠금을 해제했습니다.", ephemeral=True); new_view = TicketControlView(self.cog, self.ticket_type, is_locked=False)
             else:
-                all_admin_roles = set(self.cog.master_roles + self.cog.leader_roles + self.cog.report_roles); members_to_remove = [m for m in await thread.fetch_members() if not m.bot and all_admin_roles.isdisjoint({r.id for r in m.roles})]
+                all_admin_roles = set(self.cog.master_roles + self.cog.leader_roles + self.cog.report_roles)
+                
+                # ▼▼▼▼▼ [핵심 수정] 이 부분을 아래 코드로 교체합니다. ▼▼▼▼▼
+                members_to_remove = []
+                async for thread_member in thread.fetch_members():
+                    # ThreadMember에서 완전한 Member 객체를 가져옴
+                    member = await interaction.guild.fetch_member(thread_member.id)
+                    if not member.bot and all_admin_roles.isdisjoint({r.id for r in member.roles}):
+                        members_to_remove.append(member)
+                # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
+
                 for member in members_to_remove: await thread.remove_user(member)
                 await update_ticket_lock_status(thread.id, True); self.cog.tickets[thread.id]['is_locked'] = True
                 await interaction.followup.send(f"✅ 관리자 외의 멤버를 제외하고 티켓을 잠갔습니다.", ephemeral=True); new_view = TicketControlView(self.cog, self.ticket_type, is_locked=True)
