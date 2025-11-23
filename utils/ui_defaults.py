@@ -1,9 +1,3 @@
-# bot-management/utils/ui_defaults.py
-"""
-봇이 사용하는 모든 UI 요소 및 핵심 매핑 데이터의 기본값을 정의하는 파일입니다.
-봇이 시작될 때 이 파일의 데이터가 Supabase 데이터베이스에 동기화됩니다.
-"""
-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 1. 역할 키 맵 (Role Key Map)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -46,12 +40,10 @@ UI_ROLE_KEY_MAP = {
     "role_staff_intern_design": {"name": "『 🌸 』 ◟디자인인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
     "role_approval": {"name": "꒰🏠꒱ 스태프", "is_prefix": False, "priority": 70},
 
-    # --- [수정] 일반 유저 접두사 역할 ---
+    # --- [유지] 일반 유저 접두사 역할 ---
     "role_premium_booster": {"name": "『 🍩：도넛』", "is_prefix": True, "priority": 55, "prefix_symbol": "🍩", "prefix_format": "〚{symbol}〛", "suffix": " ⸝⁺⊹"},
-    "role_resident_elder": {"name": "장로", "is_prefix": True, "priority": 50, "prefix_symbol": "📜", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"}, # 레벨업 보상 (유지)
-    "role_resident_veteran": {"name": "베테랑", "is_prefix": True, "priority": 45, "prefix_symbol": "veterαn", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"}, # 레벨업 보상 (유지)
-    
-    # 직업 접두사 (유지)
+    "role_resident_elder": {"name": "장로", "is_prefix": True, "priority": 50, "prefix_symbol": "📜", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_resident_veteran": {"name": "베테랑", "is_prefix": True, "priority": 45, "prefix_symbol": "veterαn", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_master_chef": {"name": "마스터 셰프", "is_prefix": True, "priority": 16, "prefix_symbol": "‍🍳", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_master_angler": {"name": "강태공", "is_prefix": True, "priority": 16, "prefix_symbol": "🏆", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_master_farmer": {"name": "대농", "is_prefix": True, "priority": 16, "prefix_symbol": "👑", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
@@ -60,12 +52,9 @@ UI_ROLE_KEY_MAP = {
     "role_job_fisherman": {"name": "낚시꾼", "is_prefix": True, "priority": 15, "prefix_symbol": "🎣", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_farmer": {"name": "농부", "is_prefix": True, "priority": 15, "prefix_symbol": "🌾", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_miner": {"name": "광부", "is_prefix": True, "priority": 15, "prefix_symbol": "⛏️", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    
-    # 등급 접두사 역할 (새로운 이름으로 변경)
     "role_resident_regular": {"name": "『 🌊︰ 해몽 』", "is_prefix": True, "priority": 3, "prefix_symbol": "🌊", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
     "role_resident_rookie": {"name": "『 🐳︰ 연안 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🐳", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
     "role_guest": {"name": "『 💧 』 ◟해변 ⸝⸝‧⁺", "is_prefix": True, "priority": 1, "prefix_symbol": "💧", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
-
     # --- [수정] 정보 역할 (성별, 나이) ---
     "role_info_male": {"name": "『 💙︰ 남자 』", "is_prefix": False, "priority": 0},
     "role_info_female": {"name": "『 🩷︰ 여자 』", "is_prefix": False, "priority": 0},
@@ -205,7 +194,19 @@ UI_EMBEDS = {
         "color": 0x5865F2,
     },
     # ▲▲▲▲▲ [추가 완료] ▲▲▲▲▲
-    
+    # ▼▼▼ [핵심 추가] 공개 자기소개용 임베드 템플릿 ▼▼▼
+    "guide_public_introduction": {
+        "description": "{member_mention}",
+        "color": 0x3498DB,
+        "fields": [
+            {"name": "이름", "value": "{submitted_name}", "inline": True},
+            {"name": "출생년도", "value": "{submitted_birth_year}", "inline": True},
+            {"name": "성별", "value": "{submitted_gender}", "inline": True},
+            {"name": "가입 경로", "value": "{submitted_join_path}", "inline": False},
+            {"name": "담당 스태프", "value": "{approver_mention}", "inline": False}
+        ]
+    },
+    # ▲▲▲ [추가 완료] ▲▲▲
     # ▼▼▼▼▼ [추가] 안내 스레드 내부 환영 임베드 ▼▼▼▼▼
     "guide_thread_page_1": {
         "description": "### 👋 안녕하세요, {user_mention}님!\n과자 공장에 오신 것을 환영합니다!\n\n이곳은 {user_mention}님과 스태프만 대화할 수 있는 비밀의 공간이랍니다.\n\n과자 공장 입장하시기 전에 몇 가지 안내를 도와드리도록 하겠습니다!\n\n> 아래 ‘다음’ 버튼을 눌러 안내를 계속 읽어 주세요.",
