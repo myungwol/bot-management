@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Dict, List, Any
 import asyncio
 from datetime import datetime
-import re # <--- [추가] 정규표현식 모듈 import
+import re
 
 from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, get_panel_components_from_db, get_config
 from utils.helpers import format_embed_from_db, has_required_roles
@@ -80,7 +80,10 @@ class GuideApprovalView(ui.View):
             await interaction.followup.send("❌ 대상 유저를 찾을 수 없습니다. 서버를 나간 것 같습니다.", ephemeral=True)
             return
 
+        # ▼▼▼ [핵심 수정] 역할 부여/제거 로직 변경 ▼▼▼
         roles_to_add = []
+        
+        # 1. 정보 역할 추가 (성별, 나이)
         gender_text = self.submitted_data['gender'].strip().lower()
         if any(k in gender_text for k in ['남자', '남성', '남']):
             if (rid := get_id("role_info_male")) and (r := member.guild.get_role(rid)): roles_to_add.append(r)
@@ -92,15 +95,24 @@ class GuideApprovalView(ui.View):
         if year_mapping:
             if (rid := get_id(year_mapping['key'])) and (r := member.guild.get_role(rid)): roles_to_add.append(r)
 
+        # 2. 해변 역할(게스트)이 있다면 제거
         if (guest_rid := get_id("role_guest")) and (guest_role := member.guild.get_role(guest_rid)):
-            if guest_role in member.roles: await member.remove_roles(guest_role, reason="안내 가이드 승인")
+            if guest_role in member.roles:
+                await member.remove_roles(guest_role, reason="안내 가이드 승인")
         
+        # 3. 연안 역할(루키)과 해몽 역할(레귤러)을 roles_to_add 리스트에 추가
         if (rookie_rid := get_id("role_resident_rookie")) and (rookie_role := member.guild.get_role(rookie_rid)):
             roles_to_add.append(rookie_role)
-
+        
+        if (regular_rid := get_id("role_resident_regular")) and (regular_role := member.guild.get_role(regular_rid)):
+            roles_to_add.append(regular_role)
+        
+        # 4. 모아둔 모든 역할을 한 번에 부여
         if roles_to_add:
             await member.add_roles(*roles_to_add, reason="안내 가이드 승인")
+        # ▲▲▲ [수정 완료] ▲▲▲
 
+        # 닉네임 변경
         try:
             prefix_cog = self.cog.bot.get_cog("PrefixManager")
             if prefix_cog:
@@ -110,8 +122,10 @@ class GuideApprovalView(ui.View):
         except Exception as e:
             logger.error(f"가이드 승인 중 닉네임 변경 실패: {e}", exc_info=True)
 
+        # 공개 자기소개 전송
         await self._send_public_introduction(interaction.user, member)
 
+        # 피드백
         button.disabled = True
         button.label = "승인 완료"
         
@@ -122,7 +136,6 @@ class GuideApprovalView(ui.View):
         await interaction.message.edit(embed=original_embed, view=self)
         await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인하고, 공개 채널에 소개글을 게시했습니다.", ephemeral=True)
         await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다! 이제 서버의 모든 채널을 이용할 수 있습니다.")
-
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
     # ▼▼▼ [핵심 수정 1/2] 이름 입력 필드의 최대 길이를 8로 변경 ▼▼▼
