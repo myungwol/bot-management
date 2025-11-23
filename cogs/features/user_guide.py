@@ -287,11 +287,14 @@ class UserGuidePanelView(ui.View):
         
         await i.response.defer(ephemeral=True)
         try:
-            thread_name = f"👋ㅣ{i.user.display_name}님의-안내"
-            
-            # ▼▼▼ [핵심 수정] 스레드 타입을 public -> private 으로 변경합니다. ▼▼▼
-            thread = await i.channel.create_thread(name=thread_name, type=discord.ChannelType.private_thread)
+            # ▼▼▼ [핵심 수정] '해변' 역할 부여 로직 추가 ▼▼▼
+            if (guest_rid := get_id("role_guest")) and (guest_role := i.guild.get_role(guest_rid)):
+                if guest_role not in i.user.roles:
+                    await i.user.add_roles(guest_role, reason="안내 가이드 시작")
             # ▲▲▲ [수정 완료] ▲▲▲
+
+            thread_name = f"👋ㅣ{i.user.display_name}님의-안내"
+            thread = await i.channel.create_thread(name=thread_name, type=discord.ChannelType.private_thread)
             
             self.cog.active_guide_threads[i.user.id] = thread.id
             steps = await self.cog.get_guide_steps()
