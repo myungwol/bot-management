@@ -26,17 +26,47 @@ class GuideApprovalView(ui.View):
         self.target_user_id = target_user_id
         self.submitted_data = submitted_data
 
+    # ▼▼▼ [디버깅 추가 1/2] 권한 확인 함수에 로그 추가 ▼▼▼
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
-        # (이 함수는 변경 없음)
-        # ...
+        print("\n" + "="*50)
+        print(f"--- [디버깅] 권한 확인 시작: {interaction.user.display_name} ---")
+        
         required_keys = [
             "role_staff_team_info", "role_staff_team_newbie",
             "role_staff_leader_info", "role_staff_leader_newbie",
             "role_staff_deputy_manager", "role_staff_general_manager",
             "role_staff_deputy_chief", "role_staff_village_chief"
         ]
-        error_message = "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."
-        return await has_required_roles(interaction, required_keys, error_message)
+        print(f"[디버깅] 필요한 역할 키 목록: {required_keys}")
+
+        # 필요한 역할들의 ID를 DB에서 가져옵니다.
+        allowed_role_ids = {get_id(key) for key in required_keys if get_id(key)}
+        print(f"[디버깅] DB에서 찾은 필요 역할 ID 목록: {allowed_role_ids}")
+
+        if not allowed_role_ids:
+            print("[디버깅] 오류: DB에 필요한 역할이 하나도 설정되지 않았습니다.")
+            await interaction.response.send_message("❌ 권한 확인에 필요한 역할이 서버에 설정되지 않았습니다. 관리자에게 문의하세요.", ephemeral=True)
+            print("="*50 + "\n")
+            return False
+
+        # 버튼을 누른 유저의 역할 ID 목록을 가져옵니다.
+        user_role_ids = {role.id for role in interaction.user.roles}
+        user_role_names = {role.name for role in interaction.user.roles}
+        print(f"[디버깅] 유저가 가진 역할 ID 목록: {user_role_ids}")
+        print(f"[디버깅] 유저가 가진 역할 이름 목록: {user_role_names}")
+
+        # 두 목록의 교집합(공통된 역할)을 확인합니다.
+        has_permission = not user_role_ids.isdisjoint(allowed_role_ids)
+        print(f"[디버깅] 권한 확인 결과: {has_permission}")
+
+        if not has_permission:
+            error_message = "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."
+            await interaction.response.send_message(error_message, ephemeral=True)
+        
+        print("="*50 + "\n")
+        return has_permission
+    # ▲▲▲ [디버깅 추가 완료] ▲▲▲
+
 
     async def _send_public_introduction(self, approver: discord.Member, member: discord.Member):
         # (이 함수는 변경 없음)
@@ -73,10 +103,15 @@ class GuideApprovalView(ui.View):
             logger.error(f"공개 자기소개 메시지 전송 중 오류 발생: {e}", exc_info=True)
 
 
+    # ▼▼▼ [디버깅 추가 2/2] approve 함수에 진입 로그 추가 ▼▼▼
     @ui.button(label="수락", style=discord.ButtonStyle.success, emoji="✅", custom_id="guide_approve_button")
     async def approve(self, interaction: discord.Interaction, button: ui.Button):
+        # 함수 진입 직후 로그를 남겨, 함수가 호출되었는지 확인
+        print("\n>>> 'approve' 함수가 호출되었습니다! 권한 확인을 시작합니다...")
         if not await self._check_permission(interaction):
+            print(">>> 권한이 없어 'approve' 함수를 종료합니다.\n")
             return
+        print(">>> 권한 확인 통과! 'approve' 로직을 계속 진행합니다.")
 
         await interaction.response.defer(ephemeral=True)
         
@@ -87,23 +122,18 @@ class GuideApprovalView(ui.View):
             return
 
         try:
-            # ▼▼▼ [디버깅 로그 추가] ▼▼▼
             print("\n" + "="*50)
             print(f"--- [디버깅 시작] {member.display_name} 역할 업데이트 ---")
 
-            # 1. 제거 대상인 '해변' 역할의 ID를 확인합니다.
             guest_rid = get_id("role_guest")
             print(f"[디버깅 1] 제거할 '해변' 역할 ID: {guest_rid}")
 
-            # 2. 역할 수정 전, 유저가 현재 가진 역할 목록을 출력합니다.
             current_role_names = [r.name for r in member.roles]
             print(f"[디버깅 2] 수정 전 역할 목록 ({len(current_role_names)}개): {current_role_names}")
 
-            # 3. '해변' 역할을 제외하고 유지할 역할 목록을 만듭니다.
             roles_to_keep = [role for role in member.roles if role.id != guest_rid]
             print(f"[디버깅 3] '해변' 제외 후 유지할 역할 목록 ({len(roles_to_keep)}개): {[r.name for r in roles_to_keep]}")
             
-            # 4. 새로 부여할 역할들의 ID 목록을 만듭니다.
             new_role_ids_to_add = [
                 get_id("role_resident_rookie"),
                 get_id("role_resident_regular")
@@ -121,23 +151,20 @@ class GuideApprovalView(ui.View):
             
             print(f"[디버깅 4] 새로 추가할 역할 ID 목록: {new_role_ids_to_add}")
 
-            # 5. 최종 역할 목록을 계산합니다.
             final_roles = roles_to_keep
             for role_id in new_role_ids_to_add:
                 if role_id and (role := interaction.guild.get_role(role_id)):
                     final_roles.append(role)
-            final_roles = list(dict.fromkeys(final_roles)) # 중복 제거
+            final_roles = list(dict.fromkeys(final_roles))
             
             final_role_names = [r.name for r in final_roles]
             print(f"[디버깅 5] 최종 적용될 역할 목록 ({len(final_role_names)}개): {final_role_names}")
 
-            # 6. 닉네임 계산
             final_nickname = await self.cog.bot.get_cog("PrefixManager").get_final_nickname(
                 member, base_name=self.submitted_data['name']
             )
             print(f"[디버깅 6] 최종 적용될 닉네임: {final_nickname}")
 
-            # 7. 역할과 닉네임을 수정합니다.
             print("[디버깅 7] member.edit() 실행 직전...")
             await member.edit(
                 nick=final_nickname,
@@ -147,7 +174,6 @@ class GuideApprovalView(ui.View):
             print("[디버깅 8] member.edit() 실행 완료!")
             print("="*50 + "\n")
             # ▲▲▲ [디버깅 로그 완료] ▲▲▲
-
         except discord.Forbidden:
             logger.error(f"역할/닉네임 업데이트 실패(Forbidden): {member.display_name}")
             await interaction.followup.send("❌ 역할/닉네임 업데이트에 실패했습니다. 봇의 역할이 대상 역할들보다 높은지 확인해주세요.", ephemeral=True)
@@ -169,12 +195,7 @@ class GuideApprovalView(ui.View):
         await interaction.message.edit(embed=original_embed, view=self)
         await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인했습니다.", ephemeral=True)
         await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다! 이제 서버의 모든 채널을 이용할 수 있습니다.")
-
-
-# (파일의 나머지 모든 부분은 이전과 동일하게 유지됩니다.)
-# ...
-
-
+        
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
     # ▼▼▼ [핵심 수정 1/2] 이름 입력 필드의 최대 길이를 8로 변경 ▼▼▼
     name = ui.TextInput(label="이름", placeholder="한글/공백 포함 8자 이하", required=True, max_length=8)
