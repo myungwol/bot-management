@@ -27,6 +27,8 @@ class GuideApprovalView(ui.View):
         self.submitted_data = submitted_data
 
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
+        # (이 함수는 변경 없음)
+        # ...
         required_keys = [
             "role_staff_team_info", "role_staff_team_newbie",
             "role_staff_leader_info", "role_staff_leader_newbie",
@@ -37,7 +39,8 @@ class GuideApprovalView(ui.View):
         return await has_required_roles(interaction, required_keys, error_message)
 
     async def _send_public_introduction(self, approver: discord.Member, member: discord.Member):
-        # ... (이 함수는 변경 없음) ...
+        # (이 함수는 변경 없음)
+        # ...
         try:
             channel_id = self.cog.public_intro_channel_id
             if not channel_id:
@@ -84,49 +87,66 @@ class GuideApprovalView(ui.View):
             return
 
         try:
-            # ▼▼▼ [핵심 수정] 역할 리스트를 처음부터 새로 구성하는 방식으로 변경 ▼▼▼
-            
-            # 1. 관리 대상이 아닌, 유저가 원래 가지고 있던 역할들만 먼저 추려냅니다.
-            guest_rid = get_id("role_guest")
-            roles_to_keep = [role for role in member.roles if role.id != guest_rid]
+            # ▼▼▼ [디버깅 로그 추가] ▼▼▼
+            print("\n" + "="*50)
+            print(f"--- [디버깅 시작] {member.display_name} 역할 업데이트 ---")
 
-            # 2. 새로 부여할 역할들의 ID 목록을 만듭니다.
-            new_role_ids = [
+            # 1. 제거 대상인 '해변' 역할의 ID를 확인합니다.
+            guest_rid = get_id("role_guest")
+            print(f"[디버깅 1] 제거할 '해변' 역할 ID: {guest_rid}")
+
+            # 2. 역할 수정 전, 유저가 현재 가진 역할 목록을 출력합니다.
+            current_role_names = [r.name for r in member.roles]
+            print(f"[디버깅 2] 수정 전 역할 목록 ({len(current_role_names)}개): {current_role_names}")
+
+            # 3. '해변' 역할을 제외하고 유지할 역할 목록을 만듭니다.
+            roles_to_keep = [role for role in member.roles if role.id != guest_rid]
+            print(f"[디버깅 3] '해변' 제외 후 유지할 역할 목록 ({len(roles_to_keep)}개): {[r.name for r in roles_to_keep]}")
+            
+            # 4. 새로 부여할 역할들의 ID 목록을 만듭니다.
+            new_role_ids_to_add = [
                 get_id("role_resident_rookie"),
                 get_id("role_resident_regular")
             ]
             gender_text = self.submitted_data['gender'].strip().lower()
             if any(k in gender_text for k in ['남자', '남성', '남']):
-                new_role_ids.append(get_id("role_info_male"))
+                new_role_ids_to_add.append(get_id("role_info_male"))
             elif any(k in gender_text for k in ['여자', '여성', '여']):
-                new_role_ids.append(get_id("role_info_female"))
+                new_role_ids_to_add.append(get_id("role_info_female"))
 
             birth_year = self.submitted_data['birth_year']
             year_mapping = next((item for item in AGE_ROLE_MAPPING_BY_YEAR if item["year"] == birth_year), None)
             if year_mapping:
-                new_role_ids.append(get_id(year_mapping['key']))
+                new_role_ids_to_add.append(get_id(year_mapping['key']))
+            
+            print(f"[디버깅 4] 새로 추가할 역할 ID 목록: {new_role_ids_to_add}")
 
-            # 3. ID 목록을 실제 역할 객체로 변환하고, 기존 역할과 합칩니다.
+            # 5. 최종 역할 목록을 계산합니다.
             final_roles = roles_to_keep
-            for role_id in new_role_ids:
+            for role_id in new_role_ids_to_add:
                 if role_id and (role := interaction.guild.get_role(role_id)):
                     final_roles.append(role)
+            final_roles = list(dict.fromkeys(final_roles)) # 중복 제거
             
-            # (중복 제거)
-            final_roles = list(dict.fromkeys(final_roles))
+            final_role_names = [r.name for r in final_roles]
+            print(f"[디버깅 5] 최종 적용될 역할 목록 ({len(final_role_names)}개): {final_role_names}")
 
-            # 4. 닉네임 계산
+            # 6. 닉네임 계산
             final_nickname = await self.cog.bot.get_cog("PrefixManager").get_final_nickname(
                 member, base_name=self.submitted_data['name']
             )
+            print(f"[디버깅 6] 최종 적용될 닉네임: {final_nickname}")
 
-            # 5. 역할과 닉네임을 단 한 번의 요청으로 수정합니다.
+            # 7. 역할과 닉네임을 수정합니다.
+            print("[디버깅 7] member.edit() 실행 직전...")
             await member.edit(
                 nick=final_nickname,
                 roles=final_roles,
                 reason="안내 가이드 승인"
             )
-            # ▲▲▲ [수정 완료] ▲▲▲
+            print("[디버깅 8] member.edit() 실행 완료!")
+            print("="*50 + "\n")
+            # ▲▲▲ [디버깅 로그 완료] ▲▲▲
 
         except discord.Forbidden:
             logger.error(f"역할/닉네임 업데이트 실패(Forbidden): {member.display_name}")
@@ -147,8 +167,12 @@ class GuideApprovalView(ui.View):
         original_embed.set_footer(text=f"✅ {interaction.user.display_name} 님에 의해 승인됨")
         
         await interaction.message.edit(embed=original_embed, view=self)
-        await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인하고, 공개 채널에 소개글을 게시했습니다.", ephemeral=True)
+        await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인했습니다.", ephemeral=True)
         await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다! 이제 서버의 모든 채널을 이용할 수 있습니다.")
+
+
+# (파일의 나머지 모든 부분은 이전과 동일하게 유지됩니다.)
+# ...
 
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
