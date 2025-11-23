@@ -33,7 +33,7 @@ class GuideApprovalView(ui.View):
             "role_staff_deputy_manager", "role_staff_general_manager",
             "role_staff_deputy_chief", "role_staff_village_chief"
         ]
-        error_message = "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."
+        error_message = "❌ 안내팀 스태프만 수락할 수 있습니다."
         return await has_required_roles(interaction, required_keys, error_message)
 
     async def _send_public_introduction(self, approver: discord.Member, member: discord.Member):
