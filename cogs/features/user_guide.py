@@ -192,8 +192,8 @@ class GuideThreadView(ui.View):
         current_page = int(match.group(1)) - 1 if match else 0
         return steps, current_page
 
+    # ▼▼▼ [핵심 수정] 버튼 비활성화 로직 변경 ▼▼▼
     async def _update_view_state(self, new_page: int, total_pages: int):
-        # 자식 컴포넌트들을 순회하며 ID로 버튼을 찾습니다.
         prev_button = discord.utils.get(self.children, custom_id="guide_persistent_prev")
         next_button = discord.utils.get(self.children, custom_id="guide_persistent_next")
         intro_button = discord.utils.get(self.children, custom_id="guide_persistent_intro")
@@ -202,11 +202,12 @@ class GuideThreadView(ui.View):
             prev_button.disabled = (new_page == 0)
         
         if isinstance(next_button, ui.Button):
-            is_verification_page = (new_page == 2)
-            next_button.disabled = (new_page == total_pages - 1) or is_verification_page
+            # 경로 인증 페이지(인덱스 2)에서도 비활성화하지 않음
+            next_button.disabled = (new_page == total_pages - 1)
             
         if isinstance(intro_button, ui.Button):
             intro_button.disabled = (new_page != total_pages - 1)
+    # ▲▲▲ [수정 완료] ▲▲▲
 
     @ui.button(label="◀ 이전", style=discord.ButtonStyle.secondary, custom_id="guide_persistent_prev")
     async def go_previous(self, interaction: discord.Interaction, button: ui.Button):
@@ -230,7 +231,7 @@ class GuideThreadView(ui.View):
     async def open_intro_form(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(IntroductionFormModal(self.cog))
 
-# ▼▼▼ [수정] 클래스 순서를 원래대로 되돌렸습니다 ▼▼▼
+
 class UserGuidePanelView(ui.View):
     def __init__(self, cog: 'UserGuide'):
         super().__init__(timeout=None); self.cog = cog
@@ -314,35 +315,9 @@ class UserGuide(commands.Cog):
         if user.guild.get_thread(tid): return True
         else: self.active_guide_threads.pop(user.id, None); return False
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.bot:
-            return
-        if message.channel.id not in self.active_guide_threads.values():
-            return
-        
-        owner_id = next((uid for uid, tid in self.active_guide_threads.items() if tid == message.channel.id), None)
-        if not owner_id or message.author.id != owner_id:
-            return
-
-        if not message.attachments or not any(att.content_type.startswith("image/") for att in message.attachments):
-            return
-
-        async for bot_message in message.channel.history(limit=10):
-            if bot_message.author == self.bot.user and bot_message.embeds and bot_message.view:
-                embed = bot_message.embeds[0]
-                if embed.footer and "3/4" in embed.footer.text:
-                    view: GuideThreadView = self.guide_thread_view_instance
-                    
-                    next_button = discord.utils.get(view.children, custom_id="guide_persistent_next")
-                    if next_button:
-                        next_button.disabled = False
-                        await bot_message.edit(view=view)
-                    
-                    feedback_msg = await message.channel.send("✅ 인증 사진이 확인되었습니다! '다음' 버튼을 눌러 계속 진행해주세요.")
-                    await asyncio.sleep(5)
-                    await feedback_msg.delete()
-                break
+    # ▼▼▼ [핵심 수정] 이미지 감지 리스너 삭제 ▼▼▼
+    # on_message 리스너를 완전히 제거했습니다.
+    # ▲▲▲ [수정 완료] ▲▲▲
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
