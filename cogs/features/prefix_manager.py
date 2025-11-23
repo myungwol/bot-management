@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 import logging
 from typing import Set
-import asyncio # <--- [수정] 누락되었던 asyncio import를 추가합니다.
+import asyncio 
 
 from utils.database import get_config, get_id
 
@@ -24,7 +24,6 @@ class PrefixManager(commands.Cog):
         if after.bot or before.roles == after.roles:
             return
         
-        # 봇 자신에 의해 닉네임이 변경되는 것을 방지하기 위해 약간의 딜레이를 줌
         await asyncio.sleep(1) 
         
         try:
@@ -32,7 +31,7 @@ class PrefixManager(commands.Cog):
             if after.nick != new_nick:
                 await after.edit(nick=new_nick, reason="역할 변경으로 인한 칭호 자동 업데이트")
         except discord.Forbidden:
-            pass # 권한이 없는 경우(관리자 등)는 조용히 넘어감
+            pass
         except Exception as e:
             logger.error(f"{after.display_name}의 자동 닉네임 업데이트 중 오류: {e}", exc_info=True)
 
@@ -86,8 +85,11 @@ class PrefixManager(commands.Cog):
                     base = temp_name[:-len(suffix_str)] if suffix_str else temp_name
                     break
 
-        # 3. 접두사 예외 역할 처리 (모든 관리자 역할은 접두사를 붙이지 않음)
-        no_prefix_role_keys = {key for key, config in UI_ROLE_KEY_MAP.items() if not config.get("is_prefix")}
+        # ▼▼▼ [핵심 수정] UI_ROLE_KEY_MAP -> role_configs 로 변경 ▼▼▼
+        # 3. 접두사 예외 역할 처리
+        no_prefix_role_keys = {key for key, config in role_configs.items() if not config.get("is_prefix")}
+        # ▲▲▲ [수정 완료] ▲▲▲
+        
         no_prefix_role_ids = {get_id(key) for key in no_prefix_role_keys if get_id(key)}
         user_has_no_prefix_role = bool(no_prefix_role_ids.intersection(member_role_ids))
 
