@@ -33,7 +33,7 @@ class GuideApprovalView(ui.View):
             "role_staff_deputy_manager", "role_staff_general_manager",
             "role_staff_deputy_chief", "role_staff_village_chief"
         ]
-        error_message = "❌ 안내팀 스태프만 수락할 수 있습니다."
+        error_message = "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."
         return await has_required_roles(interaction, required_keys, error_message)
 
     async def _send_public_introduction(self, approver: discord.Member, member: discord.Member):
@@ -74,42 +74,56 @@ class GuideApprovalView(ui.View):
             return
 
         await interaction.response.defer(ephemeral=True)
-        member = interaction.guild.get_member(self.target_user_id)
         
-        if not member:
+        # ▼▼▼ [핵심 수정 1/2] 캐시 대신 서버에서 직접 멤버 정보를 가져옵니다. ▼▼▼
+        try:
+            member = await interaction.guild.fetch_member(self.target_user_id)
+        except discord.NotFound:
             await interaction.followup.send("❌ 대상 유저를 찾을 수 없습니다. 서버를 나간 것 같습니다.", ephemeral=True)
             return
+        # ▲▲▲ [수정 완료] ▲▲▲
 
-        # ▼▼▼ [핵심 수정] 역할 부여/제거 로직 변경 ▼▼▼
-        roles_to_add = []
-        
-        # 1. 정보 역할 추가 (성별, 나이)
-        gender_text = self.submitted_data['gender'].strip().lower()
-        if any(k in gender_text for k in ['남자', '남성', '남']):
-            if (rid := get_id("role_info_male")) and (r := member.guild.get_role(rid)): roles_to_add.append(r)
-        elif any(k in gender_text for k in ['여자', '여성', '여']):
-            if (rid := get_id("role_info_female")) and (r := member.guild.get_role(rid)): roles_to_add.append(r)
-        
-        birth_year = self.submitted_data['birth_year']
-        year_mapping = next((item for item in AGE_ROLE_MAPPING_BY_YEAR if item["year"] == birth_year), None)
-        if year_mapping:
-            if (rid := get_id(year_mapping['key'])) and (r := member.guild.get_role(rid)): roles_to_add.append(r)
+        # ▼▼▼ [핵심 수정 2/2] 역할 부여/제거 로직을 더 안정적인 방식으로 변경 ▼▼▼
+        try:
+            final_roles = set(member.roles) # 유저의 현재 역할 목록으로 시작
 
-        # 2. 해변 역할(게스트)이 있다면 제거
-        if (guest_rid := get_id("role_guest")) and (guest_role := member.guild.get_role(guest_rid)):
-            if guest_role in member.roles:
-                await member.remove_roles(guest_role, reason="안내 가이드 승인")
-        
-        # 3. 연안 역할(루키)과 해몽 역할(레귤러)을 roles_to_add 리스트에 추가
-        if (rookie_rid := get_id("role_resident_rookie")) and (rookie_role := member.guild.get_role(rookie_rid)):
-            roles_to_add.append(rookie_role)
-        
-        if (regular_rid := get_id("role_resident_regular")) and (regular_role := member.guild.get_role(regular_rid)):
-            roles_to_add.append(regular_role)
-        
-        # 4. 모아둔 모든 역할을 한 번에 부여
-        if roles_to_add:
-            await member.add_roles(*roles_to_add, reason="안내 가이드 승인")
+            # 1. 제거할 역할 (해변/게스트)
+            if (guest_rid := get_id("role_guest")) and (guest_role := interaction.guild.get_role(guest_rid)):
+                final_roles.discard(guest_role) # set에서 해당 역할 제거
+
+            # 2. 추가할 역할 목록 생성
+            roles_to_add = []
+            # 성별
+            gender_text = self.submitted_data['gender'].strip().lower()
+            if any(k in gender_text for k in ['남자', '남성', '남']):
+                if (rid := get_id("role_info_male")): roles_to_add.append(interaction.guild.get_role(rid))
+            elif any(k in gender_text for k in ['여자', '여성', '여']):
+                if (rid := get_id("role_info_female")): roles_to_add.append(interaction.guild.get_role(rid))
+            
+            # 출생년도
+            birth_year = self.submitted_data['birth_year']
+            year_mapping = next((item for item in AGE_ROLE_MAPPING_BY_YEAR if item["year"] == birth_year), None)
+            if year_mapping:
+                if (rid := get_id(year_mapping['key'])): roles_to_add.append(interaction.guild.get_role(rid))
+
+            # 연안 + 해몽 역할
+            if (rid := get_id("role_resident_rookie")): roles_to_add.append(interaction.guild.get_role(rid))
+            if (rid := get_id("role_resident_regular")): roles_to_add.append(interaction.guild.get_role(rid))
+            
+            # 최종 역할 목록에 추가할 역할들을 합침 (None이 아닌 역할만 필터링)
+            final_roles.update([role for role in roles_to_add if role])
+
+            # 3. 계산된 최종 역할 목록으로 한 번에 수정
+            await member.edit(roles=list(final_roles), reason="안내 가이드 승인")
+
+        except discord.Forbidden:
+            logger.error(f"역할 업데이트 실패(Forbidden): {member.display_name}")
+            await interaction.followup.send("❌ 역할 업데이트에 실패했습니다. 봇의 역할이 대상 역할들보다 높은지 확인해주세요.", ephemeral=True)
+            return
+        except Exception as e:
+            logger.error(f"역할 업데이트 중 오류: {e}", exc_info=True)
+            await interaction.followup.send("❌ 역할 업데이트 중 알 수 없는 오류가 발생했습니다.", ephemeral=True)
+            return
         # ▲▲▲ [수정 완료] ▲▲▲
 
         # 닉네임 변경
