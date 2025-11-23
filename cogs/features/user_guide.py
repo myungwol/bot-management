@@ -132,7 +132,6 @@ class GuideApprovalView(ui.View):
 
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
-    # (이 클래스는 이전 단계와 동일하게 유지)
     name = ui.TextInput(label="이름", placeholder="서버에서 사용할 이름을 알려주세요.", required=True, max_length=12)
     birth_year_str = ui.TextInput(label="출생년도 (YYYY)", placeholder="예: 1998, 2005 (4자리로 입력)", required=True, min_length=4, max_length=4)
     gender = ui.TextInput(label="성별", placeholder="성별을 알려주세요.", required=True, max_length=10)
@@ -175,13 +174,10 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
         
         approval_view = GuideApprovalView(self.cog, interaction.user.id, submitted_data)
         
-        guide_role_id = get_id("role_staff_team_info")
-        newbie_role_id = get_id("role_staff_team_newbie")
-        
-        mentions = []
-        if guide_role_id: mentions.append(f"<@&{guide_role_id}>")
-        if newbie_role_id: mentions.append(f"<@&{newbie_role_id}>")
-        mention_str = " ".join(mentions) if mentions else "스태프 여러분,"
+        # ▼▼▼ [핵심 수정] 언급할 역할을 "안내해주세요" 역할로 변경 ▼▼▼
+        notify_role_id = get_id("role_notify_guide_approval")
+        mention_str = f"<@&{notify_role_id}>" if notify_role_id else "스태프 여러분,"
+        # ▲▲▲ [수정 완료] ▲▲▲
         
         await interaction.channel.send(
             content=mention_str,
@@ -190,10 +186,8 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             allowed_mentions=discord.AllowedMentions(roles=True)
         )
 
-        await interaction.followup.send("✅ 자기소개서를 제출했습니다. 안내팀의 확인 후 역할이 지급됩니다.", ephemeral=True)
+        await interaction.followup.send("✅ 자기소개서를 제출했습니다. 스태프 확인 후 역할이 지급됩니다.", ephemeral=True)
 
-# (GuideThreadView, UserGuidePanelView 클래스는 이전과 동일하게 유지)
-# ...
 
 class UserGuide(commands.Cog):
     def __init__(self, bot: commands.Bot):
