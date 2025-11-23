@@ -61,7 +61,6 @@ async def has_required_roles(interaction: discord.Interaction, required_keys: Li
         return False
         
     return True
-# ▲▲▲ [핵심 추가] ▲▲▲
 
 def format_embed_from_db(embed_data: Dict[str, Any], **kwargs: Any) -> discord.Embed:
     if not isinstance(embed_data, dict):
