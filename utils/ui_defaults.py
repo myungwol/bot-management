@@ -28,7 +28,7 @@ UI_ROLE_KEY_MAP = {
     "role_staff_pr": {"name": "『 🍯：시 럽 공 정 팀 』", "is_prefix": False, "priority": 65},
     "role_staff_police": {"name": "123", "is_prefix": False, "priority": 65},
     "role_staff_festival": {"name": "『 🍦：크 림 조 립 팀 』", "is_prefix": False, "priority": 65},
-    "role_staff_newbie_helper": {"name": "『 🍥：반 죽 제 조 팀 』","is_prefix": False, "priority": 65},
+    "role_staff_newbie_helper": {"name": "이","is_prefix": False, "priority": 65},
 
     "role_approval": {"name": "234", "is_prefix": False, "priority": 60},
 
