@@ -41,7 +41,7 @@ UI_ROLE_KEY_MAP = {
     "role_approval": {"name": "꒰🏠꒱ 스태프", "is_prefix": False, "priority": 70},
 
     # --- [유지] 일반 유저 접두사 역할 ---
-    "role_premium_booster": {"name": "『 🍩：도넛』", "is_prefix": True, "priority": 55, "prefix_symbol": "🍩", "prefix_format": "〚{symbol}〛", "suffix": " ⸝⁺⊹"},
+    "role_premium_booster": {"name": "『💝︰ 𝗕𝗢𝗢𝗦𝗧𝗘𝗥』", "is_prefix": False, "priority": 70},
     "role_resident_elder": {"name": "장로", "is_prefix": True, "priority": 50, "prefix_symbol": "📜", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_resident_veteran": {"name": "베테랑", "is_prefix": True, "priority": 45, "prefix_symbol": "veterαn", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_master_chef": {"name": "마스터 셰프", "is_prefix": True, "priority": 16, "prefix_symbol": "‍🍳", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
