@@ -75,66 +75,62 @@ class GuideApprovalView(ui.View):
 
         await interaction.response.defer(ephemeral=True)
         
-        # ▼▼▼ [핵심 수정 1/2] 캐시 대신 서버에서 직접 멤버 정보를 가져옵니다. ▼▼▼
         try:
             member = await interaction.guild.fetch_member(self.target_user_id)
         except discord.NotFound:
             await interaction.followup.send("❌ 대상 유저를 찾을 수 없습니다. 서버를 나간 것 같습니다.", ephemeral=True)
             return
-        # ▲▲▲ [수정 완료] ▲▲▲
 
-        # ▼▼▼ [핵심 수정 2/2] 역할 부여/제거 로직을 더 안정적인 방식으로 변경 ▼▼▼
         try:
-            final_roles = set(member.roles) # 유저의 현재 역할 목록으로 시작
-
-            # 1. 제거할 역할 (해변/게스트)
+            # ▼▼▼ [핵심 수정] 역할과 닉네임을 한 번에 처리하는 로직으로 변경 ▼▼▼
+            
+            # 1. 최종 역할 목록 계산
+            final_roles = set(member.roles)
             if (guest_rid := get_id("role_guest")) and (guest_role := interaction.guild.get_role(guest_rid)):
-                final_roles.discard(guest_role) # set에서 해당 역할 제거
+                final_roles.discard(guest_role)
 
-            # 2. 추가할 역할 목록 생성
-            roles_to_add = []
-            # 성별
+            roles_to_add_ids = [
+                get_id("role_resident_rookie"),
+                get_id("role_resident_regular")
+            ]
             gender_text = self.submitted_data['gender'].strip().lower()
             if any(k in gender_text for k in ['남자', '남성', '남']):
-                if (rid := get_id("role_info_male")): roles_to_add.append(interaction.guild.get_role(rid))
+                roles_to_add_ids.append(get_id("role_info_male"))
             elif any(k in gender_text for k in ['여자', '여성', '여']):
-                if (rid := get_id("role_info_female")): roles_to_add.append(interaction.guild.get_role(rid))
-            
-            # 출생년도
+                roles_to_add_ids.append(get_id("role_info_female"))
+
             birth_year = self.submitted_data['birth_year']
             year_mapping = next((item for item in AGE_ROLE_MAPPING_BY_YEAR if item["year"] == birth_year), None)
             if year_mapping:
-                if (rid := get_id(year_mapping['key'])): roles_to_add.append(interaction.guild.get_role(rid))
+                roles_to_add_ids.append(get_id(year_mapping['key']))
 
-            # 연안 + 해몽 역할
-            if (rid := get_id("role_resident_rookie")): roles_to_add.append(interaction.guild.get_role(rid))
-            if (rid := get_id("role_resident_regular")): roles_to_add.append(interaction.guild.get_role(rid))
+            for role_id in roles_to_add_ids:
+                if role_id and (role := interaction.guild.get_role(role_id)):
+                    final_roles.add(role)
             
-            # 최종 역할 목록에 추가할 역할들을 합침 (None이 아닌 역할만 필터링)
-            final_roles.update([role for role in roles_to_add if role])
-
-            # 3. 계산된 최종 역할 목록으로 한 번에 수정
-            await member.edit(roles=list(final_roles), reason="안내 가이드 승인")
-
-        except discord.Forbidden:
-            logger.error(f"역할 업데이트 실패(Forbidden): {member.display_name}")
-            await interaction.followup.send("❌ 역할 업데이트에 실패했습니다. 봇의 역할이 대상 역할들보다 높은지 확인해주세요.", ephemeral=True)
-            return
-        except Exception as e:
-            logger.error(f"역할 업데이트 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ 역할 업데이트 중 알 수 없는 오류가 발생했습니다.", ephemeral=True)
-            return
-        # ▲▲▲ [수정 완료] ▲▲▲
-
-        # 닉네임 변경
-        try:
+            # 2. 최종 닉네임 계산 (실제 변경은 아직 안 함)
+            final_nickname = member.nick
             prefix_cog = self.cog.bot.get_cog("PrefixManager")
             if prefix_cog:
-                await prefix_cog.apply_prefix(member, base_name=self.submitted_data['name'])
-            else:
-                await member.edit(nick=self.submitted_data['name'], reason="안내 가이드 승인 (PrefixManager 없음)")
+                # get_final_nickname은 닉네임을 계산해서 문자열만 반환해주는 함수입니다.
+                final_nickname = await prefix_cog.get_final_nickname(member, base_name=self.submitted_data['name'])
+
+            # 3. 역할과 닉네임을 한 번에 수정
+            await member.edit(
+                nick=final_nickname,
+                roles=list(final_roles),
+                reason="안내 가이드 승인"
+            )
+            # ▲▲▲ [수정 완료] ▲▲▲
+
+        except discord.Forbidden:
+            logger.error(f"역할/닉네임 업데이트 실패(Forbidden): {member.display_name}")
+            await interaction.followup.send("❌ 역할/닉네임 업데이트에 실패했습니다. 봇의 역할이 대상 역할들보다 높은지 확인해주세요.", ephemeral=True)
+            return
         except Exception as e:
-            logger.error(f"가이드 승인 중 닉네임 변경 실패: {e}", exc_info=True)
+            logger.error(f"역할/닉네임 업데이트 중 오류: {e}", exc_info=True)
+            await interaction.followup.send("❌ 역할/닉네임 업데이트 중 알 수 없는 오류가 발생했습니다.", ephemeral=True)
+            return
 
         # 공개 자기소개 전송
         await self._send_public_introduction(interaction.user, member)
@@ -150,6 +146,7 @@ class GuideApprovalView(ui.View):
         await interaction.message.edit(embed=original_embed, view=self)
         await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인하고, 공개 채널에 소개글을 게시했습니다.", ephemeral=True)
         await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다! 이제 서버의 모든 채널을 이용할 수 있습니다.")
+
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
     # ▼▼▼ [핵심 수정 1/2] 이름 입력 필드의 최대 길이를 8로 변경 ▼▼▼
