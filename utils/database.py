@@ -14,14 +14,14 @@ from supabase import create_client, AsyncClient
 from postgrest.exceptions import APIError
 
 # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
-# ui_defaults.py에서 BOSS_REWARD_TIERS를 import 합니다.
+# ui_defaults.py에서 삭제된 AGE_ROLE_MAPPING, AGE_BRACKET_ROLES를 제거하고,
+# 새로 추가된 AGE_ROLE_MAPPING_BY_YEAR를 import 합니다.
 from .ui_defaults import (
-    UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP, 
-    SETUP_COMMAND_MAP, JOB_SYSTEM_CONFIG, AGE_ROLE_MAPPING, GAME_CONFIG,
+    UI_EMBEDS, UI_PANEL_COMPONENTS, UI_ROLE_KEY_MAP,
+    SETUP_COMMAND_MAP, JOB_SYSTEM_CONFIG, GAME_CONFIG,
     ONBOARDING_CHOICES, STATIC_AUTO_ROLE_PANELS, BOSS_REWARD_TIERS,
     TICKET_APPLICATION_DEPARTMENTS,
-    # ▼▼▼ [추가] 이 줄을 추가해주세요 ▼▼▼
-    TICKET_DEPARTMENT_MANAGERS,AGE_BRACKET_ROLES  
+    TICKET_DEPARTMENT_MANAGERS, AGE_ROLE_MAPPING_BY_YEAR # [수정] 이 부분을 수정했습니다.
 )
 # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
 
@@ -48,7 +48,6 @@ except Exception as e:
 _bot_configs_cache: Dict[str, Any] = {}
 _channel_id_cache: Dict[str, int] = {}
 _user_abilities_cache: Dict[int, tuple[List[str], float]] = {}
-# ▼▼▼ [추가] 고정 임베드 메시지 캐시 ▼▼▼
 _sticky_messages_cache: Dict[int, Dict[str, Any]] = {}
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -94,24 +93,21 @@ def supabase_retry_handler(retries: int = 3, delay: int = 2):
 async def sync_defaults_to_db():
     logger.info("------ [ 기본값 DB 동기화 시작 ] ------")
     try:
-        # 새로운 UI_ROLE_KEY_MAP 전체를 DB에 동기화
         await save_config_to_db("UI_ROLE_KEY_MAP", UI_ROLE_KEY_MAP)
         
-        # 병렬 처리로 나머지 설정 동기화
         await asyncio.gather(
             *[save_embed_to_db(key, data) for key, data in UI_EMBEDS.items()],
             *[save_panel_component_to_db(comp) for comp in UI_PANEL_COMPONENTS],
             save_config_to_db("SETUP_COMMAND_MAP", SETUP_COMMAND_MAP),
             save_config_to_db("STATIC_AUTO_ROLE_PANELS", STATIC_AUTO_ROLE_PANELS),
             save_config_to_db("JOB_SYSTEM_CONFIG", JOB_SYSTEM_CONFIG),
-            save_config_to_db("AGE_ROLE_MAPPING", AGE_ROLE_MAPPING),
             save_config_to_db("GAME_CONFIG", GAME_CONFIG),
             save_config_to_db("ONBOARDING_CHOICES", ONBOARDING_CHOICES),
-            # ▼▼▼ [수정 후] 이 라인 끝에 쉼표(,)를 추가하세요 ▼▼▼
             save_config_to_db("BOSS_REWARD_TIERS", BOSS_REWARD_TIERS),
-            # ▲▲▲ [수정 후] 완료 ▲▲▲
             save_config_to_db("TICKET_APPLICATION_DEPARTMENTS", TICKET_APPLICATION_DEPARTMENTS),
-            save_config_to_db("TICKET_DEPARTMENT_MANAGERS", TICKET_DEPARTMENT_MANAGERS)
+            save_config_to_db("TICKET_DEPARTMENT_MANAGERS", TICKET_DEPARTMENT_MANAGERS),
+            # [수정] AGE_ROLE_MAPPING -> AGE_ROLE_MAPPING_BY_YEAR 로 변경
+            save_config_to_db("AGE_ROLE_MAPPING_BY_YEAR", AGE_ROLE_MAPPING_BY_YEAR) 
         )
 
         all_role_keys = list(UI_ROLE_KEY_MAP.keys())
@@ -130,14 +126,13 @@ async def sync_defaults_to_db():
 
 async def load_all_data_from_db():
     logger.info("------ [ 모든 DB 데이터 캐시 로드 시작 ] ------")
-    # ▼▼▼ [수정] load_sticky_messages_from_db() 추가 ▼▼▼
     await asyncio.gather(
         load_bot_configs_from_db(), 
         load_channel_ids_from_db(),
         load_sticky_messages_from_db()
     )
-    # ▲▲▲ [수정 완료] ▲▲▲
     logger.info("------ [ 모든 DB 데이터 캐시 로드 완료 ] ------")
+
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 4. 설정 (bot_configs) 관련 함수
