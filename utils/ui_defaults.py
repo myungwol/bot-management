@@ -873,12 +873,12 @@ UI_EMBEDS = {
     },
     "embed_reminder_confirmation_disboard": {
         "title": "서버 갱신 완료!",
-        "description": "DISBOARD에서 확인해 주세요!\n[DISBOARD](https://disboard.org/ko/server/1419879546752077867)",
+        "description": "DISBOARD에서 확인해 주세요!\n[DISBOARD](https://disboard.org/ko/server/1414625026581332112)",
         "color": 0x5865F2
     },
     "embed_reminder_confirmation_dicoall": {
         "title": "서버 갱신 완료!",
-        "description": "DICOALL에서 확인해 주세요!\n[DICOALL](https://kr.dicoall.com/server/1419879546752077867)",
+        "description": "DICOALL에서 확인해 주세요!\n[DICOALL](https://kr.dicoall.com/server/1414625026581332112)",
         "color": 0x2ECC71
     },
     # ▼▼▼ [추가] 새로운 티켓 패널 및 관리자 신청 관련 임베드 ▼▼▼
