@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Dict, List, Any
 import asyncio
 from datetime import datetime
-import re
+import re # <--- [추가] 정규표현식 모듈 import
 
 from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, get_panel_components_from_db, get_config
 from utils.helpers import format_embed_from_db, has_required_roles
@@ -20,7 +20,6 @@ class GuideThreadView:
     pass
 
 class GuideApprovalView(ui.View):
-    # (이 클래스는 이전과 동일하게 유지)
     def __init__(self, cog: 'UserGuide', target_user_id: int, submitted_data: dict):
         super().__init__(timeout=None)
         self.cog = cog
@@ -126,7 +125,10 @@ class GuideApprovalView(ui.View):
 
 
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
-    name = ui.TextInput(label="이름", placeholder="서버에서 사용할 이름을 알려주세요.", required=True, max_length=12)
+    # ▼▼▼ [핵심 수정 1/2] 이름 입력 필드의 최대 길이를 8로 변경 ▼▼▼
+    name = ui.TextInput(label="이름", placeholder="한글/공백 포함 8자 이하", required=True, max_length=8)
+    # ▲▲▲ [수정 완료] ▲▲▲
+    
     birth_year_str = ui.TextInput(label="출생년도 (YYYY)", placeholder="예: 1998, 2005 (4자리로 입력)", required=True, min_length=4, max_length=4)
     gender = ui.TextInput(label="성별", placeholder="성별을 알려주세요.", required=True, max_length=10)
     join_path = ui.TextInput(label="가입 경로", placeholder="어떻게 우리 서버를 알게 되셨나요?", style=discord.TextStyle.paragraph, required=True)
@@ -137,7 +139,18 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
+
+        # ▼▼▼ [핵심 수정 2/2] 이름 유효성 검사 로직 추가 ▼▼▼
+        name_input = self.name.value
+        if len(name_input) > 8:
+            await interaction.followup.send("❌ 이름은 공백을 포함하여 8자 이하로 입력해주세요.", ephemeral=True)
+            return
         
+        if not re.match(r"^[가-힣 ]+$", name_input):
+            await interaction.followup.send("❌ 이름은 한글과 공백만 사용하여 입력해주세요. (특수문자, 영문, 숫자 불가)", ephemeral=True)
+            return
+        # ▲▲▲ [수정 완료] ▲▲▲
+
         try:
             year = int(self.birth_year_str.value)
             current_year = datetime.now().year
@@ -149,7 +162,7 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             return
 
         submitted_data = {
-            "name": self.name.value,
+            "name": name_input.strip(), # .strip()으로 앞뒤 공백 제거
             "birth_year": int(self.birth_year_str.value),
             "gender": self.gender.value,
             "join_path": self.join_path.value
@@ -160,7 +173,7 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             description=f"{interaction.user.mention}님이 자기소개서를 제출했습니다.\n아래 내용을 확인 후 `수락` 버튼을 눌러주세요.",
             color=discord.Color.yellow()
         )
-        approval_embed.add_field(name="신청 이름", value=self.name.value, inline=True)
+        approval_embed.add_field(name="신청 이름", value=submitted_data['name'], inline=True)
         approval_embed.add_field(name="출생년도", value=self.birth_year_str.value, inline=True)
         approval_embed.add_field(name="성별", value=self.gender.value, inline=True)
         approval_embed.add_field(name="가입 경로", value=self.join_path.value, inline=False)
@@ -178,7 +191,6 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
             allowed_mentions=discord.AllowedMentions(roles=True)
         )
         await interaction.followup.send("✅ 자기소개서를 제출했습니다. 스태프 확인 후 역할이 지급됩니다.", ephemeral=True)
-
 
 class GuideThreadView(ui.View):
     def __init__(self, cog: 'UserGuide'):
