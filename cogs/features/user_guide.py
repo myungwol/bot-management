@@ -37,6 +37,7 @@ class GuideApprovalView(ui.View):
         return await has_required_roles(interaction, required_keys, error_message)
 
     async def _send_public_introduction(self, approver: discord.Member, member: discord.Member):
+        # ... (이 함수는 변경 없음) ...
         try:
             channel_id = self.cog.public_intro_channel_id
             if not channel_id:
@@ -68,6 +69,7 @@ class GuideApprovalView(ui.View):
         except Exception as e:
             logger.error(f"공개 자기소개 메시지 전송 중 오류 발생: {e}", exc_info=True)
 
+
     @ui.button(label="수락", style=discord.ButtonStyle.success, emoji="✅", custom_id="guide_approve_button")
     async def approve(self, interaction: discord.Interaction, button: ui.Button):
         if not await self._check_permission(interaction):
@@ -82,43 +84,46 @@ class GuideApprovalView(ui.View):
             return
 
         try:
-            # ▼▼▼ [핵심 수정] 역할과 닉네임을 한 번에 처리하는 로직으로 변경 ▼▼▼
+            # ▼▼▼ [핵심 수정] 역할 리스트를 처음부터 새로 구성하는 방식으로 변경 ▼▼▼
             
-            # 1. 최종 역할 목록 계산
-            final_roles = set(member.roles)
-            if (guest_rid := get_id("role_guest")) and (guest_role := interaction.guild.get_role(guest_rid)):
-                final_roles.discard(guest_role)
+            # 1. 관리 대상이 아닌, 유저가 원래 가지고 있던 역할들만 먼저 추려냅니다.
+            guest_rid = get_id("role_guest")
+            roles_to_keep = [role for role in member.roles if role.id != guest_rid]
 
-            roles_to_add_ids = [
+            # 2. 새로 부여할 역할들의 ID 목록을 만듭니다.
+            new_role_ids = [
                 get_id("role_resident_rookie"),
                 get_id("role_resident_regular")
             ]
             gender_text = self.submitted_data['gender'].strip().lower()
             if any(k in gender_text for k in ['남자', '남성', '남']):
-                roles_to_add_ids.append(get_id("role_info_male"))
+                new_role_ids.append(get_id("role_info_male"))
             elif any(k in gender_text for k in ['여자', '여성', '여']):
-                roles_to_add_ids.append(get_id("role_info_female"))
+                new_role_ids.append(get_id("role_info_female"))
 
             birth_year = self.submitted_data['birth_year']
             year_mapping = next((item for item in AGE_ROLE_MAPPING_BY_YEAR if item["year"] == birth_year), None)
             if year_mapping:
-                roles_to_add_ids.append(get_id(year_mapping['key']))
+                new_role_ids.append(get_id(year_mapping['key']))
 
-            for role_id in roles_to_add_ids:
+            # 3. ID 목록을 실제 역할 객체로 변환하고, 기존 역할과 합칩니다.
+            final_roles = roles_to_keep
+            for role_id in new_role_ids:
                 if role_id and (role := interaction.guild.get_role(role_id)):
-                    final_roles.add(role)
+                    final_roles.append(role)
             
-            # 2. 최종 닉네임 계산 (실제 변경은 아직 안 함)
-            final_nickname = member.nick
-            prefix_cog = self.cog.bot.get_cog("PrefixManager")
-            if prefix_cog:
-                # get_final_nickname은 닉네임을 계산해서 문자열만 반환해주는 함수입니다.
-                final_nickname = await prefix_cog.get_final_nickname(member, base_name=self.submitted_data['name'])
+            # (중복 제거)
+            final_roles = list(dict.fromkeys(final_roles))
 
-            # 3. 역할과 닉네임을 한 번에 수정
+            # 4. 닉네임 계산
+            final_nickname = await self.cog.bot.get_cog("PrefixManager").get_final_nickname(
+                member, base_name=self.submitted_data['name']
+            )
+
+            # 5. 역할과 닉네임을 단 한 번의 요청으로 수정합니다.
             await member.edit(
                 nick=final_nickname,
-                roles=list(final_roles),
+                roles=final_roles,
                 reason="안내 가이드 승인"
             )
             # ▲▲▲ [수정 완료] ▲▲▲
@@ -132,10 +137,8 @@ class GuideApprovalView(ui.View):
             await interaction.followup.send("❌ 역할/닉네임 업데이트 중 알 수 없는 오류가 발생했습니다.", ephemeral=True)
             return
 
-        # 공개 자기소개 전송
         await self._send_public_introduction(interaction.user, member)
 
-        # 피드백
         button.disabled = True
         button.label = "승인 완료"
         
