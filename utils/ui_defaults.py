@@ -8,29 +8,54 @@
 # 1. 역할 키 맵 (Role Key Map)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_ROLE_KEY_MAP = {
-    # --- 최상위 관리 역할 ---
-    "role_staff_village_chief": {"name": "『 🧩：대표 』", "is_prefix": False, "priority": 90},
-    "role_staff_deputy_chief": {"name": "『 🌷：부 대 표 』", "is_prefix": False, "priority": 85},
-    
-    # ▼▼▼ [수정] 팀장 역할 그룹 추가 ▼▼▼
-    "role_staff_leader_machine": {"name": "『 🍫：기 계 공 정 팀 장 』", "is_prefix": False, "priority": 71},
-    "role_staff_leader_syrup": {"name": "『 🍯：시 럽 공 정 팀 장 』", "is_prefix": False, "priority": 70},
-    "role_staff_leader_packaging": {"name": "『 🫙：포 장 관 리 팀 장 』", "is_prefix": False, "priority": 70},
-    "role_staff_leader_cream": {"name": "『 🍦：크 림 조 립 팀 장 』", "is_prefix": False, "priority": 70},
-    "role_staff_leader_dough": {"name": "『 🍥：반 죽 제 조 팀 장 』", "is_prefix": False, "priority": 70},
-    # ▲▲▲ [수정 완료] ▲▲▲
+    # --- [수정] 새로운 관리자 역할 그룹 ---
+    # 최상위 관리 역할
+    "role_staff_village_chief": {"name": ". ˚👑◞ 대표 . ˚", "is_prefix": False, "priority": 100},
+    "role_staff_deputy_chief": {"name": ". ˚🔱◞ 부대표 . ˚", "is_prefix": False, "priority": 99},
+    "role_staff_general_manager": {"name": ". ˚🔱◞ 총관리자 . ˚", "is_prefix": False, "priority": 98},
+    "role_staff_deputy_manager": {"name": ". ˚🔱◞ 부관리자 . ˚", "is_prefix": False, "priority": 97},
+    "role_staff_high_level": {"name": "꒰🔱꒱ : 고위직", "is_prefix": False, "priority": 95},
 
-    # --- 최상위 접두사 역할 ---
-    "role_admin_total": {"name": "345", "is_prefix": False, "priority": 100},
-    
-    
-    # --- 스태프 접두사 역할 ---
-    "role_staff_pr": {"name": "『 🍯：시 럽 공 정 팀 』", "is_prefix": False, "priority": 65},
-    "role_staff_police": {"name": "123", "is_prefix": False, "priority": 65},
-    "role_staff_festival": {"name": "『 🍦：크 림 조 립 팀 』", "is_prefix": False, "priority": 65},
-    "role_staff_newbie_helper": {"name": "이","is_prefix": False, "priority": 65},
+    # 팀장 역할
+    "role_staff_head_leader": {"name": ". ˚⚜️◞ 팀장 . ˚", "is_prefix": False, "priority": 90},
+    "role_staff_leader_admin": {"name": ". ˚✒️◞ 행정팀장 . ˚", "is_prefix": False, "priority": 89},
+    "role_staff_leader_security": {"name": ". ˚🌹◞ 보안팀장 . ˚", "is_prefix": False, "priority": 89},
+    "role_staff_leader_info": {"name": ". ˚🌷◞ 안내팀장 . ˚", "is_prefix": False, "priority": 89},
+    "role_staff_leader_newbie": {"name": ". ˚🐤◞ 뉴관팀장 . ˚", "is_prefix": False, "priority": 89},
+    "role_staff_leader_planning": {"name": ". ˚🪻◞ 기획팀장 . ˚", "is_prefix": False, "priority": 89},
+    "role_staff_leader_pvp": {"name": ". ˚🐬◞ 내전팀장 . ˚", "is_prefix": False, "priority": 89},
+    "role_staff_leader_design": {"name": ". ˚🌸◞ 디자인팀장 . ˚", "is_prefix": False, "priority": 89},
 
-    "role_approval": {"name": "234", "is_prefix": False, "priority": 60},
+    # 부팀장 역할
+    "role_staff_head_sub_leader": {"name": ". ˚⚜️◞ 부팀장 . ˚", "is_prefix": False, "priority": 85},
+    "role_staff_sub_leader_admin": {"name": ". ˚✒️◞ 행정부팀장 . ˚", "is_prefix": False, "priority": 84},
+    "role_staff_sub_leader_security": {"name": ". ˚🌹◞ 보안부팀장  . ˚", "is_prefix": False, "priority": 84},
+    "role_staff_sub_leader_info": {"name": ". ˚🌷◞ 안내부팀장 . ˚", "is_prefix": False, "priority": 84},
+    "role_staff_sub_leader_newbie": {"name": ". ˚🐤◞ 뉴관부팀장 . ˚", "is_prefix": False, "priority": 84},
+    "role_staff_sub_leader_planning": {"name": ". ˚🪻◞ 기획부팀장 . ˚", "is_prefix": False, "priority": 84},
+    "role_staff_sub_leader_pvp": {"name": ". ˚🐬◞ 내전부팀장 . ˚", "is_prefix": False, "priority": 84},
+    "role_staff_sub_leader_design": {"name": ". ˚🌸◞ 디자인부팀장 . ˚", "is_prefix": False, "priority": 84},
+    
+    # 팀 역할
+    "role_staff_team_admin": {"name": "『 ✒️ 』 ◟행정팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
+    "role_staff_team_security": {"name": "『 🌹 』 ◟보안팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
+    "role_staff_team_info": {"name": "『 🌷 』 ◟안내팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
+    "role_staff_team_newbie": {"name": "『 🐤 』 ◟뉴관팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
+    "role_staff_team_planning": {"name": "『 🪻 』 ◟기획팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
+    "role_staff_team_pvp": {"name": "『 🐬 』 ◟내전팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
+    "role_staff_team_design": {"name": "『 🌸 』 ◟디자인팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
+
+    # 인턴 역할
+    "role_staff_intern_admin": {"name": "『 ✒️ 』 ◟행정인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
+    "role_staff_intern_security": {"name": "『 🌹 』 ◟보안인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
+    "role_staff_intern_info": {"name": "『 🌷 』 ◟안내인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
+    "role_staff_intern_newbie": {"name": "『 🐤 』 ◟뉴관인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
+    "role_staff_intern_planning": {"name": "『 🪻 』 ◟기획인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
+    "role_staff_intern_pvp": {"name": "『 🐬 』 ◟내전인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
+    "role_staff_intern_design": {"name": "『 🌸 』 ◟디자인인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
+    
+    # 기존 역할 중 관리 기능과 직접 연관된 역할
+    "role_approval": {"name": "꒰🏠꒱ 스태프", "is_prefix": False, "priority": 70},
 
     # --- 일반 접두사 역할 (우선순위 순) ---
     "role_premium_booster": {"name": "『 🍩：도넛』", "is_prefix": True, "priority": 55, "prefix_symbol": "🍩", "prefix_format": "〚{symbol}〛", "suffix": " ⸝⁺⊹"},
@@ -53,7 +78,7 @@ UI_ROLE_KEY_MAP = {
     "role_resident_rookie": {"name": "『 🧈：버터 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🧈", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_guest": {"name": "『 🌾：밀가루 』", "is_prefix": True, "priority": 1, "prefix_symbol": "🌾", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
 
-    # ▼▼▼ [추가] 부스트 보상 역할 10개 ▼▼▼
+    # --- 기타 역할 (접두사 없음) ---
     "role_boost_ticket_1": {"name": "♡。💌：역할선택권 1 ໒꒱", "is_prefix": False, "priority": 0},
     "role_boost_ticket_2": {"name": "♡。💌：역할선택권 2 ໒꒱", "is_prefix": False, "priority": 0},
     "role_boost_ticket_3": {"name": "♡。💌：역할선택권 3 ໒꒱", "is_prefix": False, "priority": 0},
@@ -64,25 +89,20 @@ UI_ROLE_KEY_MAP = {
     "role_boost_ticket_8": {"name": "♡。💌：역할선택권 8 ໒꒱", "is_prefix": False, "priority": 0},
     "role_boost_ticket_9": {"name": "♡。💌：역할선택권 9 ໒꒱", "is_prefix": False, "priority": 0},
     "role_boost_ticket_10": {"name": "♡。💌：역할선택권 10 ໒꒱", "is_prefix": False, "priority": 0},
-    # ▲▲▲ [추가 완료] ▲▲▲
     
-    # ... (기존 역할들) ...
     "role_info_male": {"name": "『 👦：남자 』", "is_prefix": False, "priority": 0},
     "role_info_female": {"name": "『 👧：여자 』", "is_prefix": False, "priority": 0},
-    # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
-
     "role_info_age_private": {"name": "비공개", "is_prefix": False, "priority": 0},
     "role_info_age_70s": {"name": "70", "is_prefix": False, "priority": 0},
     "role_info_age_80s": {"name": "『 🥪：𝟏𝟗𝟖𝟎 』", "is_prefix": False, "priority": 0},
     "role_info_age_90s": {"name": "『 🥨：𝟏𝟗𝟗𝟎 』", "is_prefix": False, "priority": 0},
     "role_info_age_00s": {"name": "『 🥐：𝟐𝟎𝟎𝟎 』", "is_prefix": False, "priority": 0},
     
-    # ▼▼▼▼▼ [수정] 아래 3개의 연령대 역할 이름을 변경합니다. (role_age_40s는 그대로 둡니다) ▼▼▼▼▼
     "role_age_10s": {"name": "『 🍞：𝟭𝟬대 』", "is_prefix": False, "priority": 0},
     "role_age_20s": {"name": "『 🥐：𝟮𝟬대 』", "is_prefix": False, "priority": 0},
     "role_age_30s": {"name": "『 🥨：𝟯𝟬대 』", "is_prefix": False, "priority": 0},
+    "role_age_40s": {"name": "『 🥪 : 𝟰𝟬대 이상 』", "is_prefix": False, "priority": 0},
 
-    
     "role_notify_dding": {"name": "⊹ ₊ 띵 동 .ᐟ ⊹", "is_prefix": False, "priority": 0},
     "role_notify_welcome": {"name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗", "is_prefix": False, "priority": 0},
     "role_notify_disboard": {"name": "『 🍨 : 공장 홍보대사 』", "is_prefix": False, "priority": 0},
@@ -102,6 +122,8 @@ UI_ROLE_KEY_MAP = {
     "role_warning_level_2": {"name": "『 🚫：경고 2 』", "is_prefix": False, "priority": 0},
     "role_warning_level_3": {"name": "『 🚫：경고 3 』", "is_prefix": False, "priority": 0},
     "role_warning_level_4": {"name": "벌점 4회", "is_prefix": False, "priority": 0},
+    "role_warning_separator": {"name": "━━━━━━━━━━", "is_prefix": False, "priority": 0},
+    "role_shop_separator": {"name": "━━━━━━━━━━", "is_prefix": False, "priority": 0},
 }
 AGE_BRACKET_ROLES = [
     {"key": "role_age_10s", "min_age": 10, "max_age": 19},
