@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 import logging
 from typing import Optional, List
-import re # <-- 정규표현식을 위해 re 모듈을 import 합니다.
+import re
 
 from utils.helpers import format_embed_from_db
 from utils.database import get_id, get_embed_from_db, supabase, get_config, backup_member_data, get_member_backup, delete_member_backup
@@ -27,8 +27,9 @@ class MemberEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
-        # ... (이 함수는 변경 없음) ...
         if member.bot: return
+        
+        # 재참여 유저 데이터 복구 로직 (유지)
         backup = await get_member_backup(member.id, member.guild.id)
         if backup:
             logger.info(f"재참여 유저 '{member.display_name}'님의 데이터를 발견하여 복구를 시도합니다.")
@@ -40,20 +41,29 @@ class MemberEvents(commands.Cog):
                 await delete_member_backup(member.id, member.guild.id)
             except Exception as e: logger.error(f"'{member.display_name}'님 데이터 복구 중 오류: {e}", exc_info=True)
             return
+            
+        # 신규 유저 초기 데이터 생성 (유지)
         try:
             await supabase.table('user_levels').upsert({'user_id': member.id, 'level': 1, 'xp': 0}, on_conflict='user_id').execute()
         except Exception as e: logger.error(f"'{member.display_name}'님의 초기 레벨 데이터 생성 중 오류: {e}", exc_info=True)
-        initial_role_keys = ["role_notify_welcome", "role_notify_dding", "role_guest"]
+        
+        # ▼▼▼ [핵심 수정] role_guest 부여 로직 삭제 ▼▼▼
+        # 초기 알림 역할만 부여하도록 수정합니다.
+        initial_role_keys = ["role_notify_welcome", "role_notify_dding"]
+        # ▲▲▲ [수정 완료] ▲▲▲
+        
         roles_to_add = [role for key in initial_role_keys if (role_id := get_id(key)) and (role := member.guild.get_role(role_id))]
         if roles_to_add:
             try: await member.add_roles(*roles_to_add, reason="서버 참여 시 초기 역할 부여")
             except discord.Forbidden: logger.error(f"'{member.display_name}'님에게 초기 역할을 부여하지 못했습니다. (권한 부족)")
+            
+        # 환영 메시지 전송 (유지)
         if self.welcome_channel_id and (channel := self.bot.get_channel(self.welcome_channel_id)):
             embed_data = await get_embed_from_db('welcome_embed')
             if embed_data:
                 embed = format_embed_from_db(embed_data, member_mention=member.mention, guild_name=member.guild.name)
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-                await channel.send(f"{member.mention}님, 과자 공장에 오신 것을 환영합니다 <a:newheart_01:1427212124588998706> ", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+                await channel.send(f"{member.mention}님, 서버에 오신 것을 환영합니다.", embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
