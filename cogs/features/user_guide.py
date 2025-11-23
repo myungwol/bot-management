@@ -239,18 +239,21 @@ class UserGuidePanelView(ui.View):
         comp = comps[0] if comps else {}; btn = ui.Button(label=comp.get('label', "안내 시작하기"), style=discord.ButtonStyle.success, emoji=comp.get('emoji', "👋"), custom_id=comp.get('component_key', "start_user_guide"))
         btn.callback = self.start_guide_callback; self.add_item(btn)
         
+    # ▼▼▼ [핵심 수정] start_guide_callback 함수 수정 ▼▼▼
     async def start_guide_callback(self, i: discord.Interaction):
+        # 1. 어떤 작업보다 먼저 defer를 호출하여 상호작용 실패를 방지합니다.
+        await i.response.defer(ephemeral=True)
+
+        # 2. 기존 스레드 확인 로직을 defer 다음에 배치합니다.
         if self.cog.has_active_thread(i.user): 
-            await i.response.send_message(f"❌ 이미 진행 중인 안내 스레드(<#{self.cog.active_guide_threads.get(i.user.id)}>)가 있습니다.", ephemeral=True)
+            # 3. defer를 이미 했으므로 response 대신 followup을 사용합니다.
+            await i.followup.send(f"❌ 이미 진행 중인 안내 스레드(<#{self.cog.active_guide_threads.get(i.user.id)}>)가 있습니다.", ephemeral=True)
             return
         
-        await i.response.defer(ephemeral=True)
         try:
-            # ▼▼▼ [핵심 수정] '해변' 역할 부여 로직 추가 ▼▼▼
             if (guest_rid := get_id("role_guest")) and (guest_role := i.guild.get_role(guest_rid)):
                 if guest_role not in i.user.roles:
                     await i.user.add_roles(guest_role, reason="안내 가이드 시작")
-            # ▲▲▲ [수정 완료] ▲▲▲
 
             thread_name = f"👋ㅣ{i.user.display_name}님의-안내"
             thread = await i.channel.create_thread(name=thread_name, type=discord.ChannelType.private_thread)
@@ -277,7 +280,9 @@ class UserGuidePanelView(ui.View):
         except Exception as e:
             self.cog.active_guide_threads.pop(i.user.id, None)
             logger.error(f"유저 안내 스레드 생성 중 오류: {e}", exc_info=True)
+            # 이미 defer 했으므로 followup으로 오류 메시지 전송
             await i.followup.send("❌ 스레드 생성 중 오류가 발생했습니다.", ephemeral=True)
+    # ▲▲▲ [수정 완료] ▲▲▲
 
 
 class UserGuide(commands.Cog):
