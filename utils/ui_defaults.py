@@ -78,12 +78,7 @@ UI_ROLE_KEY_MAP = {
     "role_info_birth_year_1997": {"name": "『 🎀︰ 97년생 』", "is_prefix": False, "priority": 0},
     "role_info_age_private": {"name": "『 🎀︰ 비공 』", "is_prefix": False, "priority": 0},
 
-    # [삭제] 기존의 10년 단위, 10대/20대 단위 나이 역할은 모두 제거
-
-    # --- [유지] 기타 역할 ---
-    "role_boost_ticket_1": {"name": "♡。💌：역할선택권 1 ໒꒱", "is_prefix": False, "priority": 0},
-    # ... (나머지 부스트 역할 9개) ...
-    "role_boost_ticket_10": {"name": "♡。💌：역할선택권 10 ໒꒱", "is_prefix": False, "priority": 0},
+    "role_notify_guide_approval": {"name": "‶ 💞 : 안내해주세요 .ᐟ ‶", "is_prefix": False, "priority": 0},
 
     "role_notify_dding": {"name": "⊹ ₊ 띵 동 .ᐟ ⊹", "is_prefix": False, "priority": 0},
     "role_notify_welcome": {"name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗", "is_prefix": False, "priority": 0},
