@@ -20,6 +20,7 @@ class GuideThreadView:
     pass
 
 class GuideApprovalView(ui.View):
+    # (이 클래스는 이전과 동일하게 유지)
     def __init__(self, cog: 'UserGuide', target_user_id: int, submitted_data: dict):
         super().__init__(timeout=None)
         self.cog = cog
@@ -248,7 +249,10 @@ class UserGuidePanelView(ui.View):
         await i.response.defer(ephemeral=True)
         try:
             thread_name = f"👋ㅣ{i.user.display_name}님의-안내"
-            thread = await i.channel.create_thread(name=thread_name, type=discord.ChannelType.public_thread)
+            
+            # ▼▼▼ [핵심 수정] 스레드 타입을 public -> private 으로 변경합니다. ▼▼▼
+            thread = await i.channel.create_thread(name=thread_name, type=discord.ChannelType.private_thread)
+            # ▲▲▲ [수정 완료] ▲▲▲
             
             self.cog.active_guide_threads[i.user.id] = thread.id
             steps = await self.cog.get_guide_steps()
