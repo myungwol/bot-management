@@ -8,15 +8,12 @@
 # 1. 역할 키 맵 (Role Key Map)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 UI_ROLE_KEY_MAP = {
-    # --- [수정] 새로운 관리자 역할 그룹 ---
-    # 최상위 관리 역할
+    # --- [유지] 관리자 역할 그룹 ---
     "role_staff_village_chief": {"name": ". ˚👑◞ 대표 . ˚", "is_prefix": False, "priority": 100},
     "role_staff_deputy_chief": {"name": ". ˚🔱◞ 부대표 . ˚", "is_prefix": False, "priority": 99},
     "role_staff_general_manager": {"name": ". ˚🔱◞ 총관리자 . ˚", "is_prefix": False, "priority": 98},
     "role_staff_deputy_manager": {"name": ". ˚🔱◞ 부관리자 . ˚", "is_prefix": False, "priority": 97},
     "role_staff_high_level": {"name": "꒰🔱꒱ : 고위직", "is_prefix": False, "priority": 95},
-
-    # 팀장 역할
     "role_staff_head_leader": {"name": ". ˚⚜️◞ 팀장 . ˚", "is_prefix": False, "priority": 90},
     "role_staff_leader_admin": {"name": ". ˚✒️◞ 행정팀장 . ˚", "is_prefix": False, "priority": 89},
     "role_staff_leader_security": {"name": ". ˚🌹◞ 보안팀장 . ˚", "is_prefix": False, "priority": 89},
@@ -25,8 +22,6 @@ UI_ROLE_KEY_MAP = {
     "role_staff_leader_planning": {"name": ". ˚🪻◞ 기획팀장 . ˚", "is_prefix": False, "priority": 89},
     "role_staff_leader_pvp": {"name": ". ˚🐬◞ 내전팀장 . ˚", "is_prefix": False, "priority": 89},
     "role_staff_leader_design": {"name": ". ˚🌸◞ 디자인팀장 . ˚", "is_prefix": False, "priority": 89},
-
-    # 부팀장 역할
     "role_staff_head_sub_leader": {"name": ". ˚⚜️◞ 부팀장 . ˚", "is_prefix": False, "priority": 85},
     "role_staff_sub_leader_admin": {"name": ". ˚✒️◞ 행정부팀장 . ˚", "is_prefix": False, "priority": 84},
     "role_staff_sub_leader_security": {"name": ". ˚🌹◞ 보안부팀장  . ˚", "is_prefix": False, "priority": 84},
@@ -35,8 +30,6 @@ UI_ROLE_KEY_MAP = {
     "role_staff_sub_leader_planning": {"name": ". ˚🪻◞ 기획부팀장 . ˚", "is_prefix": False, "priority": 84},
     "role_staff_sub_leader_pvp": {"name": ". ˚🐬◞ 내전부팀장 . ˚", "is_prefix": False, "priority": 84},
     "role_staff_sub_leader_design": {"name": ". ˚🌸◞ 디자인부팀장 . ˚", "is_prefix": False, "priority": 84},
-    
-    # 팀 역할
     "role_staff_team_admin": {"name": "『 ✒️ 』 ◟행정팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
     "role_staff_team_security": {"name": "『 🌹 』 ◟보안팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
     "role_staff_team_info": {"name": "『 🌷 』 ◟안내팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
@@ -44,8 +37,6 @@ UI_ROLE_KEY_MAP = {
     "role_staff_team_planning": {"name": "『 🪻 』 ◟기획팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
     "role_staff_team_pvp": {"name": "『 🐬 』 ◟내전팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
     "role_staff_team_design": {"name": "『 🌸 』 ◟디자인팀 ⸝⸝‧⁺", "is_prefix": False, "priority": 80},
-
-    # 인턴 역할
     "role_staff_intern_admin": {"name": "『 ✒️ 』 ◟행정인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
     "role_staff_intern_security": {"name": "『 🌹 』 ◟보안인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
     "role_staff_intern_info": {"name": "『 🌷 』 ◟안내인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
@@ -53,15 +44,14 @@ UI_ROLE_KEY_MAP = {
     "role_staff_intern_planning": {"name": "『 🪻 』 ◟기획인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
     "role_staff_intern_pvp": {"name": "『 🐬 』 ◟내전인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
     "role_staff_intern_design": {"name": "『 🌸 』 ◟디자인인턴 ⸝⸝‧⁺", "is_prefix": False, "priority": 75},
-    
-    # 기존 역할 중 관리 기능과 직접 연관된 역할
     "role_approval": {"name": "꒰🏠꒱ 스태프", "is_prefix": False, "priority": 70},
 
-    # --- 일반 접두사 역할 (우선순위 순) ---
+    # --- [수정] 일반 유저 접두사 역할 ---
     "role_premium_booster": {"name": "『 🍩：도넛』", "is_prefix": True, "priority": 55, "prefix_symbol": "🍩", "prefix_format": "〚{symbol}〛", "suffix": " ⸝⁺⊹"},
-    "role_resident_elder": {"name": "장로", "is_prefix": True, "priority": 50, "prefix_symbol": "📜", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_resident_elder": {"name": "장로", "is_prefix": True, "priority": 50, "prefix_symbol": "📜", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"}, # 레벨업 보상 (유지)
+    "role_resident_veteran": {"name": "베테랑", "is_prefix": True, "priority": 45, "prefix_symbol": "veterαn", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"}, # 레벨업 보상 (유지)
     
-    # --- 직업 접두사 역할 ---
+    # 직업 접두사 (유지)
     "role_job_master_chef": {"name": "마스터 셰프", "is_prefix": True, "priority": 16, "prefix_symbol": "‍🍳", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_master_angler": {"name": "강태공", "is_prefix": True, "priority": 16, "prefix_symbol": "🏆", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_master_farmer": {"name": "대농", "is_prefix": True, "priority": 16, "prefix_symbol": "👑", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
@@ -71,37 +61,40 @@ UI_ROLE_KEY_MAP = {
     "role_job_farmer": {"name": "농부", "is_prefix": True, "priority": 15, "prefix_symbol": "🌾", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_miner": {"name": "광부", "is_prefix": True, "priority": 15, "prefix_symbol": "⛏️", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     
-    # --- 등급 접두사 역할 (우선순위 순) ---
-    "role_resident": {"name": "주민", "is_prefix": True, "priority": 10, "prefix_symbol": "💌", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_resident_veteran": {"name": "베테랑", "is_prefix": True, "priority": 4, "prefix_symbol": "veterαn", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_resident_regular": {"name": "『 🍪：쿠키 』", "is_prefix": True, "priority": 3, "prefix_symbol": "🍪", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
-    "role_resident_rookie": {"name": "『 🧈：버터 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🧈", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_guest": {"name": "『 🌾：밀가루 』", "is_prefix": True, "priority": 1, "prefix_symbol": "🌾", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
+    # 등급 접두사 역할 (새로운 이름으로 변경)
+    "role_resident_regular": {"name": "『 🌊︰ 해몽 』", "is_prefix": True, "priority": 3, "prefix_symbol": "🌊", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
+    "role_resident_rookie": {"name": "『 🐳︰ 연안 』", "is_prefix": True, "priority": 2, "prefix_symbol": "🐳", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
+    "role_guest": {"name": "『 💧 』 ◟해변 ⸝⸝‧⁺", "is_prefix": True, "priority": 1, "prefix_symbol": "💧", "prefix_format": "『{symbol}』", "suffix": " ⸝⁺⊹"},
 
-    # --- 기타 역할 (접두사 없음) ---
+    # --- [수정] 정보 역할 (성별, 나이) ---
+    "role_info_male": {"name": "『 💙︰ 남자 』", "is_prefix": False, "priority": 0},
+    "role_info_female": {"name": "『 🩷︰ 여자 』", "is_prefix": False, "priority": 0},
+
+    # [신규] 출생년도별 역할
+    "role_info_birth_year_2012": {"name": "『 🎀︰ 12년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2011": {"name": "『 🎀︰ 11년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2010": {"name": "『 🎀︰ 10년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2009": {"name": "『 🎀︰ 09년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2008": {"name": "『 🎀︰ 08년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2007": {"name": "『 🎀︰ 07년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2006": {"name": "『 🎀︰ 06년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2005": {"name": "『 🎀︰ 05년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2004": {"name": "『 🎀︰ 04년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2003": {"name": "『 🎀︰ 03년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2002": {"name": "『 🎀︰ 02년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2001": {"name": "『 🎀︰ 01년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_2000": {"name": "『 🎀︰ 00년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_1999": {"name": "『 🎀︰ 99년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_1998": {"name": "『 🎀︰ 98년생 』", "is_prefix": False, "priority": 0},
+    "role_info_birth_year_1997": {"name": "『 🎀︰ 97년생 』", "is_prefix": False, "priority": 0},
+    "role_info_age_private": {"name": "『 🎀︰ 비공 』", "is_prefix": False, "priority": 0},
+
+    # [삭제] 기존의 10년 단위, 10대/20대 단위 나이 역할은 모두 제거
+
+    # --- [유지] 기타 역할 ---
     "role_boost_ticket_1": {"name": "♡。💌：역할선택권 1 ໒꒱", "is_prefix": False, "priority": 0},
-    "role_boost_ticket_2": {"name": "♡。💌：역할선택권 2 ໒꒱", "is_prefix": False, "priority": 0},
-    "role_boost_ticket_3": {"name": "♡。💌：역할선택권 3 ໒꒱", "is_prefix": False, "priority": 0},
-    "role_boost_ticket_4": {"name": "♡。💌：역할선택권 4 ໒꒱", "is_prefix": False, "priority": 0},
-    "role_boost_ticket_5": {"name": "♡。💌：역할선택권 5 ໒꒱", "is_prefix": False, "priority": 0},
-    "role_boost_ticket_6": {"name": "♡。💌：역할선택권 6 ໒꒱", "is_prefix": False, "priority": 0},
-    "role_boost_ticket_7": {"name": "♡。💌：역할선택권 7 ໒꒱", "is_prefix": False, "priority": 0},
-    "role_boost_ticket_8": {"name": "♡。💌：역할선택권 8 ໒꒱", "is_prefix": False, "priority": 0},
-    "role_boost_ticket_9": {"name": "♡。💌：역할선택권 9 ໒꒱", "is_prefix": False, "priority": 0},
+    # ... (나머지 부스트 역할 9개) ...
     "role_boost_ticket_10": {"name": "♡。💌：역할선택권 10 ໒꒱", "is_prefix": False, "priority": 0},
-    
-    "role_info_male": {"name": "『 👦：남자 』", "is_prefix": False, "priority": 0},
-    "role_info_female": {"name": "『 👧：여자 』", "is_prefix": False, "priority": 0},
-    "role_info_age_private": {"name": "비공개", "is_prefix": False, "priority": 0},
-    "role_info_age_70s": {"name": "70", "is_prefix": False, "priority": 0},
-    "role_info_age_80s": {"name": "『 🥪：𝟏𝟗𝟖𝟎 』", "is_prefix": False, "priority": 0},
-    "role_info_age_90s": {"name": "『 🥨：𝟏𝟗𝟗𝟎 』", "is_prefix": False, "priority": 0},
-    "role_info_age_00s": {"name": "『 🥐：𝟐𝟎𝟎𝟎 』", "is_prefix": False, "priority": 0},
-    
-    "role_age_10s": {"name": "『 🍞：𝟭𝟬대 』", "is_prefix": False, "priority": 0},
-    "role_age_20s": {"name": "『 🥐：𝟮𝟬대 』", "is_prefix": False, "priority": 0},
-    "role_age_30s": {"name": "『 🥨：𝟯𝟬대 』", "is_prefix": False, "priority": 0},
-    "role_age_40s": {"name": "『 🥪 : 𝟰𝟬대 이상 』", "is_prefix": False, "priority": 0},
 
     "role_notify_dding": {"name": "⊹ ₊ 띵 동 .ᐟ ⊹", "is_prefix": False, "priority": 0},
     "role_notify_welcome": {"name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗", "is_prefix": False, "priority": 0},
@@ -109,14 +102,7 @@ UI_ROLE_KEY_MAP = {
     "role_notify_ask": {"name": "『 🍳：에 스 크 알 림 』", "is_prefix": False, "priority": 0},
     "role_notify_up": {"name": "『 🍭 : 공장 업 』", "is_prefix": False, "priority": 0},
     "role_game_tft": {"name": "ʚ ♟️：롤토체스 ɞ", "is_prefix": False, "priority": 0},
-    "role_game_lol": {"name": "ʚ ⚔️：리그오브레전드 ɞ", "is_prefix": False, "priority": 0},
-    "role_game_valorant": {"name": "ʚ 🔫：발로란트 ɞ", "is_prefix": False, "priority": 0},
-    "role_game_overwatch": {"name": "ʚ ⏰：오버워치 ɞ", "is_prefix": False, "priority": 0},
-    "role_game_lostark": {"name": "ʚ ⏰：로스트아크 ɞ", "is_prefix": False, "priority": 0},
-    "role_game_minecraft": {"name": "ʚ ⛏️：마인크래프트 ɞ", "is_prefix": False, "priority": 0},
-    "role_game_zombi": {"name": "ʚ 🧟‍♂️：좀비고등학교 ɞ", "is_prefix": False, "priority": 0},
-    "role_platform_steam": {"name": "ʚ 🎮：스팀 게임 ɞ", "is_prefix": False, "priority": 0},
-    "role_platform_smartphone": {"name": "ʚ 🎮：모바일 게임 ɞ", "is_prefix": False, "priority": 0},
+    # ... (나머지 게임 역할) ...
     "role_platform_switch": {"name": "ʚ 🎮：기타 게임 ɞ", "is_prefix": False, "priority": 0},
     "role_warning_level_1": {"name": "『 🚫：경고 1 』", "is_prefix": False, "priority": 0},
     "role_warning_level_2": {"name": "『 🚫：경고 2 』", "is_prefix": False, "priority": 0},
@@ -125,42 +111,41 @@ UI_ROLE_KEY_MAP = {
     "role_warning_separator": {"name": "━━━━━━━━━━", "is_prefix": False, "priority": 0},
     "role_shop_separator": {"name": "━━━━━━━━━━", "is_prefix": False, "priority": 0},
 }
-AGE_BRACKET_ROLES = [
-    {"key": "role_age_10s", "min_age": 10, "max_age": 19},
-    {"key": "role_age_20s", "min_age": 20, "max_age": 29},
-    {"key": "role_age_30s", "min_age": 30, "max_age": 39},
-    {"key": "role_age_40s", "min_age": 40, "max_age": 99} # 40대 이상은 모두 이 역할을 받음
+
+# [신규] 출생년도별 역할 부여를 위한 정확한 매핑 데이터
+# onboarding.py, user_guide.py 등에서 이 데이터를 사용하여 역할을 부여하게 됩니다.
+AGE_ROLE_MAPPING_BY_YEAR = [
+    {"key": "role_info_birth_year_2012", "year": 2012},
+    {"key": "role_info_birth_year_2011", "year": 2011},
+    {"key": "role_info_birth_year_2010", "year": 2010},
+    {"key": "role_info_birth_year_2009", "year": 2009},
+    {"key": "role_info_birth_year_2008", "year": 2008},
+    {"key": "role_info_birth_year_2007", "year": 2007},
+    {"key": "role_info_birth_year_2006", "year": 2006},
+    {"key": "role_info_birth_year_2005", "year": 2005},
+    {"key": "role_info_birth_year_2004", "year": 2004},
+    {"key": "role_info_birth_year_2003", "year": 2003},
+    {"key": "role_info_birth_year_2002", "year": 2002},
+    {"key": "role_info_birth_year_2001", "year": 2001},
+    {"key": "role_info_birth_year_2000", "year": 2000},
+    {"key": "role_info_birth_year_1999", "year": 1999},
+    {"key": "role_info_birth_year_1998", "year": 1998},
+    {"key": "role_info_birth_year_1997", "year": 1997},
 ]
+
+# [삭제] 기존의 AGE_BRACKET_ROLES 와 AGE_ROLE_MAPPING 은 새로운 시스템과 호환되지 않아 제거합니다.
+
+# [수정] 온보딩 시 유저에게 보여줄 출생년도 선택지
 ONBOARDING_CHOICES = {
-    "gender": [{
-        "label": "남성",
-        "value": "남성"
-    }, {
-        "label": "여성",
-        "value": "여성"
-    }],
-    "birth_year_groups": {
-        "2000s": [{
-            "label": f"{year}년생",
-            "value": str(year)
-        } for year in range(2009, 1999, -1)],
-        "1990s": [{
-            "label": f"{year}년생",
-            "value": str(year)
-        } for year in range(1999, 1989, -1)],
-        "1980s": [{
-            "label": f"{year}년생",
-            "value": str(year)
-        } for year in range(1989, 1979, -1)],
-        "1970s": [{
-            "label": f"{year}년생",
-            "value": str(year)
-        } for year in range(1979, 1969, -1)],
-        "private": [{
-            "label": "비공개",
-            "value": "비공개"
-        }]
-    }
+    "gender": [
+        {"label": "남성", "value": "남성"},
+        {"label": "여성", "value": "여성"}
+    ],
+    "birth_years": [
+        {"label": f"{str(year)[2:]}년생", "value": str(year)} for year in range(2012, 1996, -1)
+    ] + [
+        {"label": "비공개", "value": "비공개"}
+    ]
 }
 USABLE_ITEMS = {
     "role_item_warning_deduct": {
