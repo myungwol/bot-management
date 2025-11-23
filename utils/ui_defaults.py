@@ -1152,6 +1152,14 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[패널] 신규 유저 안내",
         "channel_type": "text"
     },
+    # ▼▼▼ [핵심 추가] 공개 자기소개 채널 설정 명령어 추가 ▼▼▼
+    "channel_introduction_public": {
+        "type": "channel",
+        "cog_name": "UserGuide",
+        "key": "introduction_public_channel_id",
+        "friendly_name": "[채널] 공개 자기소개",
+        "channel_type": "text"
+    },
     "panel_notification_roles": {
         "type": "panel",
         "cog_name": "RolePanel",
