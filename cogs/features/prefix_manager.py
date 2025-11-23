@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 import logging
 from typing import Set
+import asyncio # <--- [수정] 누락되었던 asyncio import를 추가합니다.
 
 from utils.database import get_config, get_id
 
@@ -85,8 +86,8 @@ class PrefixManager(commands.Cog):
                     base = temp_name[:-len(suffix_str)] if suffix_str else temp_name
                     break
 
-        # 3. 접두사 예외 역할 처리
-        no_prefix_role_keys = {"role_staff_village_chief", "role_staff_deputy_chief", "role_approval"}
+        # 3. 접두사 예외 역할 처리 (모든 관리자 역할은 접두사를 붙이지 않음)
+        no_prefix_role_keys = {key for key, config in UI_ROLE_KEY_MAP.items() if not config.get("is_prefix")}
         no_prefix_role_ids = {get_id(key) for key in no_prefix_role_keys if get_id(key)}
         user_has_no_prefix_role = bool(no_prefix_role_ids.intersection(member_role_ids))
 
