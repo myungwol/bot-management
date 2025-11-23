@@ -21,7 +21,7 @@ UI_ROLE_KEY_MAP = {
     # ▲▲▲ [수정 완료] ▲▲▲
 
     # --- 최상위 접두사 역할 ---
-    "role_admin_total": {"name": "『 ⭐：엔지니어 』", "is_prefix": False, "priority": 100},
+    "role_admin_total": {"name": "345", "is_prefix": False, "priority": 100},
     
     
     # --- 스태프 접두사 역할 ---
@@ -30,7 +30,7 @@ UI_ROLE_KEY_MAP = {
     "role_staff_festival": {"name": "『 🍦：크 림 조 립 팀 』", "is_prefix": False, "priority": 65},
     "role_staff_newbie_helper": {"name": "『 🍥：반 죽 제 조 팀 』","is_prefix": False, "priority": 65},
 
-    "role_approval": {"name": "『🧺：바구니 』", "is_prefix": False, "priority": 60},
+    "role_approval": {"name": "234", "is_prefix": False, "priority": 60},
 
     # --- 일반 접두사 역할 (우선순위 순) ---
     "role_premium_booster": {"name": "『 🍩：도넛』", "is_prefix": True, "priority": 55, "prefix_symbol": "🍩", "prefix_format": "〚{symbol}〛", "suffix": " ⸝⁺⊹"},
