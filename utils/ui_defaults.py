@@ -26,7 +26,7 @@ UI_ROLE_KEY_MAP = {
     
     # --- 스태프 접두사 역할 ---
     "role_staff_pr": {"name": "『 🍯：시 럽 공 정 팀 』", "is_prefix": False, "priority": 65},
-    "role_staff_police": {"name": "『 🫙：포 장 관 리 팀 』", "is_prefix": False, "priority": 65},
+    "role_staff_police": {"name": "123", "is_prefix": False, "priority": 65},
     "role_staff_festival": {"name": "『 🍦：크 림 조 립 팀 』", "is_prefix": False, "priority": 65},
     "role_staff_newbie_helper": {"name": "『 🍥：반 죽 제 조 팀 』","is_prefix": False, "priority": 65},
 
