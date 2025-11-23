@@ -19,188 +19,119 @@ logger = logging.getLogger(__name__)
 class GuideThreadView:
     pass
 
+# ▼▼▼ [핵심 수정 1/3] GuideApprovalView를 상태 없는(Stateless) 구조로 완전히 변경 ▼▼▼
 class GuideApprovalView(ui.View):
-    def __init__(self, cog: 'UserGuide', target_user_id: int, submitted_data: dict):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.cog = cog
-        self.target_user_id = target_user_id
-        self.submitted_data = submitted_data
 
-    # ▼▼▼ [디버깅 추가 1/2] 권한 확인 함수에 로그 추가 ▼▼▼
     async def _check_permission(self, interaction: discord.Interaction) -> bool:
-        print("\n" + "="*50)
-        print(f"--- [디버깅] 권한 확인 시작: {interaction.user.display_name} ---")
-        
         required_keys = [
             "role_staff_team_info", "role_staff_team_newbie",
             "role_staff_leader_info", "role_staff_leader_newbie",
             "role_staff_deputy_manager", "role_staff_general_manager",
             "role_staff_deputy_chief", "role_staff_village_chief"
         ]
-        print(f"[디버깅] 필요한 역할 키 목록: {required_keys}")
+        error_message = "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."
+        return await has_required_roles(interaction, required_keys, error_message)
 
-        # 필요한 역할들의 ID를 DB에서 가져옵니다.
-        allowed_role_ids = {get_id(key) for key in required_keys if get_id(key)}
-        print(f"[디버깅] DB에서 찾은 필요 역할 ID 목록: {allowed_role_ids}")
-
-        if not allowed_role_ids:
-            print("[디버깅] 오류: DB에 필요한 역할이 하나도 설정되지 않았습니다.")
-            await interaction.response.send_message("❌ 권한 확인에 필요한 역할이 서버에 설정되지 않았습니다. 관리자에게 문의하세요.", ephemeral=True)
-            print("="*50 + "\n")
-            return False
-
-        # 버튼을 누른 유저의 역할 ID 목록을 가져옵니다.
-        user_role_ids = {role.id for role in interaction.user.roles}
-        user_role_names = {role.name for role in interaction.user.roles}
-        print(f"[디버깅] 유저가 가진 역할 ID 목록: {user_role_ids}")
-        print(f"[디버깅] 유저가 가진 역할 이름 목록: {user_role_names}")
-
-        # 두 목록의 교집합(공통된 역할)을 확인합니다.
-        has_permission = not user_role_ids.isdisjoint(allowed_role_ids)
-        print(f"[디버깅] 권한 확인 결과: {has_permission}")
-
-        if not has_permission:
-            error_message = "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."
-            await interaction.response.send_message(error_message, ephemeral=True)
-        
-        print("="*50 + "\n")
-        return has_permission
-    # ▲▲▲ [디버깅 추가 완료] ▲▲▲
-
-
-    async def _send_public_introduction(self, approver: discord.Member, member: discord.Member):
-        # (이 함수는 변경 없음)
-        # ...
+    async def _send_public_introduction(self, cog: 'UserGuide', approver: discord.Member, member: discord.Member, data: dict):
         try:
-            channel_id = self.cog.public_intro_channel_id
-            if not channel_id:
-                logger.warning("공개 자기소개 채널이 설정되지 않아 메시지를 보낼 수 없습니다.")
-                return
-
-            channel = self.cog.bot.get_channel(channel_id)
-            if not channel:
-                logger.warning(f"공개 자기소개 채널(ID: {channel_id})을 찾을 수 없습니다.")
-                return
+            channel_id = cog.public_intro_channel_id
+            if not channel_id: return logger.warning("공개 자기소개 채널이 설정되지 않음.")
+            channel = cog.bot.get_channel(channel_id)
+            if not channel: return logger.warning(f"공개 자기소개 채널(ID: {channel_id})을 찾을 수 없음.")
             
             embed_data = await get_embed_from_db("guide_public_introduction")
-            if not embed_data:
-                logger.warning("DB에서 'guide_public_introduction' 임베드 템플릿을 찾을 수 없습니다.")
-                return
+            if not embed_data: return logger.warning("DB에서 'guide_public_introduction' 템플릿을 찾을 수 없음.")
 
             embed = format_embed_from_db(
-                embed_data,
-                member_mention=member.mention,
-                submitted_name=self.submitted_data['name'],
-                submitted_birth_year=str(self.submitted_data['birth_year']),
-                submitted_gender=self.submitted_data['gender'],
-                submitted_join_path=self.submitted_data['join_path'],
+                embed_data, member_mention=member.mention,
+                submitted_name=data['name'], submitted_birth_year=str(data['birth_year']),
+                submitted_gender=data['gender'], submitted_join_path=data['join_path'],
                 approver_mention=approver.mention
             )
             embed.set_thumbnail(url=member.display_avatar.url)
-            
             await channel.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
         except Exception as e:
             logger.error(f"공개 자기소개 메시지 전송 중 오류 발생: {e}", exc_info=True)
 
-
-    # ▼▼▼ [디버깅 추가 2/2] approve 함수에 진입 로그 추가 ▼▼▼
     @ui.button(label="수락", style=discord.ButtonStyle.success, emoji="✅", custom_id="guide_approve_button")
     async def approve(self, interaction: discord.Interaction, button: ui.Button):
-        # 함수 진입 직후 로그를 남겨, 함수가 호출되었는지 확인
-        print("\n>>> 'approve' 함수가 호출되었습니다! 권한 확인을 시작합니다...")
+        cog = interaction.client.get_cog("UserGuide")
+        if not cog:
+            return await interaction.response.send_message("❌ UserGuide 기능이 로드되지 않았습니다.", ephemeral=True)
+
         if not await self._check_permission(interaction):
-            print(">>> 권한이 없어 'approve' 함수를 종료합니다.\n")
             return
-        print(">>> 권한 확인 통과! 'approve' 로직을 계속 진행합니다.")
 
         await interaction.response.defer(ephemeral=True)
+
+        # 1. 메시지 임베드에서 정보 파싱
+        embed = interaction.message.embeds[0]
         
+        # 대상 유저 ID 파싱
+        match = re.search(r"<@!?(\d+)>", embed.description)
+        if not match:
+            return await interaction.followup.send("❌ 임베드에서 대상 유저를 찾을 수 없습니다.", ephemeral=True)
+        target_user_id = int(match.group(1))
+
+        # 자기소개 데이터 파싱
+        submitted_data = {}
+        field_map = {"신청 이름": "name", "출생년도": "birth_year_str", "성별": "gender", "가입 경로": "join_path"}
+        for field in embed.fields:
+            if field.name in field_map:
+                key = field_map[field.name]
+                submitted_data[key] = field.value
+        submitted_data['birth_year'] = int(submitted_data.get('birth_year_str', 0))
+
+        # 2. 멤버 객체 가져오기
         try:
-            member = await interaction.guild.fetch_member(self.target_user_id)
+            member = await interaction.guild.fetch_member(target_user_id)
         except discord.NotFound:
-            await interaction.followup.send("❌ 대상 유저를 찾을 수 없습니다. 서버를 나간 것 같습니다.", ephemeral=True)
-            return
+            return await interaction.followup.send("❌ 대상 유저를 찾을 수 없습니다. 서버를 나간 것 같습니다.", ephemeral=True)
 
+        # 3. 역할 및 닉네임 수정
         try:
-            print("\n" + "="*50)
-            print(f"--- [디버깅 시작] {member.display_name} 역할 업데이트 ---")
-
-            guest_rid = get_id("role_guest")
-            print(f"[디버깅 1] 제거할 '해변' 역할 ID: {guest_rid}")
-
-            current_role_names = [r.name for r in member.roles]
-            print(f"[디버깅 2] 수정 전 역할 목록 ({len(current_role_names)}개): {current_role_names}")
-
-            roles_to_keep = [role for role in member.roles if role.id != guest_rid]
-            print(f"[디버깅 3] '해변' 제외 후 유지할 역할 목록 ({len(roles_to_keep)}개): {[r.name for r in roles_to_keep]}")
+            final_roles = {role for role in member.roles if role.id != get_id("role_guest")}
             
-            new_role_ids_to_add = [
-                get_id("role_resident_rookie"),
-                get_id("role_resident_regular")
-            ]
-            gender_text = self.submitted_data['gender'].strip().lower()
-            if any(k in gender_text for k in ['남자', '남성', '남']):
-                new_role_ids_to_add.append(get_id("role_info_male"))
-            elif any(k in gender_text for k in ['여자', '여성', '여']):
-                new_role_ids_to_add.append(get_id("role_info_female"))
+            roles_to_add_ids = [get_id("role_resident_rookie"), get_id("role_resident_regular")]
+            gender_text = submitted_data.get('gender', '').strip().lower()
+            if any(k in gender_text for k in ['남자', '남성', '남']): roles_to_add_ids.append(get_id("role_info_male"))
+            elif any(k in gender_text for k in ['여자', '여성', '여']): roles_to_add_ids.append(get_id("role_info_female"))
 
-            birth_year = self.submitted_data['birth_year']
-            year_mapping = next((item for item in AGE_ROLE_MAPPING_BY_YEAR if item["year"] == birth_year), None)
-            if year_mapping:
-                new_role_ids_to_add.append(get_id(year_mapping['key']))
-            
-            print(f"[디버깅 4] 새로 추가할 역할 ID 목록: {new_role_ids_to_add}")
+            year_mapping = next((item for item in AGE_ROLE_MAPPING_BY_YEAR if item["year"] == submitted_data['birth_year']), None)
+            if year_mapping: roles_to_add_ids.append(get_id(year_mapping['key']))
 
-            final_roles = roles_to_keep
-            for role_id in new_role_ids_to_add:
+            for role_id in roles_to_add_ids:
                 if role_id and (role := interaction.guild.get_role(role_id)):
-                    final_roles.append(role)
-            final_roles = list(dict.fromkeys(final_roles))
+                    final_roles.add(role)
             
-            final_role_names = [r.name for r in final_roles]
-            print(f"[디버깅 5] 최종 적용될 역할 목록 ({len(final_role_names)}개): {final_role_names}")
-
-            final_nickname = await self.cog.bot.get_cog("PrefixManager").get_final_nickname(
-                member, base_name=self.submitted_data['name']
+            final_nickname = await cog.bot.get_cog("PrefixManager").get_final_nickname(
+                member, base_name=submitted_data['name']
             )
-            print(f"[디버깅 6] 최종 적용될 닉네임: {final_nickname}")
 
-            print("[디버깅 7] member.edit() 실행 직전...")
-            await member.edit(
-                nick=final_nickname,
-                roles=final_roles,
-                reason="안내 가이드 승인"
-            )
-            print("[디버깅 8] member.edit() 실행 완료!")
-            print("="*50 + "\n")
-            # ▲▲▲ [디버깅 로그 완료] ▲▲▲
+            await member.edit(nick=final_nickname, roles=list(final_roles), reason="안내 가이드 승인")
         except discord.Forbidden:
-            logger.error(f"역할/닉네임 업데이트 실패(Forbidden): {member.display_name}")
-            await interaction.followup.send("❌ 역할/닉네임 업데이트에 실패했습니다. 봇의 역할이 대상 역할들보다 높은지 확인해주세요.", ephemeral=True)
-            return
+            return await interaction.followup.send("❌ 역할/닉네임 업데이트에 실패했습니다. 봇의 역할 권한을 확인해주세요.", ephemeral=True)
         except Exception as e:
             logger.error(f"역할/닉네임 업데이트 중 오류: {e}", exc_info=True)
-            await interaction.followup.send("❌ 역할/닉네임 업데이트 중 알 수 없는 오류가 발생했습니다.", ephemeral=True)
-            return
+            return await interaction.followup.send("❌ 역할/닉네임 업데이트 중 알 수 없는 오류가 발생했습니다.", ephemeral=True)
 
-        await self._send_public_introduction(interaction.user, member)
+        # 4. 후속 작업
+        await self._send_public_introduction(cog, interaction.user, member, submitted_data)
 
         button.disabled = True
         button.label = "승인 완료"
+        embed.color = discord.Color.green()
+        embed.set_footer(text=f"✅ {interaction.user.display_name} 님에 의해 승인됨")
         
-        original_embed = interaction.message.embeds[0]
-        original_embed.color = discord.Color.green()
-        original_embed.set_footer(text=f"✅ {interaction.user.display_name} 님에 의해 승인됨")
-        
-        await interaction.message.edit(embed=original_embed, view=self)
+        await interaction.message.edit(embed=embed, view=self)
         await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인했습니다.", ephemeral=True)
         await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다! 이제 서버의 모든 채널을 이용할 수 있습니다.")
-        
+
+
 class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
-    # ▼▼▼ [핵심 수정 1/2] 이름 입력 필드의 최대 길이를 8로 변경 ▼▼▼
     name = ui.TextInput(label="이름", placeholder="한글/공백 포함 8자 이하", required=True, max_length=8)
-    # ▲▲▲ [수정 완료] ▲▲▲
-    
     birth_year_str = ui.TextInput(label="출생년도 (YYYY)", placeholder="예: 1998, 2005 (4자리로 입력)", required=True, min_length=4, max_length=4)
     gender = ui.TextInput(label="성별", placeholder="성별을 알려주세요.", required=True, max_length=10)
     join_path = ui.TextInput(label="가입 경로", placeholder="어떻게 우리 서버를 알게 되셨나요?", style=discord.TextStyle.paragraph, required=True)
@@ -212,54 +143,37 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        # ▼▼▼ [핵심 수정 2/2] 이름 유효성 검사 로직 추가 ▼▼▼
         name_input = self.name.value
-        if len(name_input) > 8:
-            await interaction.followup.send("❌ 이름은 공백을 포함하여 8자 이하로 입력해주세요.", ephemeral=True)
-            return
+        if len(name_input) > 8 or not re.match(r"^[가-힣 ]+$", name_input):
+            return await interaction.followup.send("❌ 이름은 한글과 공백만 사용하여 8자 이하로 입력해주세요.", ephemeral=True)
         
-        if not re.match(r"^[가-힣 ]+$", name_input):
-            await interaction.followup.send("❌ 이름은 한글과 공백만 사용하여 입력해주세요. (특수문자, 영문, 숫자 불가)", ephemeral=True)
-            return
-        # ▲▲▲ [수정 완료] ▲▲▲
-
         try:
             year = int(self.birth_year_str.value)
-            current_year = datetime.now().year
-            if not (1950 <= year <= current_year - 13):
-                await interaction.followup.send("❌ 유효하지 않은 출생년도입니다. (만 13세 이상)", ephemeral=True)
-                return
+            if not (1950 <= year <= datetime.now().year - 13):
+                return await interaction.followup.send("❌ 유효하지 않은 출생년도입니다. (만 13세 이상)", ephemeral=True)
         except ValueError:
-            await interaction.followup.send("❌ 출생년도는 4자리 숫자로 입력해주세요.", ephemeral=True)
-            return
+            return await interaction.followup.send("❌ 출생년도는 4자리 숫자로 입력해주세요.", ephemeral=True)
 
-        submitted_data = {
-            "name": name_input.strip(), # .strip()으로 앞뒤 공백 제거
-            "birth_year": int(self.birth_year_str.value),
-            "gender": self.gender.value,
-            "join_path": self.join_path.value
-        }
-        
         approval_embed = discord.Embed(
             title="📝 자기소개서 제출됨",
             description=f"{interaction.user.mention}님이 자기소개서를 제출했습니다.\n아래 내용을 확인 후 `수락` 버튼을 눌러주세요.",
             color=discord.Color.yellow()
         )
-        approval_embed.add_field(name="신청 이름", value=submitted_data['name'], inline=True)
+        approval_embed.add_field(name="신청 이름", value=name_input.strip(), inline=True)
         approval_embed.add_field(name="출생년도", value=self.birth_year_str.value, inline=True)
         approval_embed.add_field(name="성별", value=self.gender.value, inline=True)
         approval_embed.add_field(name="가입 경로", value=self.join_path.value, inline=False)
         approval_embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar)
         
-        approval_view = GuideApprovalView(self.cog, interaction.user.id, submitted_data)
+        # ▼▼▼ [핵심 수정 2/3] 상태 없는 View를 생성합니다. ▼▼▼
+        approval_view = GuideApprovalView()
+        # ▲▲▲ [수정 완료] ▲▲▲
         
         notify_role_id = get_id("role_notify_guide_approval")
         mention_str = f"<@&{notify_role_id}>" if notify_role_id else "스태프 여러분,"
         
         await interaction.channel.send(
-            content=mention_str,
-            embed=approval_embed,
-            view=approval_view,
+            content=mention_str, embed=approval_embed, view=approval_view,
             allowed_mentions=discord.AllowedMentions(roles=True)
         )
         await interaction.followup.send("✅ 자기소개서를 제출했습니다. 스태프 확인 후 역할이 지급됩니다.", ephemeral=True)
@@ -379,17 +293,19 @@ class UserGuide(commands.Cog):
     async def cog_load(self): 
         await self.load_configs()
         
+    # ▼▼▼ [핵심 수정 3/3] register_persistent_views 수정 ▼▼▼
     async def register_persistent_views(self):
         self.view_instance = UserGuidePanelView(self)
-        await self.view_instance.setup_buttons()
         self.bot.add_view(self.view_instance)
         
         self.guide_thread_view_instance = GuideThreadView(self)
         self.bot.add_view(self.guide_thread_view_instance)
         
-        self.bot.add_view(GuideApprovalView(self, 0, {}))
+        # 더 이상 dummy instance를 등록하지 않고, 클래스 자체를 등록합니다.
+        self.bot.add_view(GuideApprovalView())
         
         logger.info("✅ 신규 유저 안내 시스템의 영구 View 3개가 성공적으로 등록되었습니다.")
+    # ▲▲▲ [수정 완료] ▲▲▲
         
     async def load_configs(self): 
         self.panel_channel_id = get_id("user_guide_panel_channel_id")
@@ -397,7 +313,6 @@ class UserGuide(commands.Cog):
         logger.info("[UserGuide Cog] DB로부터 설정을 로드했습니다.")
         
     async def get_guide_steps(self) -> List[Dict[str, Any]]:
-        # ▼▼▼ [핵심 수정] 5단계에 맞는 임베드 키 목록으로 변경 ▼▼▼
         keys = ["guide_thread_page_1", "guide_thread_page_2", "guide_thread_page_verification", "guide_thread_page_4", "guide_thread_page_5"]
         return [data for key in keys if (data := await get_embed_from_db(key))]
         
