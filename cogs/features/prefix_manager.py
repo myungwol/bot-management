@@ -7,6 +7,7 @@ from typing import Set
 import asyncio 
 
 from utils.database import get_config, get_id
+from utils.ui_defaults import ADMIN_ROLE_KEYS # [추가] 관리자 역할 키 목록 import
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +86,9 @@ class PrefixManager(commands.Cog):
                     base = temp_name[:-len(suffix_str)] if suffix_str else temp_name
                     break
 
-        # ▼▼▼ [핵심 수정] UI_ROLE_KEY_MAP -> role_configs 로 변경 ▼▼▼
-        # 3. 접두사 예외 역할 처리
-        no_prefix_role_keys = {key for key, config in role_configs.items() if not config.get("is_prefix")}
+        # ▼▼▼ [핵심 수정] 접두사 예외 처리 로직을 완전히 수정합니다. ▼▼▼
+        # 3. 접두사 예외 역할 처리 (관리자 역할만 예외)
+        no_prefix_role_keys = set(ADMIN_ROLE_KEYS)
         # ▲▲▲ [수정 완료] ▲▲▲
         
         no_prefix_role_ids = {get_id(key) for key in no_prefix_role_keys if get_id(key)}
