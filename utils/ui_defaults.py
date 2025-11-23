@@ -147,6 +147,9 @@ ONBOARDING_CHOICES = {
         {"label": "비공개", "value": "비공개"}
     ]
 }
+
+# (이하 나머지 파일 내용은 그대로 유지됩니다)
+# ...
 USABLE_ITEMS = {
     "role_item_warning_deduct": {
         "name": "벌점 1회 차감권",
