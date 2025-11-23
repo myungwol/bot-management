@@ -310,7 +310,8 @@ class UserGuide(commands.Cog):
         logger.info("[UserGuide Cog] DB로부터 설정을 로드했습니다.")
         
     async def get_guide_steps(self) -> List[Dict[str, Any]]:
-        keys = ["guide_thread_page_1", "guide_thread_page_2", "guide_thread_page_verification", "guide_thread_page_4"]
+        # ▼▼▼ [핵심 수정] 5단계에 맞는 임베드 키 목록으로 변경 ▼▼▼
+        keys = ["guide_thread_page_1", "guide_thread_page_2", "guide_thread_page_verification", "guide_thread_page_4", "guide_thread_page_5"]
         return [data for key in keys if (data := await get_embed_from_db(key))]
         
     def has_active_thread(self, user: discord.Member) -> bool:
@@ -318,10 +319,6 @@ class UserGuide(commands.Cog):
         if not tid: return False
         if user.guild.get_thread(tid): return True
         else: self.active_guide_threads.pop(user.id, None); return False
-
-    # ▼▼▼ [핵심 수정] 이미지 감지 리스너 삭제 ▼▼▼
-    # on_message 리스너를 완전히 제거했습니다.
-    # ▲▲▲ [수정 완료] ▲▲▲
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
