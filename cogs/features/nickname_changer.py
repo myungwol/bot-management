@@ -9,10 +9,11 @@ from datetime import datetime, timezone
 import logging
 from typing import Optional, Dict
 
+# ▼▼▼ [수정] save_config_to_db 추가 ▼▼▼
 from utils.database import (
     get_panel_id, save_panel_id, get_cooldown, set_cooldown, 
     get_id, get_embed_from_db, get_panel_components_from_db,
-    get_config
+    get_config, save_config_to_db
 )
 from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_required_roles
 from .prefix_manager import PrefixManager
@@ -138,10 +139,7 @@ class NicknameChangerPanelView(ui.View):
         lock = self.user_locks.setdefault(i.user.id, asyncio.Lock())
         if lock.locked(): return await i.response.send_message("이전 요청 처리 중입니다.", ephemeral=True)
         async with lock:
-            # ▼▼▼ [수정] 쿨타임 기본값을 21600초(6시간)으로 변경 ▼▼▼
             cooldown = int(get_config("NICKNAME_CHANGE_COOLDOWN_SECONDS", 21600))
-            # ▲▲▲ [수정 완료] ▲▲▲
-            
             last_time = await get_cooldown(str(i.user.id), "nickname_change")
             if last_time and (datetime.now(timezone.utc).timestamp() - last_time) < cooldown:
                 remaining = cooldown - (datetime.now(timezone.utc).timestamp() - last_time)
@@ -164,6 +162,11 @@ class NicknameChanger(commands.Cog, name="Nicknames"):
         logger.info("✅ 닉네임 변경 패널의 영구 View가 성공적으로 등록되었습니다.")
 
     async def cog_load(self):
+        # ▼▼▼ [수정] 봇 시작 시 DB 설정을 21600(6시간)으로 강제 업데이트 ▼▼▼
+        await save_config_to_db("NICKNAME_CHANGE_COOLDOWN_SECONDS", 21600)
+        logger.info("닉네임 변경 쿨타임 설정을 6시간(21600초)으로 DB에 동기화했습니다.")
+        # ▲▲▲ [수정 완료] ▲▲▲
+        
         await self.register_persistent_views()
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames") -> bool:
