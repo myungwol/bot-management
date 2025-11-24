@@ -238,6 +238,7 @@ class UserGuide(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
         await channel.send(embed=embed)
 
+    # ▼▼▼ [수정] 임베드 대신 일반 메시지로 포맷팅하여 전송하도록 변경 ▼▼▼
     async def send_main_chat_welcome(self, member: discord.Member):
         try:
             if not self.main_chat_channel_id:
@@ -247,36 +248,33 @@ class UserGuide(commands.Cog):
             if not isinstance(channel, discord.TextChannel):
                 return
 
-            embed_data = await get_embed_from_db("embed_main_chat_welcome")
-            if not embed_data:
-                logger.warning("메인 채팅 환영 임베드(embed_main_chat_welcome)를 찾을 수 없습니다.")
-                return
+            # DB에서 ID를 가져오되, 없으면 요청하신 기본값을 사용
+            # 1. 역할 채널 ID (notification_role_panel_channel_id 또는 기본값)
+            role_channel_id = get_id('notification_role_panel_channel_id') or 1421544728494604369
             
-            staff_role_id = get_id('role_staff_newbie_helper') or 1412052122949779517
-            nickname_channel_id = get_id('nickname_panel_channel_id') or 1412052293096050729
-            role_channel_id = get_id('auto_role_channel_id') or 1412052301115424799
-            inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1412052236736925737
-            bot_guide_channel_id = get_id('bot_guide_channel_id') or 1412052405477970040 
-            festival_channel_id = get_id('festival_channel_id') or 1412052244349845627
-
-            format_args = {
-                "member_mention": member.mention,
-                "staff_role_mention": f"<@&{staff_role_id}>",
-                "nickname_channel_mention": f"<#{nickname_channel_id}>",
-                "role_channel_mention": f"<#{role_channel_id}>",
-                "inquiry_channel_mention": f"<#{inquiry_channel_id}>",
-                "bot_guide_channel_mention": f"<#{bot_guide_channel_id}>",
-                "festival_channel_mention": f"<#{festival_channel_id}>"
-            }
-
-            embed = format_embed_from_db(embed_data, **format_args)
+            # 2. 문의 채널 ID (ticket_main_panel_channel_id 또는 기본값)
+            inquiry_channel_id = get_id('ticket_main_panel_channel_id') or 1414675593533984860
             
-            # ▼▼▼ [수정] content 내용을 요청하신 문구로 변경했습니다. ▼▼▼
-            welcome_content = f"{member.mention}님, 해몽 : 海夢에 오신 걸 환영합니다!"
-            await channel.send(content=welcome_content, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
+            # 3. 도우미 역할 ID (role_staff_newbie_helper 또는 기본값)
+            helper_role_id = get_id('role_staff_newbie_helper') or 1442372586259611688
+            
+            # 4. 규칙 채널 ID (DB 키가 명확치 않으면 기본값 사용)
+            rule_channel_id = 1414675515759005727
+
+            message_content = (
+                f"{member.mention}님, 해몽 : 海夢에 오신 걸 환영합니다!\n\n"
+                f" <a:1124928221243244644:1416125149782212831> <#{rule_channel_id}> 서버 규칙사항 먼저 숙지해주세요 ! \n\n"
+                f" <a:1124928273755938907:1416125162671046736> <#{role_channel_id}> 역할은 여기에서 받아주세요 ! \n\n"
+                f" <:1367097758577852427:1421788139940479036> 문의 & 건의사항이 있으시다면 <#{inquiry_channel_id}> 채널을 사용해주세요 ! \n\n"
+                f" <a:1125436475631218769:1416108859956793344> 마지막으로 적응이 힘드시다면 <@&{helper_role_id}> 을 멘션 해주세요 ! \n\n"
+                f" 해몽에서 즐거운 시간 되시길 바랍니다 ! <:1339999746298740788:1419558757716725760>"
+            )
+
+            await channel.send(content=message_content, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
             
         except Exception as e:
             logger.error(f"메인 채팅 환영 메시지 전송 중 오류 발생: {e}", exc_info=True)
+    # ▲▲▲ [수정 완료] ▲▲▲
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
