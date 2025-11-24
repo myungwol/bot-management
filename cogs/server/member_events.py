@@ -47,10 +47,8 @@ class MemberEvents(commands.Cog):
             await supabase.table('user_levels').upsert({'user_id': member.id, 'level': 1, 'xp': 0}, on_conflict='user_id').execute()
         except Exception as e: logger.error(f"'{member.display_name}'님의 초기 레벨 데이터 생성 중 오류: {e}", exc_info=True)
         
-        # ▼▼▼ [핵심 수정] role_guest 부여 로직 삭제 ▼▼▼
-        # 초기 알림 역할만 부여하도록 수정합니다.
+        # 초기 알림 역할만 부여
         initial_role_keys = ["role_notify_welcome", "role_notify_dding"]
-        # ▲▲▲ [수정 완료] ▲▲▲
         
         roles_to_add = [role for key in initial_role_keys if (role_id := get_id(key)) and (role := member.guild.get_role(role_id))]
         if roles_to_add:
@@ -67,7 +65,6 @@ class MemberEvents(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
-        # ... (이 함수는 변경 없음) ...
         if member.bot: return
         try:
             role_ids_to_backup = [role.id for role in member.roles if not role.is_default()]
@@ -80,7 +77,6 @@ class MemberEvents(commands.Cog):
                 if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
                 await channel.send(embed=embed)
 
-    # ▼▼▼ [수정] 이 함수 전체를 아래 내용으로 교체해주세요. ▼▼▼
     async def _handle_boost_start(self, member: discord.Member):
         logger.info(f"--- 부스트 보상 지급 프로세스 시작: {member.display_name} ---")
         
@@ -109,79 +105,77 @@ class MemberEvents(commands.Cog):
                 if level > highest_level:
                     highest_level = level
         
-        # --- ▼▼▼ [핵심 수정] 역할 변경 및 알림 로직 통합 ▼▼▼ ---
-        
         role_to_add = None
         roles_to_remove_set = set(existing_reward_roles)
         final_roles_for_embed = []
 
-        # 시나리오 1: 아직 최고 레벨이 아닐 때 (레벨업 진행)
         if highest_level < 10:
             new_level = highest_level + 2
-            if new_level > 10:
-                new_level = 10
-            
+            if new_level > 10: new_level = 10
             role_to_add = boost_ticket_roles_by_level.get(new_level)
             
-            # 최종 역할 목록 계산 및 역할 변경
             final_roles = list(current_member_roles - roles_to_remove_set)
-            if role_to_add:
-                final_roles.append(role_to_add)
+            if role_to_add: final_roles.append(role_to_add)
             await member.edit(roles=final_roles, reason="서버 부스트 보상 업데이트")
-            
-            # 임베드에 표시될 역할은 새로 추가된 역할입니다.
             final_roles_for_embed = [role_to_add] if role_to_add else []
-
-        # 시나리오 2: 이미 최고 레벨일 때 (역할 변경 없음)
         else:
             logger.info("이미 최고 레벨(10)에 도달하여 역할 변경은 없습니다.")
-            # 임베드에 표시될 역할은 현재 가지고 있는 최고 레벨 역할입니다.
             final_roles_for_embed = existing_reward_roles
 
-        # --- 알림 메시지 발송 (공통 로직) ---
         try:
             boost_channel_id = get_id("boost_log_channel_id")
             if boost_channel := self.bot.get_channel(boost_channel_id):
                 embed_data = await get_embed_from_db("log_boost_start")
                 if embed_data:
                     roles_list_str = "\n".join([f"- {role.mention}" for role in final_roles_for_embed]) if final_roles_for_embed else "최고 레벨 달성!"
-                    
                     embed = format_embed_from_db(
                         embed_data, 
                         member_mention=member.mention, 
                         member_name=member.display_name,
                         roles_list=roles_list_str
                     )
-                    
                     await boost_channel.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
-            else:
-                logger.warning("부스트 로그 채널이 설정되지 않아 알림을 보낼 수 없습니다.")
-
-        except discord.Forbidden:
-            logger.error(f"{member.display_name}님의 부스트 보상 처리 중 권한 오류 발생")
         except Exception as e:
             logger.error(f"{member.display_name}님에게 부스트 보상 지급 중 오류 발생: {e}", exc_info=True)
         
         logger.info(f"--- 부스트 보상 지급 프로세스 종료: {member.display_name} ---")
-    # ▲▲▲ [수정 완료] ▲▲▲
     
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
+        if after.bot: return
+
+        # ▼▼▼ [추가] 해몽 역할(role_resident_regular) 수호자 로직 ▼▼▼
+        # 손님(role_guest)이 아닌데, 해몽 역할이 없다면 강제로 다시 부여합니다.
+        try:
+            haemong_role_id = get_id("role_resident_regular")
+            guest_role_id = get_id("role_guest")
+
+            if haemong_role_id and guest_role_id:
+                has_guest_role = any(r.id == guest_role_id for r in after.roles)
+                has_haemong_role = any(r.id == haemong_role_id for r in after.roles)
+
+                # 손님이 아니고 && 해몽 역할이 없으면 -> 해몽 역할 복구
+                if not has_guest_role and not has_haemong_role:
+                    haemong_role = after.guild.get_role(haemong_role_id)
+                    if haemong_role:
+                        await after.add_roles(haemong_role, reason="[자동 복구] 해몽 역할은 필수 기본 역할입니다.")
+                        logger.info(f"🛡️ {after.display_name} 님에게서 누락된 '해몽' 역할을 자동으로 복구했습니다.")
+        except Exception as e:
+            logger.error(f"해몽 역할 자동 복구 로직 수행 중 오류: {e}")
+        # ▲▲▲ [추가 완료] ▲▲▲
+
+        # 부스트 상태 변경 확인 및 처리
         if before.premium_since == after.premium_since:
             return
 
-        # --- 시나리오 1: 사용자가 새로 부스트를 시작했을 때 ---
         if before.premium_since is None and after.premium_since is not None:
             await self._handle_boost_start(after)
 
-        # --- 시나리오 2: 사용자가 부스트를 중지했을 때 ---
         elif before.premium_since is not None and after.premium_since is None:
             logger.info(f"{after.display_name}님이 서버 부스트를 중지하여 보상 역할을 회수합니다.")
-            
             boost_ticket_role_keys = [f"role_boost_ticket_{i}" for i in range(1, 11)]
             all_reward_role_ids = {get_id(key) for key in boost_ticket_role_keys if get_id(key)}
             roles_to_remove = [role for role in after.roles if role.id in all_reward_role_ids]
-            
             try:
                 if roles_to_remove:
                     await after.remove_roles(*roles_to_remove, reason="서버 부스트 중지")
