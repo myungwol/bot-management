@@ -156,9 +156,18 @@ class ServerSystem(commands.Cog):
         
         for key, info in SETUP_COMMAND_MAP.items():
             prefix = "[패널]" if info.get("type") == "panel" else "[채널]"
-            choice_name = f"{prefix} {info.get('friendly_name', key)} 설정"
-            if current.lower() in choice_name.lower():
-                choices.append(app_commands.Choice(name=choice_name, value=f"channel_setup:{key}"))
+            friendly_name = info.get('friendly_name', key)
+            
+            # 1. 설정 선택지
+            choice_name_setup = f"{prefix} {friendly_name} 설정"
+            if current.lower() in choice_name_setup.lower():
+                choices.append(app_commands.Choice(name=choice_name_setup, value=f"channel_setup:{key}"))
+            
+            # 2. [재설치] 선택지 추가 (패널 타입인 경우만)
+            if info.get("type") == "panel":
+                choice_name_regen = f"[재설치] {friendly_name}"
+                if current.lower() in choice_name_regen.lower():
+                    choices.append(app_commands.Choice(name=choice_name_regen, value=f"panel_regenerate:{key}"))
         
         role_setup_actions = {
             "role_setup:bump_reminder_role_id": "[알림] Disboard BUMP 알림 역할 설정", 
@@ -210,25 +219,18 @@ class ServerSystem(commands.Cog):
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
 
-        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
-        # 임시로 사용할 액션을 추가하여 DB 설정을 직접 수정합니다.
         if action == "fix_boss_reward_tiers":
             try:
-                # 1. DB에서 현재 설정을 가져옵니다.
                 reward_tiers_config = get_config("BOSS_REWARD_TIERS")
                 if not reward_tiers_config:
                     return await interaction.followup.send("❌ DB에서 BOSS_REWARD_TIERS 설정을 찾을 수 없습니다.", ephemeral=True)
 
-                # 2. '단순 참여자' 등급의 percentile 값을 수정합니다.
                 for boss_type in ['weekly', 'monthly']:
                     if boss_type in reward_tiers_config and reward_tiers_config[boss_type]:
-                        # 마지막 등급을 찾습니다 (가장 percentile이 높은 등급)
                         last_tier = max(reward_tiers_config[boss_type], key=lambda x: x['percentile'])
                         last_tier['percentile'] = 1.01
                 
-                # 3. 수정된 설정을 다시 DB에 저장합니다.
                 await save_config_to_db("BOSS_REWARD_TIERS", reward_tiers_config)
-                # 4. 게임 봇이 설정을 다시 로드하도록 요청합니다.
                 await save_config_to_db("config_reload_request", time.time())
 
                 await interaction.followup.send("✅ 보스 보상 티어의 랭킹 조건을 수정했습니다. 이제 참가자가 1명일 때도 보상 등급이 정상적으로 표시됩니다.", ephemeral=True)
@@ -298,6 +300,56 @@ class ServerSystem(commands.Cog):
             await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
             return
 
+        # ▼▼▼ [핵심 추가] 특정 패널 재설치 로직 ▼▼▼
+        elif action.startswith("panel_regenerate:"):
+            panel_key = action.split(":", 1)[1]
+            config = SETUP_COMMAND_MAP.get(panel_key)
+            
+            if not config:
+                return await interaction.followup.send(f"❌ 유효하지 않은 패널 키입니다: {panel_key}", ephemeral=True)
+            
+            friendly_name = config.get('friendly_name', panel_key)
+            
+            # 게임 봇 패널인지 관리 봇 패널인지 확인
+            if "[게임]" in friendly_name or "[보스]" in friendly_name:
+                # 게임 봇 패널: DB에 요청
+                db_key = f"panel_regenerate_request_{panel_key}"
+                timestamp = datetime.now(timezone.utc).timestamp()
+                try:
+                    await save_config_to_db(db_key, timestamp)
+                    logger.info(f"[Game Bot Request] '{friendly_name}' 패널 재설치를 요청했습니다.")
+                    await interaction.followup.send(f"✅ **{friendly_name}** 재설치를 게임 봇에게 요청했습니다.\n잠시 후 패널이 새로고침됩니다.", ephemeral=True)
+                except Exception as e:
+                    logger.error(f"패널 재설치 요청 중 오류: {e}", exc_info=True)
+                    await interaction.followup.send("❌ 패널 재설치 요청 중 오류가 발생했습니다.", ephemeral=True)
+            else:
+                # 관리 봇 패널: 직접 실행
+                cog_name = config.get("cog_name")
+                channel_db_key = config.get("key")
+                
+                cog = self.bot.get_cog(cog_name)
+                channel_id = get_id(channel_db_key)
+                target_channel = self.bot.get_channel(channel_id) if channel_id else None
+                
+                if not cog:
+                    return await interaction.followup.send(f"❌ 오류: 해당 패널을 관리하는 Cog(`{cog_name}`)를 찾을 수 없습니다.", ephemeral=True)
+                if not target_channel:
+                    return await interaction.followup.send(f"❌ 오류: 해당 패널의 채널이 설정되지 않았거나 찾을 수 없습니다.", ephemeral=True)
+                if not hasattr(cog, 'regenerate_panel'):
+                    return await interaction.followup.send(f"❌ 오류: `{cog_name}`에 패널 재설치 기능이 없습니다.", ephemeral=True)
+                
+                try:
+                    success = await cog.regenerate_panel(target_channel, panel_key=panel_key)
+                    if success:
+                        await interaction.followup.send(f"✅ **{friendly_name}**을(를) <#{target_channel.id}> 채널에 성공적으로 재설치했습니다.", ephemeral=True)
+                    else:
+                        await interaction.followup.send(f"❌ **{friendly_name}** 재설치에 실패했습니다. 로그를 확인해주세요.", ephemeral=True)
+                except Exception as e:
+                    logger.error(f"패널 재설치 실행 중 오류: {e}", exc_info=True)
+                    await interaction.followup.send(f"❌ 패널 재설치 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
+            return
+        # ▲▲▲ [추가 완료] ▲▲▲
+
         if action == "game_data_reload":
             db_key = "game_data_reload_request"
             payload = time.time()
@@ -311,11 +363,8 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 게임 데이터 새로고침 요청 중 오류가 발생했습니다.")
             return
         
-        # --- ▼▼▼▼▼ 핵심 수정 시작 ▼▼▼▼▼ ---
         if action == "boss_reset_check_test":
             try:
-                # 원인: 게임 봇의 Cog를 직접 가져오려고 시도했습니다.
-                # 해결: 데이터베이스에 요청을 기록하는 방식으로 변경합니다.
                 db_key = "boss_reset_manual_request"
                 payload = {"timestamp": time.time()}
                 await save_config_to_db(db_key, payload)
@@ -326,7 +375,6 @@ class ServerSystem(commands.Cog):
                 logger.error(f"보스 리셋 루프 수동 실행 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 보스 리셋 루프를 요청하는 중 오류가 발생했습니다.", ephemeral=True)
             return
-        # --- ▲▲▲▲▲ 핵심 수정 종료 ▲▲▲▲▲ ---
 
         if action == "status_show":
             embed = discord.Embed(title="⚙️ 서버 설정 현황 대시보드", color=0x3498DB)
@@ -558,9 +606,7 @@ class ServerSystem(commands.Cog):
                             failure_list.append(f"・`{friendly_name}`: 채널이 설정되지 않았거나 찾을 수 없습니다.")
                             continue
                         
-                        # ▼▼▼ [수정 후] 아래 한 줄로 교체하세요 ▼▼▼
                         success = await cog.regenerate_panel(target_channel, panel_key=key)
-                        # ▲▲▲ [수정 후] 완료 ▲▲▲
                         
                         if success: success_list.append(f"・`{friendly_name}` → <#{target_channel.id}>")
                         
