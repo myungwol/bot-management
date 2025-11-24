@@ -15,7 +15,8 @@ from utils.database import (
     get_config
 )
 from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_required_roles
-from .prefix_manager import PrefixManager # 다른 Cog를 타입 힌팅으로 가져옴
+# PrefixManager는 타입 힌팅용입니다. 실제 로드 시에는 bot.get_cog를 사용합니다.
+from .prefix_manager import PrefixManager
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,9 @@ class NicknameChangerPanelView(ui.View):
                 return await i.response.send_message(f"❌ 다음 신청까지 **{format_seconds_to_hms(remaining)}** 남았습니다.", ephemeral=True)
             await i.response.send_modal(NicknameChangeModal(self.parent_cog))
 
-class NicknameChanger(commands.Cog):
+# ▼▼▼ [핵심 수정] Cog 이름을 'Nicknames'로 명시하여 설정 파일과 일치시킴 ▼▼▼
+class NicknameChanger(commands.Cog, name="Nicknames"):
+# ▲▲▲ [수정 완료] ▲▲▲
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.view_instance = None; self._user_locks: Dict[int, asyncio.Lock] = {}
         self.panel_regeneration_lock = asyncio.Lock()
@@ -151,10 +154,12 @@ class NicknameChanger(commands.Cog):
         self.view_instance = NicknameChangerPanelView(self)
         await self.view_instance.setup_buttons()
         self.bot.add_view(self.view_instance)
+        logger.info("✅ 닉네임 변경 패널의 영구 View가 성공적으로 등록되었습니다.")
 
     async def cog_load(self):
         # on_ready에서 load_configs를 호출하지 않으므로 여기서 호출할 필요가 없음
-        pass
+        # 하지만 영구 View 등록은 필요합니다.
+        await self.register_persistent_views()
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames") -> bool:
         async with self.panel_regeneration_lock:
