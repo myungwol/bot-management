@@ -49,22 +49,20 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
         notify_role_id = get_id("role_notify_guide_approval")
         mention_str = f"<@&{notify_role_id}>" if notify_role_id else "스태프 여러분,"
         
+        # ▼▼▼ [수정] self.cog.approval_view를 통해 View 인스턴스에 접근합니다. ▼▼▼
         await interaction.channel.send(content=mention_str, embed=approval_embed, view=self.cog.approval_view, allowed_mentions=discord.AllowedMentions(roles=True))
         await interaction.followup.send("✅ 자기소개서를 제출했습니다. 스태프 확인 후 역할이 지급됩니다.", ephemeral=True)
 
 
 class UserGuide(commands.Cog):
-    # ▼▼▼ [핵심] 모든 View 클래스를 Cog 내부에 중첩된 클래스로 정의 ▼▼▼
+    # ▼▼▼ [핵심] 모든 View 클래스를 Cog 내부에 중첩된 클래스로 정의하여 구조를 명확히 합니다. ▼▼▼
     class GuideApprovalView(ui.View):
-        # 이 View는 self.view.cog를 통해 외부 Cog에 접근합니다.
-        def __init__(self):
+        def __init__(self, outer_cog: 'UserGuide'):
             super().__init__(timeout=None)
+            self.cog = outer_cog
 
         @ui.button(label="수락", style=discord.ButtonStyle.success, emoji="✅", custom_id="guide_approve_button")
         async def approve(self, interaction: discord.Interaction, button: ui.Button):
-            cog: 'UserGuide' = self.view.cog # Cog 인스턴스 가져오기
-            if not cog: return
-
             required_keys = ["role_staff_team_info", "role_staff_team_newbie", "role_staff_leader_info", "role_staff_leader_newbie", "role_staff_deputy_manager", "role_staff_general_manager", "role_staff_deputy_chief", "role_staff_village_chief"]
             if not await has_required_roles(interaction, required_keys, "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."):
                 return
@@ -95,56 +93,63 @@ class UserGuide(commands.Cog):
                 if year_map: new_role_ids.append(get_id(year_map['key']))
                 for role_id in new_role_ids:
                     if role_id and (role := interaction.guild.get_role(role_id)): final_roles.add(role)
-                final_nickname = await cog.bot.get_cog("PrefixManager").get_final_nickname(member, base_name=submitted_data['name'])
+                final_nickname = await self.cog.bot.get_cog("PrefixManager").get_final_nickname(member, base_name=submitted_data['name'])
                 await member.edit(nick=final_nickname, roles=list(final_roles), reason="안내 가이드 승인")
             except Exception as e:
                 logger.error(f"역할/닉네임 업데이트 중 오류: {e}", exc_info=True)
                 return await interaction.followup.send("❌ 역할/닉네임 업데이트 중 오류가 발생했습니다.", ephemeral=True)
 
-            await cog.send_public_introduction(interaction.user, member, submitted_data)
+            await self.cog.send_public_introduction(interaction.user, member, submitted_data)
             button.disabled, button.label = True, "승인 완료"
-            embed.color, embed.set_footer(text=f"✅ {interaction.user.display_name} 님에 의해 승인됨")
+            embed.color = discord.Color.green() # 색상 변경 추가
+            embed.set_footer(text=f"✅ {interaction.user.display_name} 님에 의해 승인됨")
             await interaction.message.edit(embed=embed, view=self)
             await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인했습니다.", ephemeral=True)
-            await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다!")
+            if interaction.channel.permissions_for(interaction.guild.me).manage_threads:
+                await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다! 10초 후 안내 스레드가 닫힙니다.")
+                await asyncio.sleep(10)
+                await interaction.channel.edit(archived=True, reason="안내 완료")
 
     class GuideThreadView(ui.View):
-        def __init__(self):
+        def __init__(self, outer_cog: 'UserGuide'):
             super().__init__(timeout=None)
+            self.cog = outer_cog
+            
         async def _update_view_state(self, new_page: int, total_pages: int):
             prev, next_btn, intro = [discord.utils.get(self.children, custom_id=cid) for cid in ["guide_persistent_prev", "guide_persistent_next", "guide_persistent_intro"]]
             if prev: prev.disabled = (new_page == 0)
             if next_btn: next_btn.disabled = (new_page >= total_pages - 1)
             if intro: intro.disabled = (new_page != total_pages - 1)
+            
         @ui.button(label="◀ 이전", style=discord.ButtonStyle.secondary, custom_id="guide_persistent_prev")
         async def go_previous(self, i: discord.Interaction, b: ui.Button):
-            cog: 'UserGuide' = self.view.cog
-            steps = await cog.get_guide_steps()
+            steps = await self.cog.get_guide_steps()
             match = re.search(r"(\d+)/(\d+)", i.message.embeds[0].footer.text)
             page = int(match.group(1)) - 1 if match else 0
             if not steps or page <= 0: return await i.response.defer()
             new_page = page - 1
             await self._update_view_state(new_page, len(steps))
             await i.response.edit_message(embed=format_embed_from_db(steps[new_page], user_mention=i.user.mention), view=self)
+            
         @ui.button(label="다음 ▶", style=discord.ButtonStyle.primary, custom_id="guide_persistent_next")
         async def go_next(self, i: discord.Interaction, b: ui.Button):
-            cog: 'UserGuide' = self.view.cog
-            steps = await cog.get_guide_steps()
+            steps = await self.cog.get_guide_steps()
             match = re.search(r"(\d+)/(\d+)", i.message.embeds[0].footer.text)
             page = int(match.group(1)) - 1 if match else 0
             if not steps or page >= len(steps) - 1: return await i.response.defer()
             new_page = page + 1
             await self._update_view_state(new_page, len(steps))
             await i.response.edit_message(embed=format_embed_from_db(steps[new_page], user_mention=i.user.mention), view=self)
+            
         @ui.button(label="자기소개서 작성하기", style=discord.ButtonStyle.success, emoji="📝", custom_id="guide_persistent_intro", disabled=True)
         async def open_intro_form(self, i: discord.Interaction, b: ui.Button):
-            cog: 'UserGuide' = self.view.cog
-            await i.response.send_modal(IntroductionFormModal(cog))
+            await i.response.send_modal(IntroductionFormModal(self.cog))
 
     class UserGuidePanelView(ui.View):
         def __init__(self, outer_cog: 'UserGuide'):
             super().__init__(timeout=None)
             self.cog = outer_cog
+            
         async def setup_buttons(self):
             self.clear_items()
             comps = await get_panel_components_from_db('user_guide')
@@ -153,42 +158,39 @@ class UserGuide(commands.Cog):
             btn.callback = self.start_guide_callback
             self.add_item(btn)
         
-        # ▼▼▼ [핵심 수정] 빠뜨렸던 'b: ui.Button' 인자를 추가합니다. ▼▼▼
+        # ▼▼▼ [핵심 수정 1/2] 콜백 함수의 인자를 올바르게 수정합니다. (b: ui.Button 추가) ▼▼▼
         async def start_guide_callback(self, i: discord.Interaction, b: ui.Button):
-        # ▲▲▲ [수정 완료] ▲▲▲
-            cog: 'UserGuide' = self.cog
             await i.response.defer(ephemeral=True)
-            if cog.has_active_thread(i.user):
-                return await i.followup.send(f"❌ 이미 진행 중인 안내 스레드(<#{cog.active_guide_threads.get(i.user.id)}>)가 있습니다.", ephemeral=True)
+            if self.cog.has_active_thread(i.user):
+                return await i.followup.send(f"❌ 이미 진행 중인 안내 스레드(<#{self.cog.active_guide_threads.get(i.user.id)}>)가 있습니다.", ephemeral=True)
             try:
                 if (guest_rid := get_id("role_guest")) and (guest_role := i.guild.get_role(guest_rid)) and guest_role not in i.user.roles:
                     await i.user.add_roles(guest_role, reason="안내 가이드 시작")
                 thread = await i.channel.create_thread(name=f"👋ㅣ{i.user.display_name}님의-안내", type=discord.ChannelType.private_thread)
-                cog.active_guide_threads[i.user.id] = thread.id
-                steps = await cog.get_guide_steps()
+                self.cog.active_guide_threads[i.user.id] = thread.id
+                steps = await self.cog.get_guide_steps()
                 if not steps: raise ValueError("DB에서 안내 가이드 페이지를 불러올 수 없습니다.")
-                guide_view = cog.guide_thread_view
+                
+                guide_view = self.cog.guide_thread_view
                 await guide_view._update_view_state(0, len(steps))
                 await thread.send(content=f"{i.user.mention}", embed=format_embed_from_db(steps[0], user_mention=i.user.mention), view=guide_view, allowed_mentions=discord.AllowedMentions(users=True, roles=False))
                 fu_msg = await i.followup.send(f"✅ 안내 스레드를 생성했습니다: {thread.mention}", ephemeral=True, wait=True)
                 await asyncio.sleep(10)
                 await fu_msg.delete()
             except Exception as e:
-                cog.active_guide_threads.pop(i.user.id, None)
+                self.cog.active_guide_threads.pop(i.user.id, None)
                 logger.error(f"유저 안내 스레드 생성 중 오류: {e}", exc_info=True)
                 await i.followup.send("❌ 스레드 생성 중 오류가 발생했습니다.", ephemeral=True)
 
     def __init__(self, bot: commands.Bot):
-        # (이하 __init__ 및 나머지 코드는 이전과 동일하게 유지)
         self.bot = bot
         self.panel_channel_id: Optional[int] = None
         self.public_intro_channel_id: Optional[int] = None
         self.active_guide_threads: Dict[int, int] = {}
+        # Cog가 View 인스턴스들을 소유하도록 변경
         self.panel_view = self.UserGuidePanelView(self)
-        self.guide_thread_view = self.GuideThreadView()
-        self.approval_view = self.GuideApprovalView()
-        self.guide_thread_view.cog = self 
-        self.approval_view.cog = self 
+        self.guide_thread_view = self.GuideThreadView(self)
+        self.approval_view = self.GuideApprovalView(self)
         logger.info("UserGuide Cog가 성공적으로 초기화되었습니다.")
 
     async def cog_load(self): 
@@ -212,15 +214,33 @@ class UserGuide(commands.Cog):
     def has_active_thread(self, user: discord.Member) -> bool:
         tid = self.active_guide_threads.get(user.id)
         if not tid: return False
+        # 스레드가 존재하는지 확인하고, 없으면 목록에서 제거
         if user.guild.get_thread(tid): return True
         else: self.active_guide_threads.pop(user.id, None); return False
 
     async def send_public_introduction(self, approver: discord.Member, member: discord.Member, data: dict):
-        # GuideApprovalView 내부의 로직을 Cog 메서드로 이동
-        await self.approval_view._send_public_introduction(self, approver, member, data)
+        if not self.public_intro_channel_id: return
+        channel = self.bot.get_channel(self.public_intro_channel_id)
+        if not isinstance(channel, discord.TextChannel): return
+
+        embed_data = await get_embed_from_db("guide_public_introduction")
+        if not embed_data: return
+        
+        embed = format_embed_from_db(
+            embed_data, 
+            member_mention=member.mention, 
+            submitted_name=data['name'],
+            submitted_birth_year=data['birth_year'],
+            submitted_gender=data['gender'],
+            submitted_join_path=data['join_path'],
+            approver_mention=approver.mention
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        await channel.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
+        # 스레드가 삭제되면 활성 스레드 목록에서 제거
         uid = next((uid for uid, tid in self.active_guide_threads.items() if tid == thread.id), None)
         if uid: 
             self.active_guide_threads.pop(uid, None)
