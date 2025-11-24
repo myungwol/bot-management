@@ -74,7 +74,7 @@ class NicknameApprovalView(ui.View):
         title = "✅ 이름 변경 승인" if is_approved else "❌ 이름 변경 거절"
         color = discord.Color.green() if is_approved else discord.Color.red()
         embed = discord.Embed(title=title, color=color, timestamp=datetime.now(timezone.utc))
-        embed.add_field(name="주민", value=member.mention, inline=False)
+        embed.add_field(name="유저", value=member.mention, inline=False)
         if is_approved:
             embed.add_field(name="기존 이름", value=f"`{self.original_name}`", inline=False)
             embed.add_field(name="새 이름", value=f"`{final_name}`", inline=False)
