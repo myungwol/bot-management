@@ -74,7 +74,7 @@ class NicknameApprovalView(ui.View):
         title = "✅ 이름 변경 승인" if is_approved else "❌ 이름 변경 거절"
         color = discord.Color.green() if is_approved else discord.Color.red()
         embed = discord.Embed(title=title, color=color, timestamp=datetime.now(timezone.utc))
-        embed.add_field(name="유저", value=member.mention, inline=False)
+        embed.add_field(name="주민", value=member.mention, inline=False)
         if is_approved:
             embed.add_field(name="기존 이름", value=f"`{self.original_name}`", inline=False)
             embed.add_field(name="새 이름", value=f"`{final_name}`", inline=False)
@@ -90,7 +90,6 @@ class NicknameApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
-    # ▼▼▼ [수정 1] 입력 제한을 8자로 변경하고 안내 문구 수정 ▼▼▼
     new_name = ui.TextInput(
         label="새로운 이름", 
         placeholder="한글과 공백 포함 8자 이내로 입력해주세요.", 
@@ -104,7 +103,6 @@ class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
     async def on_submit(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True); name = self.new_name.value
         
-        # ▼▼▼ [수정 2] 정규식을 한글(가-힣) + 공백(\s) 허용으로 변경하고 길이 체크 8자로 수정 ▼▼▼
         if not re.match(r"^[가-힣\s]+$", name) or len(name) > 8:
             return await i.followup.send("❌ 이름은 8자 이내의 한글과 공백으로만 구성되어야 합니다.", ephemeral=True)
         
@@ -140,7 +138,10 @@ class NicknameChangerPanelView(ui.View):
         lock = self.user_locks.setdefault(i.user.id, asyncio.Lock())
         if lock.locked(): return await i.response.send_message("이전 요청 처리 중입니다.", ephemeral=True)
         async with lock:
-            cooldown = int(get_config("NICKNAME_CHANGE_COOLDOWN_SECONDS", 14400))
+            # ▼▼▼ [수정] 쿨타임 기본값을 21600초(6시간)으로 변경 ▼▼▼
+            cooldown = int(get_config("NICKNAME_CHANGE_COOLDOWN_SECONDS", 21600))
+            # ▲▲▲ [수정 완료] ▲▲▲
+            
             last_time = await get_cooldown(str(i.user.id), "nickname_change")
             if last_time and (datetime.now(timezone.utc).timestamp() - last_time) < cooldown:
                 remaining = cooldown - (datetime.now(timezone.utc).timestamp() - last_time)
