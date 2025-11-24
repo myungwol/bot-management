@@ -52,8 +52,8 @@ UI_ROLE_KEY_MAP = {
     "role_job_fisherman": {"name": "낚시꾼", "is_prefix": True, "priority": 15, "prefix_symbol": "🎣", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_farmer": {"name": "농부", "is_prefix": True, "priority": 15, "prefix_symbol": "🌾", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
     "role_job_miner": {"name": "광부", "is_prefix": True, "priority": 15, "prefix_symbol": "⛏️", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_resident_regular": {"name": "『 🌊︰ 해몽 』", "is_prefix": True, "priority": 45, "prefix_symbol": "해몽", "prefix_format": "【{symbol}】 ", "suffix": " ੭"},
-    "role_resident_rookie": {"name": "『 🐳︰ 연안 』", "is_prefix": True, "priority": 50, "prefix_symbol": "연안", "prefix_format": "【{symbol}】 ", "suffix": " ੭"},
+    "role_resident_regular": {"name": "『 🌊︰ 해몽 』", "is_prefix": True, "priority": 45, "prefix_symbol": "해몽", "prefix_format": "【{symbol}】", "suffix": " ੭"},
+    "role_resident_rookie": {"name": "『 🐳︰ 연안 』", "is_prefix": True, "priority": 50, "prefix_symbol": "연안", "prefix_format": "【{symbol}】", "suffix": " ੭"},
     "role_guest": {"name": "『 💧 』  ◟해변 ⸝⸝‧⁺", "is_prefix": False, "priority": 1}, # is_prefix: False, priority: 1로 명확히 설정
     # --- [수정] 정보 역할 (성별, 나이) ---
     "role_info_male": {"name": "『 💙︰ 남자 』", "is_prefix": False, "priority": 0},
