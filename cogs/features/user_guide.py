@@ -256,7 +256,7 @@ class UserGuide(commands.Cog):
             inquiry_channel_id = get_id('ticket_main_panel_channel_id') or 1414675593533984860
             
             # 3. 도우미 역할 ID (role_staff_newbie_helper 또는 기본값)
-            helper_role_id = get_id('role_staff_newbie_helper') or 1442372586259611688
+            helper_role_id = get_id('role_staff_newbie_helper') or 1414627893727858770
             
             # 4. 규칙 채널 ID (DB 키가 명확치 않으면 기본값 사용)
             rule_channel_id = 1414675515759005727
