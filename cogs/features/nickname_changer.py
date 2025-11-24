@@ -15,7 +15,6 @@ from utils.database import (
     get_config
 )
 from utils.helpers import format_embed_from_db, format_seconds_to_hms, has_required_roles
-# PrefixManager는 타입 힌팅용입니다. 실제 로드 시에는 bot.get_cog를 사용합니다.
 from .prefix_manager import PrefixManager
 
 logger = logging.getLogger(__name__)
@@ -59,13 +58,12 @@ class NicknameApprovalView(ui.View):
 
             final_name = self.new_name # 기본값은 신청한 이름
             if is_approved:
-                # PrefixManager Cog를 통해 최종 닉네임 계산 및 적용
                 prefix_cog: PrefixManager = self.parent_cog.bot.get_cog("PrefixManager")
                 if prefix_cog:
                     final_name = await prefix_cog.apply_prefix(member, base_name=self.new_name)
                 else:
                     logger.error("PrefixManager Cog를 찾을 수 없어 접두사 적용에 실패했습니다.")
-                    try: # 접두사 적용 실패 시 기본 이름이라도 적용 시도
+                    try:
                         await member.edit(nick=self.new_name, reason=f"관리자 승인 ({interaction.user})")
                     except Exception as e: logger.error(f"닉네임 변경 실패: {e}", exc_info=True)
             
@@ -92,13 +90,23 @@ class NicknameApprovalView(ui.View):
     async def reject(self, i: discord.Interaction, b: ui.Button): await self._handle_approval_flow(i, is_approved=False)
 
 class NicknameChangeModal(ui.Modal, title="이름 변경 신청"):
-    new_name = ui.TextInput(label="새로운 이름", placeholder="순수 한글 6자 이내로 입력해주세요.", required=True, max_length=6)
+    # ▼▼▼ [수정 1] 입력 제한을 8자로 변경하고 안내 문구 수정 ▼▼▼
+    new_name = ui.TextInput(
+        label="새로운 이름", 
+        placeholder="한글과 공백 포함 8자 이내로 입력해주세요.", 
+        required=True, 
+        max_length=8
+    )
+    
     def __init__(self, parent_cog: 'NicknameChanger'):
         super().__init__(); self.parent_cog = parent_cog
+        
     async def on_submit(self, i: discord.Interaction):
         await i.response.defer(ephemeral=True); name = self.new_name.value
-        if not re.match(r"^[\uAC00-\uD7A3]+$", name) or len(name) > 6:
-            return await i.followup.send("❌ 이름은 6자 이내의 한글로만 구성되어야 합니다.", ephemeral=True)
+        
+        # ▼▼▼ [수정 2] 정규식을 한글(가-힣) + 공백(\s) 허용으로 변경하고 길이 체크 8자로 수정 ▼▼▼
+        if not re.match(r"^[가-힣\s]+$", name) or len(name) > 8:
+            return await i.followup.send("❌ 이름은 8자 이내의 한글과 공백으로만 구성되어야 합니다.", ephemeral=True)
         
         await set_cooldown(str(i.user.id), "nickname_change")
         embed = discord.Embed(title="📝 이름 변경 신청", color=discord.Color.blue())
@@ -139,9 +147,7 @@ class NicknameChangerPanelView(ui.View):
                 return await i.response.send_message(f"❌ 다음 신청까지 **{format_seconds_to_hms(remaining)}** 남았습니다.", ephemeral=True)
             await i.response.send_modal(NicknameChangeModal(self.parent_cog))
 
-# ▼▼▼ [핵심 수정] Cog 이름을 'Nicknames'로 명시하여 설정 파일과 일치시킴 ▼▼▼
 class NicknameChanger(commands.Cog, name="Nicknames"):
-# ▲▲▲ [수정 완료] ▲▲▲
     def __init__(self, bot: commands.Bot):
         self.bot = bot; self.view_instance = None; self._user_locks: Dict[int, asyncio.Lock] = {}
         self.panel_regeneration_lock = asyncio.Lock()
@@ -157,8 +163,6 @@ class NicknameChanger(commands.Cog, name="Nicknames"):
         logger.info("✅ 닉네임 변경 패널의 영구 View가 성공적으로 등록되었습니다.")
 
     async def cog_load(self):
-        # on_ready에서 load_configs를 호출하지 않으므로 여기서 호출할 필요가 없음
-        # 하지만 영구 View 등록은 필요합니다.
         await self.register_persistent_views()
 
     async def regenerate_panel(self, channel: discord.TextChannel, panel_key: str = "panel_nicknames") -> bool:
