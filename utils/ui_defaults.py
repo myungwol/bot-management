@@ -224,8 +224,7 @@ UI_EMBEDS = {
     },
     # ▲▲▲▲▲ [수정 완료] ▲▲▲▲▲
     "guide_public_introduction": {
-        "title": "🌊 새로운 주민을 소개합니다!",
-        "description": "{member_mention}님이 우리와 함께하게 되었어요. 모두 따뜻하게 맞이해주세요!",
+        "description": "{member_mention}",
         "color": 0x3498DB,
         "fields": [
             {"name": "이름", "value": "{submitted_name}", "inline": True},
