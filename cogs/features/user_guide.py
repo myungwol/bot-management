@@ -97,12 +97,18 @@ class UserGuide(commands.Cog):
                 logger.error(f"역할/닉네임 업데이트 중 오류: {e}", exc_info=True)
                 return await interaction.followup.send("❌ 역할/닉네임 업데이트 중 오류가 발생했습니다.", ephemeral=True)
 
+            # 1. 스태프 기록 채널에 전송 (기존 로직)
             await self.cog.send_public_introduction(interaction.user, member, submitted_data)
+            
+            # 2. 메인 채팅방에 환영 메시지 전송 (추가된 로직)
+            await self.cog.send_main_chat_welcome(member)
+
             button.disabled, button.label = True, "승인 완료"
             embed.color = discord.Color.green()
             embed.set_footer(text=f"✅ {interaction.user.display_name} 님에 의해 승인됨")
             await interaction.message.edit(embed=embed, view=self)
             await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인했습니다.", ephemeral=True)
+            
             if interaction.channel.permissions_for(interaction.guild.me).manage_threads:
                 await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다! 10초 후 안내 스레드가 닫힙니다.")
                 await asyncio.sleep(10)
@@ -183,6 +189,7 @@ class UserGuide(commands.Cog):
         self.bot = bot
         self.panel_channel_id: Optional[int] = None
         self.public_intro_channel_id: Optional[int] = None
+        self.main_chat_channel_id: Optional[int] = None # 메인 채팅방 ID 변수 추가
         self.active_guide_threads: Dict[int, int] = {}
         self.panel_view = self.UserGuidePanelView(self)
         self.guide_thread_view = self.GuideThreadView(self)
@@ -191,19 +198,18 @@ class UserGuide(commands.Cog):
 
     async def cog_load(self): 
         await self.load_configs()
-    
-    # ▼▼▼ [핵심 수정] 버튼을 먼저 만들고 View를 등록합니다 ▼▼▼
+        
     async def register_persistent_views(self):
-        await self.panel_view.setup_buttons() # 버튼 생성 (비동기)
-        self.bot.add_view(self.panel_view)    # 버튼이 있는 상태로 등록
+        await self.panel_view.setup_buttons()
+        self.bot.add_view(self.panel_view)
         self.bot.add_view(self.guide_thread_view)
         self.bot.add_view(self.approval_view)
         logger.info("✅ 신규 유저 안내 시스템의 영구 View 3개가 성공적으로 등록되었습니다.")
-    # ▲▲▲ [수정 완료] ▲▲▲
         
     async def load_configs(self): 
         self.panel_channel_id = get_id("user_guide_panel_channel_id")
         self.public_intro_channel_id = get_id("introduction_public_channel_id")
+        self.main_chat_channel_id = get_id("main_chat_channel_id") # 설정 로드
         logger.info("[UserGuide Cog] DB로부터 설정을 로드했습니다.")
         
     async def get_guide_steps(self) -> List[Dict[str, Any]]:
@@ -217,6 +223,7 @@ class UserGuide(commands.Cog):
         else: self.active_guide_threads.pop(user.id, None); return False
 
     async def send_public_introduction(self, approver: discord.Member, member: discord.Member, data: dict):
+        """스태프 기록용 채널에 자기소개 요약 전송"""
         if not self.public_intro_channel_id: return
         channel = self.bot.get_channel(self.public_intro_channel_id)
         if not isinstance(channel, discord.TextChannel): return
@@ -235,6 +242,47 @@ class UserGuide(commands.Cog):
         )
         embed.set_thumbnail(url=member.display_avatar.url)
         await channel.send(embed=embed)
+
+    # ▼▼▼ [추가] 메인 채팅방 환영 메시지 전송 메서드 ▼▼▼
+    async def send_main_chat_welcome(self, member: discord.Member):
+        """메인 채팅방에 환영 메시지 전송 (Onboarding과 동일 로직)"""
+        try:
+            if not self.main_chat_channel_id:
+                return
+            
+            channel = self.bot.get_channel(self.main_chat_channel_id)
+            if not isinstance(channel, discord.TextChannel):
+                return
+
+            embed_data = await get_embed_from_db("embed_main_chat_welcome")
+            if not embed_data:
+                logger.warning("메인 채팅 환영 임베드(embed_main_chat_welcome)를 찾을 수 없습니다.")
+                return
+            
+            # 플레이스홀더에 들어갈 ID들을 가져옵니다.
+            staff_role_id = get_id('role_staff_newbie_helper') or 1412052122949779517
+            nickname_channel_id = get_id('nickname_panel_channel_id') or 1412052293096050729
+            role_channel_id = get_id('auto_role_channel_id') or 1412052301115424799
+            inquiry_channel_id = get_id('inquiry_panel_channel_id') or 1412052236736925737
+            bot_guide_channel_id = get_id('bot_guide_channel_id') or 1412052405477970040 
+            festival_channel_id = get_id('festival_channel_id') or 1412052244349845627
+
+            format_args = {
+                "member_mention": member.mention,
+                "staff_role_mention": f"<@&{staff_role_id}>",
+                "nickname_channel_mention": f"<#{nickname_channel_id}>",
+                "role_channel_mention": f"<#{role_channel_id}>",
+                "inquiry_channel_mention": f"<#{inquiry_channel_id}>",
+                "bot_guide_channel_mention": f"<#{bot_guide_channel_id}>",
+                "festival_channel_mention": f"<#{festival_channel_id}>"
+            }
+
+            embed = format_embed_from_db(embed_data, **format_args)
+            await channel.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
+            
+        except Exception as e:
+            logger.error(f"메인 채팅 환영 메시지 전송 중 오류 발생: {e}", exc_info=True)
+    # ▲▲▲ [추가 완료] ▲▲▲
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
