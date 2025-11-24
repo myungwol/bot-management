@@ -227,9 +227,9 @@ UI_EMBEDS = {
         "description": "{member_mention}",
         "color": 0x3498DB,
         "fields": [
-            {"name": "이름", "value": "{submitted_name}", "inline": True},
-            {"name": "출생년도", "value": "{submitted_birth_year}", "inline": True},
-            {"name": "성별", "value": "{submitted_gender}", "inline": True},
+            {"name": "이름", "value": "{submitted_name}", "inline": False},
+            {"name": "출생년도", "value": "{submitted_birth_year}", "inline": False},
+            {"name": "성별", "value": "{submitted_gender}", "inline": False},
             {"name": "가입 경로", "value": "{submitted_join_path}", "inline": False},
             {"name": "담당 스태프", "value": "{approver_mention}", "inline": False}
         ]
