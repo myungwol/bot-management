@@ -156,10 +156,7 @@ class UserGuide(commands.Cog):
             btn.callback = self.start_guide_callback
             self.add_item(btn)
         
-        # ▼▼▼ [핵심 수정] 인자에서 'b: ui.Button'을 제거했습니다. ▼▼▼
-        # 수동으로 생성한 버튼(btn.callback = ...)은 interaction만 전달받습니다.
         async def start_guide_callback(self, i: discord.Interaction):
-        # ▲▲▲ [수정 완료] ▲▲▲
             await i.response.defer(ephemeral=True)
             if self.cog.has_active_thread(i.user):
                 return await i.followup.send(f"❌ 이미 진행 중인 안내 스레드(<#{self.cog.active_guide_threads.get(i.user.id)}>)가 있습니다.", ephemeral=True)
@@ -194,12 +191,15 @@ class UserGuide(commands.Cog):
 
     async def cog_load(self): 
         await self.load_configs()
-        
+    
+    # ▼▼▼ [핵심 수정] 버튼을 먼저 만들고 View를 등록합니다 ▼▼▼
     async def register_persistent_views(self):
-        self.bot.add_view(self.panel_view)
+        await self.panel_view.setup_buttons() # 버튼 생성 (비동기)
+        self.bot.add_view(self.panel_view)    # 버튼이 있는 상태로 등록
         self.bot.add_view(self.guide_thread_view)
         self.bot.add_view(self.approval_view)
         logger.info("✅ 신규 유저 안내 시스템의 영구 View 3개가 성공적으로 등록되었습니다.")
+    # ▲▲▲ [수정 완료] ▲▲▲
         
     async def load_configs(self): 
         self.panel_channel_id = get_id("user_guide_panel_channel_id")
