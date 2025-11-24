@@ -49,13 +49,11 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
         notify_role_id = get_id("role_notify_guide_approval")
         mention_str = f"<@&{notify_role_id}>" if notify_role_id else "스태프 여러분,"
         
-        # ▼▼▼ [수정] self.cog.approval_view를 통해 View 인스턴스에 접근합니다. ▼▼▼
         await interaction.channel.send(content=mention_str, embed=approval_embed, view=self.cog.approval_view, allowed_mentions=discord.AllowedMentions(roles=True))
         await interaction.followup.send("✅ 자기소개서를 제출했습니다. 스태프 확인 후 역할이 지급됩니다.", ephemeral=True)
 
 
 class UserGuide(commands.Cog):
-    # ▼▼▼ [핵심] 모든 View 클래스를 Cog 내부에 중첩된 클래스로 정의하여 구조를 명확히 합니다. ▼▼▼
     class GuideApprovalView(ui.View):
         def __init__(self, outer_cog: 'UserGuide'):
             super().__init__(timeout=None)
@@ -101,7 +99,7 @@ class UserGuide(commands.Cog):
 
             await self.cog.send_public_introduction(interaction.user, member, submitted_data)
             button.disabled, button.label = True, "승인 완료"
-            embed.color = discord.Color.green() # 색상 변경 추가
+            embed.color = discord.Color.green()
             embed.set_footer(text=f"✅ {interaction.user.display_name} 님에 의해 승인됨")
             await interaction.message.edit(embed=embed, view=self)
             await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인했습니다.", ephemeral=True)
@@ -158,8 +156,10 @@ class UserGuide(commands.Cog):
             btn.callback = self.start_guide_callback
             self.add_item(btn)
         
-        # ▼▼▼ [핵심 수정 1/2] 콜백 함수의 인자를 올바르게 수정합니다. (b: ui.Button 추가) ▼▼▼
-        async def start_guide_callback(self, i: discord.Interaction, b: ui.Button):
+        # ▼▼▼ [핵심 수정] 인자에서 'b: ui.Button'을 제거했습니다. ▼▼▼
+        # 수동으로 생성한 버튼(btn.callback = ...)은 interaction만 전달받습니다.
+        async def start_guide_callback(self, i: discord.Interaction):
+        # ▲▲▲ [수정 완료] ▲▲▲
             await i.response.defer(ephemeral=True)
             if self.cog.has_active_thread(i.user):
                 return await i.followup.send(f"❌ 이미 진행 중인 안내 스레드(<#{self.cog.active_guide_threads.get(i.user.id)}>)가 있습니다.", ephemeral=True)
@@ -187,7 +187,6 @@ class UserGuide(commands.Cog):
         self.panel_channel_id: Optional[int] = None
         self.public_intro_channel_id: Optional[int] = None
         self.active_guide_threads: Dict[int, int] = {}
-        # Cog가 View 인스턴스들을 소유하도록 변경
         self.panel_view = self.UserGuidePanelView(self)
         self.guide_thread_view = self.GuideThreadView(self)
         self.approval_view = self.GuideApprovalView(self)
@@ -214,7 +213,6 @@ class UserGuide(commands.Cog):
     def has_active_thread(self, user: discord.Member) -> bool:
         tid = self.active_guide_threads.get(user.id)
         if not tid: return False
-        # 스레드가 존재하는지 확인하고, 없으면 목록에서 제거
         if user.guild.get_thread(tid): return True
         else: self.active_guide_threads.pop(user.id, None); return False
 
@@ -240,7 +238,6 @@ class UserGuide(commands.Cog):
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
-        # 스레드가 삭제되면 활성 스레드 목록에서 제거
         uid = next((uid for uid, tid in self.active_guide_threads.items() if tid == thread.id), None)
         if uid: 
             self.active_guide_threads.pop(uid, None)
