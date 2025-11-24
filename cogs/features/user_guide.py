@@ -142,8 +142,9 @@ class UserGuide(commands.Cog):
             await i.response.send_modal(IntroductionFormModal(cog))
 
     class UserGuidePanelView(ui.View):
-        def __init__(self):
+        def __init__(self, outer_cog: 'UserGuide'):
             super().__init__(timeout=None)
+            self.cog = outer_cog
         async def setup_buttons(self):
             self.clear_items()
             comps = await get_panel_components_from_db('user_guide')
@@ -151,8 +152,11 @@ class UserGuide(commands.Cog):
             btn = ui.Button(label=comp.get('label', "안내 시작하기"), style=discord.ButtonStyle.success, emoji=comp.get('emoji', "👋"), custom_id=comp.get('component_key', "start_user_guide"))
             btn.callback = self.start_guide_callback
             self.add_item(btn)
+        
+        # ▼▼▼ [핵심 수정] 빠뜨렸던 'b: ui.Button' 인자를 추가합니다. ▼▼▼
         async def start_guide_callback(self, i: discord.Interaction, b: ui.Button):
-            cog: 'UserGuide' = self.view.cog
+        # ▲▲▲ [수정 완료] ▲▲▲
+            cog: 'UserGuide' = self.cog
             await i.response.defer(ephemeral=True)
             if cog.has_active_thread(i.user):
                 return await i.followup.send(f"❌ 이미 진행 중인 안내 스레드(<#{cog.active_guide_threads.get(i.user.id)}>)가 있습니다.", ephemeral=True)
@@ -175,25 +179,22 @@ class UserGuide(commands.Cog):
                 await i.followup.send("❌ 스레드 생성 중 오류가 발생했습니다.", ephemeral=True)
 
     def __init__(self, bot: commands.Bot):
+        # (이하 __init__ 및 나머지 코드는 이전과 동일하게 유지)
         self.bot = bot
         self.panel_channel_id: Optional[int] = None
         self.public_intro_channel_id: Optional[int] = None
         self.active_guide_threads: Dict[int, int] = {}
-        # Cog가 시작될 때 자신의 View 인스턴스를 생성
-        self.panel_view = self.UserGuidePanelView()
+        self.panel_view = self.UserGuidePanelView(self)
         self.guide_thread_view = self.GuideThreadView()
         self.approval_view = self.GuideApprovalView()
-        # View가 Cog에 접근할 수 있도록 .cog 속성을 설정
-        self.panel_view.cog = self
-        self.guide_thread_view.cog = self
-        self.approval_view.cog = self
+        self.guide_thread_view.cog = self 
+        self.approval_view.cog = self 
         logger.info("UserGuide Cog가 성공적으로 초기화되었습니다.")
-        
+
     async def cog_load(self): 
         await self.load_configs()
         
     async def register_persistent_views(self):
-        # __init__에서 생성된 인스턴스를 등록
         self.bot.add_view(self.panel_view)
         self.bot.add_view(self.guide_thread_view)
         self.bot.add_view(self.approval_view)
