@@ -41,17 +41,17 @@ UI_ROLE_KEY_MAP = {
     "role_approval": {"name": "꒰🏠꒱ 스태프", "is_prefix": False, "priority": 70},
 
     # --- [유지] 일반 유저 접두사 역할 ---
-    "role_premium_booster": {"name": "『💝︰ 𝗕𝗢𝗢𝗦𝗧𝗘𝗥』", "is_prefix": False, "priority": 70},
-    "role_resident_elder": {"name": "장로", "is_prefix": True, "priority": 50, "prefix_symbol": "📜", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_resident_veteran": {"name": "베테랑", "is_prefix": True, "priority": 45, "prefix_symbol": "veterαn", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_job_master_chef": {"name": "마스터 셰프", "is_prefix": True, "priority": 16, "prefix_symbol": "‍🍳", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_job_master_angler": {"name": "강태공", "is_prefix": True, "priority": 16, "prefix_symbol": "🏆", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_job_master_farmer": {"name": "대농", "is_prefix": True, "priority": 16, "prefix_symbol": "👑", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_job_expert_miner": {"name": "전문 광부", "is_prefix": True, "priority": 16, "prefix_symbol": "💎", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_job_chef": {"name": "요리사", "is_prefix": True, "priority": 15, "prefix_symbol": "🍳", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_job_fisherman": {"name": "낚시꾼", "is_prefix": True, "priority": 15, "prefix_symbol": "🎣", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_job_farmer": {"name": "농부", "is_prefix": True, "priority": 15, "prefix_symbol": "🌾", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
-    "role_job_miner": {"name": "광부", "is_prefix": True, "priority": 15, "prefix_symbol": "⛏️", "prefix_format": "「{symbol}」", "suffix": " ⸝⁺⊹"},
+    "role_premium_booster": {"name": "『💝︰ 𝗕𝗢𝗢𝗦𝗧𝗘𝗥』", "is_prefix": False, "priority": 40},
+    "role_resident_elder": {"name": "장로", "is_prefix": False, "priority": 40},
+    "role_resident_veteran": {"name": "베테랑", "is_prefix": False, "priority": 40},
+    "role_job_master_chef": {"name": "마스터 셰프", "is_prefix": False, "priority": 40},
+    "role_job_master_angler": {"name": "강태공", "is_prefix": False, "priority": 40},
+    "role_job_master_farmer": {"name": "대농", "is_prefix": False, "priority": 40},
+    "role_job_expert_miner": {"name": "전문 광부", "is_prefix": False, "priority": 40},
+    "role_job_chef": {"name": "요리사", "is_prefix": False, "priority": 30},
+    "role_job_fisherman": {"name": "낚시꾼", "is_prefix": False, "priority": 30},
+    "role_job_farmer": {"name": "농부", "is_prefix": False, "priority": 30},
+    "role_job_miner": {"name": "광부", "is_prefix": False, "priority": 30},
     "role_resident_regular": {"name": "『 🌊︰ 해몽 』", "is_prefix": True, "priority": 45, "prefix_symbol": "해몽", "prefix_format": "【{symbol}】", "suffix": " ੭"},
     "role_resident_rookie": {"name": "『 🐳︰ 연안 』", "is_prefix": True, "priority": 50, "prefix_symbol": "연안", "prefix_format": "【{symbol}】", "suffix": " ੭"},
     "role_guest": {"name": "『 💧 』  ◟해변 ⸝⸝‧⁺", "is_prefix": False, "priority": 1}, # is_prefix: False, priority: 1로 명확히 설정
@@ -1807,20 +1807,7 @@ JOB_SYSTEM_CONFIG = {
         "master_farmer": "role_job_master_farmer",
         "expert_miner": "role_job_expert_miner",
         "master_chef": "role_job_master_chef" # [추가]
-    },
-    "LEVEL_TIER_ROLES": [{
-        "level": 150,
-        "role_key": "role_resident_elder"
-    }, {
-        "level": 100,
-        "role_key": "role_resident_veteran"
-    }, {
-        "level": 50,
-        "role_key": "role_resident_regular"
-    }, {
-        "level": 1,
-        "role_key": "role_resident_rookie"
-    }]
+    }
 }
 # ▲▲▲ [핵심 수정] 종료 ▲▲▲
 AGE_ROLE_MAPPING = [{
