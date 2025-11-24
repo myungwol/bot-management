@@ -62,7 +62,7 @@ class UserGuide(commands.Cog):
         @ui.button(label="수락", style=discord.ButtonStyle.success, emoji="✅", custom_id="guide_approve_button")
         async def approve(self, interaction: discord.Interaction, button: ui.Button):
             required_keys = ["role_staff_team_info", "role_staff_team_newbie", "role_staff_leader_info", "role_staff_leader_newbie", "role_staff_deputy_manager", "role_staff_general_manager", "role_staff_deputy_chief", "role_staff_village_chief"]
-            if not await has_required_roles(interaction, required_keys, "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."):
+            if not await has_required_roles(interaction, required_keys, "❌ 안내팀 스태프만 수락할 수 있습니다."):
                 return
 
             await interaction.response.defer(ephemeral=True)
