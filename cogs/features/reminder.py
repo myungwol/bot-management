@@ -39,8 +39,16 @@ class Reminder(commands.Cog):
         self.check_reminders.cancel()
 
     async def load_configs(self):
-        self.configs['disboard'] = {'channel_id': get_id("bump_reminder_channel_id"), 'role_id': get_id("role_notify_disboard")}
-        self.configs['dicoall'] = {'channel_id': get_id("dicoall_reminder_channel_id"), 'role_id': get_id("role_notify_up")}
+        # ▼▼▼ [핵심 수정] 키 이름을 system.py의 설정 명령어와 일치시켰습니다. ▼▼▼
+        self.configs['disboard'] = {
+            'channel_id': get_id("bump_reminder_channel_id"), 
+            'role_id': get_id("bump_reminder_role_id")  # 기존: role_notify_disboard -> 수정: bump_reminder_role_id
+        }
+        self.configs['dicoall'] = {
+            'channel_id': get_id("dicoall_reminder_channel_id"), 
+            'role_id': get_id("dicoall_reminder_role_id") # 기존: role_notify_up -> 수정: dicoall_reminder_role_id
+        }
+        # ▲▲▲ [수정 완료] ▲▲▲
         logger.info(f"[Reminder] 설정 로드 완료: {self.configs}")
 
     @commands.Cog.listener()
@@ -53,26 +61,22 @@ class Reminder(commands.Cog):
         for key, config in REMINDER_CONFIG.items():
             if message.author.id == config['bot_id'] and config['keyword'] in embed_description:
                 
-                # --- ▼▼▼ [핵심 수정] 이전 알림 메시지를 찾는 로직 변경 ▼▼▼ ---
                 try:
-                    # is_active 조건을 제거하고, .single() 대신 안전한 .execute()를 사용합니다.
                     response = await supabase.table('reminders').select('reminder_message_id') \
                         .eq('guild_id', message.guild.id) \
                         .eq('reminder_type', key) \
                         .not_.is_('reminder_message_id', 'null') \
                         .order('created_at', desc=True).limit(1).execute()
                     
-                    # 결과가 있고, 데이터가 비어있지 않은지 확인합니다.
                     if response and response.data:
                         record = response.data[0]
                         if msg_id := record.get('reminder_message_id'):
                             original_reminder_msg = await message.channel.fetch_message(msg_id)
                             await original_reminder_msg.delete()
                 except discord.NotFound:
-                    pass # 이미 삭제된 경우 괜찮음
+                    pass 
                 except Exception as e:
                     logger.warning(f"이전 알림 메시지 삭제 중 오류: {e}")
-                # --- ▲▲▲ [수정 완료] ---
                 
                 user_mention = self.find_user_mention_in_embed(embed_description)
                 confirmation_msg = await self.send_confirmation_message(key, config.get('confirmation_embed_key'), message.channel, user_mention)
@@ -117,12 +121,30 @@ class Reminder(commands.Cog):
                 config = REMINDER_CONFIG.get(reminder_type)
                 reminder_settings = self.configs.get(reminder_type)
 
-                if not all([config, reminder_settings, reminder_settings.get('channel_id'), reminder_settings.get('role_id')]):
+                # 설정값 검증 강화 및 로그 추가
+                if not config:
+                    logger.warning(f"알림 타입 '{reminder_type}'에 대한 내부 설정(REMINDER_CONFIG)이 없습니다.")
                     await deactivate_reminder(reminder['id']); continue
                 
-                channel = guild.get_channel(reminder_settings['channel_id'])
-                role = guild.get_role(reminder_settings['role_id'])
-                if not channel or not role:
+                if not reminder_settings:
+                    logger.warning(f"알림 타입 '{reminder_type}'에 대한 서버 설정(self.configs)이 로드되지 않았습니다.")
+                    await deactivate_reminder(reminder['id']); continue
+
+                channel_id = reminder_settings.get('channel_id')
+                role_id = reminder_settings.get('role_id')
+
+                if not channel_id or not role_id:
+                    logger.warning(f"'{reminder_type}' 알림을 위한 채널 ID 또는 역할 ID가 설정되지 않았습니다. (Ch: {channel_id}, Role: {role_id})")
+                    await deactivate_reminder(reminder['id']); continue
+                
+                channel = guild.get_channel(channel_id)
+                role = guild.get_role(role_id)
+                
+                if not channel:
+                    logger.warning(f"설정된 알림 채널(ID: {channel_id})을 찾을 수 없습니다.")
+                    await deactivate_reminder(reminder['id']); continue
+                if not role:
+                    logger.warning(f"설정된 알림 역할(ID: {role_id})을 찾을 수 없습니다.")
                     await deactivate_reminder(reminder['id']); continue
 
                 if confirmation_msg_id := reminder.get('confirmation_message_id'):
