@@ -1,17 +1,96 @@
-2025-11-24 03:27:10 - ERROR - [cogs.features.user_guide] 역할/닉네임 업데이트 중 오류: name 'new_role_ids' is not defined
-Traceback (most recent call last):
-  File "/app/cogs/features/user_guide.py", line 74, in approve
-    if year_map: new_role_ids.append(get_id(year_map['key']))
-                 ^^^^^^^^^^^^
-NameError: name 'new_role_ids' is not defined
-2025-11-24 03:27:21 - ERROR - [cogs.features.user_guide] 역할/닉네임 업데이트 중 오류: name 'new_role_ids' is not defined
-Traceback (most recent call last):
-  File "/app/cogs/features/user_guide.py", line 74, in approve
-    if year_map: new_role_ids.append(get_id(year_map['key']))
-                 ^^^^^^^^^^^^
-NameError: name 'new_role_ids' is not defined
+# cogs/features/user_guide.py
+
+import discord
+from discord import ui
+from discord.ext import commands
+import logging
+from typing import Optional, Dict, List, Any
+import asyncio
+from datetime import datetime
+import re
+
+from utils.database import get_id, save_panel_id, get_panel_id, get_embed_from_db, get_panel_components_from_db, get_config
+from utils.helpers import format_embed_from_db, has_required_roles
+from utils.ui_defaults import AGE_ROLE_MAPPING_BY_YEAR
+
+logger = logging.getLogger(__name__)
 
 
+class GuideApprovalView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def _check_permission(self, interaction: discord.Interaction) -> bool:
+        required_keys = ["role_staff_team_info", "role_staff_team_newbie", "role_staff_leader_info", "role_staff_leader_newbie", "role_staff_deputy_manager", "role_staff_general_manager", "role_staff_deputy_chief", "role_staff_village_chief"]
+        error_message = "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."
+        return await has_required_roles(interaction, required_keys, error_message)
+
+    async def _send_public_introduction(self, cog: 'UserGuide', approver: discord.Member, member: discord.Member, data: dict):
+        try:
+            channel_id = cog.public_intro_channel_id
+            if not channel_id: return logger.warning("공개 자기소개 채널이 설정되지 않음.")
+            channel = cog.bot.get_channel(channel_id)
+            if not channel: return logger.warning(f"공개 자기소개 채널(ID: {channel_id})을 찾을 수 없음.")
+            embed_data = await get_embed_from_db("guide_public_introduction")
+            if not embed_data: return logger.warning("DB에서 'guide_public_introduction' 템플릿을 찾을 수 없음.")
+            embed = format_embed_from_db(embed_data, member_mention=member.mention, submitted_name=data['name'], submitted_birth_year=str(data['birth_year']), submitted_gender=data['gender'], submitted_join_path=data['join_path'], approver_mention=approver.mention)
+            embed.set_thumbnail(url=member.display_avatar.url)
+            await channel.send(content=member.mention, embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+        except Exception as e:
+            logger.error(f"공개 자기소개 메시지 전송 중 오류 발생: {e}", exc_info=True)
+
+    @ui.button(label="수락", style=discord.ButtonStyle.success, emoji="✅", custom_id="guide_approve_button")
+    async def approve(self, interaction: discord.Interaction, button: ui.Button):
+        cog = interaction.client.get_cog("UserGuide")
+        if not cog or not await self._check_permission(interaction): return
+
+        await interaction.response.defer(ephemeral=True)
+        embed = interaction.message.embeds[0]
+        match = re.search(r"<@!?(\d+)>", embed.description)
+        if not match: return await interaction.followup.send("❌ 임베드에서 대상 유저를 찾을 수 없습니다.", ephemeral=True)
+        target_user_id = int(match.group(1))
+
+        submitted_data = {
+            "name": next((f.value for f in embed.fields if f.name == "신청 이름"), ""),
+            "birth_year": int(next((f.value for f in embed.fields if f.name == "출생년도"), "0")),
+            "gender": next((f.value for f in embed.fields if f.name == "성별"), ""),
+            "join_path": next((f.value for f in embed.fields if f.name == "가입 경로"), "")
+        }
+
+        try:
+            member = await interaction.guild.fetch_member(target_user_id)
+        except discord.NotFound:
+            return await interaction.followup.send("❌ 대상 유저를 찾을 수 없습니다.", ephemeral=True)
+
+        try:
+            final_roles = {role for role in member.roles if role.id != get_id("role_guest")}
+            
+            roles_to_add_ids = [get_id("role_resident_rookie"), get_id("role_resident_regular")]
+            gender = submitted_data.get('gender', '').lower()
+            if '남' in gender: roles_to_add_ids.append(get_id("role_info_male"))
+            elif '여' in gender: roles_to_add_ids.append(get_id("role_info_female"))
+            
+            # ▼▼▼ [핵심 수정] 변수 이름을 new_role_ids -> roles_to_add_ids 로 수정 ▼▼▼
+            year_map = next((item for item in AGE_ROLE_MAPPING_BY_YEAR if item["year"] == submitted_data['birth_year']), None)
+            if year_map: roles_to_add_ids.append(get_id(year_map['key']))
+            # ▲▲▲ [수정 완료] ▲▲▲
+            
+            for role_id in roles_to_add_ids:
+                if role_id and (role := interaction.guild.get_role(role_id)): final_roles.add(role)
+            
+            final_nickname = await cog.bot.get_cog("PrefixManager").get_final_nickname(member, base_name=submitted_data['name'])
+            
+            await member.edit(nick=final_nickname, roles=list(final_roles), reason="안내 가이드 승인")
+        except Exception as e:
+            logger.error(f"역할/닉네임 업데이트 중 오류: {e}", exc_info=True)
+            return await interaction.followup.send("❌ 역할/닉네임 업데이트 중 오류가 발생했습니다.", ephemeral=True)
+
+        await self._send_public_introduction(cog, interaction.user, member, submitted_data)
+        button.disabled, button.label = True, "승인 완료"
+        embed.color, embed.set_footer(text=f"✅ {interaction.user.display_name} 님에 의해 승인됨")
+        await interaction.message.edit(embed=embed, view=self)
+        await interaction.followup.send(f"✅ {member.mention}님의 자기소개를 승인했습니다.", ephemeral=True)
+        await interaction.channel.send(f"🎉 {member.mention}님의 자기소개가 승인되었습니다!")
 
 class GuideThreadView(ui.View):
     def __init__(self, cog: 'UserGuide'):
