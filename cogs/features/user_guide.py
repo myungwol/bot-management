@@ -49,7 +49,12 @@ class IntroductionFormModal(ui.Modal, title="자기소개서 작성"):
         notify_role_id = get_id("role_notify_guide_approval")
         mention_str = f"<@&{notify_role_id}>" if notify_role_id else "스태프 여러분,"
         
-        await interaction.channel.send(content=mention_str, embed=approval_embed, view=self.cog.approval_view, allowed_mentions=discord.AllowedMentions(roles=True))
+        # ▼▼▼ [수정] self.cog.approval_view(재사용) 대신 새로운 인스턴스 생성 ▼▼▼
+        # 기존: view=self.cog.approval_view
+        # 수정: view=self.cog.GuideApprovalView(self.cog)
+        new_view = self.cog.GuideApprovalView(self.cog)
+        
+        await interaction.channel.send(content=mention_str, embed=approval_embed, view=new_view, allowed_mentions=discord.AllowedMentions(roles=True))
         await interaction.followup.send("✅ 자기소개서를 제출했습니다. 스태프 확인 후 역할이 지급됩니다.", ephemeral=True)
 
 
@@ -62,7 +67,7 @@ class UserGuide(commands.Cog):
         @ui.button(label="수락", style=discord.ButtonStyle.success, emoji="✅", custom_id="guide_approve_button")
         async def approve(self, interaction: discord.Interaction, button: ui.Button):
             required_keys = ["role_staff_team_info", "role_staff_team_newbie", "role_staff_leader_info", "role_staff_leader_newbie", "role_staff_deputy_manager", "role_staff_general_manager", "role_staff_deputy_chief", "role_staff_village_chief"]
-            if not await has_required_roles(interaction, required_keys, "❌ 안내팀 스태프만 수락할 수 있습니다."):
+            if not await has_required_roles(interaction, required_keys, "❌ 안내팀 또는 뉴비 관리팀 스태프만 수락할 수 있습니다."):
                 return
 
             await interaction.response.defer(ephemeral=True)
@@ -238,7 +243,6 @@ class UserGuide(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
         await channel.send(embed=embed)
 
-    # ▼▼▼ [수정] 임베드 대신 일반 메시지로 포맷팅하여 전송하도록 변경 ▼▼▼
     async def send_main_chat_welcome(self, member: discord.Member):
         try:
             if not self.main_chat_channel_id:
@@ -248,25 +252,17 @@ class UserGuide(commands.Cog):
             if not isinstance(channel, discord.TextChannel):
                 return
 
-            # DB에서 ID를 가져오되, 없으면 요청하신 기본값을 사용
-            # 1. 역할 채널 ID (notification_role_panel_channel_id 또는 기본값)
             role_channel_id = get_id('notification_role_panel_channel_id') or 1421544728494604369
-            
-            # 2. 문의 채널 ID (ticket_main_panel_channel_id 또는 기본값)
             inquiry_channel_id = get_id('ticket_main_panel_channel_id') or 1414675593533984860
-            
-            # 3. 도우미 역할 ID (role_staff_newbie_helper 또는 기본값)
             helper_role_id = get_id('role_staff_newbie_helper') or 1414627893727858770
-            
-            # 4. 규칙 채널 ID (DB 키가 명확치 않으면 기본값 사용)
             rule_channel_id = 1414675515759005727
 
             message_content = (
                 f"{member.mention}님, 해몽 : 海夢에 오신 걸 환영합니다!\n\n"
                 f" <a:1124928221243244644:1416125149782212831> <#{rule_channel_id}> 서버 규칙사항 먼저 숙지해주세요 ! \n\n"
-                f" <a:1124928273755938907:1416125162671046736> <#1421544728494604369> 역할은 여기에서 받아주세요 ! \n\n"
-                f" <:1367097758577852427:1421788139940479036> 문의 & 건의사항이 있으시다면 <#1414675593533984860> 채널을 사용해주세요 ! \n\n"
-                f" <a:1125436475631218769:1416108859956793344> 마지막으로 적응이 힘드시다면 <@&1414627893727858770> 을 멘션 해주세요 ! \n\n"
+                f" <a:1124928273755938907:1416125162671046736> <#{role_channel_id}> 역할은 여기에서 받아주세요 ! \n\n"
+                f" <:1367097758577852427:1421788139940479036> 문의 & 건의사항이 있으시다면 <#{inquiry_channel_id}> 채널을 사용해주세요 ! \n\n"
+                f" <a:1125436475631218769:1416108859956793344> 마지막으로 적응이 힘드시다면 <@&{helper_role_id}> 을 멘션 해주세요 ! \n\n"
                 f" 해몽에서 즐거운 시간 되시길 바랍니다 ! <:1339999746298740788:1419558757716725760>"
             )
 
@@ -274,7 +270,6 @@ class UserGuide(commands.Cog):
             
         except Exception as e:
             logger.error(f"메인 채팅 환영 메시지 전송 중 오류 발생: {e}", exc_info=True)
-    # ▲▲▲ [수정 완료] ▲▲▲
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread):
