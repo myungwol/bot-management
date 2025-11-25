@@ -80,8 +80,8 @@ UI_ROLE_KEY_MAP = {
     "role_noti_virtual_req": {"name": "‶ 💕 : 우결해요 .ᐟ ‶", "is_prefix": False, "priority": 0},
     "role_notify_ask": {"name": "‶ 🔔 : 에스크 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
     "role_notify_event": {"name": "‶ 🔔 : 이벤트 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
-    "role_notify_disboard": {"name": "‶ 🔔 : 범프 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0}, 
-    "role_notify_up": {"name": "‶ 🔔 : 업 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0},       
+    "role_notify_disboard": {"name": "‶ 🔔 : 범프 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_notify_up": {"name": "‶ 🔔 : 업 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0},
     "role_notify_update": {"name": "‶ 📝 : 서버 업뎃 .ᐟ ‶", "is_prefix": False, "priority": 0},
     "role_notify_first": {"name": "‶ 📝 : 선착 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
     "role_game_lol": {"name": ". ˚🎮◞ 리그오브레전드 . ˚", "is_prefix": False, "priority": 0},
@@ -176,7 +176,6 @@ USABLE_ITEMS = {
         "type": "open_chest",
         "description": "월간 보스를 처치하고 얻은 희귀한 전리품 상자. 무엇이 들어있을까?"
     },
-    # [추가] 벌점 차감권 아이템 설정
     "item_warning_deduction": {
         "name": "벌점 차감권",
         "type": "deduct_warning",
