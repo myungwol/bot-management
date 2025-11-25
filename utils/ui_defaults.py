@@ -111,7 +111,7 @@ UI_ROLE_KEY_MAP = {
     "role_warning_level_2": {"name": "『 🚨 』  ◟경고 2 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
     "role_warning_level_3": {"name": "『 🚨 』  ◟경고 3 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
     "role_warning_level_4": {"name": "『 🚨 』  ◟경고 4 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
-    "role_warning_level_4": {"name": "『 🚨 』  ◟경고 5 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
+    "role_warning_level_5": {"name": "『 🚨 』  ◟경고 5 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
 }
 
 # [신규] 출생년도별 역할 부여를 위한 정확한 매핑 데이터
