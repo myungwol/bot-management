@@ -1228,13 +1228,11 @@ UI_PANEL_COMPONENTS = [
 ]
 # [복구] USABLE_ITEMS (아이템 정의)
 USABLE_ITEMS = {
-    "role_item_warning_deduct": {
-        "name": "벌점 1회 차감권",
-        "type": "deduct_warning",
-        "value": -1,
-        "description": "누적된 벌점을 1회 차감합니다.",
-        "log_channel_key": "log_item_warning_deduct",
-        "log_embed_key": "log_item_use_warning_deduct"
+    "item_warning_deduction": {
+      "name": "벌점 차감권",
+      "type": "deduct_warning",
+      "description": "사용 시 벌점을 1점 차감합니다.",
+      "log_channel_key": "warning_log_channel_id"
     },
     "role_item_event_priority": {
         "name": "이벤트 우선 참여권",
