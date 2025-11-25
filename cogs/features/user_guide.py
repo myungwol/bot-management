@@ -252,11 +252,6 @@ class UserGuide(commands.Cog):
             if not isinstance(channel, discord.TextChannel):
                 return
 
-            role_channel_id = get_id('notification_role_panel_channel_id') or 1421544728494604369
-            inquiry_channel_id = get_id('ticket_main_panel_channel_id') or 1414675593533984860
-            helper_role_id = get_id('role_staff_newbie_helper') or 1414627893727858770
-            rule_channel_id = 1414675515759005727
-
             message_content = (
                 f"{member.mention}님, 해몽 : 海夢에 오신 걸 환영합니다!\n\n"
                 f" <a:1124928221243244644:1416125149782212831> <#1414675515759005727> 서버 규칙사항 먼저 숙지해주세요 ! \n\n"
