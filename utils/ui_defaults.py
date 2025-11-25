@@ -1,4 +1,4 @@
-# cogs/system/ui_defaults.py
+# utils/ui_defaults.py
 
 UI_ROLE_KEY_MAP = {
     "role_staff_village_chief": {"name": ". ˚👑◞ 대표 . ˚", "is_prefix": False, "priority": 100},
@@ -133,10 +133,10 @@ ONBOARDING_CHOICES = {
 
 USABLE_ITEMS = {
     "role_item_warning_deduct": {
-        "name": "벌점 차감권",
+        "name": "벌점 1회 차감권",
         "type": "deduct_warning",
         "value": -1,
-        "description": "사용 시 누적된 벌점을 1회 차감합니다.",
+        "description": "누적된 벌점을 1회 차감합니다.",
         "log_channel_key": "log_item_warning_deduct",
         "log_embed_key": "log_item_use_warning_deduct"
     },
@@ -175,6 +175,13 @@ USABLE_ITEMS = {
         "name": "월간 보스 보물 상자",
         "type": "open_chest",
         "description": "월간 보스를 처치하고 얻은 희귀한 전리품 상자. 무엇이 들어있을까?"
+    },
+    # [추가] 벌점 차감권 아이템 설정
+    "item_warning_deduction": {
+        "name": "벌점 차감권",
+        "type": "deduct_warning",
+        "log_channel_key": "warning_log_channel_id",
+        "description": "사용 시 벌점을 1점 차감합니다."
     }
 }
 
@@ -245,7 +252,7 @@ UI_EMBEDS = {
     "onboarding_guide_rules": {
         "title": "",
         "description":
-        "## 📜 마을의 규칙을 꼭 읽어주세요! 📜\n> ### 우리 마을의 모든 주민들이 즐겁고 평화롭게 지내기 위한 약속이에요.\n### 📜 규칙 채널 확인 안내\n- 규칙 채널에는 마을의 법과 질서를 지키기 위한 중요한 내용들이 담겨 있어요.\n- 모든 주민분들이 서로를 존중하고 배려하며 즐거운 시간을 보낼 수 있도록, 아래 규칙 채널의 내용을 잠시 시간을 내어 꼼꼼히 읽어주세요.\n### <#1412052221209608273>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.",
+        "## 📜 마을의 규칙을 꼭 읽어주세요! 📜\n> ### 우리 마을의 모든 주민들이 즐겁고 평화롭게 지내기 위한 약속이에요.\n### 📜 규칙 채널 확인 안내\n- 규칙 채널에는 마을의 법과 질서를 지키기 위한 중요한 내용들이 담겨 있어요.\n- 모든 주민분들이 서로를 존중하고 배려하며 즐거운 시간을 보낼 수 있도록, 아래 규칙 채널의 내용을 잠시 시간을 내어 꼼꼼히 읽어주세요.\n### <#1412052221209608273>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.",
         "color": 0x5865F2,
         "footer": {
             "text": "3/7 단계"
@@ -254,7 +261,7 @@ UI_EMBEDS = {
     "onboarding_guide_channels": {
         "title": "",
         "description":
-        "## 🗺️ 마을 지도를 확인하고 둘러보세요! 🗺️\n> ### 🗺️ 마을의 어떤 장소에서 무엇을 할 수 있는지, 한눈에 알아보세요!\n### 마을 지도 확인 안내\n- 마을의 이곳저곳을 둘러보며 새로운 이웃들과 즐거운 추억을 만들어갈 준비를 해보아요.\n- 마을 지도 채널은 우리 마을의 다양한 채널에 대한 소개와 이용 방법을 안내하는 곳이에요.\n- 어떤 곳에서 이야기를 나누고, 어디서 게임을 즐길 수 있는지 궁금하다면 아래 마을 지도 채널을 펼쳐보세요!\n### <#1412052225710096555>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.",
+        "## 🗺️ 마을 지도를 확인하고 둘러보세요! 🗺️\n> ### 🗺️ 마을의 어떤 장소에서 무엇을 할 수 있는지, 한눈에 알아보세요!\n### 마을 지도 확인 안내\n- 마을의 이곳저곳을 둘러보며 새로운 이웃들과 즐거운 추억을 만들어갈 준비를 해보아요.\n- 마을 지도 채널은 우리 마을의 다양한 채널에 대한 소개와 이용 방법을 안내하는 곳이에요.\n- 어떤 곳에서 이야기를 나누고, 어디서 게임을 즐길 수 있는지 궁금하다면 아래 마을 지도 채널을 펼쳐보세요!\n### <#1412052225710096555>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.",
         "color": 0x5865F2,
         "footer": {
             "text": "4/7 단계"
@@ -263,7 +270,7 @@ UI_EMBEDS = {
     "onboarding_guide_roles": {
         "title": "",
         "description":
-        "## 🎭 마을의 역할들을 미리 만나보세요! 🎭\n> ### 우리 마을에는 저마다의 개성과 이야기를 가진 역할들이 존재해요.\n### 🎭 역할 소개 확인 안내\n- 각 역할에 따라 참여할 수 있는 특별한 게임이나 채널이 달라지기도 한답니다.\n- 자신에게 어울리는 역할은 무엇일지 상상해보며, 앞으로의 마을 생활을 더욱 기대해보세요!\n- 아래 역할 소개 채널은 마을의 다양한 역할들이 각각 어떤 의미를 가지고, 어떤 활동을 하는지 설명해주는 곳이에요.\n### <#1412052229405409400>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.",
+        "## 🎭 마을의 역할들을 미리 만나보세요! 🎭\n> ### 우리 마을에는 저마다의 개성과 이야기를 가진 역할들이 존재해요.\n### 🎭 역할 소개 확인 안내\n- 각 역할에 따라 참여할 수 있는 특별한 게임이나 채널이 달라지기도 한답니다.\n- 자신에게 어울리는 역할은 무엇일지 상상해보며, 앞으로의 마을 생활을 더욱 기대해보세요!\n- 아래 역할 소개 채널은 마을의 다양한 역할들이 각각 어떤 의미를 가지고, 어떤 활동을 하는지 설명해주는 곳이에요.\n### <#1412052229405409400>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.",
         "color": 0x5865F2,
         "footer": {
             "text": "5/7 단계"
@@ -272,7 +279,7 @@ UI_EMBEDS = {
     "onboarding_guide_staff": {
         "title": "",
         "description":
-        "## 🏢 마을 사무소의 직원들을 소개합니다! 🏢\n> ### 마을에 어려움이 생기거나 궁금한 점이 있다면, 언제든지 사무소의 직원들을 찾아주세요!\n### 🏢 직원 소개 확인 안내\n- 든든한 직원들이 있기에 우리 마을은 언제나 평화롭고 즐겁답니다!\n- 도움이 필요하거나 건의할 사항이 있다면 언제든지 직원들을 호출해주세요. 친절하게 안내해 드릴 거예요.\n- 아래 직원 소개 채널에서는 마을을 위해 힘써주시는 촌장님과 부촌장님, 직원(관리자)들을 만날 수 있어요.\n### <#1412052233121431642>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.",
+        "## 🏢 마을 사무소의 직원들을 소개합니다! 🏢\n> ### 마을에 어려움이 생기거나 궁금한 점이 있다면, 언제든지 사무소의 직원들을 찾아주세요!\n### 🏢 직원 소개 확인 안내\n- 든든한 직원들이 있기에 우리 마을은 언제나 평화롭고 즐겁답니다!\n- 도움이 필요하거나 건의할 사항이 있다면 언제든지 직원들을 호출해주세요. 친절하게 안내해 드릴 거예요.\n- 아래 직원 소개 채널에서는 마을을 위해 힘써주시는 촌장님과 부촌장님, 직원(관리자)들을 만날 수 있어요.\n### <#1412052233121431642>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n아래 '다음' 버튼을 눌러 안내를 읽어주세요.",
         "color": 0x5865F2,
         "footer": {
             "text": "6/7 단계"
@@ -281,7 +288,7 @@ UI_EMBEDS = {
     "onboarding_guide_intro": {
         "title": "",
         "description":
-        "## 마지막으로, 자기소개인 '주민 등록증'을 작성해봅시다!\n### 주민등록 규칙\n- 성별 공개는 필수입니다.\n- 이름에 특수문자, 이모티콘, 공백은 사용할 수 없습니다.\n- 이름은 최대 8글자로 한글은 2글자, 영문, 숫자는 1글자로 취급됩니다.\n- 부적절한 닉네임은 승인되지 않습니다.\n- 모든 항목을 정확하게 기입해 주십시오. (미기입시 거부될 수 있습니다.)\n- 참여 경로를 꼭 기입해 주시기 바랍니다. (예: Disboard, 〇〇님으로부터의 초대 등)\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n제출 후, 직원이 확인하고 승인하면 정식 주민으로 인정됩니다.",
+        "## 마지막으로, 자기소개인 '주민 등록증'을 작성해봅시다!\n### 주민등록 규칙\n- 성별 공개는 필수입니다.\n- 이름에 특수문자, 이모티콘, 공백은 사용할 수 없습니다.\n- 이름은 최대 8글자로 한글은 2글자, 영문, 숫자는 1글자로 취급됩니다.\n- 부적절한 닉네임은 승인되지 않습니다.\n- 모든 항목을 정확하게 기입해 주십시오. (미기입시 거부될 수 있습니다.)\n- 참여 경로를 꼭 기입해 주시기 바랍니다. (예: Disboard, 〇〇님으로부터의 초대 등)\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n제출 후, 직원이 확인하고 승인하면 정식 주민으로 인정됩니다.",
         "color": 0x5865F2,
         "footer": {
             "text": "7/7 단계"
@@ -327,7 +334,7 @@ UI_EMBEDS = {
     },
     "panel_nicknames": {
         "title": "✒️ 이름 변경",
-        "description": "### 아래 버튼을 통해 공장에서 사용할 이름을 변경할 수 있습니다.\n- 신청서가 제출되면 이 채널에 관리자용 승인 메시지가 나타납니다.\n- 이름은 **한글과 공백**으로만 만들 수 있습니다. (특수문자, 영문, 숫자 불가)\n- 이름은 **최대 8자**까지 가능합니다.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n제출 후, 관리자가 확인하고 승인하면 이름이 변경됩니다.",
+        "description": "### 아래 버튼을 통해 공장에서 사용할 이름을 변경할 수 있습니다.\n- 신청서가 제출되면 이 채널에 관리자용 승인 메시지가 나타납니다.\n- 이름은 **한글과 공백**으로만 만들 수 있습니다. (특수문자, 영문, 숫자 불가)\n- 이름은 **최대 8자**까지 가능합니다.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n제출 후, 관리자가 확인하고 승인하면 이름이 변경됩니다.",
         "color": 0x5865F2
     },
     "embed_main_chat_welcome": {
@@ -896,7 +903,6 @@ UI_EMBEDS = {
         "description": "**{member_mention}** 님\n공장의 **도넛**이 되신 것을 환영합니다.\n\n공장의 도넛이 된 {member_mention} 님을 위한 선물!\n\n### ꒰ 부스트 혜택 ꒱\nA. <@&1426938324546879608> 역할 <a:newheart_01:1427212124588998706>\n\nB. 멤버 목록 상단 배치\n\nC. 부스트 전용 괄호 및 이모지 변경\n\nD. 이벤트 진행시 혜택 지급\n\nE. <@&1419879547171508264> \n╰ ⁠：<#1419879550191534181> 중 선택 - ( 준 비 중 )\n\nF. 바구니에 담길 수 있는 특별 권한\n╰ ⁠：바구니 선택 가능",
         "color": 0xF47FFF,
     },
-    # ▼▼▼ [추가] 벌점 차감권 사용 알림 임베드 ▼▼▼
     "log_item_use_warning_deduct": {
         "title": "🎫 벌점 차감권 사용 알림",
         "description": "{user_mention}님이 벌점 차감권을 사용하여 벌점을 1회 차감했습니다.",
@@ -1986,122 +1992,6 @@ UI_STRINGS = {
             "back_button": "뒤로"
         }
     }
-}
-JOB_ADVANCEMENT_DATA = {
-    "50": [
-        {
-            "job_key": "fisherman",
-            "job_name": "낚시꾼",
-            "role_key": "role_job_fisherman",
-            "description": "물고기를 낚는 데 특화된 전문가입니다.",
-            "abilities": [
-                {"ability_key": "fish_bait_saver_1", "ability_name": "미끼 절약 (확률)", "description": "낚시할 때 일정 확률로 미끼를 소모하지 않습니다."},
-                {"ability_key": "fish_bite_time_down_1", "ability_name": "입질 시간 단축", "description": "물고기가 미끼를 무는 데 걸리는 시간이 전체적으로 2초 단축됩니다."}
-            ]
-        },
-        {
-            "job_key": "farmer",
-            "job_name": "농부",
-            "role_key": "role_job_farmer",
-            "description": "작물을 키우고 수확하는 데 특화된 전문가입니다.",
-            "abilities": [
-                {"ability_key": "farm_seed_saver_1", "ability_name": "씨앗 절약 (확률)", "description": "씨앗을 심을 때 일정 확률로 씨앗을 소모하지 않습니다."},
-                {"ability_key": "farm_water_retention_1", "ability_name": "수분 유지력 UP", "description": "작물이 수분을 더 오래 머금어 물을 주는 간격이 길어집니다."}
-            ]
-        },
-        {
-            "job_key": "miner",
-            "job_name": "광부",
-            "role_key": "role_job_miner",
-            "description": "광물 채굴에 특화된 전문가입니다.",
-            "abilities": [
-                {"ability_key": "mine_time_down_1", "ability_name": "신속한 채굴", "description": "광석 채굴에 필요한 시간이 3초 단축됩니다."},
-                {"ability_key": "mine_duration_up_1", "ability_name": "집중 탐사", "description": "광산 입장 시 15% 확률로 제한 시간이 2배(20분)로 늘어납니다."}
-            ]
-        },
-        {
-            "job_key": "chef",
-            "job_name": "요리사",
-            "role_key": "role_job_chef",
-            "description": "다양한 재료로 맛있는 음식을 만드는 요리의 전문가입니다.",
-            "abilities": [
-                {"ability_key": "cook_ingredient_saver_1", "ability_name": "알뜰한 손맛 (확률)", "description": "요리할 때 15% 확률로 재료를 소모하지 않습니다."},
-                {"ability_key": "cook_time_down_1", "ability_name": "요리의 기본", "description": "모든 요리의 소요 시간이 10% 단축됩니다."}
-            ]
-        }
-    ],
-    "100": [
-        {
-            "job_key": "master_angler",
-            "job_name": "강태공",
-            "role_key": "role_job_master_angler",
-            "description": "낚시의 길을 통달하여 전설의 물고기를 쫓는 자. 낚시꾼의 상위 직업입니다.",
-            "prerequisite_job": "fisherman",
-            "abilities": [
-                {"ability_key": "fish_rare_up_2", "ability_name": "희귀어 확률 UP (대)", "description": "희귀한 물고기를 낚을 확률이 상승합니다."},
-                {"ability_key": "fish_size_up_2", "ability_name": "물고기 크기 UP (대)", "description": "낚는 물고기의 평균 크기가 커집니다."}
-            ]
-        },
-        {
-            "job_key": "master_farmer",
-            "job_name": "대농",
-            "role_key": "role_job_master_farmer",
-            "description": "농업의 정수를 깨달아 대지로부터 최대의 은혜를 얻는 자. 농부의 상위 직업입니다.",
-            "prerequisite_job": "farmer",
-            "abilities": [
-                {"ability_key": "farm_yield_up_2", "ability_name": "수확량 UP (대)", "description": "작물을 수확할 때의 수확량이 대폭 증가합니다."},
-                {"ability_key": "farm_seed_harvester_2", "ability_name": "씨앗 수확 (확률)", "description": "작물 수확 시 낮은 확률로 해당 작물의 씨앗을 1~3개 획득합니다."}
-            ]
-        },
-        {
-            "job_key": "expert_miner",
-            "job_name": "전문 광부",
-            "role_key": "role_job_expert_miner",
-            "description": "광맥의 흐름을 읽어 희귀한 광물을 찾아내는 베테랑입니다. 광부의 상위 직업입니다.",
-            "prerequisite_job": "miner",
-            "abilities": [
-                {"ability_key": "mine_rare_up_2", "ability_name": "노다지 발견", "description": "희귀한 광물을 발견할 확률이 대폭 증가합니다."},
-                {"ability_key": "mine_double_yield_2", "ability_name": "풍부한 광맥", "description": "광석 채굴 시 20% 확률로 광석을 2개 획득합니다."}
-            ]
-        },
-        {
-            "job_key": "master_chef",
-            "job_name": "마스터 셰프",
-            "role_key": "role_job_master_chef",
-            "description": "요리의 경지에 이르러 평범한 재료로도 최고의 맛을 이끌어내는 자. 요리사의 상위 직업입니다.",
-            "prerequisite_job": "chef",
-            "abilities": [
-                {
-                    "ability_key": "cook_quality_up_2",
-                    "ability_name": "장인의 솜씨",
-                    "description": "요리 완성 시 10% 확률로 '특상품' 요리를 만듭니다. 특상품은 더 비싸게 판매할 수 있습니다."
-                },
-                {
-                    "ability_key": "cook_double_yield_2",
-                    "ability_name": "풍성한 식탁",
-                    "description": "요리 완성 시 15% 확률로 결과물을 2개 획득합니다."
-                }
-            ]
-        }
-    ]
-}
-BOSS_REWARD_TIERS = {
-    "weekly": [
-        {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [20000, 30000], "xp": [2500, 3500], "rare_item_chance": 1.0},
-        {"percentile": 0.10, "name": "상위 기여자 (4-10%)",    "coins": [12000, 18000], "xp": [1500, 2200], "rare_item_chance": 0.75},
-        {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [7000, 11000],  "xp": [800, 1200],  "rare_item_chance": 0.50},
-        {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [4000, 6000],   "xp": [400, 600],   "rare_item_chance": 0.25},
-        {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [1500, 2500],   "xp": [150, 250],   "rare_item_chance": 0.10},
-        {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [500, 1000],    "xp": [50, 100],    "rare_item_chance": 0.0}
-    ],
-    "monthly": [
-        {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [100000, 150000], "xp": [10000, 15000], "rare_item_chance": 1.0},
-        {"percentile": 0.10, "name": "상위 기여자 (4-10%)",    "coins": [60000, 90000],   "xp": [6000, 9000],   "rare_item_chance": 0.80},
-        {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [35000, 55000],   "xp": [3000, 5000],   "rare_item_chance": 0.60},
-        {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [20000, 30000],   "xp": [1500, 2500],   "rare_item_chance": 0.35},
-        {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [8000, 12000],    "xp": [800, 1200],    "rare_item_chance": 0.15},
-        {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [3000, 5000],     "xp": [300, 500],     "rare_item_chance": 0.0}
-    ]
 }
 TICKET_LEADER_ROLES = [
     "role_staff_leader_machine",
