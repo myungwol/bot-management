@@ -1636,6 +1636,24 @@ BOSS_REWARD_TIERS = {
         {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [3000, 5000],     "xp": [300, 500],     "rare_item_chance": 0.0}
     ]
 }
+
+TICKET_MASTER_ROLES = ["role_staff_village_chief", "role_staff_deputy_chief"]
+TICKET_REPORT_ROLES = ["role_staff_police"]
+
+TICKET_LEADER_ROLES = [
+    "role_staff_leader_machine",
+    "role_staff_leader_syrup",
+    "role_staff_leader_packaging",
+    "role_staff_leader_cream",
+    "role_staff_leader_dough"
+]
+
+TICKET_DEPARTMENT_MANAGERS = [
+    "role_staff_village_chief",
+    "role_staff_deputy_chief",
+    "role_approval"
+]
+
 TICKET_APPLICATION_DEPARTMENTS = {
     "newbie": {
         "label": "안내/뉴관",
