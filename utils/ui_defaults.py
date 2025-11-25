@@ -185,6 +185,14 @@ USABLE_ITEMS = {
 }
 
 UI_EMBEDS = {
+    "log_item_use": {
+        "title": "아이템 사용 알림",
+        "description": "{user_mention}님이 아이템을 사용했습니다.",
+        "color": 0x3498DB,
+        "footer": {
+            "text": "아이템 사용 로그"
+        }
+    },
     "panel_user_guide": {
         "title": "✨ 신규 유저 안내",
         "description": "서버에 처음 오셨나요?\n\n> 하단의 ‘안내 시작하기’ 버튼을 누르면 스태프와 함께 하는 비공개 안내 스레드가 생성됩니다. \n> 서버 입장을 원하신다면? ‘안내 시작하기’ 버튼을 눌러 주세요.",
