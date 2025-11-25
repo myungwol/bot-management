@@ -80,20 +80,38 @@ UI_ROLE_KEY_MAP = {
 
     "role_notify_guide_approval": {"name": "‶ 💞 : 안내해주세요 .ᐟ ‶", "is_prefix": False, "priority": 0},
 
-    "role_notify_dding": {"name": "⊹ ₊ 띵 동 .ᐟ ⊹", "is_prefix": False, "priority": 0},
-    "role_notify_welcome": {"name": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗", "is_prefix": False, "priority": 0},
-    "role_notify_disboard": {"name": "『 🍨 : 공장 홍보대사 』", "is_prefix": False, "priority": 0},
-    "role_notify_ask": {"name": "『 🍳：에 스 크 알 림 』", "is_prefix": False, "priority": 0},
-    "role_notify_up": {"name": "『 🍭 : 공장 업 』", "is_prefix": False, "priority": 0},
-    "role_game_tft": {"name": "ʚ ♟️：롤토체스 ɞ", "is_prefix": False, "priority": 0},
+    "role_rel_taken": {"name": "‶ 🩷 : 연애중 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_rel_virtual": {"name": "‶ ❣️ : 우결중 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_rel_solo": {"name": "‶ 🩶 : 솔로 .ᐟ ‶", "is_prefix": False, "priority": 0},
+
+    # --- [2] 알림 역할 ---
+    "role_noti_friend": {"name": "‶ 🍄 : 친구해요 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_noti_off": {"name": "‶ 🧸 : 우프해요 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_noti_call": {"name": "‶ 📞 : 전화해요 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_noti_virtual_req": {"name": "‶ 💕 : 우결해요 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_notify_ask": {"name": "‶ 🔔 : 에스크 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_notify_event": {"name": "‶ 🔔 : 이벤트 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_notify_disboard": {"name": "‶ 🔔 : 범프 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0}, # 기존 리마인더 연동 유지
+    "role_notify_up": {"name": "‶ 🔔 : 업 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0},       # 기존 리마인더 연동 유지
+    "role_notify_update": {"name": "‶ 📝 : 서버 업뎃 .ᐟ ‶", "is_prefix": False, "priority": 0},
+    "role_notify_first": {"name": "‶ 📝 : 선착 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
+
+    # --- [3] 게임 역할 ---
+    "role_game_lol": {"name": ". ˚🎮◞ 리그오브레전드 . ˚", "is_prefix": False, "priority": 0},
+    "role_game_val": {"name": ". ˚🔫◞ 발로란트 . ˚", "is_prefix": False, "priority": 0},
+    "role_game_mc": {"name": ". ˚🔨◞ 마인크래프트 . ˚", "is_prefix": False, "priority": 0},
+    "role_game_ow": {"name": ". ˚🎮◞ 오버워치 . ˚", "is_prefix": False, "priority": 0},
+    "role_game_steam": {"name": ". ˚🎮◞ 스팀 . ˚", "is_prefix": False, "priority": 0},
+    "role_game_tft": {"name": ". ˚🎮◞ 롤토체스 . ˚", "is_prefix": False, "priority": 0},
+    "role_game_etc": {"name": ". ˚🎮◞ 기타게임 . ˚", "is_prefix": False, "priority": 0},
+    "role_game_lol_internal": {"name": "『 🔔 』 ◟롤 내전 알림 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
+    "role_game_val_internal": {"name": "『 🔔 』  ◟발로 내전 알림 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
     # ... (나머지 게임 역할) ...
     "role_platform_switch": {"name": "ʚ 🎮：기타 게임 ɞ", "is_prefix": False, "priority": 0},
     "role_warning_level_1": {"name": "『 🚫：경고 1 』", "is_prefix": False, "priority": 0},
     "role_warning_level_2": {"name": "『 🚫：경고 2 』", "is_prefix": False, "priority": 0},
     "role_warning_level_3": {"name": "『 🚫：경고 3 』", "is_prefix": False, "priority": 0},
     "role_warning_level_4": {"name": "벌점 4회", "is_prefix": False, "priority": 0},
-    "role_warning_separator": {"name": "━━━━━━━━━━", "is_prefix": False, "priority": 0},
-    "role_shop_separator": {"name": "━━━━━━━━━━", "is_prefix": False, "priority": 0},
 }
 
 # [신규] 출생년도별 역할 부여를 위한 정확한 매핑 데이터
@@ -310,13 +328,19 @@ UI_EMBEDS = {
         "## 👋 다음에 또 만나요\n### **{member_name}**님이 마을을 떠났습니다.\n### 함께했던 모든 순간에 감사드립니다.\n### 앞으로의 여정에 행운이 가득하기를 바랍니다.",
         "color": 0x99AAB5
     },
+    "panel_relationship_roles": {
+        "title": "💕 연애 여부 선택",
+        "description": "현재 자신의 연애 상태를 선택해주세요.\n선택한 역할은 프로필에 표시됩니다.",
+        "color": 0xFF69B4
+    },
     "panel_notification_roles": {
-        "description": "### <a:123:1436399569804984320> 선택역할\n\n<a:loverh01:1427211866081591347> <@&1419879547251200057>\n╰─➤ 마음이 담긴 연락을 받아볼 수 있어요.\n\n<a:loverh04:1427212010633957447> <@&1419879547251200056>\n╰─➤ 가장 먼저 유저들과 대화할 수 있어요.\n\n<a:loverh08:1427212016753573996> <@&1419879547251200054>\n╰─➤ <#1419879550644387861>\n\n<a:loverh03:1427212009052704799> <@&1419879547251200055>\n╰─➤ <#1419879551772659764>\n\n<a:loverh07:1427212015084113993> <@&1436037451314495498>\n╰─➤ <#1430188707452948723>",
-        "color": 0x5865F2
+        "title": "🔔 알림 역할 선택",
+        "description": "받고 싶은 알림을 자유롭게 선택해주세요.\n역할을 선택하면 관련 멘션을 받을 수 있습니다.",
+        "color": 0xFFD700
     },
     "panel_game_roles": {
-        "title": "🎮 게임 역할 부여",
-        "description": "아래 메뉴에서 플레이하는 게임 역할을 선택하여 파티원을 찾아보세요!",
+        "title": "🎮 게임 역할 선택",
+        "description": "플레이하는 게임을 선택하여 파티원을 구하거나 내전에 참여해보세요!",
         "color": 0x5865F2
     },
     "panel_onboarding": {
@@ -1169,19 +1193,27 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[채널] 공개 자기소개",
         "channel_type": "text"
     },
+    "panel_relationship_roles": {
+        "type": "panel",
+        "cog_name": "RolePanel",
+        "key": "relationship_role_panel_channel_id",
+        "friendly_name": "[패널] 연애 여부 선택",
+        "channel_type": "text"
+    },
+    # [수정] 알림 역할 패널
     "panel_notification_roles": {
         "type": "panel",
         "cog_name": "RolePanel",
-        "key": "notification_role_panel_channel_id", # DB에 채널 ID를 저장할 새로운 키
-        "friendly_name": "[패널] 알림 역할 자동부여",
+        "key": "notification_role_panel_channel_id",
+        "friendly_name": "[패널] 알림 역할 선택",
         "channel_type": "text"
     },
-    # ▼▼▼ [추가] 게임 역할 패널 설치 정보 ▼▼▼
+    # [신규] 게임 역할 패널
     "panel_game_roles": {
         "type": "panel",
         "cog_name": "RolePanel",
-        "key": "game_role_panel_channel_id", # DB에 채널 ID를 저장할 새로운 키
-        "friendly_name": "[패널] 게임 역할 자동부여",
+        "key": "game_role_panel_channel_id",
+        "friendly_name": "[패널] 게임 역할 선택",
         "channel_type": "text"
     },
     "panel_onboarding": {
@@ -1717,52 +1749,55 @@ ADMIN_ROLE_KEYS = [
     "role_approval"
 ]
 STATIC_AUTO_ROLE_PANELS = {
-    # ▼▼▼ [수정] 알림 역할 패널 설정 ▼▼▼
-    "panel_notification_roles": {
-        "panel_key": "panel_notification_roles",
-        "embed_key": "panel_notification_roles",
-        "categories": [
-            {
-                "id": "notifications",
-                "label": "🔔 알림",
-                "description": "받고 싶은 알림을 선택하세요.",
-                "emoji": "🔔"
-            }
-        ],
+    # --- [1] 연애 여부 패널 ---
+    "panel_relationship_roles": {
+        "panel_key": "panel_relationship_roles",
+        "embed_key": "panel_relationship_roles",
+        "categories": [{"id": "relationship", "label": "연애 여부 선택", "description": "자신의 상태를 선택해주세요.", "emoji": "💕"}],
         "roles": {
-            "notifications": [
-                { "role_id_key": "role_notify_dding", "label": "⊹ ₊ 띵 동 .ᐟ ⊹" },
-                { "role_id_key": "role_notify_welcome", "label": "˗ˏˋ    환 영 합 니 다 .ᐟ  ˊˎ˗" },
-                { "role_id_key": "role_notify_ask", "label": "『 🍳：에 스 크 알 림 』" },
-                { "role_id_key": "role_notify_disboard", "label": "『 🍨 : 공장 홍보대사 』" },
-                { "role_id_key": "role_notify_up", "label": "『 🍭 : 공장 업 』" },
+            "relationship": [
+                { "role_id_key": "role_rel_taken", "label": "연애중" },
+                { "role_id_key": "role_rel_virtual", "label": "우결중" },
+                { "role_id_key": "role_rel_solo", "label": "솔로" },
             ]
         }
     },
-    # ▼▼▼ [추가] 게임 역할 패널 설정 ▼▼▼
+    # --- [2] 알림 역할 패널 ---
+    "panel_notification_roles": {
+        "panel_key": "panel_notification_roles",
+        "embed_key": "panel_notification_roles",
+        "categories": [{"id": "notifications", "label": "알림 역할 선택", "description": "받고 싶은 알림을 선택해주세요.", "emoji": "🔔"}],
+        "roles": {
+            "notifications": [
+                { "role_id_key": "role_noti_friend", "label": "친구해요" },
+                { "role_id_key": "role_noti_off", "label": "우프해요" },
+                { "role_id_key": "role_noti_call", "label": "전화해요" },
+                { "role_id_key": "role_noti_virtual_req", "label": "우결해요" },
+                { "role_id_key": "role_notify_ask", "label": "에스크 알림" },
+                { "role_id_key": "role_notify_event", "label": "이벤트 알림" },
+                { "role_id_key": "role_notify_disboard", "label": "범프 할 시간" },
+                { "role_id_key": "role_notify_up", "label": "업 할 시간" },
+                { "role_id_key": "role_notify_update", "label": "서버 업뎃" },
+                { "role_id_key": "role_notify_first", "label": "선착 알림" },
+            ]
+        }
+    },
+    # --- [3] 게임 역할 패널 ---
     "panel_game_roles": {
         "panel_key": "panel_game_roles",
         "embed_key": "panel_game_roles",
-        "categories": [
-            {
-                "id": "games",
-                "label": "🎮 게임",
-                "description": "플레이하는 게임을 선택하세요.",
-                "emoji": "🎮"
-            }
-        ],
+        "categories": [{"id": "games", "label": "게임 역할 선택", "description": "플레이하는 게임을 선택해주세요.", "emoji": "🎮"}],
         "roles": {
             "games": [
-                { "role_id_key": "role_game_tft", "label": "롤토체스" },
                 { "role_id_key": "role_game_lol", "label": "리그오브레전드" },
-                { "role_id_key": "role_game_valorant", "label": "발로란트" },
-                { "role_id_key": "role_game_overwatch", "label": "오버워치" },
-                { "role_id_key": "role_game_lostark", "label": "로스트아크" },
-                { "role_id_key": "role_game_minecraft", "label": "마인크래프트" },
-                { "role_id_key": "role_game_zombi", "label": "좀비고등학교" },
-                { "role_id_key": "role_platform_steam", "label": "스팀 게임" },
-                { "role_id_key": "role_platform_smartphone", "label": "모바일 게임" },
-                { "role_id_key": "role_platform_switch", "label": "기타 게임" },
+                { "role_id_key": "role_game_val", "label": "발로란트" },
+                { "role_id_key": "role_game_mc", "label": "마인크래프트" },
+                { "role_id_key": "role_game_ow", "label": "오버워치" },
+                { "role_id_key": "role_game_steam", "label": "스팀" },
+                { "role_id_key": "role_game_tft", "label": "롤토체스" },
+                { "role_id_key": "role_game_etc", "label": "기타게임" },
+                { "role_id_key": "role_game_lol_internal", "label": "롤 내전 알림" },
+                { "role_id_key": "role_game_val_internal", "label": "발로 내전 알림" },
             ]
         }
     }
