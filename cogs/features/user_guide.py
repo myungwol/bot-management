@@ -157,18 +157,13 @@ class UserGuide(commands.Cog):
         channel = self.bot.get_channel(self.main_chat_channel_id)
         if not isinstance(channel, discord.TextChannel): return
 
-        # 설정값 로드 (DB 없으면 기본값)
-        role_channel_id = get_id('notification_role_panel_channel_id') or 1421544728494604369
-        inquiry_channel_id = get_id('ticket_main_panel_channel_id') or 1414675593533984860
-        helper_role_id = get_id('role_staff_newbie_helper') or 1414627893727858770
-        rule_channel_id = 1414675515759005727
 
         message_content = (
             f"{member.mention}님, 해몽 : 海夢에 오신 걸 환영합니다!\n\n"
-            f" <a:1124928221243244644:1416125149782212831> <#{rule_channel_id}> 서버 규칙사항 먼저 숙지해주세요 ! \n\n"
-            f" <a:1124928273755938907:1416125162671046736> <#{role_channel_id}> 역할은 여기에서 받아주세요 ! \n\n"
-            f" <:1367097758577852427:1421788139940479036> 문의 & 건의사항이 있으시다면 <#{inquiry_channel_id}> 채널을 사용해주세요 ! \n\n"
-            f" <a:1125436475631218769:1416108859956793344> 마지막으로 적응이 힘드시다면 <@&{helper_role_id}> 을 멘션 해주세요 ! \n\n"
+            f" <a:1124928221243244644:1416125149782212831> <#1414675515759005727> 서버 규칙사항 먼저 숙지해주세요 ! \n\n"
+            f" <a:1124928273755938907:1416125162671046736> <#1421544728494604369> 역할은 여기에서 받아주세요 ! \n\n"
+            f" <:1367097758577852427:1421788139940479036> 문의 & 건의사항이 있으시다면 <#1414675593533984860> 채널을 사용해주세요 ! \n\n"
+            f" <a:1125436475631218769:1416108859956793344> 마지막으로 적응이 힘드시다면 <@&1414627893727858770> 을 멘션 해주세요 ! \n\n"
             f" 해몽에서 즐거운 시간 되시길 바랍니다 ! <:1339999746298740788:1419558757716725760>"
         )
         await channel.send(content=message_content, allowed_mentions=discord.AllowedMentions(users=True, roles=True))
