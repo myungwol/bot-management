@@ -131,7 +131,7 @@ class WarningPanelView(ui.View):
 
     async def on_button_click(self, interaction: discord.Interaction):
         required_keys = [POLICE_ROLE_KEY, "role_staff_high_level", "role_staff_sub_leader_security", "role_staff_leader_security"]
-        error_message = "❌ 이 기능은 `고위직`, `보안팀` 역할만 사용할 수 있습니다."
+        error_message = "❌ 이 기능은 `고위직`, `보안팀장`, `보안부팀장` 역할만 사용할 수 있습니다."
         
         if not await has_required_roles(interaction, required_keys, error_message):
             return
