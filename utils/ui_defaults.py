@@ -91,8 +91,8 @@ UI_ROLE_KEY_MAP = {
     "role_noti_virtual_req": {"name": "‶ 💕 : 우결해요 .ᐟ ‶", "is_prefix": False, "priority": 0},
     "role_notify_ask": {"name": "‶ 🔔 : 에스크 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
     "role_notify_event": {"name": "‶ 🔔 : 이벤트 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
-    "role_notify_disboard": {"name": "‶ 🔔 : 범프 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0}, # 기존 리마인더 연동 유지
-    "role_notify_up": {"name": "‶ 🔔 : 업 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0},       # 기존 리마인더 연동 유지
+    "role_notify_disboard": {"name": "‶ 🔔 : 범프 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0}, 
+    "role_notify_up": {"name": "‶ 🔔 : 업 할 시간 .ᐟ ‶", "is_prefix": False, "priority": 0},       
     "role_notify_update": {"name": "‶ 📝 : 서버 업뎃 .ᐟ ‶", "is_prefix": False, "priority": 0},
     "role_notify_first": {"name": "‶ 📝 : 선착 알림 .ᐟ ‶", "is_prefix": False, "priority": 0},
 
@@ -107,10 +107,11 @@ UI_ROLE_KEY_MAP = {
     "role_game_lol_internal": {"name": "『 🔔 』 ◟롤 내전 알림 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
     "role_game_val_internal": {"name": "『 🔔 』  ◟발로 내전 알림 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
     # ... (나머지 게임 역할) ...
-    "role_warning_level_1": {"name": "『 🚫：경고 1 』", "is_prefix": False, "priority": 0},
-    "role_warning_level_2": {"name": "『 🚫：경고 2 』", "is_prefix": False, "priority": 0},
-    "role_warning_level_3": {"name": "『 🚫：경고 3 』", "is_prefix": False, "priority": 0},
-    "role_warning_level_4": {"name": "벌점 4회", "is_prefix": False, "priority": 0},
+    "role_warning_level_1": {"name": "『 🚨 』  ◟경고 1 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
+    "role_warning_level_2": {"name": "『 🚨 』  ◟경고 2 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
+    "role_warning_level_3": {"name": "『 🚨 』  ◟경고 3 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
+    "role_warning_level_4": {"name": "『 🚨 』  ◟경고 4 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
+    "role_warning_level_4": {"name": "『 🚨 』  ◟경고 5 ⸝⸝‧⁺", "is_prefix": False, "priority": 0},
 }
 
 # [신규] 출생년도별 역할 부여를 위한 정확한 매핑 데이터
