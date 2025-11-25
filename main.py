@@ -47,26 +47,22 @@ intents.message_content = True
 intents.voice_states = True
 BOT_VERSION = "v2.6-stability-hotfix"
 
-# --- 커스텀 봇 클래스 ---
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.recently_moderated_users = set()
 
     async def setup_hook(self):
-        # 1. DB에 기본값을 동기화하고, 동시에 로컬 캐시를 채웁니다.
         await sync_defaults_to_db()
-        # 2. DB에서 값을 읽어와 로컬 캐시를 '업데이트'합니다. (덮어쓰기 X)
         await load_all_data_from_db()
 
-        # 3. 모든 기능(Cogs) 로드
         await self.load_all_extensions()
         
-        # 4. 영구 View 등록
         cogs_with_persistent_views = [
             "RolePanel", "Onboarding", "NicknameChanger", "TicketSystem", 
             "CustomEmbed", "ItemSystem", "AnonymousBoard", 
             "WarningSystem", "VoiceMaster", "StickyEmbed",
+            "UserGuide"
         ]
         
         registered_views_count = 0
