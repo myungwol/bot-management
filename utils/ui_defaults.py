@@ -992,6 +992,13 @@ SETUP_COMMAND_MAP = {
         "friendly_name": "[로그] 보스 이벤트 기록",
         "channel_type": "text"
     },
+    "panel_tutorial": {
+        "type": "panel",
+        "cog_name": "TutorialSystem",
+        "key": "tutorial_panel_channel_id",
+        "friendly_name": "[게임] 튜토리얼 패널",
+        "channel_type": "text"
+    },
 }
 
 # 5. 패널 컴포넌트 (UI_PANEL_COMPONENTS)
