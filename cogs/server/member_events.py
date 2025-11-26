@@ -144,27 +144,6 @@ class MemberEvents(commands.Cog):
     async def on_member_update(self, before: discord.Member, after: discord.Member):
         if after.bot: return
 
-        # ▼▼▼ [추가] 해몽 역할(role_resident_regular) 수호자 로직 ▼▼▼
-        # 손님(role_guest)이 아닌데, 해몽 역할이 없다면 강제로 다시 부여합니다.
-        try:
-            haemong_role_id = get_id("role_resident_regular")
-            guest_role_id = get_id("role_guest")
-
-            if haemong_role_id and guest_role_id:
-                has_guest_role = any(r.id == guest_role_id for r in after.roles)
-                has_haemong_role = any(r.id == haemong_role_id for r in after.roles)
-
-                # 손님이 아니고 && 해몽 역할이 없으면 -> 해몽 역할 복구
-                if not has_guest_role and not has_haemong_role:
-                    haemong_role = after.guild.get_role(haemong_role_id)
-                    if haemong_role:
-                        await after.add_roles(haemong_role, reason="[자동 복구] 해몽 역할은 필수 기본 역할입니다.")
-                        logger.info(f"🛡️ {after.display_name} 님에게서 누락된 '해몽' 역할을 자동으로 복구했습니다.")
-        except Exception as e:
-            logger.error(f"해몽 역할 자동 복구 로직 수행 중 오류: {e}")
-        # ▲▲▲ [추가 완료] ▲▲▲
-
-        # 부스트 상태 변경 확인 및 처리
         if before.premium_since == after.premium_since:
             return
 
@@ -190,6 +169,6 @@ class MemberEvents(commands.Cog):
                         await boost_channel.send(embed=embed)
             except Exception as e:
                 logger.error(f"{after.display_name}님의 역할 회수 중 오류 발생: {e}", exc_info=True)
-
+                
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemberEvents(bot))
