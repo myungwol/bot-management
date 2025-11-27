@@ -1391,6 +1391,7 @@ ADMIN_ACTION_MAP = {
     "coin_take": "[코인] 유저의 코인 차감",
     "xp_give": "[XP] 유저에게 XP 지급",
     "level_set": "[레벨] 유저 레벨 설정",
+    "item_give": "[아이템] 유저에게 아이템 지급",
     "trigger_daily_updates": "[수동] 시세 및 작물 상태 업데이트 즉시 실행",
     "farm_next_day": "[농장] 다음 날로 시간 넘기기 (테스트용)",
     "farm_reset_date": "[농장] 시간을 현재로 초기화 (테스트용)",
