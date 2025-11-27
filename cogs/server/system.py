@@ -187,7 +187,8 @@ class ServerSystem(commands.Cog):
         channel="[채널/통계] 작업에 필요한 채널을 선택하세요.",
         role="[역할/통계] 작업에 필요한 역할을 선택하세요.",
         user="[코인/XP/레벨/펫] 대상을 지정하세요.",
-        amount="[코인/XP] 지급 또는 차감할 수량을 입력하세요.",
+        amount="[코인/XP/아이템] 지급 또는 차감할 수량을 입력하세요.",
+        item_name="[아이템] 지급할 아이템의 정확한 이름을 입력하세요.",
         level="[레벨/펫] 설정할 레벨을 입력하세요.",
         stat_type="[통계] 표시할 통계 유형을 선택하세요.",
         template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)"
@@ -213,6 +214,9 @@ class ServerSystem(commands.Cog):
                     channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None,
                     role: Optional[discord.Role] = None, user: Optional[discord.Member] = None,
                     amount: Optional[app_commands.Range[int, 1, None]] = None,
+                    # ▼▼▼ [추가] item_name 인자 추가 ▼▼▼
+                    item_name: Optional[str] = None,
+                    # ▲▲▲
                     level: Optional[app_commands.Range[int, 1, None]] = None,
                     stat_type: Optional[str] = None, template: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
@@ -409,7 +413,7 @@ class ServerSystem(commands.Cog):
                 logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
                 await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
 
-        elif action in ["coin_give", "coin_take", "xp_give", "level_set"]:
+        elif action in ["coin_give", "coin_take", "xp_give", "level_set", "item_give"]:
             if not user: return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션이 필요합니다.", ephemeral=True)
             
             db_key = ""
@@ -436,6 +440,13 @@ class ServerSystem(commands.Cog):
                 db_key = f"xp_admin_update_request_{user.id}"
                 payload = {"exact_level": level, "timestamp": time.time()}
                 response_message = f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다."
+            elif action == "item_give":
+                if not item_name: return await interaction.followup.send("❌ `item_name` 옵션에 아이템 이름을 입력해야 합니다.", ephemeral=True)
+                if not amount: return await interaction.followup.send("❌ `amount` 옵션에 수량을 입력해야 합니다.", ephemeral=True)
+                
+                db_key = f"item_admin_give_request_{user.id}"
+                payload = {"item_name": item_name, "amount": amount, "timestamp": time.time()}
+                response_message = f"✅ {user.mention}님에게 아이템 **'{item_name}'** {amount}개를 지급하도록 게임 봇에게 요청했습니다."
             
             if db_key and payload:
                 try:
