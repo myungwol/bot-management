@@ -1624,20 +1624,22 @@ JOB_ADVANCEMENT_DATA = {
 }
 BOSS_REWARD_TIERS = {
     "weekly": [
-        {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [20000, 30000], "xp": [2500, 3500], "rare_item_chance": 1.0},
-        {"percentile": 0.10, "name": "상위 기여자 (4-10%)",    "coins": [12000, 18000], "xp": [1500, 2200], "rare_item_chance": 0.75},
-        {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [7000, 11000],  "xp": [800, 1200],  "rare_item_chance": 0.50},
-        {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [4000, 6000],   "xp": [400, 600],   "rare_item_chance": 0.25},
-        {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [1500, 2500],   "xp": [150, 250],   "rare_item_chance": 0.10},
-        {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [500, 1000],    "xp": [50, 100],    "rare_item_chance": 0.0}
+        # [주간 보스] 1위~3%는 코어/핵을 3~5개 획득!
+        {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [20000, 30000], "xp": [2500, 3500], "rare_item_chance": 1.0, "rare_item_qty": [3, 5]},
+        {"percentile": 0.10, "name": "상위 기여자 (4-10%)",    "coins": [12000, 18000], "xp": [1500, 2200], "rare_item_chance": 0.8, "rare_item_qty": [1, 3]},
+        {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [7000, 11000],  "xp": [800, 1200],  "rare_item_chance": 0.6, "rare_item_qty": [0, 2]},
+        {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [4000, 6000],   "xp": [400, 600],   "rare_item_chance": 0.3, "rare_item_qty": [0, 1]},
+        {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [1500, 2500],   "xp": [150, 250],   "rare_item_chance": 0.1, "rare_item_qty": [0, 0]},
+        {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [500, 1000],    "xp": [50, 100],    "rare_item_chance": 0.0, "rare_item_qty": [0, 0]}
     ],
     "monthly": [
-        {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [100000, 150000], "xp": [10000, 15000], "rare_item_chance": 1.0},
-        {"percentile": 0.10, "name": "상위 기여자 (4-10%)",    "coins": [60000, 90000],   "xp": [6000, 9000],   "rare_item_chance": 0.80},
-        {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [35000, 55000],   "xp": [3000, 5000],   "rare_item_chance": 0.60},
-        {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [20000, 30000],   "xp": [1500, 2500],   "rare_item_chance": 0.35},
-        {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [8000, 12000],    "xp": [800, 1200],    "rare_item_chance": 0.15},
-        {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [3000, 5000],     "xp": [300, 500],     "rare_item_chance": 0.0}
+        # [월간 보스] 1위~3%는 코어/핵을 5~8개 획득! (대박 기회)
+        {"percentile": 0.03, "name": "최상위 기여자 (1-3%)",   "coins": [100000, 150000], "xp": [10000, 15000], "rare_item_chance": 1.0, "rare_item_qty": [3, 5]},
+        {"percentile": 0.10, "name": "상위 기여자 (4-10%)",    "coins": [60000, 90000],   "xp": [6000, 9000],   "rare_item_chance": 0.9, "rare_item_qty": [1, 3]},
+        {"percentile": 0.30, "name": "핵심 기여자 (11-30%)",   "coins": [35000, 55000],   "xp": [3000, 5000],   "rare_item_chance": 0.7, "rare_item_qty": [0, 2]},
+        {"percentile": 0.50, "name": "우수 기여자 (31-50%)",   "coins": [20000, 30000],   "xp": [1500, 2500],   "rare_item_chance": 0.4, "rare_item_qty": [0, 1]},
+        {"percentile": 0.80, "name": "참여자 (51-80%)",      "coins": [8000, 12000],    "xp": [800, 1200],    "rare_item_chance": 0.2, "rare_item_qty": [0, 0]},
+        {"percentile": 1.01, "name": "단순 참여자 (81% 이하)","coins": [3000, 5000],     "xp": [300, 500],     "rare_item_chance": 0.0, "rare_item_qty": [0, 0]}
     ]
 }
 
