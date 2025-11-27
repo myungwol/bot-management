@@ -25,11 +25,25 @@ class PrefixManager(commands.Cog):
         if after.bot or before.roles == after.roles:
             return
         
+        # ▼▼▼ [수정] 안내를 받지 않은(주민이 아닌) 유저는 닉네임 변경 건너뛰기 ▼▼▼
+        guest_role_id = get_id("role_guest")
+        rookie_role_id = get_id("role_resident_rookie")
+        regular_role_id = get_id("role_resident_regular")
+
+        # 손님 역할은 있지만, 정식 주민 역할(연안, 해몽 등)이 없는 경우 -> 아직 안내 전이므로 변경 금지
+        has_guest = any(r.id == guest_role_id for r in after.roles)
+        has_resident = any(r.id in [rookie_role_id, regular_role_id] for r in after.roles if r.id)
+
+        if has_guest and not has_resident:
+            return
+        # ▲▲▲ [수정 완료] ▲▲▲
+
         await asyncio.sleep(1) 
         
         try:
             new_nick = await self.get_final_nickname(after)
-            if after.nick != new_nick:
+            # 닉네임이 실제로 다를 때만 API 요청
+            if after.display_name != new_nick: 
                 await after.edit(nick=new_nick, reason="역할 변경으로 인한 칭호 자동 업데이트")
         except discord.Forbidden:
             pass
@@ -43,7 +57,7 @@ class PrefixManager(commands.Cog):
         """
         final_name = await self.get_final_nickname(member, base_name=base_name)
         try:
-            if member.nick != final_name:
+            if member.display_name != final_name:
                 await member.edit(nick=final_name, reason="닉네임 승인 또는 역할 업데이트")
         except discord.Forbidden:
             logger.warning(f"접두사 적용 실패: {member.display_name}의 닉네임을 변경할 권한이 없습니다.")
@@ -68,7 +82,8 @@ class PrefixManager(commands.Cog):
         # 2. 기본 이름(base_name) 추출하기
         # base_name이 주어지지 않았다면, 현재 닉네임에서 기존 접두사를 떼어내야 합니다.
         if not base_name.strip():
-            current_nick = member.nick or member.name
+            # ▼▼▼ [핵심 수정] 아이디(name) 대신 별명(global_name)을 우선 사용 ▼▼▼
+            current_nick = member.nick or member.global_name or member.name
             temp_name = current_nick.strip()
 
             # DB에 등록된 모든 가능한 접두사와 접미사 수집
@@ -78,7 +93,6 @@ class PrefixManager(commands.Cog):
             for config in role_configs.values():
                 if config.get("is_prefix") and (symbol := config.get("prefix_symbol")):
                     p_format = config.get("prefix_format", "「{symbol}」")
-                    # 포맷에서 실제 텍스트 생성 후 양옆 공백 제거
                     raw_prefix = p_format.format(symbol=symbol).strip()
                     if raw_prefix:
                         all_prefixes.append(raw_prefix)
@@ -87,22 +101,20 @@ class PrefixManager(commands.Cog):
                     if s_format:
                         all_suffixes.append(s_format)
             
-            # 긴 것부터 검사해야 부분 일치 오류를 방지함 (예: '대장' vs '대장군')
             all_prefixes.sort(key=len, reverse=True)
             all_suffixes.sort(key=len, reverse=True)
 
-            # ▼▼▼ [수정 핵심] 접미사 먼저 제거 후 공백 정리
+            # 접미사 제거
             for s in all_suffixes:
                 if temp_name.endswith(s):
                     temp_name = temp_name[:-len(s)].strip()
-                    break # 접미사는 하나만 있다고 가정
+                    break 
             
-            # ▼▼▼ [수정 핵심] 접두사 제거 후 공백 정리
-            # 기존에는 공백까지 정확히 맞아야 했으나, 이제는 텍스트만 맞으면 제거합니다.
+            # 접두사 제거
             for p in all_prefixes:
                 if temp_name.startswith(p):
                     temp_name = temp_name[len(p):].strip()
-                    break # 접두사는 하나만 있다고 가정
+                    break 
             
             base = temp_name
         else:
@@ -121,27 +133,23 @@ class PrefixManager(commands.Cog):
                 prefix_format = highest_priority_role_config.get("prefix_format", "「{symbol}」")
                 suffix = highest_priority_role_config.get("suffix", "")
                 
-                # 여기서 봇이 의도하는 포맷대로 결합 (일반적으로 접두사 뒤에 공백 1개)
                 full_prefix = prefix_format.format(symbol=symbol)
                 final_nick = f"{full_prefix} {base}{suffix}"
         
         # 5. 길이 제한 처리 (디스코드 닉네임 최대 32자)
         if len(final_nick) > 32:
             prefix_str, suffix_str = "", ""
-            # 적용하려던 접두사/접미사 길이 계산
             if highest_priority_role_config and not user_has_no_prefix_role and (symbol := highest_priority_role_config.get("prefix_symbol")):
                 p_format = highest_priority_role_config.get("prefix_format", "「{symbol}」")
                 s_format = highest_priority_role_config.get("suffix", "")
                 prefix_str = f"{p_format.format(symbol=symbol)} "
                 suffix_str = s_format
             
-            # 기본 이름(base)을 잘라서 길이를 맞춤
             allowed_base_len = 32 - (len(prefix_str) + len(suffix_str))
             if allowed_base_len > 0:
                 base = base[:allowed_base_len]
                 final_nick = f"{prefix_str}{base}{suffix_str}"
             else:
-                # 접두사가 너무 길면 그냥 자름
                 final_nick = final_nick[:32]
             
         return final_nick
