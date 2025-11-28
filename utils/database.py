@@ -417,3 +417,29 @@ async def remove_sticky_message(channel_id: int):
     await supabase.table('sticky_messages').delete().eq('channel_id', channel_id).execute()
     _sticky_messages_cache.pop(channel_id, None)
     logger.info(f"📌 채널(ID: {channel_id})의 고정 임베드 메시지 설정을 삭제했습니다.")
+
+
+
+
+
+# 1회
+
+@supabase_retry_handler()
+async def join_event_participant(user_id: int) -> bool:
+    """이벤트 참가 신청 (성공 시 True, 이미 참가 중이면 False)"""
+    try:
+        await supabase.table('event_participants').insert({"user_id": user_id}).execute()
+        return True
+    except Exception:
+        return False
+
+@supabase_retry_handler()
+async def get_event_participants() -> List[int]:
+    """이벤트 참가자 ID 목록 반환"""
+    response = await supabase.table('event_participants').select('user_id').execute()
+    return [int(row['user_id']) for row in response.data] if response.data else []
+
+@supabase_retry_handler()
+async def clear_event_participants():
+    """(이벤트 종료 후) 참가자 데이터 초기화"""
+    await supabase.table('event_participants').delete().neq('user_id', 0).execute()
