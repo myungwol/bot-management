@@ -1399,6 +1399,7 @@ ADMIN_ACTION_MAP = {
     "pet_admin_levelup": "[펫] 펫 1레벨업 (테스트용)",
     "pet_level_set": "[펫] 펫 레벨 설정 (테스트용)",
     "exploration_complete_now": "[펫] 펫 탐사 즉시 완료 (테스트용)",
+    "shop_add_role": "[상점] 역할 상품 추가",
     "boss_spawn_test": "[보스] 강제 소환 (테스트용)",
     "boss_defeat_test": "[보스] 강제 처치 (테스트용)",
 }
