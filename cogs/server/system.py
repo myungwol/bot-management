@@ -413,6 +413,7 @@ class ServerSystem(commands.Cog):
                 logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
                 await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
 
+# ▼▼▼ [수정] 기존의 coin/xp/level 처리 로직을 지우고 이 코드로 교체하세요 ▼▼▼
         elif action in ["coin_give", "coin_take", "xp_give", "level_set", "item_give"]:
             if not user: return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션이 필요합니다.", ephemeral=True)
             
@@ -440,6 +441,8 @@ class ServerSystem(commands.Cog):
                 db_key = f"xp_admin_update_request_{user.id}"
                 payload = {"exact_level": level, "timestamp": time.time()}
                 response_message = f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다."
+            
+            # [추가된 부분] 아이템 지급 로직
             elif action == "item_give":
                 if not item_name: return await interaction.followup.send("❌ `item_name` 옵션에 아이템 이름을 입력해야 합니다.", ephemeral=True)
                 if not amount: return await interaction.followup.send("❌ `amount` 옵션에 수량을 입력해야 합니다.", ephemeral=True)
