@@ -1444,15 +1444,13 @@ UI_STRINGS = {
             {"key": "item", "title_suffix": " - 아이템", "label": "아이템", "emoji": "📦"},
             {"key": "gear", "title_suffix": " - 장비", "label": "장비", "emoji": "⚒️"},
             {"key": "pet", "title_suffix": " - 펫 아이템", "label": "펫 아이템", "emoji": "🐾"},
-            
+            {"key": "seed", "title_suffix": " - 씨앗", "label": "씨앗", "emoji": "🌱"},
+
             # Row 1 (5개)
             {"key": "fish", "title_suffix": " - 어항", "label": "어항", "emoji": "🐠"},
-            {"key": "seed", "title_suffix": " - 씨앗", "label": "씨앗", "emoji": "🌱"},
             {"key": "crop", "title_suffix": " - 작물", "label": "작물", "emoji": "🌾"},
             {"key": "mineral", "title_suffix": " - 광물", "label": "광물", "emoji": "💎"},
             {"key": "food", "title_suffix": " - 음식", "label": "음식", "emoji": "🍲"},
-            
-            # Row 2 (1개)
             {"key": "loot", "title_suffix": " - 전리품", "label": "전리품", "emoji": "🏆"}
         ],
         "info_tab": {
