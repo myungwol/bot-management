@@ -1246,6 +1246,13 @@ UI_PANEL_COMPONENTS = [
 ]
 # [복구] USABLE_ITEMS (아이템 정의)
 USABLE_ITEMS = {
+    "item_role_selector": {
+        "name": "역할 선택권",
+        "type": "role_selector",
+        "description": "사용하면 상점에 있는 역할 중 하나를 선택하여 획득할 수 있습니다.",
+        "log_embed_key": "log_item_use_role_selector", # 로그가 필요하다면 추가
+        "log_channel_key": "log_item_role_selector"
+    }
     "item_warning_deduction": {
       "name": "벌점 차감권",
       "type": "deduct_warning",
