@@ -186,12 +186,12 @@ class ServerSystem(commands.Cog):
         boss_type="[보스] 대상으로 할 보스의 종류를 선택하세요.",
         channel="[채널/통계] 작업에 필요한 채널을 선택하세요.",
         role="[역할/통계] 작업에 필요한 역할을 선택하세요.",
-        user="[코인/XP/레벨/펫] 대상을 지정하세요.",
+        user="[코인/XP/레벨/펫/아이템] 대상을 지정하세요.",
         amount="[코인/XP/아이템] 지급 또는 차감할 수량을 입력하세요.",
-        item_name="[아이템] 지급할 아이템의 정확한 이름을 입력하세요.",
         level="[레벨/펫] 설정할 레벨을 입력하세요.",
         stat_type="[통계] 표시할 통계 유형을 선택하세요.",
-        template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)"
+        template="[통계] 채널 이름 형식을 지정하세요. (예: 👤 유저: {count}명)",
+        item_name="[아이템] 지급할 아이템의 정확한 이름을 입력하세요."
     )
     @app_commands.autocomplete(action=setup_action_autocomplete)
     @app_commands.choices(
@@ -214,11 +214,9 @@ class ServerSystem(commands.Cog):
                     channel: Optional[discord.TextChannel | discord.VoiceChannel | discord.ForumChannel] = None,
                     role: Optional[discord.Role] = None, user: Optional[discord.Member] = None,
                     amount: Optional[app_commands.Range[int, 1, None]] = None,
-                    # ▼▼▼ [추가] item_name 인자 추가 ▼▼▼
-                    item_name: Optional[str] = None,
-                    # ▲▲▲
                     level: Optional[app_commands.Range[int, 1, None]] = None,
-                    stat_type: Optional[str] = None, template: Optional[str] = None):
+                    stat_type: Optional[str] = None, template: Optional[str] = None,
+                    item_name: Optional[str] = None):
         await interaction.response.defer(ephemeral=True)
         
         logger.info(f"[Admin Command] '{interaction.user}' (ID: {interaction.user.id})님이 'setup' 명령어를 실행했습니다. (action: {action})")
@@ -304,7 +302,6 @@ class ServerSystem(commands.Cog):
             await interaction.followup.send(f"✅ **{friendly_name}**을(를) `{channel.mention}` 채널로 설정했습니다.", ephemeral=True)
             return
 
-        # ▼▼▼ [핵심 추가] 특정 패널 재설치 로직 ▼▼▼
         elif action.startswith("panel_regenerate:"):
             panel_key = action.split(":", 1)[1]
             config = SETUP_COMMAND_MAP.get(panel_key)
@@ -314,9 +311,7 @@ class ServerSystem(commands.Cog):
             
             friendly_name = config.get('friendly_name', panel_key)
             
-            # 게임 봇 패널인지 관리 봇 패널인지 확인
             if "[게임]" in friendly_name or "[보스]" in friendly_name:
-                # 게임 봇 패널: DB에 요청
                 db_key = f"panel_regenerate_request_{panel_key}"
                 timestamp = datetime.now(timezone.utc).timestamp()
                 try:
@@ -327,7 +322,6 @@ class ServerSystem(commands.Cog):
                     logger.error(f"패널 재설치 요청 중 오류: {e}", exc_info=True)
                     await interaction.followup.send("❌ 패널 재설치 요청 중 오류가 발생했습니다.", ephemeral=True)
             else:
-                # 관리 봇 패널: 직접 실행
                 cog_name = config.get("cog_name")
                 channel_db_key = config.get("key")
                 
@@ -352,7 +346,6 @@ class ServerSystem(commands.Cog):
                     logger.error(f"패널 재설치 실행 중 오류: {e}", exc_info=True)
                     await interaction.followup.send(f"❌ 패널 재설치 중 예기치 않은 오류가 발생했습니다.", ephemeral=True)
             return
-        # ▲▲▲ [추가 완료] ▲▲▲
 
         if action == "game_data_reload":
             db_key = "game_data_reload_request"
@@ -413,7 +406,7 @@ class ServerSystem(commands.Cog):
                 logger.error(f"서버 ID 저장 중 오류 발생: {e}", exc_info=True)
                 await interaction.followup.send("❌ 서버 ID를 데이터베이스에 저장하는 중 오류가 발생했습니다.")
 
-# ▼▼▼ [수정] 기존의 coin/xp/level 처리 로직을 지우고 이 코드로 교체하세요 ▼▼▼
+        # [수정] 아이템 지급(item_give) 포함
         elif action in ["coin_give", "coin_take", "xp_give", "level_set", "item_give"]:
             if not user: return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션이 필요합니다.", ephemeral=True)
             
@@ -441,8 +434,6 @@ class ServerSystem(commands.Cog):
                 db_key = f"xp_admin_update_request_{user.id}"
                 payload = {"exact_level": level, "timestamp": time.time()}
                 response_message = f"✅ {user.mention}님의 레벨을 **{level}**로 설정하도록 게임 봇에게 요청했습니다."
-            
-            # [추가된 부분] 아이템 지급 로직
             elif action == "item_give":
                 if not item_name: return await interaction.followup.send("❌ `item_name` 옵션에 아이템 이름을 입력해야 합니다.", ephemeral=True)
                 if not amount: return await interaction.followup.send("❌ `amount` 옵션에 수량을 입력해야 합니다.", ephemeral=True)
@@ -517,6 +508,25 @@ class ServerSystem(commands.Cog):
                 logger.error(f"펫 레벨 설정 요청 중 오류: {e}", exc_info=True)
                 await interaction.followup.send("❌ 펫 레벨 설정 요청 중 오류가 발생했습니다.", ephemeral=True)
             return
+        
+        elif action == "pet_force_return":
+            if not user:
+                return await interaction.followup.send("❌ 이 작업을 수행하려면 `user` 옵션을 지정해야 합니다.", ephemeral=True)
+            
+            try:
+                db_key = f"pet_force_return_request_{user.id}"
+                await save_config_to_db(db_key, time.time())
+                
+                logger.info(f"관리자({interaction.user.id})가 {user.id}의 펫 강제 귀환을 요청했습니다.")
+                await interaction.followup.send(
+                    f"✅ {user.mention}님의 펫을 **강제 귀환(초기화)**하도록 요청했습니다.\n"
+                    f"탐사 보상은 지급되지 않으며, 펫 상태가 '대기'로 변경됩니다.", 
+                    ephemeral=True
+                )
+            except Exception as e:
+                logger.error(f"펫 강제 귀환 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 요청 중 오류가 발생했습니다.", ephemeral=True)
+            return
 
         elif action == "exploration_complete_now":
             if not user:
@@ -537,6 +547,38 @@ class ServerSystem(commands.Cog):
                 await interaction.followup.send("❌ 펫 탐사 즉시 완료 요청 중 오류가 발생했습니다.", ephemeral=True)
             return
         
+        elif action == "shop_add_role":
+            if not role:
+                return await interaction.followup.send("❌ 판매할 `role`(역할)을 선택해야 합니다.", ephemeral=True)
+            if not amount:
+                return await interaction.followup.send("❌ `amount`(가격)을 입력해야 합니다.", ephemeral=True)
+            
+            bot_member = interaction.guild.get_member(self.bot.user.id)
+            if role.position >= bot_member.top_role.position:
+                return await interaction.followup.send("❌ 봇보다 상위 역할은 상점에 등록할 수 없습니다.", ephemeral=True)
+
+            try:
+                db_key = f"shop_add_role_request_{role.id}"
+                payload = {
+                    "role_id": role.id,
+                    "role_name": role.name,
+                    "price": amount,
+                    "timestamp": time.time()
+                }
+                await save_config_to_db(db_key, payload)
+                
+                logger.info(f"관리자({interaction.user.id})가 역할 상점 등록을 요청했습니다: {role.name} ({amount}코인)")
+                await interaction.followup.send(
+                    f"✅ **@{role.name}** 역할을 상점의 **[역할]** 카테고리에 추가하도록 요청했습니다.\n"
+                    f"**가격:** `{amount:,}` 코인\n"
+                    "잠시 후 게임 봇이 설정을 적용합니다.", 
+                    ephemeral=True
+                )
+            except Exception as e:
+                logger.error(f"역할 상점 등록 요청 중 오류: {e}", exc_info=True)
+                await interaction.followup.send("❌ 요청 중 오류가 발생했습니다.", ephemeral=True)
+            return
+
         elif action == "template_edit":
             all_embeds = await get_all_embeds()
             if not all_embeds: return await interaction.followup.send("❌ DB에 편집 가능한 임베드 템플릿이 없습니다.", ephemeral=True)
